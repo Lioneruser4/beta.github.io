@@ -1,95 +1,130 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flappy Bird</title>
-    <style>
-        canvas { 
-            display: block; 
-            margin: 0 auto; 
-            background: #000;
-        }
-    </style>
-</head>
-<body>
-    <canvas id="canvas" width="320" height="480"></canvas>
-    <script>
-        var canvas = document.getElementById("canvas");
-        var context = canvas.getContext("2d");
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
-        var bird = new Image();
-        bird.src = "bird.png"; // kuşun resmi
+namespace FlappyBird
+{
+    public partial class GameForm : Form
+    {
+        private const int Gravity = 8;
+        private const int JumpSpeed = -15;
+        private const int PipeSpeed = 5;
+        private const int PipeInterval = 120;
+        private const int PipeWidth = 80;
 
-        var bg = new Image();
-        bg.src = "bg.png"; // arka plan resmi
+        private int score = 0;
+        private bool isGameOver = false;
+        private List<PictureBox> pipes = new List<PictureBox>();
 
-        var pipeNorth = new Image();
-        pipeNorth.src = "pipeNorth.png"; // üst boru resmi
-
-        var pipeSouth = new Image();
-        pipeSouth.src = "pipeSouth.png"; // alt boru resmi
-
-        var gap = 85;
-        var constant = pipeNorth.height + gap;
-
-        var bX = 10;
-        var bY = 150;
-
-        var gravity = 1.5;
-
-        var score = 0;
-
-        document.addEventListener("keydown", moveUp);
-
-        function moveUp() {
-            bY -= 25;
+        public GameForm()
+        {
+            InitializeComponent();
+            InitializeGame();
         }
 
-        var pipe = [];
+        private void InitializeGame()
+        {
+            // Setup bird
+            var bird = new PictureBox
+            {
+                Size = new Size(30, 30),
+                Location = new Point(50, 200),
+                BackgroundImage = Properties.Resources.bird,
+                BackgroundImageLayout = ImageLayout.Stretch
+            };
+            Controls.Add(bird);
 
-        pipe[0] = {
-            x : canvas.width,
-            y : 0
-        };
+            // Add event handler for jumping
+            KeyDown += (sender, e) =>
+            {
+                if (e.KeyCode == Keys.Space)
+                {
+                    bird.Top += JumpSpeed;
+                }
+            };
 
-        function draw() {
-            context.drawImage(bg, 0, 0);
+            // Game loop
+            var gameTimer = new Timer { Interval = 20 };
+            gameTimer.Tick += (sender, e) =>
+            {
+                // Bird's gravity
+                bird.Top += Gravity;
 
-            for(var i = 0; i < pipe.length; i++) {
-                context.drawImage(pipeNorth, pipe[i].x, pipe[i].y);
-                context.drawImage(pipeSouth, pipe[i].x, pipe[i].y + constant);
-
-                pipe[i].x--;
-
-                if(pipe[i].x == 125) {
-                    pipe.push({
-                        x : canvas.width,
-                        y : Math.floor(Math.random() * pipeNorth.height) - pipeNorth.height
-                    });
+                // Check for collisions
+                foreach (var pipe in pipes)
+                {
+                    if (bird.Bounds.IntersectsWith(pipe.Bounds) || bird.Bounds.IntersectsWith(pipe.Bounds))
+                    {
+                        EndGame();
+                        return;
+                    }
                 }
 
-                if(bX + bird.width >= pipe[i].x && bX <= pipe[i].x + pipeNorth.width && (bY <= pipe[i].y + pipeNorth.height || bY + bird.height >= pipe[i].y + constant) || bY + bird.height >= canvas.height) {
-                    location.reload(); // Yeniden yükleme
+                // Remove off-screen pipes
+                foreach (var pipe in pipes.ToList())
+                {
+                    if (pipe.Right < 0)
+                    {
+                        pipes.Remove(pipe);
+                        Controls.Remove(pipe);
+                    }
+                    else
+                    {
+                        pipe.Left -= PipeSpeed;
+                    }
                 }
 
-                if(pipe[i].x == 5) {
+                // Add new pipes
+                if (score % PipeInterval == 0)
+                {
+                    AddPipe();
+                }
+
+                // Update score
+                if (!isGameOver)
+                {
                     score++;
+                    scoreLabel.Text = "Score: " + score;
                 }
-            }
-
-            context.drawImage(bird, bX, bY);
-
-            bY += gravity;
-
-            context.fillStyle = "#FFF";
-            context.font = "20px Verdana";
-            context.fillText("Score : " + score, 10, canvas.height - 20);
-
-            requestAnimationFrame(draw);
+            };
+            gameTimer.Start();
         }
 
-        draw();
-    </script>
-</body>
-</html>
+        private void AddPipe()
+        {
+            // Upper pipe
+            var upperPipe = new PictureBox
+            {
+                Size = new Size(PipeWidth, 300),
+                Location = new Point(Width, -100),
+                BackgroundImage = Properties.Resources.pipe,
+                BackgroundImageLayout = ImageLayout.Stretch
+            };
+            Controls.Add(upperPipe);
+            pipes.Add(upperPipe);
+
+            // Lower pipe
+            var lowerPipe = new PictureBox
+            {
+                Size = new Size(PipeWidth, 300),
+                Location = new Point(Width, 400),
+                BackgroundImage = Properties.Resources.pipe,
+                BackgroundImageLayout = ImageLayout.Stretch,
+                SizeMode = PictureBoxSizeMode.StretchImage
+            };
+            lowerPipe.Image.RotateFlip(RotateFlipType.Rotate180FlipX);
+            Controls.Add(lowerPipe);
+            pipes.Add(lowerPipe);
+        }
+
+        private void EndGame()
+        {
+            isGameOver = true;
+            MessageBox.Show("Game Over! Your score: " + score);
+        }
+    }
+}
