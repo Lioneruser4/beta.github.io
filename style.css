@@ -1,0 +1,67 @@
+/* Tam Ekran və Mobil Uyğunluq */
+body {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f0f0f0;
+    font-family: sans-serif;
+    overflow: hidden; /* Tam ekran üçün hər hansı kaydırmanı ləğv edir */
+}
+
+.game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 95vw; /* Genişlik 95% */
+    max-width: 500px; /* Maksimum genişlik masaüstü üçün */
+    padding: 10px;
+}
+
+.score-board {
+    text-align: center;
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Oyun Şəbəkəsi (Grid) */
+.grid {
+    width: 100%;
+    height: 100vw; /* Kvadrat formalı grid üçün (mobil üçün yaxşı işləyir) */
+    max-height: 500px; /* Maksimum hündürlük masaüstü üçün */
+    display: flex;
+    flex-wrap: wrap;
+    border: 3px solid #333;
+    background-color: #eee;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+}
+
+.square {
+    /* JavaScript-də hesablanacaq */
+    font-size: 30px; 
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: grab;
+    transition: transform 0.2s ease, opacity 0.5s ease;
+    user-select: none; /* Emojilərin seçilməsini bloklayır */
+    touch-action: none; /* Mobil cihazlarda daha yaxşı drag-drop üçün */
+}
+
+/* Patlama (Explosion) Effekti */
+.is-blank {
+    opacity: 0;
+    background-color: transparent !important;
+    pointer-events: none;
+}
+
+/* Sürüşdürmə effekti üçün (opsiyonel) */
+.drag-start {
+    opacity: 0.5;
+    transform: scale(0.9);
+}
