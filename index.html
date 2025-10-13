@@ -1,130 +1,20 @@
-using System;
-using System.Drawing;
-using System.Windows.Forms;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+<!DOCTYPE html>
+<html lang="az">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emoji Crush</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="score-board">
+            <h2>Xal: <span id="score">0</span></h2>
+        </div>
+        <div class="grid" id="game-grid">
+            </div>
+    </div>
 
-namespace FlappyBird
-{
-    public partial class GameForm : Form
-    {
-        private const int Gravity = 8;
-        private const int JumpSpeed = -15;
-        private const int PipeSpeed = 5;
-        private const int PipeInterval = 120;
-        private const int PipeWidth = 80;
-
-        private int score = 0;
-        private bool isGameOver = false;
-        private List<PictureBox> pipes = new List<PictureBox>();
-
-        public GameForm()
-        {
-            InitializeComponent();
-            InitializeGame();
-        }
-
-        private void InitializeGame()
-        {
-            // Setup bird
-            var bird = new PictureBox
-            {
-                Size = new Size(30, 30),
-                Location = new Point(50, 200),
-                BackgroundImage = Properties.Resources.bird,
-                BackgroundImageLayout = ImageLayout.Stretch
-            };
-            Controls.Add(bird);
-
-            // Add event handler for jumping
-            KeyDown += (sender, e) =>
-            {
-                if (e.KeyCode == Keys.Space)
-                {
-                    bird.Top += JumpSpeed;
-                }
-            };
-
-            // Game loop
-            var gameTimer = new Timer { Interval = 20 };
-            gameTimer.Tick += (sender, e) =>
-            {
-                // Bird's gravity
-                bird.Top += Gravity;
-
-                // Check for collisions
-                foreach (var pipe in pipes)
-                {
-                    if (bird.Bounds.IntersectsWith(pipe.Bounds) || bird.Bounds.IntersectsWith(pipe.Bounds))
-                    {
-                        EndGame();
-                        return;
-                    }
-                }
-
-                // Remove off-screen pipes
-                foreach (var pipe in pipes.ToList())
-                {
-                    if (pipe.Right < 0)
-                    {
-                        pipes.Remove(pipe);
-                        Controls.Remove(pipe);
-                    }
-                    else
-                    {
-                        pipe.Left -= PipeSpeed;
-                    }
-                }
-
-                // Add new pipes
-                if (score % PipeInterval == 0)
-                {
-                    AddPipe();
-                }
-
-                // Update score
-                if (!isGameOver)
-                {
-                    score++;
-                    scoreLabel.Text = "Score: " + score;
-                }
-            };
-            gameTimer.Start();
-        }
-
-        private void AddPipe()
-        {
-            // Upper pipe
-            var upperPipe = new PictureBox
-            {
-                Size = new Size(PipeWidth, 300),
-                Location = new Point(Width, -100),
-                BackgroundImage = Properties.Resources.pipe,
-                BackgroundImageLayout = ImageLayout.Stretch
-            };
-            Controls.Add(upperPipe);
-            pipes.Add(upperPipe);
-
-            // Lower pipe
-            var lowerPipe = new PictureBox
-            {
-                Size = new Size(PipeWidth, 300),
-                Location = new Point(Width, 400),
-                BackgroundImage = Properties.Resources.pipe,
-                BackgroundImageLayout = ImageLayout.Stretch,
-                SizeMode = PictureBoxSizeMode.StretchImage
-            };
-            lowerPipe.Image.RotateFlip(RotateFlipType.Rotate180FlipX);
-            Controls.Add(lowerPipe);
-            pipes.Add(lowerPipe);
-        }
-
-        private void EndGame()
-        {
-            isGameOver = true;
-            MessageBox.Show("Game Over! Your score: " + score);
-        }
-    }
-}
+    <script src="script.js"></script>
+</body>
+</html>
