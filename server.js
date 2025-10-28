@@ -1,4 +1,4 @@
-// Dosya Adı: server.js
+// Dosya Adı: server.js (YENİ TASARIM)
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -18,7 +18,6 @@ const io = new Server(server, {
 
 const rooms = {};
 
-// Level'a göre bomba sayısını belirleyen fonksiyon
 function getBombCount(level) {
     if (level === 1) return 2;
     if (level === 2) return 3;
@@ -26,7 +25,6 @@ function getBombCount(level) {
     return 2;
 }
 
-// Rastgele bomba indexleri seçen fonksiyon
 function selectRandomBombs(boardSize, bombCount) {
     const indices = Array.from({ length: boardSize }, (_, i) => i);
     for (let i = indices.length - 1; i > 0; i--) {
@@ -44,7 +42,7 @@ function generateRoomCode() {
     return code;
 }
 
-const LEVELS_SIZE = [12, 16, 20]; // Board boyutları
+const LEVELS_SIZE = [12, 16, 20]; 
 
 io.on('connection', (socket) => {
     
@@ -60,6 +58,8 @@ io.on('connection', (socket) => {
             currentLevel: 1,
             hostBombs: null, 
             guestBombs: null, 
+            currentTurn: 0, // 0: Host, 1: Guest (YENİ)
+            boardState: [], // Oyun tahtasının güncel durumu (YENİ)
         };
         socket.join(code);
         socket.emit('roomCreated', code);
@@ -83,7 +83,6 @@ io.on('connection', (socket) => {
         const boardSize = LEVELS_SIZE[level - 1];
         const bombCount = getBombCount(level);
         
-        // OTOMATİK BOMBA SEÇİMİ
         room.hostBombs = selectRandomBombs(boardSize, bombCount);
         room.guestBombs = selectRandomBombs(boardSize, bombCount);
 
@@ -92,21 +91,42 @@ io.on('connection', (socket) => {
             { id: room.guestId, username: room.guestUsername, isHost: false }
         ];
 
-        // Oyun Başlangıcı Sinyali (Bomba verileri ile birlikte)
+        // Oyun Başlangıcı Sinyali
         io.to(code).emit('gameStart', {
             players, 
             hostBombs: room.hostBombs,
             guestBombs: room.guestBombs,
-            level: level
+            level: level,
+            initialTurn: room.currentTurn, // Başlangıç sırası
         });
     });
 
-    socket.on('gameData', (data) => {
-        const code = data.roomCode;
-        if (code) {
-            // Hareketi sadece rakibe ilet
-            socket.to(code).emit('gameData', data);
+    // KRİTİK: Sadece MOVE sinyalini dinle ve sırayı sunucuda değiştir
+    socket.on('MOVE', (data) => {
+        const room = rooms[data.roomCode];
+        if (!room) return;
+
+        // İstemciden gelen hareket bilgisini doğrula (Güvenlik için basit kontrol)
+        const isHostPlayer = socket.id === room.hostId;
+        const expectedTurn = isHostPlayer ? 0 : 1;
+
+        if (room.currentTurn !== expectedTurn) {
+             // Sıra oyuncuda değilse, hareket reddedilir (hata mesajı yok, sadece yoksayılır)
+             return;
         }
+        
+        // Hareketi her iki istemciye de gönder (client'lar uygulayacak)
+        io.to(data.roomCode).emit('playerMove', {
+            cardIndex: data.cardIndex,
+            // Sadece hareketin kimden geldiği ve hangi kart olduğu bilgisi gönderilir.
+        });
+        
+        // KRİTİK: Sırayı sunucuda değiştir
+        room.currentTurn = room.currentTurn === 0 ? 1 : 0;
+        
+        // KRİTİK: Yeni sıra bilgisini tüm client'lara gönder
+        io.to(data.roomCode).emit('turnChange', { newTurn: room.currentTurn });
+
     });
 
     socket.on('nextLevel', (data) => {
@@ -115,19 +135,18 @@ io.on('connection', (socket) => {
         
         if (room) {
             room.currentLevel = newLevel;
-
-            // Yeni Seviye için OTOMATİK bomba seçimi
             const boardSize = LEVELS_SIZE[newLevel - 1];
             const bombCount = getBombCount(newLevel);
             
             room.hostBombs = selectRandomBombs(boardSize, bombCount);
             room.guestBombs = selectRandomBombs(boardSize, bombCount);
-            
-            // Tüm odaya yeni seviye ve bomba bilgilerini ilet
+            room.currentTurn = 0; // Yeni seviyede Host başlar
+
             io.to(roomCode).emit('nextLevel', { 
                 newLevel,
                 hostBombs: room.hostBombs,
-                guestBombs: room.guestBombs
+                guestBombs: room.guestBombs,
+                initialTurn: 0,
             });
         }
     });
