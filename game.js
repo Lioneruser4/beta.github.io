@@ -1,4 +1,4 @@
-// Dosya Adı: game.js (BOMBALI HAFIZA İSTEMCİ V3 - TAM)
+// Dosya Adı: game.js (BOMBALI HAFIZA İSTEMCİ V3 - KART SEÇME DÜZELTME)
 let socket;
 let currentRoomCode = '';
 let isHost = false; 
@@ -82,7 +82,7 @@ function initializeGame(boardSize, hostBombs, guestBombs, currentLevel, initialT
     
     for (let i = cardContents.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [cardContents[i], cardContents[j]] = [cardContents[i], cardContents[j]];
+        [cardContents[i], cardContents[j]] = [cardContents[j], cardContents[i]];
     }
 
     gameData.board = cardContents;
@@ -97,12 +97,15 @@ function drawBoard() {
     gameBoardEl.className = `grid w-full max-w-sm mx-auto memory-board grid-cols-${columns}`; 
     gameBoardEl.innerHTML = '';
     
+    const myTurnId = isHost ? 0 : 1;
+    const isMyTurn = gameData.turn === myTurnId; // Sıra bende mi?
+
     gameData.board.forEach((content, index) => {
         const cardContainer = document.createElement('div');
         cardContainer.className = 'card-container aspect-square';
 
         const card = document.createElement('div');
-        card.className = `card cursor-pointer`;
+        card.className = `card`; // cursor-pointer'ı aşağıda ekleyeceğiz
         card.dataset.index = index;
 
         const front = document.createElement('div');
@@ -112,7 +115,6 @@ function drawBoard() {
         const back = document.createElement('div');
         back.className = 'card-face back';
         
-        // Bomba mı emoji mi olduğunu belirle
         const isOpponentBomb = isHost ? gameData.guestBombs.includes(index) : gameData.hostBombs.includes(index);
         
         let displayContent = content;
@@ -123,15 +125,18 @@ function drawBoard() {
 
         back.textContent = displayContent;
 
-
         card.appendChild(front);
         card.appendChild(back);
         cardContainer.appendChild(card);
         
-        // Açık kartlar kontrolü
-        if (gameData.openedCards.includes(index)) {
+        const isOpened = gameData.openedCards.includes(index);
+
+        if (isOpened) {
+            // Kart açıksa
             card.classList.add('flipped');
-        } else {
+        } else if (isMyTurn && !gameData.isAnimating) {
+            // SADECE sıra bende ise, animasyon yoksa ve kapalıysa tıklanabilir
+            card.classList.add('cursor-pointer');
             cardContainer.addEventListener('click', handleCardClick);
         }
         
@@ -178,6 +183,7 @@ function handleCardClick(event) {
     const cardContainer = event.currentTarget; 
     const cardElement = cardContainer.querySelector('.card');
     
+    // Zaten 'flipped' ise veya 'card' yoksa durdur.
     if (!cardElement || cardElement.classList.contains('flipped')) return; 
     
     const cardIndex = parseInt(cardElement.dataset.index);
@@ -186,6 +192,7 @@ function handleCardClick(event) {
     const isMyTurn = gameData.turn === myTurnId;
         
     if (!isMyTurn) {
+         // Bu kontrol teorik olarak drawBoard tarafından engellenmeli, ama ekstra koruma
          showGlobalMessage("Sıra sende değil.", true);
          return;
     }
@@ -229,6 +236,7 @@ async function handleGameStateUpdate(data) {
     gameData.turn = newTurn; // Sırayı hemen güncelle
 
     // 3. Mesaj Göster
+    // Sıra değiştiği için, yeni sıraya göre konuşulur. Eğer sıra değişmediyse (bomba yüzünden), konuşan kişinin kendisi olduğu varsayılır.
     const playerWhoMoved = (data.newTurn === (isHost ? 0 : 1)) ? 'Rakibiniz' : 'SİZ'; 
     
     if (hitBomb) {
