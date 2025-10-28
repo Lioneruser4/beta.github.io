@@ -8,6 +8,7 @@ const server = http.createServer(app);
 
 app.use(express.static(__dirname));
 
+// CORS DÜZELTME: Tüm kaynaklardan gelen bağlantılara izin verir
 const io = new Server(server, {
     cors: {
         origin: "*",
@@ -81,7 +82,8 @@ io.on('connection', (socket) => {
                 room.guestBombs = bombs;
             }
             
-            // Bomb seçiminin diğer oyuncuya iletilmesi (Bilgilendirme)
+            // Bomb seçiminin diğer oyuncuya iletilmesi (UI güncellemesi için)
+            // Kendi sinyali kendisine geri gitmeyecektir (socket.to(code))
             socket.to(roomCode).emit('opponentBombSelectionComplete', { 
                 isHost: isHost
             });
@@ -108,8 +110,16 @@ io.on('connection', (socket) => {
 
     socket.on('nextLevel', (data) => {
         const { roomCode, newLevel } = data;
-        // Host seviye atlama sinyali gönderdiğinde tüm odaya ilet
-        io.to(roomCode).emit('nextLevel', { newLevel });
+        const room = rooms[roomCode];
+        
+        if (room) {
+            // Bomba listelerini yeni seçim için sıfırla
+            room.hostBombs = null;
+            room.guestBombs = null;
+            
+            // Host seviye atlama sinyali gönderdiğinde tüm odaya ilet
+            io.to(roomCode).emit('nextLevel', { newLevel });
+        }
     });
 
     socket.on('disconnect', () => {
@@ -122,11 +132,9 @@ io.on('connection', (socket) => {
                     io.to(opponentId).emit('opponentLeft', 'Rakibiniz bağlantıyı kesti. Lobiye dönülüyor.');
                 }
                 
-                // Oda sahibiyse odayı sil
                 if (room.hostId === socket.id) {
                     delete rooms[code];
                 } 
-                // Misafirse odadaki yerini boşalt
                 else if (room.guestId === socket.id) {
                     room.playerCount = 1;
                     room.guestId = null;
