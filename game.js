@@ -1,56 +1,31 @@
-// Dosya Adı: game.js (KİLİT KALDIRILDI)
+// Dosya Adı: game.js (DOMINO İSTEMCİ)
 let socket;
 let currentRoomCode = '';
 let isHost = false; 
 let opponentName = '';
-// isProcessingMove KALDIRILDI
+let gameData = {};
+let selectedTileIndex = -1; // Seçilen taşın indeksi
 
-// --- DOM Referansları (Aynı) ---
+// --- DOM Referansları ---
 const screens = { 
     lobby: document.getElementById('lobby'), 
     wait: document.getElementById('waitScreen'), 
     game: document.getElementById('gameScreen') 
 };
-const gameBoardEl = document.getElementById('gameBoard');
 const turnStatusEl = document.getElementById('turnStatus');
 const actionMessageEl = document.getElementById('actionMessage');
-const myLivesEl = document.getElementById('myLives');
-const opponentLivesEl = document.getElementById('opponentLives');
 const opponentNameEl = document.getElementById('opponentName');
 const roleStatusEl = document.getElementById('roleStatus');
+const playerHandEl = document.getElementById('playerHand');
+const tableEl = document.getElementById('dominoTable');
+const deckSizeEl = document.getElementById('deckSize');
+const opponentTileCountEl = document.getElementById('opponentTileCount');
+const drawBtn = document.getElementById('drawTileBtn');
+const playLeftBtn = document.getElementById('playLeftBtn');
+const playRightBtn = document.getElementById('playRightBtn');
 
-// SESLER (Aynı)
-const audioBomb = new Audio('sound1.mp3'); 
-const audioEmoji = new Audio('sound2.mp3');
-const audioWait = new Audio('sound3.mp3'); 
 
-function playSound(audioElement) {
-    if (!audioElement) return;
-    const clone = audioElement.cloneNode();
-    clone.volume = 0.5;
-    clone.play().catch(() => {});
-}
-
-// --- OYUN DURUMU ---
-let level = 1; 
-const LEVELS = [12, 16, 20];
-const BOMB_COUNTS = [2, 3, 4];
-let gameStage = 'PLAY'; 
-
-let gameData = {
-    board: [], 
-    turn: 0,   
-    hostLives: 2,
-    guestLives: 2,
-    cardsLeft: 0,
-    hostBombs: [], 
-    guestBombs: [],
-    isGameOver: false
-};
-
-const EMOTICONS = ['🙂', '😂', '😍', '😎', '🤩', '👍', '🎉', '🌟', '🍕', '🐱'];
-
-// --- TEMEL UI FONKSİYONLARI (Aynı) ---
+// --- TEMEL UI FONKSİYONLARI ---
 export function showScreen(screenId) {
     Object.values(screens).forEach(screen => screen && screen.classList.remove('active'));
     if (screens[screenId]) {
@@ -71,281 +46,194 @@ export function showGlobalMessage(message, isError = true) {
     setTimeout(() => { globalMessage.classList.add('hidden'); globalMessage.classList.remove('show'); }, 4000);
 }
 
-// --- OYUN MANTIĞI VE ÇİZİM ---
-
-function initializeGame(initialBoardSize, hostBombs, guestBombs, currentLevel, initialTurn) {
-    level = currentLevel;
-    gameData.hostBombs = hostBombs;
-    gameData.guestBombs = guestBombs;
-    
-    // Kart içerikleri oluşturma ve karıştırma
-    const pairs = initialBoardSize / 2; 
-    let cardContents = [];
-    for (let i = 0; i < pairs; i++) {
-        const emoji = EMOTICONS[i % EMOTICONS.length]; 
-        cardContents.push(emoji, emoji);
-    }
-    
-    for (let i = cardContents.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [cardContents[i], cardContents[j]] = [cardContents[i], cardContents[j]];
-    }
-
-    gameData.board = cardContents.map(content => ({
-        opened: false,
-        content: content,
-    }));
-
-    gameData.cardsLeft = initialBoardSize;
-
-    if (level === 1) {
-        gameData.hostLives = 2;
-        gameData.guestLives = 2;
-    }
-    
-    gameData.turn = initialTurn; 
-    gameData.isGameOver = false;
-    gameStage = 'PLAY'; 
+// --- DOMINO TAŞI GÖRSELLEŞTİRME ---
+function formatTile(tile) {
+    return `${tile.p1}:${tile.p2}`;
 }
 
-function drawBoard() {
-    gameBoardEl.className = 'grid w-full max-w-sm mx-auto memory-board'; 
-    gameBoardEl.style.gridTemplateColumns = 'repeat(4, 1fr)'; 
+function createTileElement(tile, isHand = true, index = -1) {
+    const div = document.createElement('div');
+    div.className = `domino-tile ${isHand ? 'cursor-pointer' : 'shadow-lg'}`;
+    div.textContent = formatTile(tile);
+    div.dataset.p1 = tile.p1;
+    div.dataset.p2 = tile.p2;
+    if (isHand) {
+        div.dataset.index = index;
+        div.addEventListener('click', handleTileSelect);
+    }
+    return div;
+}
 
-    gameBoardEl.innerHTML = '';
+function updateStatusDisplay(isMyTurn) {
+    opponentNameEl.textContent = opponentName;
+    roleStatusEl.textContent = isHost ? "Rolünüz: HOST" : "Rolünüz: GUEST";
     
-    gameData.board.forEach((cardState, index) => {
-        const cardContainer = document.createElement('div');
-        cardContainer.className = 'card-container aspect-square';
+    const leftEnd = gameData.table.length > 0 ? gameData.table[0].p1 : '?';
+    const rightEnd = gameData.table.length > 0 ? gameData.table[gameData.table.length - 1].p2 : '?';
 
-        const card = document.createElement('div');
-        card.className = `card cursor-pointer`;
-        card.dataset.index = index;
-
-        const front = document.createElement('div');
-        front.className = 'card-face front';
-        front.textContent = '?';
+    if (isMyTurn) {
+        turnStatusEl.textContent = 'SIRA SENDE!';
+        actionMessageEl.textContent = `Masa Uçları: [${leftEnd}] ve [${rightEnd}]. Hamle Yap!`;
+        turnStatusEl.classList.remove('text-red-600');
+        turnStatusEl.classList.add('text-green-600');
         
-        const back = document.createElement('div');
-        back.className = 'card-face back';
-        back.textContent = cardState.content;
+        // Hamle butonlarını aç
+        drawBtn.disabled = false;
+        playLeftBtn.disabled = selectedTileIndex === -1;
+        playRightBtn.disabled = selectedTileIndex === -1;
 
-
-        card.appendChild(front);
-        card.appendChild(back);
-        cardContainer.appendChild(card);
+    } else {
+        turnStatusEl.textContent = 'RAKİBİN SIRASI';
+        actionMessageEl.textContent = 'Lütfen Rakibini Bekle.';
+        turnStatusEl.classList.remove('text-green-600');
+        turnStatusEl.classList.add('text-red-600');
         
-        if (cardState.opened) {
-            card.classList.add('flipped');
-        } else {
-            cardContainer.addEventListener('click', handleCardClick);
+        // Hamle butonlarını kapat
+        drawBtn.disabled = true;
+        playLeftBtn.disabled = true;
+        playRightBtn.disabled = true;
+        selectedTileIndex = -1; // Seçimi temizle
+    }
+}
+
+function drawGame() {
+    // El Çizimi
+    playerHandEl.innerHTML = '';
+    gameData.myHand.forEach((tile, index) => {
+        const tileEl = createTileElement(tile, true, index);
+        if (index === selectedTileIndex) {
+            tileEl.classList.add('selected-tile');
         }
-        
-        gameBoardEl.appendChild(cardContainer);
+        playerHandEl.appendChild(tileEl);
     });
-    updateStatusDisplay();
-}
 
-function updateStatusDisplay() {
-    const myLives = isHost ? gameData.hostLives : gameData.guestLives;
-    const opponentLives = isHost ? gameData.guestLives : gameData.hostLives;
+    // Masa Çizimi
+    tableEl.innerHTML = '';
+    gameData.table.forEach(tile => {
+        tableEl.appendChild(createTileElement(tile, false));
+    });
+
+    // Durum Çizimi
+    deckSizeEl.textContent = gameData.deckSize;
+    const opponentHandSize = isHost ? gameData.guestHandSize : gameData.hostHandSize;
+    opponentTileCountEl.textContent = `${opponentHandSize} Taş`;
     
-    myLivesEl.textContent = '❤️'.repeat(Math.max(0, myLives));
-    opponentLivesEl.textContent = '❤️'.repeat(Math.max(0, opponentLives));
-
     const myTurnId = isHost ? 0 : 1;
-    const isMyTurn = gameData.turn === myTurnId;
-    
-    const bombCount = BOMB_COUNTS[level - 1];
-
-    if (gameStage === 'PLAY') {
-        const levelInfo = `Level ${level} (${LEVELS[level-1]} Kart, ${bombCount} Bomba)`;
-        
-        if (isMyTurn) {
-            turnStatusEl.textContent = 'SIRA SENDE!';
-            actionMessageEl.textContent = levelInfo + " - Bir kart aç!";
-            turnStatusEl.classList.remove('text-red-600');
-            turnStatusEl.classList.add('text-green-600');
-        } else {
-            turnStatusEl.textContent = 'RAKİBİN SIRASI';
-            actionMessageEl.textContent = levelInfo + " - Rakibini bekle.";
-            turnStatusEl.classList.remove('text-green-600');
-            turnStatusEl.classList.add('text-red-600');
-        }
-    } else if (gameStage === 'ENDED') {
-        turnStatusEl.textContent = "OYUN BİTTİ!";
-        actionMessageEl.textContent = "Sonuç bekleniyor...";
-    }
+    updateStatusDisplay(gameData.turn === myTurnId);
 }
 
 // --- HAREKET İŞLEYİCİLERİ ---
 
-function handleCardClick(event) {
-    
-    const cardContainer = event.currentTarget; 
-    const cardElement = cardContainer.querySelector('.card');
-    
-    if (!cardElement || cardElement.classList.contains('flipped')) return; 
-    
-    const cardIndex = parseInt(cardElement.dataset.index);
+function handleTileSelect(event) {
+    const tileEl = event.currentTarget;
+    const index = parseInt(tileEl.dataset.index);
 
-    if (gameStage === 'PLAY') {
-        const myTurnId = isHost ? 0 : 1;
-        const isMyTurn = gameData.turn === myTurnId;
-        
-        if (!isMyTurn || gameData.isGameOver) {
-             showGlobalMessage("Sıra sende değil.", true);
-             return;
-        }
-        
-        if (gameData.board[cardIndex].opened) return;
-        
-        // Hareketi sunucuya gönder, gerisini sunucu halledecek
-        sendMove(cardIndex);
-    }
-}
-
-function sendMove(index) {
-    if (socket && socket.connected) {
-        socket.emit('MOVE', {
-            roomCode: currentRoomCode,
-            cardIndex: index,
-        });
-    }
-}
-
-// KRİTİK: applyMove sadece kartı açar ve canı düşürür.
-async function applyMove(index) {
-    // Kilit olmadığı için tekrar kontrol et
-    if (gameData.board[index].opened) return;
-    
-    // Eğer sıra henüz client'ta değişmediyse, hamleyi yapan player mevcuttaki sıradır.
-    const isCurrentPlayerHost = gameData.turn === 0; 
-    
-    const bombsToCheck = isCurrentPlayerHost ? gameData.guestBombs : gameData.hostBombs;
-    const hitOpponentBomb = bombsToCheck.includes(index); 
-    
-    
-    if (hitOpponentBomb) {
-        if (isCurrentPlayerHost) {
-            gameData.hostLives--;
-        } else {
-            gameData.guestLives--;
-        }
-    }
-    
-    gameData.board[index].opened = true;
-    gameData.cardsLeft -= 1;
-    
-    if (hitOpponentBomb) {
-        gameData.board[index].content = '💣';
-        playSound(audioBomb);
-        const loserRoleDisplay = (isHost === isCurrentPlayerHost) ? 'SİZ' : 'RAKİP';
-        showGlobalMessage(`BOOM! ${loserRoleDisplay} bombaya bastı! Can: -1`, true);
-
+    if (index === selectedTileIndex) {
+        selectedTileIndex = -1; // Seçimi kaldır
+        tileEl.classList.remove('selected-tile');
     } else {
-        playSound(audioEmoji);
+        // Eski seçimi kaldır
+        if (selectedTileIndex !== -1) {
+            document.querySelector(`.domino-tile[data-index="${selectedTileIndex}"]`).classList.remove('selected-tile');
+        }
+        selectedTileIndex = index; // Yeni seçimi kaydet
+        tileEl.classList.add('selected-tile');
     }
-    
-    drawBoard(); 
-    
-    // Oyun Bitiş Kontrolü
-    setTimeout(() => {
-        if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
-            const winner = (gameData.hostLives <= 0 && gameData.guestLives <= 0) ? 'DRAW' : (gameData.hostLives <= 0 ? 'Guest' : 'Host');
-            endGame(winner);
-        } else if (gameData.cardsLeft === 0) {
-            endGame('LEVEL_COMPLETE');
-        } 
-        // Sıra değişikliği sunucudan gelecek, burada ek kod yok.
-    }, 1000); 
+    const myTurnId = isHost ? 0 : 1;
+    updateStatusDisplay(gameData.turn === myTurnId); // Buton durumlarını güncelle
 }
 
-function endGame(winnerRole) {
-    gameData.isGameOver = true;
-    gameStage = 'ENDED';
-
-    let winnerDisplay = winnerRole;
-
-    if (winnerRole === 'LEVEL_COMPLETE' && level < LEVELS.length) {
-        winnerDisplay = "SEVİYE TAMAMLANDI";
-        turnStatusEl.textContent = `SEVİYE ${level} TAMAMLANDI!`;
-        actionMessageEl.textContent = `Level ${level + 1}'e geçiliyor...`;
-        
-        setTimeout(() => {
-            if (isHost) {
-                socket.emit('nextLevel', { roomCode: currentRoomCode, newLevel: level + 1 });
-            }
-        }, 3000);
-        
-    } else if (winnerRole === 'LEVEL_COMPLETE' && level >= LEVELS.length) {
-        winnerDisplay = "OYUN KAZANILDI!";
-        turnStatusEl.textContent = winnerDisplay;
-        actionMessageEl.textContent = "Tüm seviyeler tamamlandı!";
-        setTimeout(resetGame, 5000);
-        
-    } else {
-        winnerDisplay = (winnerRole === 'Host') === isHost ? 'SİZ KAZANDINIZ' : 'RAKİP KAZANDI';
-        if (winnerRole === 'DRAW') winnerDisplay = "BERABERLİK";
-
-        turnStatusEl.textContent = `OYUN BİTTİ! SONUÇ: ${winnerDisplay}!`;
-        actionMessageEl.textContent = `Lobiye dönülüyor...`;
-        setTimeout(resetGame, 5000);
+function sendDominoMove(endToPlay) {
+    if (selectedTileIndex === -1) {
+        showGlobalMessage("Lütfen oynamak istediğiniz taşı seçin.", true);
+        return;
     }
+    
+    // Hamleyi sunucuya gönder
+    socket.emit('DOMINO_MOVE', {
+        roomCode: currentRoomCode,
+        tileIndex: selectedTileIndex,
+        endToPlay: endToPlay 
+    });
 }
 
-// --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
+function sendDrawMove() {
+    socket.emit('DOMINO_DRAW', { roomCode: currentRoomCode });
+}
 
-export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex, initialData) {
+// --- SOCKET.IO HANDLERS ---
+
+export function setupSocketHandlers(s, roomCode, isHostPlayer, opponentNameFromIndex, initialData) {
     socket = s;
     currentRoomCode = roomCode;
-    isHost = host;
+    isHost = isHostPlayer;
     opponentName = opponentNameFromIndex;
     
-    opponentNameEl.textContent = opponentName;
-    roleStatusEl.textContent = isHost ? "Rolünüz: HOST" : "Rolünüz: GUEST";
-    
-    initializeGame(
-        LEVELS[initialData.level - 1], 
-        initialData.hostBombs, 
-        initialData.guestBombs, 
-        initialData.level,
-        initialData.initialTurn 
-    );
-    drawBoard();
+    gameData = {
+        myHand: initialData.myHand,
+        table: initialData.table,
+        deckSize: initialData.deckSize,
+        turn: initialData.initialTurn,
+        hostHandSize: isHost ? initialData.myHand.length : 7, 
+        guestHandSize: isHost ? 7 : initialData.myHand.length,
+    };
+
+    drawGame();
     showScreen('game');
-    showGlobalMessage(`Oyun ${opponentName} ile başladı! Başarılar.`, false);
+    showGlobalMessage(`Oyun ${opponentName} ile başladı! ${isHostPlayer ? 'Sıra Sende.' : 'Rakibini Bekle.'}`, false);
     
-    // --- SOCKET.IO İŞLEYİCİLERİ ---
+    // Olay Dinleyicilerini Ata
+    drawBtn.onclick = sendDrawMove;
+    playLeftBtn.onclick = () => sendDominoMove('left');
+    playRightBtn.onclick = () => sendDominoMove('right');
 
-    // Rakibin hareketini al
-    socket.on('playerMove', (data) => {
-        if (gameStage !== 'PLAY') return;
-        applyMove(data.cardIndex);
-    });
-
-    // Sunucudan gelen sıra değişikliğini al ve UI'yi güncelle
-    socket.on('turnChange', (data) => {
-        if (gameData.isGameOver) return;
+    // Sunucudan gelen genel oyun durumu güncellemesi
+    socket.on('dominoUpdate', (data) => {
+        gameData.table = data.table;
+        gameData.deckSize = data.deckSize;
         gameData.turn = data.newTurn;
-        updateStatusDisplay();
-    });
 
-    // Seviye Atlama Sinyali
-    socket.on('nextLevel', ({ newLevel, hostBombs, guestBombs, initialTurn }) => {
-        showGlobalMessage(`Yeni Seviye: ${LEVELS[newLevel-1]} Kart!`, false);
-        initializeGame(
-            LEVELS[newLevel - 1], 
-            hostBombs, 
-            guestBombs, 
-            newLevel,
-            initialTurn 
-        );
-        drawBoard();
-        updateStatusDisplay();
+        // Kendi elini güncelle (Eğer çekme hamlesi değilse el boyutu değişir)
+        if (isHost) {
+            gameData.hostHandSize = data.hostHandSize;
+            if (data.myHand) gameData.myHand = data.myHand; // Çekme hamlesinde kullanılır
+            gameData.guestHandSize = data.guestHandSize;
+        } else {
+            gameData.guestHandSize = data.guestHandSize;
+            if (data.myHand) gameData.myHand = data.myHand; // Çekme hamlesinde kullanılır
+            gameData.hostHandSize = data.hostHandSize;
+        }
+
+        selectedTileIndex = -1; // Seçimi temizle
+        drawGame();
+        
+        // Hangi oyuncunun hamle yaptığını göster
+        const playerMadeMove = (data.lastMove.player === (isHost ? 0 : 1)) ? 'SİZ' : 'Rakibiniz';
+        if (data.lastMove.drew) {
+             showGlobalMessage(`${playerMadeMove} stoktan taş çekti ve pas geçti.`, false);
+        } else {
+             showGlobalMessage(`${playerMadeMove} bir taş oynadı.`, false);
+        }
     });
     
-    // Rakip Ayrıldı
+    // Stoktan çekme sadece çeken oyuncuya gelir
+    socket.on('drawUpdate', (data) => {
+        gameData.myHand = data.myHand;
+        gameData.deckSize = data.deckSize;
+        drawGame();
+        showGlobalMessage("Stoktan yeni taş çekildi.", false);
+    });
+
+    socket.on('invalidMove', (message) => {
+        showGlobalMessage(message, true);
+    });
+
+    socket.on('gameOver', (data) => {
+        const winner = (data.winner === (isHost ? 0 : 1)) ? 'SİZ KAZANDINIZ!' : 'RAKİP KAZANDI!';
+        showGlobalMessage(`OYUN BİTTİ: ${winner}`, false);
+        setTimeout(resetGame, 5000);
+    });
+    
     socket.on('opponentLeft', (message) => {
         showGlobalMessage(message || 'Rakibiniz ayrıldı. Lobiye dönülüyor.', true);
         resetGame();
