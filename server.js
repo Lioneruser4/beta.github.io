@@ -1,4 +1,6 @@
-// Sunucu Kodu: Node.js ile çalışır
+// Dosya Adı: server.js
+// Gerekli Paketler: npm install express socket.io
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -6,16 +8,18 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// Socket.IO Sunucusu
-// CORS ayarı: localhost:3000 portu üzerinden gelen tüm bağlantılara izin verir.
+// Socket.IO Sunucusu başlatılıyor.
+// Not: index.html dosyasını bir web sunucusu (live server vb.) üzerinden açıyorsanız
+// CORS ayarını kendi adresinize göre düzenlemeniz gerekebilir.
 const io = new Server(server, {
     cors: {
-        origin: "http://localhost:3000",
+        // index.html dosyasının açıldığı adres (Tarayıcı dosya yolunu kabul etmez, genellikle http://127.0.0.1:port veya http://localhost:port olmalıdır)
+        origin: "*", // Geliştirme aşamasında her yerden gelen bağlantıyı kabul et (DİKKAT: Üretimde bu güvensizdir)
         methods: ["GET", "POST"]
     }
 });
 
-const rooms = {}; // Aktif odaları saklar: { 'A1B2': { hostId: 'socketId1', guestId: null, playerCount: 1, ... } }
+const rooms = {}; // Aktif odaları saklar: { 'ABCD': { hostId: 'socketId1', hostUsername: 'userA', guestId: null, ... } }
 
 // Rastgele 4 haneli oda kodu oluşturucu
 function generateRoomCode() {
@@ -42,9 +46,9 @@ io.on('connection', (socket) => {
         };
         socket.join(code);
         
+        console.log(`Oda Kuruldu: ${code} (Host: ${username})`);
         // Host'a oda kodunu bildir
         socket.emit('roomCreated', code);
-        console.log(`Oda Kuruldu: ${code} (Host: ${username})`);
     });
 
     // --- ODAYA KATILMA ---
@@ -53,11 +57,13 @@ io.on('connection', (socket) => {
         const room = rooms[code];
 
         if (!room) {
-            socket.emit('roomFull'); // Odayı bulamadık
+            console.log(`Katılma Başarısız: Oda bulunamadı ${code}`);
+            socket.emit('roomFull'); // Oda bulunamadı
             return;
         }
 
         if (room.playerCount >= 2) {
+             console.log(`Katılma Başarısız: Oda dolu ${code}`);
             socket.emit('roomFull'); // Oda dolu
             return;
         }
@@ -68,9 +74,8 @@ io.on('connection', (socket) => {
         room.guestUsername = username;
         socket.join(code);
         
-        // Guest'e katılımı bildir
-        socket.emit('roomJoined', code);
         console.log(`Odaya Katılım: ${code} (Guest: ${username})`);
+        socket.emit('roomJoined', code); // Guest'e katılımı bildir
 
         // Her iki oyuncuya da oyunun başladığını ve rollerini bildir
         const players = [
@@ -82,51 +87,65 @@ io.on('connection', (socket) => {
         console.log(`Oyun Başladı: ${code}`);
     });
 
-    // --- ODADAN AYRILMA/BAĞLANTI KOPMASI ---
+    // --- ODADAN AYRILMA/BAĞLANTI KOPMASI/İPTAL ---
     socket.on('leaveRoom', ({ roomCode }) => {
-        const room = rooms[roomCode];
+        const code = roomCode.toUpperCase();
+        const room = rooms[code];
         if (room) {
-            // Eğer odadan ayrılan kişi Host ise
+            // Eğer ayrılan kişi Host ise
             if (room.hostId === socket.id) {
-                // Diğer oyuncuya (Guest'e) bildir
                 if (room.guestId) {
                     io.to(room.guestId).emit('opponentLeft');
                 }
-                delete rooms[roomCode]; // Odayı tamamen sil
-                console.log(`Oda Silindi (Host Ayrıldı): ${roomCode}`);
+                delete rooms[code]; // Odayı tamamen sil
+                console.log(`Oda Silindi (Host Ayrıldı): ${code}`);
             } 
-            // Eğer odadan ayrılan kişi Guest ise
+            // Eğer ayrılan kişi Guest ise
             else if (room.guestId === socket.id) {
                 room.playerCount = 1;
                 room.guestId = null;
                 room.guestUsername = null;
-                // Host'a bildir
                 io.to(room.hostId).emit('opponentLeft');
-                console.log(`Misafir Ayrıldı: ${roomCode}`);
+                console.log(`Misafir Ayrıldı: ${code}`);
             }
         }
-        socket.leave(roomCode);
+        socket.leave(code);
     });
 
+    // --- OYUN İÇİ VERİ AKTARIMI ---
+    socket.on('gameData', (data) => {
+        // Gelen veriyi (kart çevirme, skor vb.) odadaki diğer oyuncuya yolla
+        const code = data.roomCode;
+        if (code) {
+            // Veriyi gönderen hariç odadaki herkese yolla
+            socket.to(code).emit('gameData', data); 
+        }
+    });
+
+    // --- BAĞLANTI KESİLMESİ ---
     socket.on('disconnect', () => {
         console.log(`Kullanıcı bağlantısı kesildi: ${socket.id}`);
-        // Bağlantı kesildiğinde, ayrılma işlemini tüm odalar için kontrol et
+        // Bağlantı kesildiğinde, bu kullanıcının hangi odada olduğunu bul ve odayı temizle
         for (const code in rooms) {
             const room = rooms[code];
             if (room.hostId === socket.id || room.guestId === socket.id) {
-                // disconnect anında leaveRoom olayını simüle et
-                // Bu, diğer oyuncuya bildirim gitmesini sağlar.
-                socket.emit('leaveRoom', { roomCode: code }); 
+                // Diğer oyuncuya bildirim gönderilmesi için 'leaveRoom' olayını tetikle
+                const opponentId = (room.hostId === socket.id) ? room.guestId : room.hostId;
+                if (opponentId) {
+                    io.to(opponentId).emit('opponentLeft');
+                }
+                
+                // Odayı temizle
+                if (room.hostId === socket.id) {
+                    delete rooms[code];
+                    console.log(`Oda Silindi (Host Disconnect): ${code}`);
+                } else if (room.guestId === socket.id) {
+                    room.playerCount = 1;
+                    room.guestId = null;
+                    room.guestUsername = null;
+                    console.log(`Misafir Ayrıldı (Guest Disconnect): ${code}`);
+                }
             }
-        }
-    });
-
-    // --- OYUN İÇİ VERİ ALIŞVERİŞİ (Örnek) ---
-    socket.on('gameData', (data) => {
-        // Gelen veriyi (kart çevirme, puan vb.) odadaki diğer oyuncuya yolla
-        const code = data.roomCode;
-        if (code) {
-            socket.to(code).emit('gameData', data);
         }
     });
 });
