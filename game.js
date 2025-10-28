@@ -17,6 +17,7 @@ const myLivesEl = document.getElementById('myLives');
 const opponentLivesEl = document.getElementById('opponentLives');
 const opponentNameEl = document.getElementById('opponentName');
 const roleStatusEl = document.getElementById('roleStatus');
+const readyToPlayBtn = document.getElementById('readyToPlayBtn'); // YENİ: Hazır butonu
 
 // SESLER (Varsayım: Bu dosyalar projenizde mevcut.)
 const audioBomb = new Audio('sound1.mp3'); 
@@ -51,14 +52,11 @@ let gameData = {
 
 const EMOTICONS = ['🙂', '😂', '😍', '😎', '🤩', '👍', '🎉', '🌟', '🍕', '🐱'];
 
-// --- KEEP ALIVE (Sunucuyu uyanık tutmaya yardımcı olur) ---
+// --- KEEP ALIVE ---
 function startKeepAlive() {
-    // 10 dakikada bir (600,000 milisaniye) sunucuya ping atar.
     setInterval(() => {
         fetch(window.location.origin + '/', { method: 'GET' })
-            .catch(error => {
-                // Hata olması önemli değil, önemli olan isteğin gitmesi.
-            });
+            .catch(error => {});
     }, 600000); // 10 dakika
 }
 
@@ -92,7 +90,6 @@ function initializeGame(initialBoardSize) {
         cardContents.push(emoji, emoji);
     }
     
-    // Fisher-Yates karıştırma algoritması
     for (let i = cardContents.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [cardContents[i], cardContents[j]] = [cardContents[j], cardContents[i]];
@@ -170,22 +167,32 @@ function updateStatusDisplay() {
     if (gameStage === 'SELECTION') {
         const myBombsCount = selectedBombs.length;
         const opponentBombsReady = isHost ? gameData.guestBombs.length === 3 : gameData.hostBombs.length === 3;
+        const mySelectionComplete = myBombsCount === 3;
         
         if (myBombsCount < 3) {
             turnStatusEl.textContent = `Bomba Seç: ${myBombsCount} / 3`;
             actionMessageEl.textContent = "3 adet gizli bombayı seçin.";
+            readyToPlayBtn.style.display = 'none'; // Hazır butonu gizle
             turnStatusEl.classList.remove('text-red-600');
             turnStatusEl.classList.add('text-green-600');
-        } else if (!opponentBombsReady) {
-            turnStatusEl.textContent = `Rakip Bombasını Seçiyor...`;
-            actionMessageEl.textContent = "Seçiminiz tamamlandı. Rakibi bekleyin.";
-            turnStatusEl.classList.remove('text-green-600');
-            turnStatusEl.classList.add('text-red-600');
         } else {
-             // Bu durum, ikisi de seçtiği anda PLAY'e geçeceği için normalde görünmez.
+            // Seçim tamamlandı, şimdi Hazır butonunu göster/durumu güncelle
+            readyToPlayBtn.style.display = 'block';
+            readyToPlayBtn.disabled = false; // Tıklanabilir
+            
+            if (mySelectionComplete && !readyToPlayBtn.classList.contains('ready-sent')) {
+                turnStatusEl.textContent = `HAZIR MISIN?`;
+                actionMessageEl.textContent = "3 bombayı seçtin. BAŞLAMAK İÇİN HAZIR'a bas.";
+            } else if (readyToPlayBtn.classList.contains('ready-sent') && !opponentBombsReady) {
+                 turnStatusEl.textContent = `Rakip bekleniyor...`;
+                 actionMessageEl.textContent = "Hazır sinyaliniz gönderildi. Rakip bekleniyor.";
+                 readyToPlayBtn.style.display = 'none'; // Gönderildikten sonra butonu gizle
+            }
         }
         
     } else if (gameStage === 'PLAY') {
+        readyToPlayBtn.style.display = 'none'; // Oyun başlayınca butonu gizle
+        
         if (isMyTurn) {
             turnStatusEl.textContent = 'SIRA SENDE!';
             actionMessageEl.textContent = "Bir kart aç!";
@@ -200,6 +207,7 @@ function updateStatusDisplay() {
     }
     
     if (gameData.isGameOver) {
+        readyToPlayBtn.style.display = 'none';
         turnStatusEl.textContent = "OYUN BİTTİ!";
         actionMessageEl.textContent = "Sonuç bekleniyor...";
     }
@@ -257,9 +265,8 @@ function handleCardClick(event) {
         drawBoard(); 
         
         if (selectedBombs.length === 3) {
-            // Bombayı seçtik, sunucuya gönder.
-            socket.emit('bombSelectionComplete', { roomCode: currentRoomCode, isHost: isHost, bombs: selectedBombs });
-            // Durum updateStatusDisplay() tarafından güncellenecek (Rakip bekleniyor)
+            // Bomba seçimi tamamlandı, Hazır butonu aktifleşecek.
+            readyToPlayBtn.disabled = false;
         }
     } else if (gameStage === 'PLAY') {
         const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
@@ -268,6 +275,21 @@ function handleCardClick(event) {
         sendMove(cardIndex);
     }
 }
+
+// YENİ HAZIR BUTONU İŞLEYİCİSİ
+readyToPlayBtn.addEventListener('click', () => {
+    if (selectedBombs.length === 3) {
+        // Hazır sinyalini sunucuya gönder
+        socket.emit('bombSelectionComplete', { roomCode: currentRoomCode, isHost: isHost, bombs: selectedBombs });
+        
+        // Butonu devre dışı bırak ve sınıf ekle
+        readyToPlayBtn.disabled = true;
+        readyToPlayBtn.classList.add('ready-sent');
+        readyToPlayBtn.textContent = 'BEKLENİYOR...';
+        updateStatusDisplay();
+    }
+});
+
 
 function sendMove(index) {
     if (socket && socket.connected) {
@@ -377,6 +399,10 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     opponentNameEl.textContent = opponentName;
     roleStatusEl.textContent = isHost ? "Rolünüz: HOST" : "Rolünüz: GUEST";
 
+    // HAZIR BUTONUNU TEMİZLE
+    readyToPlayBtn.classList.remove('ready-sent');
+    readyToPlayBtn.textContent = 'HAZIR';
+
     // OYUN BAŞLANGICI: İlk seviye 1 (LEVELS[0]) yani 16 kart olacak
     level = 1; 
     initializeGame(LEVELS[level - 1]);
@@ -394,7 +420,7 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
             gameData.guestBombs = bombs;
         }
         
-        // KRİTİK FİX: İki oyuncu da bombayı seçtiyse oyunu başlat
+        // İki oyuncu da hazır sinyali gönderdi
         const hostReady = gameData.hostBombs.length === 3;
         const guestReady = gameData.guestBombs.length === 3;
 
@@ -403,7 +429,7 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
             if (gameStage !== 'PLAY') {
                 gameStage = 'PLAY'; 
                 gameData.turn = 0; // HOST başlar
-                showGlobalMessage('İki oyuncu da hazır! Kart açma aşaması başladı.', false);
+                showGlobalMessage('İki oyuncu da HAZIR! Kart açma aşaması başladı.', false);
                 drawBoard(); 
             }
         } 
@@ -426,6 +452,10 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         initializeGame(LEVELS[level - 1]);
         drawBoard();
         updateStatusDisplay();
+        
+        // Seviye atlandığında butonu sıfırla
+        readyToPlayBtn.classList.remove('ready-sent');
+        readyToPlayBtn.textContent = 'HAZIR';
     });
     
     // Rakip Ayrıldı
