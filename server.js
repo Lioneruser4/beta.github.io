@@ -1,4 +1,4 @@
-// Dosya Adı: server.js (SON TEMİZ TASARIM)
+// Dosya Adı: server.js (DOMINO OYUNU)
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -18,21 +18,21 @@ const io = new Server(server, {
 
 const rooms = {};
 
-// Yardımcı fonksiyonlar (Aynı)
-function getBombCount(level) {
-    if (level === 1) return 2;
-    if (level === 2) return 3;
-    if (level === 3) return 4;
-    return 2;
-}
+// --- DOMINO MANTIĞI YARDIMCI FONKSİYONLAR ---
 
-function selectRandomBombs(boardSize, bombCount) {
-    const indices = Array.from({ length: boardSize }, (_, i) => i);
-    for (let i = indices.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [indices[i], indices[j]] = [indices[j], indices[i]];
+function createDominoSet() {
+    const set = [];
+    for (let i = 0; i <= 6; i++) {
+        for (let j = i; j <= 6; j++) {
+            set.push({ p1: i, p2: j });
+        }
     }
-    return indices.slice(0, bombCount);
+    // Karıştırma
+    for (let i = set.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [set[i], set[j]] = [set[j], set[i]];
+    }
+    return set;
 }
 
 function generateRoomCode() {
@@ -43,7 +43,25 @@ function generateRoomCode() {
     return code;
 }
 
-const LEVELS_SIZE = [12, 16, 20]; 
+function checkValidMove(table, tile, endToPlay) {
+    if (table.length === 0) return true; // İlk hamle serbest
+    
+    const [leftEnd, rightEnd] = [table[0].p1, table[table.length - 1].p2];
+
+    if (endToPlay === 'left') {
+        return tile.p1 === leftEnd || tile.p2 === leftEnd;
+    } else if (endToPlay === 'right') {
+        return tile.p1 === rightEnd || tile.p2 === rightEnd;
+    }
+    return false;
+}
+
+function getPlayableEnds(table) {
+    if (table.length === 0) return [0, 0]; // İlk hamle, herhangi bir sayıya eşleşir
+    return [table[0].p1, table[table.length - 1].p2];
+}
+
+// --- SOCKET.IO Olay Yönetimi ---
 
 io.on('connection', (socket) => {
     
@@ -56,10 +74,11 @@ io.on('connection', (socket) => {
             hostUsername: username,
             guestId: null, 
             guestUsername: null, 
-            currentLevel: 1,
-            hostBombs: null, 
-            guestBombs: null, 
-            currentTurn: 0, 
+            deck: [],
+            hostHand: [],
+            guestHand: [],
+            table: [], // Masadaki taş zinciri
+            currentTurn: 0, // 0: Host, 1: Guest
         };
         socket.join(code);
         socket.emit('roomCreated', code);
@@ -77,75 +96,143 @@ io.on('connection', (socket) => {
         room.playerCount = 2;
         room.guestId = socket.id;
         room.guestUsername = username;
+        
+        // Oyunu Başlat
+        room.deck = createDominoSet();
+        room.hostHand = room.deck.splice(0, 7);
+        room.guestHand = room.deck.splice(0, 7);
+        room.table = [];
+        room.currentTurn = 0; // Host Başlasın
+
         socket.join(code);
-        
-        const level = room.currentLevel;
-        const boardSize = LEVELS_SIZE[level - 1];
-        const bombCount = getBombCount(level);
-        
-        room.hostBombs = selectRandomBombs(boardSize, bombCount);
-        room.guestBombs = selectRandomBombs(boardSize, bombCount);
 
-        const players = [
-            { id: room.hostId, username: room.hostUsername, isHost: true },
-            { id: room.guestId, username: room.guestUsername, isHost: false }
-        ];
+        // Her iki oyuncuya da başlangıç verilerini gönder
+        io.to(room.hostId).emit('gameStart', {
+            opponentName: room.guestUsername,
+            isHost: true,
+            myHand: room.hostHand,
+            table: room.table,
+            deckSize: room.deck.length,
+            initialTurn: room.currentTurn,
+        });
 
-        io.to(code).emit('gameStart', {
-            players, 
-            hostBombs: room.hostBombs,
-            guestBombs: room.guestBombs,
-            level: level,
-            initialTurn: room.currentTurn, 
+        io.to(room.guestId).emit('gameStart', {
+            opponentName: room.hostUsername,
+            isHost: false,
+            myHand: room.guestHand,
+            table: room.table,
+            deckSize: room.deck.length,
+            initialTurn: room.currentTurn,
         });
     });
 
-    socket.on('MOVE', (data) => {
+    // DOMINO HAMLESİ
+    socket.on('DOMINO_MOVE', (data) => {
         const room = rooms[data.roomCode];
         if (!room) return;
 
         const isHostPlayer = socket.id === room.hostId;
         const expectedTurn = isHostPlayer ? 0 : 1;
 
-        if (room.currentTurn !== expectedTurn) {
-             // Sırası olmayan hamle yapamaz
-             return; 
+        if (room.currentTurn !== expectedTurn) return; // Sıra kontrolü
+
+        let playerHand = isHostPlayer ? room.hostHand : room.guestHand;
+        const playedTile = playerHand[data.tileIndex];
+
+        if (!playedTile) return; // Geçersiz taş endeksi
+
+        // 1. Geçerlilik Kontrolü
+        const isValid = checkValidMove(room.table, playedTile, data.endToPlay);
+
+        if (isValid) {
+            // Taşı elden çıkar
+            playerHand.splice(data.tileIndex, 1);
+
+            // Taşı masaya yerleştir
+            let rotated = false;
+            if (room.table.length === 0) {
+                // İlk taş: Olduğu gibi koy
+                room.table.push(playedTile);
+            } else {
+                const [leftEnd, rightEnd] = getPlayableEnds(room.table);
+                
+                if (data.endToPlay === 'left') {
+                    if (playedTile.p1 !== leftEnd) { 
+                        // Ters çevir
+                        [playedTile.p1, playedTile.p2] = [playedTile.p2, playedTile.p1];
+                        rotated = true;
+                    }
+                    room.table.unshift(playedTile);
+                } else { // 'right'
+                    if (playedTile.p2 !== rightEnd) { 
+                        // Ters çevir
+                        [playedTile.p1, playedTile.p2] = [playedTile.p2, playedTile.p1];
+                        rotated = true;
+                    }
+                    room.table.push(playedTile);
+                }
+            }
+            
+            // Oyun Bitiş Kontrolü
+            if (playerHand.length === 0) {
+                io.to(data.roomCode).emit('gameOver', { winner: expectedTurn });
+                return;
+            }
+
+            // Sırayı değiştir ve yeni durumu yay
+            room.currentTurn = room.currentTurn === 0 ? 1 : 0;
+            io.to(data.roomCode).emit('dominoUpdate', {
+                hostHandSize: room.hostHand.length,
+                guestHandSize: room.guestHand.length,
+                myHand: playerHand,
+                table: room.table,
+                deckSize: room.deck.length,
+                newTurn: room.currentTurn,
+                lastMove: { tile: playedTile, tileIndex: data.tileIndex, player: expectedTurn, rotated: rotated }
+            });
+            
+        } else {
+            // Geçersiz hamle bildirimi (opsiyonel)
+            socket.emit('invalidMove', 'Geçersiz hamle! Taş masanın ucuna uymuyor.');
         }
-        
-        // 1. Hareketi her iki istemciye de gönder
-        io.to(data.roomCode).emit('playerMove', {
-            cardIndex: data.cardIndex,
-        });
-        
-        // 2. Sırayı sunucuda değiştir
-        room.currentTurn = room.currentTurn === 0 ? 1 : 0;
-        
-        // 3. Yeni sıra bilgisini tüm client'lara gönder
-        io.to(data.roomCode).emit('turnChange', { newTurn: room.currentTurn });
     });
 
-    socket.on('nextLevel', (data) => {
-        const { roomCode, newLevel } = data;
-        const room = rooms[roomCode];
-        
-        if (room) {
-            room.currentLevel = newLevel;
-            const boardSize = LEVELS_SIZE[newLevel - 1];
-            const bombCount = getBombCount(newLevel);
-            
-            room.hostBombs = selectRandomBombs(boardSize, bombCount);
-            room.guestBombs = selectRandomBombs(boardSize, bombCount);
-            room.currentTurn = 0; 
+    // STOKTAN ÇEKME HAMLESİ
+    socket.on('DOMINO_DRAW', (data) => {
+        const room = rooms[data.roomCode];
+        if (!room) return;
 
-            io.to(roomCode).emit('nextLevel', { 
-                newLevel,
-                hostBombs: room.hostBombs,
-                guestBombs: room.guestBombs,
-                initialTurn: 0,
+        const isHostPlayer = socket.id === room.hostId;
+        const expectedTurn = isHostPlayer ? 0 : 1;
+        
+        if (room.currentTurn !== expectedTurn) return; // Sıra kontrolü
+
+        let playerHand = isHostPlayer ? room.hostHand : room.guestHand;
+
+        if (room.deck.length > 0) {
+            // Taş çek
+            const newTile = room.deck.pop();
+            playerHand.push(newTile);
+
+            // Yeni el durumunu yalnızca çeken oyuncuya gönder
+            socket.emit('drawUpdate', { myHand: playerHand, deckSize: room.deck.length });
+        
+        } else {
+            // Stok bitti, sırayı rakibe geçir
+            room.currentTurn = room.currentTurn === 0 ? 1 : 0;
+            io.to(data.roomCode).emit('dominoUpdate', {
+                hostHandSize: room.hostHand.length,
+                guestHandSize: room.guestHand.length,
+                myHand: isHostPlayer ? room.hostHand : room.guestHand,
+                table: room.table,
+                deckSize: room.deck.length,
+                newTurn: room.currentTurn,
+                lastMove: { tile: {p1: -1, p2: -1}, player: expectedTurn, drew: true } // Çekme hamlesi sinyali
             });
         }
     });
-
+    
+    // ... (disconnect ve diğer event'ler burada kalır)
     socket.on('disconnect', () => {
         for (const code in rooms) {
             const room = rooms[code];
@@ -167,6 +254,7 @@ io.on('connection', (socket) => {
             }
         }
     });
+
 });
 
 const PORT = process.env.PORT || 3000;
