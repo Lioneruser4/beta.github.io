@@ -3,18 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>💣 Emoji Bomb 1v1 - Mobil Uyumlu</title>
+    <title>🀩 1v1 Domino - Mobil Uyumlu</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     
     <style>
-        /* CSS Başlangıcı (Aynı) */
+        /* CSS Başlangıcı */
         :root {
-            --primary-color: #3498db;
-            --secondary-color: #2980b9;
-            --success-color: #2ecc71;
-            --danger-color: #e74c3c;
+            --primary-color: #10b981; /* Zümrüt Yeşili */
+            --secondary-color: #059669;
             --text-color: #2c3e50;
             --bg-color: #ecf0f1;
             --card-bg: white;
@@ -23,42 +21,49 @@
         
         * { -webkit-tap-highlight-color: transparent; }
         body { font-family: sans-serif; background-color: var(--bg-color); color: var(--text-color); min-height: 100vh; display: flex; align-items: center; justify-content: center; overflow-x: hidden; overflow-y: auto; transition: background-color 0.3s; padding: 10px; }
-        .container { width: 100%; max-width: 500px; margin: auto; }
-        .screen { width: 100%; max-width: 500px; display: none; flex-direction: column; align-items: center; padding: 1.5rem; box-sizing: border-box; text-align: center; background-color: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow); transition: background-color 0.3s; }
+        .container { width: 100%; max-width: 550px; margin: auto; }
+        .screen { width: 100%; max-width: 550px; display: none; flex-direction: column; align-items: center; padding: 1.5rem; box-sizing: border-box; text-align: center; background-color: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow); transition: background-color 0.3s; }
         .screen.active { display: flex; }
         .btn { @apply w-full text-xl font-bold py-3 px-6 rounded-xl shadow-lg transition-all duration-200 ease-in-out; }
-        .btn-primary { @apply bg-blue-600 text-white hover:bg-blue-500 active:scale-95; }
-        .input-field { @apply w-full text-lg bg-gray-200 text-gray-900 border-2 border-gray-400 rounded-lg p-3 text-center placeholder-gray-500 focus:outline-none focus:border-blue-500; }
+        .btn-primary { @apply bg-green-600 text-white hover:bg-green-500 active:scale-95; }
+        .input-field { @apply w-full text-lg bg-gray-200 text-gray-900 border-2 border-gray-400 rounded-lg p-3 text-center placeholder-gray-500 focus:outline-none focus:border-green-500; }
         .code-display { @apply text-4xl font-extrabold p-4 bg-gray-800 text-yellow-300 rounded-lg tracking-widest; }
         
         #globalMessage.show { display: block; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 50; animation: fadeInDown 0.3s ease-out; width: 90%; max-width: 400px; }
         @keyframes fadeInDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
-        .memory-board { display: grid; gap: 8px; padding: 5px 0; }
-        .card-container { perspective: 1000px; aspect-ratio: 1; }
-        .card { width: 100%; height: 100%; border-radius: 10px; cursor: pointer; position: relative; transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); }
-        .card.flipped { transform: rotateY(180deg); }
-        .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; justify-content: center; align-items: center; border-radius: 10px; font-size: 1.5rem; font-weight: bold; }
-        @media (min-width: 400px) { .card-face { font-size: 1.8rem; } }
-        .card-face.front { background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: white; border: 3px solid var(--card-bg); transform: rotateY(0deg); z-index: 2; }
-        .card-face.back { background: var(--card-bg); color: var(--text-color); transform: rotateY(180deg); z-index: 1; }
+        /* DOMINO STİLLERİ */
+        .domino-tile {
+            @apply bg-white border-2 border-gray-800 text-gray-800 font-bold px-2 py-1 rounded-md shadow-md inline-flex justify-center items-center text-sm md:text-base;
+            margin: 3px;
+            white-space: nowrap;
+        }
+        .domino-tile:hover { @apply bg-gray-100; }
+        .domino-tile.selected-tile { @apply ring-4 ring-offset-2 ring-yellow-500 bg-yellow-100; }
 
-        .card.bomb-selected .card-face.front { background: linear-gradient(135deg, #f39c12, #e74c3c); animation: pulse-red 0.5s infinite alternate; }
-        @keyframes pulse-red { from { opacity: 1; } to { opacity: 0.8; } }
+        #playerHand { 
+            @apply flex flex-wrap justify-center p-3 bg-gray-100 rounded-lg max-h-40 overflow-y-auto; 
+            min-height: 80px; 
+        }
+
+        #dominoTable {
+            @apply flex flex-row flex-wrap justify-center items-center p-3 bg-gray-700 rounded-lg min-h-24 overflow-x-auto;
+        }
+        #dominoTable .domino-tile { @apply bg-gray-200 border-gray-900 text-gray-900; }
         
-        @keyframes vibrate { 0% { transform: translate(1px, 1px) rotate(0deg); } 20% { transform: translate(-1px, -2px) rotate(-1deg); } 40% { transform: translate(-3px, 0px) rotate(1deg); } 60% { transform: translate(3px, 2px) rotate(0deg); } 80% { transform: translate(1px, -1px) rotate(-1deg); } 100% { transform: translate(-1px, 2px) rotate(1deg); } }
-        .vibrate { animation: vibrate 0.1s linear infinite; }
+        .action-buttons button { @apply text-base py-2 px-3 rounded-lg shadow-md transition-colors duration-150; }
+        .action-buttons button:disabled { @apply bg-gray-300 text-gray-500 cursor-not-allowed; }
         /* CSS Bitişi */
     </style>
 </head>
-<body class="bg-gray-900 select-none">
+<body class="bg-gray-800 select-none">
 
     <div id="globalMessage" class="hidden w-11/12 max-w-md p-4 bg-red-600 text-white rounded-lg shadow-lg">
         <p id="globalMessageText"></p>
     </div>
 
     <div id="lobby" class="screen active space-y-6 container">
-        <h1 class="text-5xl font-black text-gray-900">💣 Emoji Bomb</h1>
+        <h1 class="text-5xl font-black text-green-700">🀩 Domino Clash</h1>
         <p class="text-gray-700">Sunucuya bağlı. Kullanıcı adınızı girin.</p>
         
         <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adı">
@@ -79,25 +84,37 @@
     </div>
 
     <div id="gameScreen" class="screen space-y-6 container">
-        <h1 class="text-5xl font-black text-gray-900">🕹️ Emoji Bomb</h1>
+        <h1 class="text-4xl font-black text-green-700">🕹️ Domino</h1>
         
         <div class="flex justify-between w-full text-gray-800 font-bold p-2 border-b border-gray-300">
-            <p>Sen: <span id="myLives" class="text-green-600">❤️❤️</span></p>
             <p>Rakip: <span id="opponentName" class="text-blue-600"></span></p>
-            <p>Can: <span id="opponentLives" class="text-green-600">❤️❤️</span></p>
+            <p>Taş Sayısı: <span id="opponentTileCount" class="text-red-600">7 Taş</span></p>
         </div>
         <p id="roleStatus" class="text-gray-700 text-sm"></p>
 
         <div id="gameContent" class="p-4 bg-gray-200 rounded-lg w-full space-y-4">
             <h3 id="turnStatus" class="text-2xl font-bold text-red-600">Rakip bekleniyor...</h3>
-            <p id="actionMessage" class="text-base text-purple-600 font-semibold"></p>
+            <p id="actionMessage" class="text-base text-gray-600 font-semibold"></p>
             
-            <div id="gameBoard" class="grid w-full max-w-sm mx-auto">
+            <div id="dominoTable" class="w-full">
                 </div>
             
         </div>
         
-        <button id="endGameBtn" class="btn bg-gray-600 text-white text-base py-3 max-w-xs">Oyunu Bitir</button>
+        <div class="w-full space-y-3">
+            <h4 class="text-xl font-bold text-gray-800">Hamleler</h4>
+            
+            <div class="flex justify-between action-buttons">
+                <button id="playLeftBtn" class="bg-blue-500 text-white hover:bg-blue-600" disabled>Sol Oyna</button>
+                <button id="drawTileBtn" class="bg-yellow-500 text-gray-800 hover:bg-yellow-600" disabled>Stok Çek (<span id="deckSize">14</span>)</button>
+                <button id="playRightBtn" class="bg-blue-500 text-white hover:bg-blue-600" disabled>Sağ Oyna</button>
+            </div>
+
+            <h4 class="text-xl font-bold text-gray-800">Senin Elin (Taş Seç)</h4>
+            <div id="playerHand" class="w-full">
+                </div>
+            
+        </div>
     </div>
 
     <script type="module">
@@ -155,19 +172,15 @@
                 
                 // OYUN BAŞLANGIÇ SİNYALİ
                 socket.on('gameStart', (data) => {
-                    const players = data.players;
-                    const opponent = players.find(p => p.id !== socket.id);
-                    const self = players.find(p => p.id === socket.id);
-                    
                     setupSocketHandlers(
                         socket, 
                         UIElements.roomCodeInput.value, 
-                        self.isHost, 
-                        opponent.username,
+                        data.isHost, 
+                        data.opponentName,
                         {
-                            hostBombs: data.hostBombs,
-                            guestBombs: data.guestBombs,
-                            level: data.level,
+                            myHand: data.myHand,
+                            table: data.table,
+                            deckSize: data.deckSize,
                             initialTurn: data.initialTurn 
                         }
                     );
@@ -206,7 +219,6 @@
         });
 
         document.getElementById('cancelBtn').addEventListener('click', UIElements.resetGame);
-        document.getElementById('endGameBtn').addEventListener('click', UIElements.resetGame);
         
         document.getElementById('copyCodeBtn').addEventListener('click', () => {
             const textToCopy = document.getElementById('roomCodeDisplay').textContent;
