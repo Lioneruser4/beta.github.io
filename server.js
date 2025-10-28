@@ -1,4 +1,4 @@
-// Dosya Adı: server.js
+// Dosya Adı: server.js (SON TEMİZ TASARIM)
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -18,6 +18,7 @@ const io = new Server(server, {
 
 const rooms = {};
 
+// Yardımcı fonksiyonlar (Aynı)
 function getBombCount(level) {
     if (level === 1) return 2;
     if (level === 2) return 3;
@@ -29,7 +30,7 @@ function selectRandomBombs(boardSize, bombCount) {
     const indices = Array.from({ length: boardSize }, (_, i) => i);
     for (let i = indices.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [indices[i], indices[j]] = [indices[i], indices[j]];
+        [indices[i], indices[j]] = [indices[j], indices[i]];
     }
     return indices.slice(0, bombCount);
 }
@@ -58,8 +59,7 @@ io.on('connection', (socket) => {
             currentLevel: 1,
             hostBombs: null, 
             guestBombs: null, 
-            currentTurn: 0, // 0: Host (ilk başlayan)
-            boardState: [], 
+            currentTurn: 0, 
         };
         socket.join(code);
         socket.emit('roomCreated', code);
@@ -100,7 +100,6 @@ io.on('connection', (socket) => {
         });
     });
 
-    // KRİTİK: Sadece MOVE sinyalini dinle ve sırayı sunucuda değiştir
     socket.on('MOVE', (data) => {
         const room = rooms[data.roomCode];
         if (!room) return;
@@ -108,12 +107,12 @@ io.on('connection', (socket) => {
         const isHostPlayer = socket.id === room.hostId;
         const expectedTurn = isHostPlayer ? 0 : 1;
 
-        // Yetki kontrolü
         if (room.currentTurn !== expectedTurn) {
+             // Sırası olmayan hamle yapamaz
              return; 
         }
         
-        // 1. Hareketi her iki istemciye de gönder (client'lar kartı açacak)
+        // 1. Hareketi her iki istemciye de gönder
         io.to(data.roomCode).emit('playerMove', {
             cardIndex: data.cardIndex,
         });
@@ -136,7 +135,7 @@ io.on('connection', (socket) => {
             
             room.hostBombs = selectRandomBombs(boardSize, bombCount);
             room.guestBombs = selectRandomBombs(boardSize, bombCount);
-            room.currentTurn = 0; // Yeni seviyede Host başlar
+            room.currentTurn = 0; 
 
             io.to(roomCode).emit('nextLevel', { 
                 newLevel,
