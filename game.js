@@ -1,4 +1,4 @@
-// Dosya Adı: game.js (BOMBALI HAFIZA İSTEMCİ V4 - EŞ ZAMANLI)
+// Dosya Adı: game.js (BOMBALI HAFIZA İSTEMCİ V4 - KESİN DÜZELTME)
 let socket;
 let currentRoomCode = '';
 let isHost = false; 
@@ -19,11 +19,11 @@ const myLivesEl = document.getElementById('myLives');
 const opponentLivesEl = document.getElementById('opponentLives');
 const opponentNameEl = document.getElementById('opponentName');
 const roleStatusEl = document.getElementById('roleStatus');
-const myNameEl = document.getElementById('myName'); // Yeni eklendi
+const myNameEl = document.getElementById('myName');
 
 // --- OYUN DURUMU ---
 let gameData = {
-    board: [], // Sadece içeriği tutar (Emoji)
+    board: [], // Tüm kartların emoji içeriklerini tutar
     openedCards: [], // Açık kartların indeksleri
     hostLives: 2,
     guestLives: 2,
@@ -34,6 +34,7 @@ let gameData = {
     isAnimating: false // Sadece animasyon süresince tıklamayı engeller
 };
 
+// 10 farklı emoji, 20 kart için
 const EMOTICONS = ['🍉', '🍇', '🍒', '🍕', '🐱', '⭐', '🚀', '🔥', '🌈', '🎉'];
 
 // --- TEMEL UI FONKSİYONLARI ---
@@ -69,14 +70,15 @@ function initializeGame(boardSize, hostBombs, guestBombs, initialLives) {
     gameData.isGameOver = false;
     gameData.isAnimating = false;
     
-    // 20 Kart için 10 çift emoji
+    // Kart içerikleri oluşturma ve karıştırma
     const pairs = boardSize / 2; 
     let cardContents = [];
     for (let i = 0; i < pairs; i++) {
         const emoji = EMOTICONS[i % EMOTICONS.length]; 
-        cardContents.push(emoji, emoji);
+        cardContents.push(emoji, emoji); // Her emojiyi çift olarak ekle
     }
     
+    // Fisher-Yates shuffle ile karıştır
     for (let i = cardContents.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [cardContents[i], cardContents[j]] = [cardContents[j], cardContents[i]];
@@ -86,7 +88,7 @@ function initializeGame(boardSize, hostBombs, guestBombs, initialLives) {
 }
 
 function drawBoard() {
-    // 20 kart için 5x4 veya 4x5 uygundur. 5x4 yapalım.
+    // 20 kart için 5x4 grid
     let columns = 5; 
     
     gameBoardEl.className = `grid w-full max-w-sm mx-auto memory-board grid-cols-${columns}`; 
@@ -110,13 +112,13 @@ function drawBoard() {
         // Bu oyuncunun canını düşürecek olan RAKİBİNİN bombasıdır.
         const isOpponentBomb = isHost ? gameData.guestBombs.includes(index) : gameData.hostBombs.includes(index);
         
-        let displayContent = content;
+        let displayContent = content; // Karıştırılmış emojiyi alıyoruz
         if (isOpponentBomb) {
             displayContent = '💣';
             back.classList.add('bg-red-200');
         }
 
-        back.textContent = displayContent;
+        back.textContent = displayContent; // Emoji veya Bomba göster
 
         card.appendChild(front);
         card.appendChild(back);
@@ -145,7 +147,6 @@ function updateStatusDisplay() {
     opponentLivesEl.textContent = '❤️'.repeat(Math.max(0, opponentLives));
     myNameEl.textContent = myName;
 
-    // Sıra olmadığı için durum sürekli "HAZIR" veya "BİTTİ"
     if (gameData.isGameOver) {
         turnStatusEl.textContent = "OYUN BİTTİ!";
         actionMessageEl.textContent = "Sonuç bekleniyor...";
@@ -195,7 +196,8 @@ async function handleGameStateUpdate(data) {
     // 1. Kartı Aç (Görsel Animasyon)
     const cardElement = document.querySelector(`.card[data-index="${cardIndex}"]`);
     if (cardElement) {
-        cardElement.classList.add('flipped');
+        // Tıklanan kartı hemen çevir (animasyon kilidini aşmak için)
+        cardElement.classList.add('flipped'); 
         
         if (hitBomb) {
             cardElement.classList.add('vibrate');
@@ -231,7 +233,7 @@ async function handleGameStateUpdate(data) {
         return;
     }
 
-    // 7. UI'yi Çiz
+    // 7. UI'yi Çiz (Yeni durumla ve güncellenmiş kartlar listesiyle)
     drawBoard();
 }
 
@@ -243,8 +245,7 @@ function handleGameEnd(winnerRole, finalHostLives, finalGuestLives) {
         endMessage = "OYUN BERABERE! (Canlar eşit veya çakışan can bitişi)";
         showGlobalMessage(endMessage, true);
     } else {
-        const winnerName = (winnerRole === 'Host') ? opponentName : myName;
-        const loserName = (winnerRole === 'Host') ? myName : opponentName;
+        const winnerName = (winnerRole === 'Host') === isHost ? myName : opponentName;
         
         if ((winnerRole === 'Host') === isHost) {
             endMessage = `TEBRİKLER! KAZANDINIZ!`;
@@ -257,7 +258,7 @@ function handleGameEnd(winnerRole, finalHostLives, finalGuestLives) {
         if (gameData.cardsLeft === 0) {
             endMessage += ` (Kartlar bittiği için can üstünlüğüyle kazandı.)`;
         } else {
-            endMessage += ` (Canı 0'a düştüğü için kaybetti.)`;
+            endMessage += ` (Canı 0'a düşen kaybetti.)`;
         }
     }
     
@@ -272,7 +273,10 @@ export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername,
     currentRoomCode = roomCode;
     myName = selfUsername;
     opponentName = opponentUsername;
-    isHost = s.id === initialData.players.find(p => p.isHost).id;
+    
+    const selfPlayer = initialData.players.find(p => p.id === socket.id);
+    const hostPlayer = initialData.players.find(p => p.isHost);
+    isHost = selfPlayer.id === hostPlayer.id; // Rolü doğru ayarla
     
     opponentNameEl.textContent = opponentName;
     roleStatusEl.textContent = isHost ? "Rol: HOST" : "Rol: GUEST";
