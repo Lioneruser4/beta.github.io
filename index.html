@@ -9,26 +9,116 @@
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     
     <style>
-        /* Genel Stil ve Arka Plan */
-        body { font-family: sans-serif; background: linear-gradient(to bottom right, #1a1a1a, #333333); color: #333; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .screen { width: 100%; max-width: 500px; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; box-sizing: border-box; text-align: center; background-color: #f0f0f0; border-radius: 12px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); }
+        /* === KENDİ OYUNUNUZDAN ALINAN CSS STİLLERİ === */
+        /* Ön yüzün rengini belirten değişkenler */
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2980b9;
+            --success-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --text-color: #2c3e50;
+            --bg-color: #ecf0f1;
+            --card-bg: white;
+            --shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Genel Stiller */
+        body { font-family: sans-serif; background-color: var(--bg-color); color: var(--text-color); height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; transition: background-color 0.3s; }
+        .screen { width: 100%; max-width: 500px; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; box-sizing: border-box; text-align: center; background-color: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow); transition: background-color 0.3s; }
         .screen.active { display: flex; }
+        
+        /* Utility */
         .btn { @apply w-full text-xl font-bold py-3 px-6 rounded-xl shadow-lg transition-all duration-200 ease-in-out; }
         .btn-primary { @apply bg-blue-600 text-white hover:bg-blue-500 active:scale-95; }
         .input-field { @apply w-full text-lg bg-gray-200 text-gray-900 border-2 border-gray-400 rounded-lg p-3 text-center placeholder-gray-500 focus:outline-none focus:border-blue-500; }
         .code-display { @apply text-4xl font-extrabold p-4 bg-gray-800 text-yellow-300 rounded-lg tracking-widest; }
         #globalMessage.show { display: block; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 50; animation: fadeInDown 0.3s ease-out; }
+        
+        /* OYUN TAHTASI VE KART ARALIKLARI */
+        .memory-board {
+            display: grid;
+            gap: 8px; /* Kartlar arasındaki boşluk */
+            padding: 5px 0;
+        }
+
+        /* Seviye Grid Düzenleri (Yeni 18/22/28 karta uyarlı) */
+        .grid-6x3 { grid-template-columns: repeat(6, 1fr); gap: 8px; } /* 18 Kart */
+        .grid-6x4 { grid-template-columns: repeat(6, 1fr); gap: 8px; } /* 22 Kart -> 6x4'e yakındır*/
+        .grid-7x4 { grid-template-columns: repeat(7, 1fr); gap: 6px; } /* 28 Kart */
+
+
         /* Kart Stilleri */
-        .card-container { perspective: 1000px; }
-        .card { width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; position: relative; background-color: transparent; }
-        .card.is-flipped { transform: rotateY(180deg); }
-        .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 8px; @apply flex items-center justify-center text-4xl font-black shadow-md; }
-        .card-front { background-color: #4a5568; color: #f7fafc; }
-        .card-back { background-color: #e2e8f0; color: #333; transform: rotateY(180deg); }
-        .card.bomb-selected .card-front { background-color: #e53e3e; animation: pulse-red 0.5s infinite alternate; }
-        @keyframes vibrate { 0% { transform: translate(1px, 1px) rotate(0deg); } 20% { transform: translate(-1px, -2px) rotate(-1deg); } 40% { transform: translate(-3px, 0px) rotate(1deg); } 60% { transform: translate(3px, 2px) rotate(0deg); } 80% { transform: translate(1px, -1px) rotate(-1deg); } 100% { transform: translate(-1px, 2px) rotate(1deg); } }
-        .vibrate { animation: vibrate 0.1s linear infinite; }
-        @keyframes pulse-red { from { opacity: 1; } to { opacity: 0.7; } }
+        .card-container {
+            perspective: 1000px; 
+            aspect-ratio: 1;
+        }
+        .card {
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            cursor: pointer;
+            position: relative;
+            transform-style: preserve-3d; 
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 10px;
+            font-size: 1.8rem;
+            font-weight: bold;
+        }
+
+        /* KARTIN ÖN YÜZÜ (KAPALI HALİ) */
+        .card-face.front {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border: 3px solid var(--card-bg);
+            transform: rotateY(0deg); 
+            z-index: 2;
+        }
+
+        /* KARTIN ARKA YÜZÜ (AÇIK HALİ) */
+        .card-face.back {
+            background: var(--card-bg);
+            color: var(--text-color);
+            transform: rotateY(180deg);
+            z-index: 1;
+        }
+
+        /* 💣 SADECE SEÇENİN GÖRDÜĞÜ KIRMIZILIK */
+        .card.bomb-selected .card-face.front {
+            background: linear-gradient(135deg, #f39c12, #e74c3c); /* Hafif turuncu-kırmızı geçiş */
+            animation: pulse-red 0.5s infinite alternate;
+        }
+        @keyframes pulse-red {
+            from { opacity: 1; }
+            to { opacity: 0.8; }
+        }
+
+        /* TİTREŞİM VE SES */
+        @keyframes vibrate {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            20% { transform: translate(-1px, -2px) rotate(-1deg); }
+            40% { transform: translate(-3px, 0px) rotate(1deg); }
+            60% { transform: translate(3px, 2px) rotate(0deg); }
+            80% { transform: translate(1px, -1px) rotate(-1deg); }
+            100% { transform: translate(-1px, 2px) rotate(1deg); }
+        }
+        .vibrate {
+            animation: vibrate 0.1s linear infinite;
+        }
     </style>
 </head>
 <body class="bg-gray-900 select-none">
@@ -72,7 +162,7 @@
             <h3 id="turnStatus" class="text-2xl font-bold text-red-600">Rakip bekleniyor...</h3>
             <p id="actionMessage" class="text-base text-purple-600 font-semibold"></p>
             
-            <div id="gameBoard" class="grid w-full max-w-sm mx-auto" style="grid-template-columns: repeat(6, 1fr);">
+            <div id="gameBoard" class="grid w-full max-w-sm mx-auto">
                 </div>
             
         </div>
@@ -98,7 +188,6 @@
 
         function connectToServer() {
             try {
-                // Socket.IO Bağlantısı
                 socket = io(LIVE_SERVER_URL, {
                     transports: ['websocket', 'polling'], 
                     reconnectionAttempts: 5, 
@@ -112,7 +201,7 @@
                 
                 socket.on('connect_error', (err) => {
                     console.error('Bağlantı Hatası:', err);
-                    UIElements.showGlobalMessage('HATA: Sunucuya erişilemiyor. Lütfen Render sayfasını kontrol edin.', true);
+                    UIElements.showGlobalMessage('HATA: Sunucuya erişilemiyor.', true);
                     showScreen('lobby');
                 });
                 
@@ -138,7 +227,7 @@
                     const self = players.find(p => p.id === socket.id);
                     
                     // Oyunu başlatmak için game.js'deki fonksiyona devret
-                    setupSocketHandlers(socket, document.getElementById('roomCodeInput').value, self.isHost, opponent.username);
+                    setupSocketHandlers(socket, UIElements.roomCodeInput.value, self.isHost, opponent.username);
                 });
 
             } catch (e) {
@@ -156,13 +245,11 @@
             const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
 
             if (roomCode === '') {
-                // Oda Oluşturma
                 document.getElementById('waitTitle').textContent = 'Oda Kuruluyor...';
                 document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
                 document.getElementById('codeArea').classList.add('hidden');
                 socket.emit('createRoom', { username });
             } else {
-                // Odaya Katılma
                 document.getElementById('waitTitle').textContent = `Odaya Katılım: ${roomCode}`;
                 document.getElementById('waitStatus').textContent = 'Bağlanılıyor...';
                 document.getElementById('codeArea').classList.add('hidden');
@@ -180,7 +267,6 @@
                 .catch(() => UIElements.showGlobalMessage('Kopyalama başarısız.', true));
         });
 
-        // Sayfa yüklendiğinde bağlantıyı başlat
         document.addEventListener('DOMContentLoaded', connectToServer);
     </script>
 </body>
