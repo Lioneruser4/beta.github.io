@@ -9,7 +9,7 @@
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     
     <style>
-        /* CSS Başlangıcı */
+        /* CSS Başlangıcı (Aynı) */
         :root {
             --primary-color: #3498db;
             --secondary-color: #2980b9;
@@ -118,7 +118,6 @@
 
         function connectToServer() {
             try {
-                // Sunucuya bağlan
                 socket = io(LIVE_SERVER_URL, {
                     transports: ['websocket', 'polling'], 
                     reconnectionAttempts: 5, 
@@ -154,7 +153,7 @@
                     UIElements.resetGame();
                 });
                 
-                // OYUN BAŞLANGIÇ SİNYALİ (initialTurn parametresi eklendi)
+                // OYUN BAŞLANGIÇ SİNYALİ
                 socket.on('gameStart', (data) => {
                     const players = data.players;
                     const opponent = players.find(p => p.id !== socket.id);
@@ -169,7 +168,7 @@
                             hostBombs: data.hostBombs,
                             guestBombs: data.guestBombs,
                             level: data.level,
-                            initialTurn: data.initialTurn // KRİTİK: Başlangıç sırası bilgisini geçir
+                            initialTurn: data.initialTurn 
                         }
                     );
                 });
@@ -211,7 +210,8 @@
                 .catch(() => UIElements.showGlobalMessage('Kopyalama başarısız.', true));
         });
 
-        document.addEventListener('DOMContentLoaded', connectToServer);
+        // KRİTİK: Bağlantıyı DOM yüklenince başlat.
+        document.addEventListener('DOMContentLoaded', connectToServer); 
     </script>
 </body>
 </html>
