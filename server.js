@@ -1,4 +1,4 @@
-// Dosya Adı: server.js (DOMINO OYUNU)
+// Dosya Adı: server.js (DOMINO V2 - GELİŞTİRİLMİŞ KURALLAR)
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -43,22 +43,49 @@ function generateRoomCode() {
     return code;
 }
 
+/**
+ * Taşın geçerli olup olmadığını ve hangi yöne çevrilmesi gerektiğini kontrol eder.
+ * @param {Array} table Masadaki taş zinciri.
+ * @param {Object} tile Oynanmak istenen taş.
+ * @param {string} endToPlay 'left' veya 'right'.
+ * @returns {Object|null} { isValid: boolean, rotated: boolean, playedValue: number }
+ */
 function checkValidMove(table, tile, endToPlay) {
-    if (table.length === 0) return true; // İlk hamle serbest
+    if (table.length === 0) {
+        // İlk hamle
+        return { isValid: true, rotated: false, playedValue: tile.p1 }; 
+    }
     
     const [leftEnd, rightEnd] = [table[0].p1, table[table.length - 1].p2];
+    const targetEnd = endToPlay === 'left' ? leftEnd : rightEnd;
+    
+    let isValid = false;
+    let rotated = false;
+    let playedValue = targetEnd; // Hangi sayıya bağlandığı
 
-    if (endToPlay === 'left') {
-        return tile.p1 === leftEnd || tile.p2 === leftEnd;
-    } else if (endToPlay === 'right') {
-        return tile.p1 === rightEnd || tile.p2 === rightEnd;
+    if (tile.p1 === targetEnd) {
+        isValid = true;
+        rotated = false;
+    } else if (tile.p2 === targetEnd) {
+        isValid = true;
+        rotated = true;
     }
-    return false;
+    
+    return isValid ? { isValid, rotated, playedValue } : null;
 }
 
-function getPlayableEnds(table) {
-    if (table.length === 0) return [0, 0]; // İlk hamle, herhangi bir sayıya eşleşir
-    return [table[0].p1, table[table.length - 1].p2];
+/**
+ * Oyuncunun elinde oynayabileceği taş olup olmadığını kontrol eder.
+ */
+function hasPlayableTile(hand, table) {
+    if (table.length === 0) return true; // İlk hamle daima oynanabilir
+    
+    const [leftEnd, rightEnd] = [table[0].p1, table[table.length - 1].p2];
+    
+    return hand.some(tile => 
+        tile.p1 === leftEnd || tile.p2 === leftEnd || 
+        tile.p1 === rightEnd || tile.p2 === rightEnd
+    );
 }
 
 // --- SOCKET.IO Olay Yönetimi ---
@@ -134,43 +161,31 @@ io.on('connection', (socket) => {
         const isHostPlayer = socket.id === room.hostId;
         const expectedTurn = isHostPlayer ? 0 : 1;
 
-        if (room.currentTurn !== expectedTurn) return; // Sıra kontrolü
+        if (room.currentTurn !== expectedTurn) return; 
 
         let playerHand = isHostPlayer ? room.hostHand : room.guestHand;
         const playedTile = playerHand[data.tileIndex];
 
-        if (!playedTile) return; // Geçersiz taş endeksi
+        if (!playedTile) return; 
 
         // 1. Geçerlilik Kontrolü
-        const isValid = checkValidMove(room.table, playedTile, data.endToPlay);
+        const moveCheck = checkValidMove(room.table, playedTile, data.endToPlay);
 
-        if (isValid) {
+        if (moveCheck && moveCheck.isValid) {
+            
             // Taşı elden çıkar
-            playerHand.splice(data.tileIndex, 1);
+            const tileToPlay = playerHand.splice(data.tileIndex, 1)[0];
+            
+            // Taşı çevir (rotated: true ise p1 ve p2 yer değiştirir)
+            if (moveCheck.rotated) {
+                [tileToPlay.p1, tileToPlay.p2] = [tileToPlay.p2, tileToPlay.p1];
+            }
 
-            // Taşı masaya yerleştir
-            let rotated = false;
-            if (room.table.length === 0) {
-                // İlk taş: Olduğu gibi koy
-                room.table.push(playedTile);
-            } else {
-                const [leftEnd, rightEnd] = getPlayableEnds(room.table);
-                
-                if (data.endToPlay === 'left') {
-                    if (playedTile.p1 !== leftEnd) { 
-                        // Ters çevir
-                        [playedTile.p1, playedTile.p2] = [playedTile.p2, playedTile.p1];
-                        rotated = true;
-                    }
-                    room.table.unshift(playedTile);
-                } else { // 'right'
-                    if (playedTile.p2 !== rightEnd) { 
-                        // Ters çevir
-                        [playedTile.p1, playedTile.p2] = [playedTile.p2, playedTile.p1];
-                        rotated = true;
-                    }
-                    room.table.push(playedTile);
-                }
+            // Masaya yerleştir
+            if (data.endToPlay === 'left') {
+                room.table.unshift(tileToPlay);
+            } else { // 'right'
+                room.table.push(tileToPlay);
             }
             
             // Oyun Bitiş Kontrolü
@@ -184,16 +199,16 @@ io.on('connection', (socket) => {
             io.to(data.roomCode).emit('dominoUpdate', {
                 hostHandSize: room.hostHand.length,
                 guestHandSize: room.guestHand.length,
-                myHand: playerHand,
+                myHand: playerHand, // Sadece bu oyuncunun elini güncel tutar
                 table: room.table,
                 deckSize: room.deck.length,
                 newTurn: room.currentTurn,
-                lastMove: { tile: playedTile, tileIndex: data.tileIndex, player: expectedTurn, rotated: rotated }
+                lastMove: { tile: tileToPlay, player: expectedTurn, rotated: moveCheck.rotated }
             });
             
         } else {
-            // Geçersiz hamle bildirimi (opsiyonel)
-            socket.emit('invalidMove', 'Geçersiz hamle! Taş masanın ucuna uymuyor.');
+            // Geçersiz hamle bildirimi
+            socket.emit('invalidMove', `Geçersiz hamle! Taş masanın ${data.endToPlay === 'left' ? 'sol' : 'sağ'} ucuna uymuyor.`);
         }
     });
 
@@ -205,9 +220,15 @@ io.on('connection', (socket) => {
         const isHostPlayer = socket.id === room.hostId;
         const expectedTurn = isHostPlayer ? 0 : 1;
         
-        if (room.currentTurn !== expectedTurn) return; // Sıra kontrolü
+        if (room.currentTurn !== expectedTurn) return; 
 
         let playerHand = isHostPlayer ? room.hostHand : room.guestHand;
+
+        // Kural Kontrolü: Oynanabilir taş var mı?
+        if (hasPlayableTile(playerHand, room.table)) {
+            socket.emit('invalidMove', 'Elinde oynanabilir taş varken stoktan çekemezsin!');
+            return;
+        }
 
         if (room.deck.length > 0) {
             // Taş çek
@@ -216,23 +237,41 @@ io.on('connection', (socket) => {
 
             // Yeni el durumunu yalnızca çeken oyuncuya gönder
             socket.emit('drawUpdate', { myHand: playerHand, deckSize: room.deck.length });
+
+            // Çekilen taşla oynayabiliyor mu?
+            if (hasPlayableTile(playerHand, room.table)) {
+                // Oynayabilir, sıra hala onda (sadece durum bildirimi)
+                io.to(data.roomCode).emit('infoMessage', { message: `${isHostPlayer ? room.hostUsername : room.guestUsername} stoktan çekti. Şimdi oyna!` });
+            } else {
+                // Hala oynayamaz, sırayı rakibe geçir (PAS)
+                room.currentTurn = room.currentTurn === 0 ? 1 : 0;
+                io.to(data.roomCode).emit('dominoUpdate', {
+                    hostHandSize: room.hostHand.length,
+                    guestHandSize: room.guestHand.length,
+                    myHand: playerHand, // Kendi eli güncellensin
+                    table: room.table,
+                    deckSize: room.deck.length,
+                    newTurn: room.currentTurn,
+                    lastMove: { tile: {p1: -1, p2: -1}, player: expectedTurn, passed: true } // PAS sinyali
+                });
+            }
         
         } else {
-            // Stok bitti, sırayı rakibe geçir
+            // Stok bitti, pas geç
             room.currentTurn = room.currentTurn === 0 ? 1 : 0;
             io.to(data.roomCode).emit('dominoUpdate', {
                 hostHandSize: room.hostHand.length,
                 guestHandSize: room.guestHand.length,
-                myHand: isHostPlayer ? room.hostHand : room.guestHand,
+                myHand: playerHand,
                 table: room.table,
                 deckSize: room.deck.length,
                 newTurn: room.currentTurn,
-                lastMove: { tile: {p1: -1, p2: -1}, player: expectedTurn, drew: true } // Çekme hamlesi sinyali
+                lastMove: { tile: {p1: -1, p2: -1}, player: expectedTurn, passed: true } // PAS sinyali
             });
         }
     });
     
-    // ... (disconnect ve diğer event'ler burada kalır)
+    // ... (disconnect event'i aynı kalır)
     socket.on('disconnect', () => {
         for (const code in rooms) {
             const room = rooms[code];
@@ -254,7 +293,6 @@ io.on('connection', (socket) => {
             }
         }
     });
-
 });
 
 const PORT = process.env.PORT || 3000;
