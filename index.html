@@ -140,9 +140,25 @@
             background-color: rgba(0, 0, 0, 0.8);
             z-index: 100;
         }
+
+        /* Global Mesaj */
+        #globalMessage.show {
+            display: block;
+            animation: fadeInDown 0.3s ease-out;
+        }
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translate(-50%, -20px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white select-none">
+
+    <!-- Global Mesaj Kutusu -->
+    <div id="globalMessage" class="hidden fixed top-5 left-1/2 -translate-x-1/2 w-11/12 max-w-md p-4 bg-red-600 text-white rounded-lg shadow-lg z-50">
+        <p id="globalMessageText"></p>
+        <button id="globalMessageClose" class="absolute top-2 right-3 text-2xl font-bold">&times;</button>
+    </div>
 
     <!-- 1. Yükleniyor Ekranı -->
     <div id="loader" class="screen active">
@@ -160,7 +176,8 @@
             
             <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adı">
             
-            <input type="text" id="roomCodeInput" class="input-field" placeholder="Oda Kodu Gir">
+            <!-- Oda Kodu Girişi kaldırıldı - sunucusuz akışta kafa karıştırıcıydı -->
+            <!-- <input type="text" id="roomCodeInput" class="input-field" placeholder="Oda Kodu Gir"> -->
             
             <button id="createRoomBtn" class="btn btn-primary">🎮 Oda Kur</button>
             <button id="joinRoomBtn" class="btn btn-secondary">🔍 Katıl</button>
@@ -177,6 +194,7 @@
                 <p class="text-lg">Oda Kodu: <strong id="roomCodeDisplay" class="text-2xl text-yellow-400 tracking-widest"></strong></p>
                 
                 <label class="text-left w-full block">1. Bu Teklif Kodunu kopyala ve arkadaşına gönder:</label>
+                <p class="text-xs text-gray-400 text-left"><i>(Not: Bu kodun çok uzun olması normaldir.)</i></p>
                 <textarea id="offerText" class="signal-textarea" readonly></textarea>
                 <button id="copyOfferBtn" class="btn btn-primary text-sm py-2">Teklifi Kopyala</button>
                 
@@ -194,6 +212,7 @@
                 <button id="createAnswerBtn" class="btn btn-secondary">Cevap Oluştur</button>
                 
                 <label class="text-left w-full block">2. Bu Cevap Kodunu kopyala ve arkadaşına geri gönder:</label>
+                <p class="text-xs text-gray-400 text-left"><i>(Not: Bu kodun çok uzun olması normaldir.)</i></p>
                 <textarea id="answerTextGuest" class="signal-textarea" readonly></textarea>
                 <button id="copyAnswerBtn" class="btn btn-primary text-sm py-2 hidden">Cevabı Kopyala</button>
 
@@ -239,175 +258,52 @@
         document.addEventListener('DOMContentLoaded', () => {
             // --- DOM Referansları ---
             const screens = {
-                loader: document.getElementById('loader'),
-                lobby: document.getElementById('lobby'),
-                connect: document.getElementById('connectScreen'),
+// ... existing code ... */
                 game: document.getElementById('gameScreen'),
                 end: document.getElementById('endScreen'),
             };
+            const globalMessage = document.getElementById('globalMessage');
+            const globalMessageText = document.getElementById('globalMessageText');
+            const globalMessageClose = document.getElementById('globalMessageClose');
+
             const usernameInput = document.getElementById('username');
-            const roomCodeInput = document.getElementById('roomCodeInput');
+            // const roomCodeInput = document.getElementById('roomCodeInput'); // KALDIRILDI
             const createRoomBtn = document.getElementById('createRoomBtn');
             const joinRoomBtn = document.getElementById('joinRoomBtn');
-            const cancelConnectBtn = document.getElementById('cancelConnectBtn');
-            
-            // Bağlantı Ekranı Elemanları
-            const connectTitle = document.getElementById('connectTitle');
-            const hostConnect = document.getElementById('hostConnect');
-            const guestConnect = document.getElementById('guestConnect');
-            const roomCodeDisplay = document.getElementById('roomCodeDisplay');
-            const offerText = document.getElementById('offerText');
-            const copyOfferBtn = document.getElementById('copyOfferBtn');
-            const answerTextHost = document.getElementById('answerTextHost');
-            const offerTextGuest = document.getElementById('offerTextGuest');
-            const createAnswerBtn = document.getElementById('createAnswerBtn');
-            const answerTextGuest = document.getElementById('answerTextGuest');
-            const copyAnswerBtn = document.getElementById('copyAnswerBtn');
-            const hostStatus = document.getElementById('hostStatus');
-            const guestStatus = document.getElementById('guestStatus');
-
-            // Oyun Ekranı Elemanları
-            const player1Name = document.getElementById('player1Name');
-            const player1Lives = document.getElementById('player1Lives');
-            const player2Name = document.getElementById('player2Name');
-            const player2Lives = document.getElementById('player2Lives');
-            const turnIndicator = document.getElementById('turnIndicator');
-            const gameGrid = document.getElementById('gameGrid');
-
-            // Oyun Sonu Ekranı Elemanları
-            const endMessage = document.getElementById('endMessage');
-            const playAgainBtn = document.getElementById('playAgainBtn');
-            const backToLobbyBtn = document.getElementById('backToLobbyBtn');
-
-            // --- Ses Efektleri (Tone.js) ---
-            let audioReady = false;
-            
-            // Bomba Sesi
-            const bombSound = new Tone.NoiseSynth({
-                noise: { type: 'pink' },
-                envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.2 }
-            }).toDestination();
-            const bombFilter = new Tone.AutoFilter("4n").toDestination().start();
-            bombSound.connect(bombFilter);
-
-            // Emoji Açılma Sesi
-            const emojiSound = new Tone.Synth({
-                oscillator: { type: 'triangle' },
-                envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 }
-            }).toDestination();
-
-            // Bekleme Sesi (Titreşim)
-            const waitSound = new Tone.MetalSynth({
-                frequency: 200,
-                envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
-                harmonicity: 3.1,
-                modulationIndex: 32,
-                resonance: 4000,
-                octaves: 1.5
-            }).toDestination();
-
-            function playBombSound() {
-                if (!audioReady) return;
-                bombSound.triggerAttackRelease("0.2");
-            }
-
-            function playEmojiSound() {
-                if (!audioReady) return;
-                emojiSound.triggerAttackRelease("C5", "8n");
-            }
-
-            let waitSoundLoop = null;
-            function startWaitSound() {
-                if (!audioReady || waitSoundLoop) return;
-                waitSoundLoop = new Tone.Loop(time => {
-                    waitSound.triggerAttackRelease("16n", time);
-                }, "8n").start(0);
-                Tone.Transport.start();
-            }
-
-            function stopWaitSound() {
-                if (waitSoundLoop) {
-                    waitSoundLoop.stop(0);
-                    waitSoundLoop.dispose();
-                    waitSoundLoop = null;
-                    Tone.Transport.stop();
-                }
-            }
-
-            async function initAudio() {
-                if (audioReady) return;
-                await Tone.start();
-                audioReady = true;
-                console.log("Audio context started.");
-            }
-
+// ... existing code ... */
             // --- Oyun Durumu (State) ---
             let peerConnection;
             let dataChannel;
-            let isHost = false;
-            let username = "";
-            let opponentName = "";
-            let currentLevel = 1;
-            let lives = [2, 2]; // [benim, rakibin]
-            let myBombs = new Set();
-            let opponentBombs = new Set();
-            let allBombs = new Set();
-            let openedCards = new Set();
-            let gamePhase = 'placing'; // 'placing', 'revealing'
-            let myTurn = false;
-            let levelSettings = {
-                1: { size: 18, bombs: 3, gridCols: 'grid-cols-3' },
-                2: { size: 22, bombs: 4, gridCols: 'grid-cols-4' }, // 22 kart 4 sütuna tam sığmaz ama en yakını
-                3: { size: 28, bombs: 5, gridCols: 'grid-cols-4' },
-            };
-            const emojis = ['🙂', '😂', '😍', '😎', '🤩', '🥳', '🤯', '😜', '😇', '👻', '👽', '👾', '🤖', '🎃'];
+// ... existing code ... */
             let bombsToPlace = 0;
 
 
             // --- Temel Fonksiyonlar ---
 
-            function showScreen(screenId) {
-                Object.values(screens).forEach(screen => {
-                    screen.classList.remove('active');
-                    screen.classList.add('hidden');
-                });
-                screens[screenId].classList.remove('hidden');
-                screens[screenId].classList.add('active');
-            }
-
-            // Kullanıcı adını localStorage'dan yükle
-            function loadUsername() {
-                const savedUsername = localStorage.getItem('emojiBombUsername');
-                if (savedUsername) {
-                    usernameInput.value = savedUsername;
+            function showGlobalMessage(message, isError = true) {
+                globalMessageText.textContent = message;
+                if (isError) {
+                    globalMessage.classList.add('bg-red-600');
+                    globalMessage.classList.remove('bg-green-600');
+                } else {
+                    globalMessage.classList.remove('bg-red-600');
+                    globalMessage.classList.add('bg-green-600');
                 }
-            }
+                globalMessage.classList.remove('hidden');
+                globalMessage.classList.add('show');
 
-            // Kullanıcı adını localStorage'a kaydet
-            function saveUsername(name) {
-                localStorage.setItem('emojiBombUsername', name);
-            }
-
-            function generateRoomCode() {
-                return Math.random().toString(36).substring(2, 7).toUpperCase();
+                // 3 saniye sonra otomatik gizle
+                setTimeout(hideGlobalMessage, 3000);
             }
             
-            function copyToClipboard(text, btn) {
-                navigator.clipboard.writeText(text).then(() => {
-                    const originalText = btn.textContent;
-                    btn.textContent = 'Kopyalandı!';
-                    setTimeout(() => {
-                        btn.textContent = originalText;
-                    }, 1500);
-                }).catch(err => {
-                    console.error('Kopyalanamadı: ', err);
-                    // Eski yöntem (execCommand)
-                    try {
-                        const ta = document.createElement('textarea');
-                        ta.value = text;
-                        document.body.appendChild(ta);
-                        ta.select();
-                        document.execCommand('copy');
+            function hideGlobalMessage() {
+                globalMessage.classList.add('hidden');
+                globalMessage.classList.remove('show');
+            }
+
+            function showScreen(screenId) {
+                Object.values(screens).forEach(screen => {
+// ... existing code ... */
                         document.body.removeChild(ta);
 
                         const originalText = btn.textContent;
@@ -416,72 +312,53 @@
                             btn.textContent = originalText;
                         }, 1500);
                     } catch(e) {
-                         alert('Kopyalama başarısız. Lütfen manuel kopyalayın.');
+                         // alert('Kopyalama başarısız. Lütfen manuel kopyalayın.');
+                         showGlobalMessage('Kopyalama başarısız. Lütfen manuel kopyalayın.');
                     }
                 });
-            }
-            
-            // --- WebRTC Sinyalleşme Fonksiyonları ---
-
-            function createPeerConnection() {
-                // STUN sunucuları NAT'ı aşmak için gereklidir (Google'ın ücretsiz sunucuları)
-                const config = {
-                    iceServers: [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' }
-                    ]
-                };
+// ... existing code ... */
                 peerConnection = new RTCPeerConnection(config);
 
                 // ICE adayı (ağ yolu) bulunduğunda tetiklenir
                 peerConnection.onicecandidate = event => {
-                    if (event.candidate) {
-                        // Adayları topluyoruz...
-                        // 'onicegatheringstatechange' kullanarak tüm adaylar toplanınca
-                        // tam sdp'yi göndereceğiz.
+                    // event.candidate null olduğunda, ICE toplanması tamamlanmıştır
+                    // ve localDescription (offer/answer) hazırdır.
+                    if (!event.candidate) {
+                        console.log('ICE Toplama tamamlandı (onicecandidate null).');
+                        if (isHost) {
+                            if(offerText.value.length === 0) { // Sadece ilk kez doldur
+                                offerText.value = JSON.stringify(peerConnection.localDescription);
+                                hostStatus.textContent = 'Teklifi arkadaşına gönder.';
+                            }
+                        } else {
+                            // Misafir için cevap hazır
+                             if(answerTextGuest.value.length === 0) { // Sadece ilk kez doldur
+                                answerTextGuest.value = JSON.stringify(peerConnection.localDescription);
+                                copyAnswerBtn.classList.remove('hidden');
+                                guestStatus.textContent = 'Cevabı arkadaşına gönder.';
+                             }
+                        }
                     }
                 };
 
                 // Ağ durumu değiştiğinde
-                peerConnection.onconnectionstatechange = () => {
-                    console.log('Bağlantı Durumu:', peerConnection.connectionState);
+// ... existing code ... */
                     if (peerConnection.connectionState === 'connected') {
                         hostStatus.textContent = 'Bağlandı!';
                         guestStatus.textContent = 'Bağlandı!';
                         // Oyun başlatma mantığı datachannel onopen'a taşındı
                     }
                     if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
-                        alert('Bağlantı koptu veya kurulamadı.');
+                        // alert('Bağlantı koptu veya kurulamadı.');
+                        showGlobalMessage('Bağlantı koptu veya kurulamadı.');
                         resetToLobby();
                     }
-                };
-            }
-
-            // --- Oda Kur (Host) ---
-            async function initCreateRoom() {
-                if (!validateUsername()) return;
-                initAudio(); // Ses context'ini başlat
-                
-                isHost = true;
-                showScreen('connect');
-                connectTitle.textContent = 'Oda Kuruluyor...';
-                guestConnect.classList.add('hidden');
-                hostConnect.classList.remove('hidden');
-                
-                const roomCode = generateRoomCode();
-                roomCodeDisplay.textContent = roomCode;
-                
-                createPeerConnection();
-                
-                // DataChannel (Oyun verisi için)
-                dataChannel = peerConnection.createDataChannel('game');
-                setupDataChannelEvents();
-                
-                // Teklif (Offer) oluştur
-                const offer = await peerConnection.createOffer();
+// ... existing code ... */
                 await peerConnection.setLocalDescription(offer);
                 
-                // Tüm ICE adaylarının toplanmasını bekle
+                // Tüm ICE adaylarının toplanmasını bekleme mantığı
+                // onicecandidate olayına taşındı.
+                /*
                 peerConnection.onicegatheringstatechange = () => {
                     if (peerConnection.iceGatheringState === 'complete') {
                         console.log("ICE Toplama tamamlandı. Teklif hazır.");
@@ -489,54 +366,16 @@
                         hostStatus.textContent = 'Teklifi arkadaşına gönder.';
                     }
                 };
+                */
             }
             
             // Host, misafirden gelen cevabı aldığında
-            async function receiveAnswer(answerString) {
-                try {
-                    const answer = JSON.parse(answerString);
-                    if (!peerConnection.currentRemoteDescription) {
-                        await peerConnection.setRemoteDescription(answer);
-                        console.log('Cevap ayarlandı (Host).');
-                        hostStatus.textContent = 'Bağlantı kuruluyor...';
-                    }
-                } catch (e) {
-                    console.error('Geçersiz cevap formatı:', e);
-                    hostStatus.textContent = 'Hata: Geçersiz cevap kodu.';
-                }
-            }
-
-            // --- Odaya Katıl (Guest) ---
-            async function initJoinRoom() {
-                if (!validateUsername()) return;
-                initAudio(); // Ses context'ini başlat
-                
-                isHost = false;
-                showScreen('connect');
-                connectTitle.textContent = 'Odaya Katıl';
-                hostConnect.classList.add('hidden');
-                guestConnect.classList.remove('hidden');
-                copyAnswerBtn.classList.add('hidden');
-
-                createPeerConnection();
-
-                // Misafir, host'tan data channel geldiğinde dinler
-                peerConnection.ondatachannel = event => {
-                    dataChannel = event.channel;
-                    setupDataChannelEvents();
-                };
-            }
-            
-            // Misafir, host'tan gelen teklifi aldığında
-            async function receiveOfferAndCreateAnswer(offerString) {
-                try {
-                    const offer = JSON.parse(offerString);
-                    await peerConnection.setRemoteDescription(offer);
-                    
-                    const answer = await peerConnection.createAnswer();
+// ... existing code ... */
                     await peerConnection.setLocalDescription(answer);
                     
                     // Cevap hazır olduğunda (ICE toplanınca)
+                    // onicecandidate olayına taşındı.
+                    /*
                     peerConnection.onicegatheringstatechange = () => {
                         if (peerConnection.iceGatheringState === 'complete') {
                             console.log("ICE Toplama tamamlandı. Cevap hazır.");
@@ -545,375 +384,47 @@
                             guestStatus.textContent = 'Cevabı arkadaşına gönder.';
                         }
                     };
+                    */
                     
                 } catch (e) {
-                    console.error('Geçersiz teklif formatı:', e);
-                    guestStatus.textContent = 'Hata: Geçersiz teklif kodu.';
-                }
-            }
-            
+// ... existing code ... */
             function validateUsername() {
                 username = usernameInput.value.trim();
                 if (username.length < 2) {
-                    alert('Lütfen geçerli bir kullanıcı adı girin (en az 2 karakter).');
+                    // alert('Lütfen geçerli bir kullanıcı adı girin (en az 2 karakter).');
+                    showGlobalMessage('Lütfen geçerli bir kullanıcı adı girin (en az 2 karakter).');
                     return false;
                 }
-                saveUsername(username);
-                return true;
-            }
-
-            // --- Data Channel (Veri Kanalı) Olayları ---
-            function setupDataChannelEvents() {
-                dataChannel.onopen = () => {
-                    console.log('Data Channel AÇIK!');
-                    // Bağlantı kuruldu, el sıkışma (handshake) gönder
-                    sendData({ type: 'handshake', name: username });
-                    
-                    if (isHost) {
-                        // Host oyunu başlatır
-                        // (Handshake cevabı bekleniyor)
-                    }
-                };
-
-                dataChannel.onmessage = event => {
-                    const data = JSON.parse(event.data);
-                    
-                    switch (data.type) {
-                        case 'handshake':
-                            // Rakibin adını al
-                            opponentName = data.name;
-                            if (isHost) {
-                                // Misafir bağlandı, oyunu başlat
-                                startGame();
-                            }
-                            break;
-                        
-                        case 'startGame':
-                            // Host'tan oyun başlangıç verisi geldi (Misafir için)
-                            opponentName = data.opponentName;
-                            currentLevel = data.level;
-                            lives = [2, 2]; // [ben, rakip]
-                            initGameScreen();
-                            break;
-                            
-                        case 'bombsPlaced':
-                            // Rakip bombalarını yerleştirdi
-                            opponentBombs = new Set(data.bombs);
-                            checkReadyToStartMainGame();
-                            break;
-                            
-                        case 'revealCard':
-                            // Rakip kart açtı
-                            handleReveal(data.index, 'opponent');
-                            break;
-                        
-                        case 'playAgain':
-                            // Rakip tekrar oynamak istiyor
-                            currentLevel = data.nextLevel;
-                            if (isHost) {
-                                // Host yeni oyunu başlatır
-                                startGame();
-                            } else {
-                                // Misafir yeni oyunu ayarlar
-                                initGameScreen();
-                            }
-                            break;
-                    }
-                };
-                
+// ... existing code ... */
                 dataChannel.onclose = () => {
                     console.log('Data Channel KAPALI!');
-                    alert('Rakibin bağlantısı koptu.');
+                    // alert('Rakibin bağlantısı koptu.');
+                    if (screens.lobby.classList.contains('active') == false) { // Sadece oyun ekranındaysa bu hatayı ver
+                        showGlobalMessage('Rakibin bağlantısı koptu.');
+                    }
                     resetToLobby();
                 };
                 
-                dataChannel.onerror = err => {
-                    console.error('Data Channel Hatası:', err);
-                };
-            }
-            
-            function sendData(data) {
-                if (dataChannel && dataChannel.readyState === 'open') {
-                    dataChannel.send(JSON.stringify(data));
+// ... existing code ... */
                 }
-            }
-
-            // --- Oyun Mantığı ---
-
-            function startGame() {
-                // Sadece Host bu fonksiyonu çağırır
-                // Yeni seviye ayarlarını al
-                const settings = levelSettings[currentLevel] || levelSettings[1];
-                
-                // Misafire oyunu başlatma sinyali gönder
-                sendData({ 
-                    type: 'startGame', 
-                    opponentName: username, // Host'un adı misafir için rakip adıdır
-                    level: currentLevel
-                });
-                
-                // Host kendi oyun ekranını ayarlar
-                lives = [2, 2]; // [ben, rakip]
-                initGameScreen();
-            }
-            
-            function initGameScreen() {
-                showScreen('game');
-                screens.end.classList.remove('active'); // End screen'i gizle
-                screens.end.classList.add('hidden');
-                stopWaitSound(); // Varsa bekleme sesini durdur
-                
-                const settings = levelSettings[currentLevel];
-                
-                // Oyuncu bilgilerini ayarla
-                player1Name.textContent = username;
-                player2Name.textContent = opponentName;
-                updateLivesUI();
-                
-                // Bomba/kart durumunu sıfırla
-                myBombs = new Set();
-                opponentBombs = new Set();
-                allBombs = new Set();
-                openedCards = new Set();
-                bombsToPlace = settings.bombs;
-                
-                // Oyun tahtasını çiz
-                gameGrid.innerHTML = '';
-                gameGrid.className = `w-full max-w-3xl grid ${settings.gridCols} gap-2 sm:gap-3 p-4 mt-32`;
-                
-                for (let i = 0; i < settings.size; i++) {
-                    const card = document.createElement('div');
-                    card.className = 'card-container';
-                    card.dataset.index = i;
-                    card.innerHTML = `
-                        <div class="card-inner">
-                            <div class="card-front">❓</div>
-                            <div class="card-back"></div>
-                        </div>
-                    `;
-                    card.addEventListener('click', () => onCardClick(i));
-                    gameGrid.appendChild(card);
-                }
-                
-                // Bomba yerleştirme aşamasını başlat
-                gamePhase = 'placing';
-                turnIndicator.textContent = `Sıra sende: ${bombsToPlace} bomba seç.`;
-                myTurn = true; // Bomba yerleştirmek için
-            }
-
-            function onCardClick(index) {
-                const card = gameGrid.querySelector(`[data-index="${index}"]`);
-                if (!card || card.classList.contains('flipped')) return;
-
-                // --- 1. Aşama: Bomba Yerleştirme ---
-                if (gamePhase === 'placing' && myTurn) {
-                    if (myBombs.has(index)) {
-                        // Seçimi kaldır
-                        myBombs.delete(index);
-                        card.querySelector('.card-front').textContent = '❓';
-                        card.classList.remove('border-4', 'border-red-500');
-                    } else if (myBombs.size < bombsToPlace) {
-                        // Bomba seç
-                        myBombs.add(index);
-                        card.querySelector('.card-front').textContent = '💣';
-                        card.classList.add('border-4', 'border-red-500');
-                    }
-                    
-                    const remaining = bombsToPlace - myBombs.size;
-                    turnIndicator.textContent = `Sıra sende: ${remaining} bomba seç.`;
-                    
-                    if (myBombs.size === bombsToPlace) {
-                        // Bombalar seçildi, rakibe gönder
-                        myTurn = false;
-                        turnIndicator.textContent = 'Rakibin bomba seçmesi bekleniyor...';
-                        sendData({ type: 'bombsPlaced', bombs: Array.from(myBombs) });
-                        checkReadyToStartMainGame();
-                    }
-                    return;
-                }
-                
-                // --- 2. Aşama: Kart Açma ---
-                if (gamePhase === 'revealing' && myTurn) {
-                    myTurn = false; // Sırayı hemen kilitle
-                    sendData({ type: 'revealCard', index });
-                    handleReveal(index, 'me');
-                }
-            }
-            
-            function checkReadyToStartMainGame() {
-                // Hem ben hem de rakip bombaları yerleştirdiyse
-                if (myBombs.size === bombsToPlace && opponentBombs.size > 0) {
-                    allBombs = new Set([...myBombs, ...opponentBombs]);
-                    gamePhase = 'revealing';
-                    
-                    // İlk sırayı host belirler
-                    myTurn = isHost;
-                    updateTurnIndicator();
-                }
-            }
-            
-            function handleReveal(index, clicker) {
-                // Kartı aç
-                const card = gameGrid.querySelector(`[data-index="${index}"]`);
-                if (!card || card.classList.contains('flipped')) return; // Zaten açıksa (çift tıklama/gecikme)
-                
-                card.classList.add('flipped');
-                openedCards.add(index);
-                const cardBack = card.querySelector('.card-back');
-                
-                // Bomba mı?
-                if (allBombs.has(index)) {
-                    playBombSound();
-                    cardBack.textContent = '💥';
-                    cardBack.classList.add('bg-red-700');
-                    document.body.classList.add('shake');
-                    setTimeout(() => document.body.classList.remove('shake'), 400);
-
-                    // Can azalt
-                    if (clicker === 'me') {
-                        lives[0]--;
-                    } else {
-                        lives[1]--;
-                    }
-                    updateLivesUI();
-                    
-                } else {
-                    // Bomba değil
-                    playEmojiSound();
-                    const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-                    cardBack.textContent = randomEmoji;
-                    cardBack.classList.add('bg-gray-600');
-                }
-                
-                // Oyun bitti mi kontrol et
-                if (lives[0] === 0 || lives[1] === 0) {
-                    setTimeout(() => showEndScreen(lives[1] === 0), 1000); // 1sn bekle
-                } else {
-                    // Sırayı değiştir (eğer clicker 'me' ise)
-                    if (clicker === 'me') {
-                        // Rakibin sırası
-                        updateTurnIndicator();
-                    } else {
-                        // Benim sıram
-                        myTurn = true;
-                        updateTurnIndicator();
-                    }
-                    checkLowCards();
-                }
-            }
-            
-            function updateLivesUI() {
-                player1Lives.textContent = '❤️'.repeat(lives[0]);
-                player2Lives.textContent = '❤️'.repeat(lives[1]);
-            }
-            
-            function updateTurnIndicator() {
-                if (gamePhase === 'revealing') {
-                    turnIndicator.textContent = myTurn ? 'Sıra Sende! Kart Seç.' : 'Rakibin Sırası Bekleniyor...';
-                }
-            }
-
-            // Kalan kart azaldığında titreşim
-            function checkLowCards() {
-                const settings = levelSettings[currentLevel];
-                const remainingCards = settings.size - openedCards.size;
-                
-                if (remainingCards > 0 && remainingCards <= 4) { // 4 veya daha az kart kaldığında
-                    startWaitSound();
-                    gameGrid.querySelectorAll('.card-container:not(.flipped)').forEach(card => {
-                        card.classList.add('vibrating');
-                    });
-                } else {
-                    stopWaitSound();
-                    gameGrid.querySelectorAll('.vibrating').forEach(card => {
-                        card.classList.remove('vibrating');
-                    });
-                }
-            }
-            
-            function showEndScreen(didIWin) {
-                stopWaitSound();
-                showScreen('end');
-                if (didIWin) {
-                    endMessage.textContent = 'Kazandın! 🎉';
-                    // Bir sonraki seviyeye geç
-                    currentLevel = Math.min(3, currentLevel + 1);
-                } else {
-                    endMessage.textContent = 'Kaybettin! 💥';
-                    // Kaybedince seviye sıfırlanabilir, şimdilik kalsın.
-                    // currentLevel = 1; 
-                }
-            }
-
-            function resetToLobby() {
-                if (peerConnection) {
-                    peerConnection.close();
-                    peerConnection = null;
-                }
-                if (dataChannel) {
-                    dataChannel.close();
-                    dataChannel = null;
-                }
-                isHost = false;
-                currentLevel = 1;
-                opponentName = "";
-                stopWaitSound();
-                showScreen('lobby');
-                // Bağlantı ekranı formlarını temizle
-                offerText.value = '';
-                answerTextHost.value = '';
-                offerTextGuest.value = '';
-                answerTextGuest.value = '';
-            }
-
-            // --- Lobi Olayları (Event Listeners) ---
-            
-            window.addEventListener('load', () => {
-                loadUsername();
-                // Loader'ı 1.5 saniye sonra gizle
-                setTimeout(() => {
-                    showScreen('lobby');
-                }, 1500);
             });
             
             createRoomBtn.addEventListener('click', initCreateRoom);
             joinRoomBtn.addEventListener('click', initJoinRoom);
             cancelConnectBtn.addEventListener('click', resetToLobby);
             
+            // Global Mesaj Kapatma
+            globalMessageClose.addEventListener('click', hideGlobalMessage);
+
             // Sinyal Kopyalama Butonları
             copyOfferBtn.addEventListener('click', () => copyToClipboard(offerText.value, copyOfferBtn));
-            copyAnswerBtn.addEventListener('click', () => copyToClipboard(answerTextGuest.value, copyAnswerBtn));
-            
-            // Sinyal Yapıştırma/Giriş
-            answerTextHost.addEventListener('input', () => {
-                // Host, cevabı alır almaz bağlantıyı dener
-                receiveAnswer(answerTextHost.value);
-            });
-            
-            createAnswerBtn.addEventListener('click', () => {
+// ... existing code ... */
                 if (offerTextGuest.value) {
                     receiveOfferAndCreateAnswer(offerTextGuest.value);
                 } else {
-                    alert('Lütfen önce arkadaşının teklif kodunu yapıştır.');
+                    // alert('Lütfen önce arkadaşının teklif kodunu yapıştır.');
+                    showGlobalMessage('Lütfen önce arkadaşının teklif kodunu yapıştır.');
                 }
             });
+// ... existing code ... */
 
-            // Oyun Sonu Butonları
-            playAgainBtn.addEventListener('click', () => {
-                sendData({ type: 'playAgain', nextLevel: currentLevel });
-                // Host ise direkt başlatır, değilse bekler
-                if (isHost) {
-                    startGame();
-                } else {
-                    initGameScreen(); // Sadece ekranı hazırlar, host'tan 'startGame' bekler
-                }
-            });
-
-            backToLobbyBtn.addEventListener('click', () => {
-                // Rakibe sinyal göndermeden lobyeye dön (bağlantı zaten kopacak)
-                resetToLobby();
-            });
-        });
-    </script>
-</body>
-</html>
