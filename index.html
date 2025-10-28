@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>💣 Emoji Bomb 1v1 - Profesyonel Eşleşme</title>
+    <title>💣 Emoji Bomb 1v1 - Mobil Uyumlu</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     
     <style>
-        /* === KENDİ OYUNUNUZDAN ALINAN CSS STİLLERİ === */
+        /* === KENDİ OYUNUNUZDAN ALINAN CSS STİLLERİ VE MOBİL UYUM === */
+        
         /* Ön yüzün rengini belirten değişkenler */
         :root {
             --primary-color: #3498db;
@@ -23,34 +24,80 @@
         }
         
         /* Genel Stiller */
-        body { font-family: sans-serif; background-color: var(--bg-color); color: var(--text-color); height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; transition: background-color 0.3s; }
-        .screen { width: 100%; max-width: 500px; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; box-sizing: border-box; text-align: center; background-color: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow); transition: background-color 0.3s; }
-        .screen.active { display: flex; }
+        * {
+            -webkit-tap-highlight-color: transparent; /* Mobil tıklama vurgusunu kaldırır */
+        }
+        body { 
+            font-family: sans-serif; 
+            background-color: var(--bg-color); 
+            color: var(--text-color); 
+            min-height: 100vh; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            overflow-x: hidden; 
+            overflow-y: auto; 
+            transition: background-color 0.3s; 
+            padding: 10px;
+        }
+        .container {
+            width: 100%;
+            max-width: 500px;
+            margin: auto;
+        }
+        .screen { 
+            width: 100%; 
+            max-width: 500px; 
+            display: none; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 1.5rem; 
+            box-sizing: border-box; 
+            text-align: center; 
+            background-color: var(--card-bg); 
+            border-radius: 12px; 
+            box-shadow: var(--shadow); 
+            transition: background-color 0.3s; 
+        }
+        .screen.active { 
+            display: flex; 
+        }
         
         /* Utility */
         .btn { @apply w-full text-xl font-bold py-3 px-6 rounded-xl shadow-lg transition-all duration-200 ease-in-out; }
         .btn-primary { @apply bg-blue-600 text-white hover:bg-blue-500 active:scale-95; }
         .input-field { @apply w-full text-lg bg-gray-200 text-gray-900 border-2 border-gray-400 rounded-lg p-3 text-center placeholder-gray-500 focus:outline-none focus:border-blue-500; }
         .code-display { @apply text-4xl font-extrabold p-4 bg-gray-800 text-yellow-300 rounded-lg tracking-widest; }
-        #globalMessage.show { display: block; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 50; animation: fadeInDown 0.3s ease-out; }
         
-        /* OYUN TAHTASI VE KART ARALIKLARI */
+        /* Global Mesaj */
+        #globalMessage.show { 
+            display: block; 
+            position: fixed; 
+            top: 20px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            z-index: 50; 
+            animation: fadeInDown 0.3s ease-out; 
+            width: 90%;
+            max-width: 400px;
+        }
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translate(-50%, -20px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+
+        /* YENİ: OYUN TAHTASI VE MOBİL UYUMLULUK */
         .memory-board {
             display: grid;
             gap: 8px; /* Kartlar arasındaki boşluk */
             padding: 5px 0;
+            /* grid-template-columns JS'ten repeat(4, 1fr) olarak ayarlanıyor */
         }
-
-        /* Seviye Grid Düzenleri (Yeni 18/22/28 karta uyarlı) */
-        .grid-6x3 { grid-template-columns: repeat(6, 1fr); gap: 8px; } /* 18 Kart */
-        .grid-6x4 { grid-template-columns: repeat(6, 1fr); gap: 8px; } /* 22 Kart -> 6x4'e yakındır*/
-        .grid-7x4 { grid-template-columns: repeat(7, 1fr); gap: 6px; } /* 28 Kart */
-
-
+        
         /* Kart Stilleri */
         .card-container {
             perspective: 1000px; 
-            aspect-ratio: 1;
+            aspect-ratio: 1; /* Kartları kare yapar */
         }
         .card {
             width: 100%;
@@ -58,8 +105,8 @@
             border-radius: 10px;
             cursor: pointer;
             position: relative;
-            transform-style: preserve-3d; 
-            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform-style: preserve-3d; /* 3D dönüşüm için kritik */
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         }
 
@@ -71,13 +118,16 @@
             position: absolute;
             width: 100%;
             height: 100%;
-            backface-visibility: hidden;
+            backface-visibility: hidden; /* Kart dönmediğinde arka yüzün görünmesini engeller */
             display: flex;
             justify-content: center;
             align-items: center;
             border-radius: 10px;
-            font-size: 1.8rem;
+            font-size: 1.5rem; 
             font-weight: bold;
+        }
+        @media (min-width: 400px) {
+             .card-face { font-size: 1.8rem; } /* Daha büyük cihazlarda fontu büyüt */
         }
 
         /* KARTIN ÖN YÜZÜ (KAPALI HALİ) */
@@ -127,7 +177,7 @@
         <p id="globalMessageText"></p>
     </div>
 
-    <div id="lobby" class="screen active space-y-6">
+    <div id="lobby" class="screen active space-y-6 container">
         <h1 class="text-5xl font-black text-gray-900">💣 Emoji Bomb</h1>
         <p class="text-gray-700">Sunucuya bağlı. Kullanıcı adınızı girin.</p>
         
@@ -137,7 +187,7 @@
         <button id="matchBtn" class="btn btn-primary">🎮 Oda Oluştur / Odaya Gir</button>
     </div>
     
-    <div id="waitScreen" class="screen space-y-6">
+    <div id="waitScreen" class="screen space-y-6 container">
         <h2 id="waitTitle" class="text-3xl font-bold text-gray-900">Oda Kuruluyor...</h2>
         <div id="codeArea" class="space-y-3 hidden">
             <p class="text-lg text-gray-700">Oda Kodunuz:</p>
@@ -148,17 +198,17 @@
         <button id="cancelBtn" class="btn bg-red-600 text-base py-3 max-w-xs">İptal Et</button>
     </div>
 
-    <div id="gameScreen" class="screen space-y-6">
+    <div id="gameScreen" class="screen space-y-6 container">
         <h1 class="text-5xl font-black text-gray-900">🕹️ Emoji Bomb</h1>
         
-        <div class="flex justify-between w-full text-gray-800 font-bold">
+        <div class="flex justify-between w-full text-gray-800 font-bold p-2 border-b border-gray-300">
             <p>Sen: <span id="myLives" class="text-green-600">❤️❤️</span></p>
             <p>Rakip: <span id="opponentName" class="text-blue-600"></span></p>
-            <p>Rakip Can: <span id="opponentLives" class="text-green-600">❤️❤️</span></p>
+            <p>Can: <span id="opponentLives" class="text-green-600">❤️❤️</span></p>
         </div>
-        <p id="roleStatus" class="text-gray-700"></p>
+        <p id="roleStatus" class="text-gray-700 text-sm"></p>
 
-        <div id="gameContent" class="p-6 bg-gray-200 rounded-lg w-full space-y-4">
+        <div id="gameContent" class="p-4 bg-gray-200 rounded-lg w-full space-y-4">
             <h3 id="turnStatus" class="text-2xl font-bold text-red-600">Rakip bekleniyor...</h3>
             <p id="actionMessage" class="text-base text-purple-600 font-semibold"></p>
             
