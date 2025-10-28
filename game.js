@@ -1,7 +1,7 @@
-// Dosya Adı: game.js (Sıra Kontrolü Düzeltilmiş Sürüm)
+// Dosya Adı: game.js (Sıra Kontrolü SADELEŞTİRİLMİŞ ve Kesinleştirilmiş Sürüm)
 let socket;
 let currentRoomCode = '';
-let isHost = false; // Bu client HOST mu? (true/false)
+let isHost = false; // Bu client HOST mu? (0)
 let opponentName = '';
 
 // --- DOM Referansları (Aynı) ---
@@ -151,9 +151,9 @@ function updateStatusDisplay() {
     myLivesEl.textContent = '❤️'.repeat(Math.max(0, myLives));
     opponentLivesEl.textContent = '❤️'.repeat(Math.max(0, opponentLives));
 
-    // KRİTİK KONTROLÜ SADELEŞTİRME
-    // Eğer ben Host'sam, gameData.turn 0 olduğunda sıramdır.
-    // Eğer ben Guest'sem, gameData.turn 1 olduğunda sıramdır.
+    // KRİTİK KONTROL: Sıra benim mi?
+    // isHost = true (0) ise ve turn = 0 ise sıra benim.
+    // isHost = false (1) ise ve turn = 1 ise sıra benim.
     const myTurnId = isHost ? 0 : 1;
     const isMyTurn = gameData.turn === myTurnId;
     
@@ -194,6 +194,7 @@ function handleCardClick(event) {
         const myTurnId = isHost ? 0 : 1;
         const isMyTurn = gameData.turn === myTurnId;
         
+        // Sadece sırası olan oyuncu kart seçebilir.
         if (!isMyTurn || gameData.isGameOver) return; 
         
         if (gameData.board[cardIndex].opened) return;
@@ -204,7 +205,7 @@ function handleCardClick(event) {
 
 function sendMove(index) {
     if (socket && socket.connected) {
-        // 1. Kart açma hareketini yerel olarak uygula (Kartı çevir, canı düşür, sırayı değiştir)
+        // 1. Kart açma hareketini yerel olarak uygula
         applyMove(index); 
         
         // 2. Hareketi rakibe ilet
@@ -260,12 +261,12 @@ async function applyMove(index) {
         } else if (gameData.cardsLeft === 0) {
             endGame('LEVEL_COMPLETE');
         } else {
-            // KRİTİK DÜZELTME: Sırayı değiştir
+            // KRİTİK DÜZELTME: Sırayı anında değiştir ve UI'yi güncelle
             gameData.turn = gameData.turn === 0 ? 1 : 0;
-            updateStatusDisplay(); // Sıra değişimi yansıtılır
+            updateStatusDisplay(); 
         }
         
-    }, 1000); 
+    }, 1000); // Animasyon süresi
 }
 
 function endGame(winnerRole) {
