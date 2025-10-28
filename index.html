@@ -9,56 +9,59 @@
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     
     <style>
-        body { font-family: sans-serif; background: linear-gradient(to bottom right, #1a1a1a, #333333); color: #f0f0f0; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .screen { width: 100%; max-width: 400px; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; box-sizing: border-box; text-align: center; }
+        /* Arka planı koyu, genel yazıyı koyu gri/siyah yaptık */
+        body { font-family: sans-serif; background: linear-gradient(to bottom right, #1a1a1a, #333333); color: #333; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .screen { width: 100%; max-width: 400px; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; box-sizing: border-box; text-align: center; background-color: #f0f0f0; border-radius: 12px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); }
         .screen.active { display: flex; }
         .btn { @apply w-full text-xl font-bold py-3 px-6 rounded-xl shadow-lg transition-all duration-200 ease-in-out; }
         .btn-primary { @apply bg-blue-600 text-white hover:bg-blue-500 active:scale-95; }
-        .input-field { @apply w-full text-lg bg-gray-700 text-white border-2 border-gray-600 rounded-lg p-3 text-center placeholder-gray-400 focus:outline-none focus:border-blue-500; }
-        .code-display { @apply text-4xl font-extrabold p-4 bg-gray-700 rounded-lg tracking-widest text-yellow-400; }
+        /* Yazı rengini koyu yapmak için input arka planını beyaza yakın yaptık */
+        .input-field { @apply w-full text-lg bg-gray-200 text-gray-900 border-2 border-gray-400 rounded-lg p-3 text-center placeholder-gray-500 focus:outline-none focus:border-blue-500; }
+        /* Oda kodunu daha dikkat çekici yapalım */
+        .code-display { @apply text-4xl font-extrabold p-4 bg-gray-800 text-yellow-300 rounded-lg tracking-widest; }
         #globalMessage.show { display: block; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 50; animation: fadeInDown 0.3s ease-out; }
     </style>
 </head>
-<body class="bg-gray-900 text-white select-none">
+<body class="bg-gray-900 select-none">
 
     <div id="globalMessage" class="hidden w-11/12 max-w-md p-4 bg-red-600 text-white rounded-lg shadow-lg">
         <p id="globalMessageText"></p>
     </div>
 
     <div id="lobby" class="screen active space-y-6">
-        <h1 class="text-5xl font-black">💣 Emoji Bomb</h1>
+        <h1 class="text-5xl font-black text-gray-900">💣 Emoji Bomb</h1>
+        <p class="text-gray-700">Canlı Sunucuya bağlı. Kullanıcı adınızı girin.</p>
         
         <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adı">
-        
         <input type="text" id="roomCodeInput" class="input-field uppercase" placeholder="Oda Numarası (Boş bırak=Oluştur)">
         
         <button id="matchBtn" class="btn btn-primary">🎮 Oda Oluştur / Odaya Gir</button>
     </div>
     
     <div id="waitScreen" class="screen space-y-6">
-        <h2 id="waitTitle" class="text-3xl font-bold">Oda Kuruluyor...</h2>
+        <h2 id="waitTitle" class="text-3xl font-bold text-gray-900">Oda Kuruluyor...</h2>
         <div id="codeArea" class="space-y-3 hidden">
-            <p class="text-lg">Oda Kodunuz:</p>
+            <p class="text-lg text-gray-700">Oda Kodunuz:</p>
             <div id="roomCodeDisplay" class="code-display"></div>
-            <button id="copyCodeBtn" class="btn bg-gray-600 text-base py-2 max-w-xs">Kopyala</button>
+            <button id="copyCodeBtn" class="btn bg-gray-600 text-white text-base py-2 max-w-xs">Kopyala</button>
         </div>
-        <p id="waitStatus" class="text-lg text-gray-400"></p>
+        <p id="waitStatus" class="text-lg text-gray-700"></p>
         <button id="cancelBtn" class="btn bg-red-600 text-base py-3 max-w-xs">İptal Et</button>
     </div>
 
     <div id="gameScreen" class="screen space-y-6">
-        <h1 class="text-5xl font-black">🕹️ Oyun Başladı!</h1>
-        <p class="text-lg">Rakip: <span id="opponentName" class="text-yellow-400"></span></p>
-        <div id="gameContent" class="p-6 bg-gray-800 rounded-lg w-full">
-            <p id="roleStatus"></p>
-            <p>Oyun verileri takası için Socket.IO hazır.</p>
+        <h1 class="text-5xl font-black text-gray-900">🕹️ Oyun Başladı!</h1>
+        <p class="text-lg text-gray-700">Rakip: <span id="opponentName" class="text-blue-600"></span></p>
+        <div id="gameContent" class="p-6 bg-gray-200 rounded-lg w-full">
+            <p id="roleStatus" class="text-gray-800"></p>
+            <p class="text-gray-600">Oyun verileri takası için Socket.IO hazır.</p>
         </div>
-        <button id="endGameBtn" class="btn bg-gray-600 text-base py-3 max-w-xs">Oyunu Bitir</button>
+        <button id="endGameBtn" class="btn bg-gray-600 text-white text-base py-3 max-w-xs">Oyunu Bitir</button>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- DOM Referansları ---
+            // --- DOM Referansları ve Değişkenler (Aynı Kalır) ---
             const screens = { lobby: document.getElementById('lobby'), wait: document.getElementById('waitScreen'), game: document.getElementById('gameScreen') };
             const globalMessage = document.getElementById('globalMessage');
             const globalMessageText = document.getElementById('globalMessageText');
@@ -75,17 +78,16 @@
             const endGameBtn = document.getElementById('endGameBtn');
             const roleStatusEl = document.getElementById('roleStatus');
             
-            // --- Oyun Durumu ---
             let socket;
             let currentRoomCode = '';
             let username = '';
             let isHost = false;
             
-            // --- Canlı Sunucu Adresi ---
-            // BURAYI RENDER'DAN ALACAĞINIZ CANLI URL İLE DEĞİŞTİRECEKSİNİZ!
-            const LIVE_SERVER_URL = 'http://localhost:3000'; 
+            // Render URL'niz: https://beta-github-io.onrender.com
+            // Lütfen bu kısmı KENDİ URL'nizle değiştirin:
+            const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
             
-            // --- Temel Fonksiyonlar ---
+            // --- Temel Fonksiyonlar (Aynı Kalır) ---
             function showGlobalMessage(message, isError = true) {
                 globalMessageText.textContent = message;
                 globalMessage.classList.remove('bg-red-600', 'bg-green-600');
@@ -100,7 +102,6 @@
             }
             function resetGame() {
                 if (socket && currentRoomCode) {
-                    // Sunucuya odadan ayrıldığımızı bildir
                     socket.emit('leaveRoom', { roomCode: currentRoomCode });
                 }
                 currentRoomCode = '';
@@ -115,30 +116,34 @@
                 return true;
             }
 
-            // --- Socket.IO Bağlantısı ---
+            // --- Socket.IO Bağlantısı (Hata Ayarları Eklendi) ---
             function connectToServer() {
                 if (socket && socket.connected) return;
 
                 try {
                     // Bağlantı adresi artık canlı sunucunuz
                     socket = io(LIVE_SERVER_URL, {
-                        transports: ['websocket'],
-                        // CORS sorunu yaşanırsa bu satırı açın:
-                        // extraHeaders: { "Access-Control-Allow-Origin": "*" } 
+                        transports: ['websocket', 'polling'], // Bağlantı düşerse polling'i denemesini sağla
+                        reconnectionAttempts: 5, // Tekrar bağlanmayı 5 kez dene
+                        timeout: 20000 // 20 saniye sonra zaman aşımı
                     });
 
                     socket.on('connect', () => {
-                        showGlobalMessage('Sunucuya bağlandı.', false);
+                        showGlobalMessage('Sunucuya bağlandı. Eşleşmeye hazırsınız.', false);
                         showScreen('lobby');
                     });
                     
                     socket.on('connect_error', (err) => {
                         console.error('Bağlantı Hatası:', err);
-                        showGlobalMessage('HATA: Canlı sunucuya bağlanılamadı. Lütfen sunucunuzun aktif olduğundan emin olun.', true);
+                        showGlobalMessage('HATA: Sunucuya erişilemiyor. Lütfen Render sayfasını kontrol edin.', true);
                         showScreen('lobby');
                     });
+                    
+                    socket.on('disconnect', () => {
+                        showGlobalMessage('Bağlantı kesildi. Tekrar bağlanmaya çalışılıyor...', true);
+                    });
 
-                    // --- Eşleşme Olayları ---
+                    // --- Diğer Socket Olayları (Aynı Kalır) ---
                     socket.on('roomCreated', (code) => {
                         currentRoomCode = code;
                         isHost = true;
@@ -154,7 +159,6 @@
                     });
                     
                     socket.on('gameStart', (players) => {
-                        // Rakip ismini bul
                         const opponent = players.find(p => p.id !== socket.id);
                         const self = players.find(p => p.id === socket.id);
 
@@ -171,19 +175,17 @@
                         resetGame();
                     });
 
-                    // --- Oyun Verisi Aktarımı ---
                     socket.on('gameData', (data) => {
-                        // Örn: data.type === 'FLIP' ise kartı çevir, data.type === 'SCORE' ise skoru güncelle
                         console.log('Rakip Verisi:', data);
                     });
 
                 } catch (e) {
-                    console.error('Socket.IO hatası:', e);
-                    showGlobalMessage('Bağlantı kurulamadı. Tarayıcı konsolunu kontrol edin.', true);
+                    console.error('Socket.IO genel hatası:', e);
+                    showGlobalMessage('Kritik bağlantı hatası oluştu.', true);
                 }
             }
             
-            // --- Olay Dinleyicileri ---
+            // --- Olay Dinleyicileri (Aynı Kalır) ---
             matchBtn.addEventListener('click', () => {
                 if (!validateInput()) return;
                 
@@ -191,13 +193,11 @@
                 const roomCode = roomCodeInput.value.trim().toUpperCase();
 
                 if (roomCode === '') {
-                    // Oda Oluşturma
                     waitTitle.textContent = 'Oda Kuruluyor...';
                     waitStatus.textContent = 'Lütfen bekleyin...';
                     codeArea.classList.add('hidden');
                     socket.emit('createRoom', { username });
                 } else {
-                    // Odaya Katılma
                     waitTitle.textContent = `Odaya Katılım: ${roomCode}`;
                     waitStatus.textContent = 'Bağlanılıyor...';
                     codeArea.classList.add('hidden');
@@ -215,7 +215,6 @@
                     .catch(() => showGlobalMessage('Kopyalama başarısız.', true));
             });
 
-            // Başlangıçta sunucuya bağlan
             connectToServer();
         });
     </script>
