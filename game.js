@@ -30,7 +30,7 @@ const messagesEl = document.getElementById('messages');
 // --- OYUN DURUMU ---
 let gameData = {
     cardContents: [], // Sunucudan alınan karıştırılmış ve atanmış içerikler
-    openedCards: new Set(), // Açık kartların indekslerini tutar (Set hızlı kontrol sağlar)
+    openedCards: new Set(), // Açık kartların indekslerini tutar
     hostLives: 2,
     guestLives: 2,
     cardsLeft: 0,
@@ -83,7 +83,6 @@ function handleSendMessage() {
 // --- OYUN MANTIĞI VE ÇİZİM ---
 
 function initializeGame(initialData) {
-    // KRİTİK: Sunucudan gelen kart içeriklerini (emoji/bomba) al
     gameData.cardContents = initialData.cardContents; 
     gameData.hostLives = initialData.initialLives;
     gameData.guestLives = initialData.initialLives;
@@ -114,7 +113,6 @@ function drawBoard() {
         const back = document.createElement('div');
         back.className = 'card-face back';
         
-        // KRİTİK DÜZELTME: İçerik doğrudan gameData.cardContents'ten alınır
         let displayContent = content;
         
         // Bomba ise özel sınıf ekle
@@ -132,9 +130,14 @@ function drawBoard() {
 
         if (isOpened) {
             card.classList.add('flipped');
-        } else if (!gameData.isGameOver && !gameData.isAnimating) {
-            // KRİTİK DÜZELTME: Hiçbir sıra kontrolü yapılmaz. Herkes her zaman tıklayabilir.
+        } 
+        
+        // KRİTİK DÜZELTME: Tıklama dinleyicisini Host/Guest ayrımı yapmadan ekle.
+        if (!isOpened && !gameData.isGameOver) {
             card.classList.add('cursor-pointer');
+            
+            // Dinleyiciyi kaldırıp tekrar eklemek, çift tetiklenmeyi önler.
+            cardContainer.removeEventListener('click', handleCardClick);
             cardContainer.addEventListener('click', handleCardClick);
         }
         
@@ -168,17 +171,22 @@ function updateStatusDisplay() {
 
 function handleCardClick(event) {
     
-    if (gameData.isAnimating || gameData.isGameOver) return; 
+    // YALNIZCA KİLİT/ANİMASYON DURUMU VEYA OYUN SONU İSE ÇIK
+    if (gameData.isAnimating || gameData.isGameOver) {
+        // console.log("Tıklama engellendi: Animasyon veya Oyun Bitti.");
+        return;
+    } 
 
     const cardContainer = event.currentTarget; 
     const cardElement = cardContainer.querySelector('.card');
     
+    // Kart zaten açıksa veya element yoksa çık
     if (!cardElement || cardElement.classList.contains('flipped')) return; 
     
     const cardIndex = parseInt(cardElement.dataset.index);
 
     sendMove(cardIndex);
-    gameData.isAnimating = true; // Animasyon bitene kadar tıklamayı engelle
+    gameData.isAnimating = true; // Sunucudan yanıt gelene kadar kilitler
 }
 
 function sendMove(index) {
@@ -190,7 +198,6 @@ function sendMove(index) {
     }
 }
 
-// KRİTİK: Sunucudan gelen oyun durumunu işler
 async function handleGameStateUpdate(data) {
     
     const { moveResult, hostLives, guestLives, cardsLeft, openedCardsIndices } = data;
@@ -203,11 +210,10 @@ async function handleGameStateUpdate(data) {
         if (hitBomb) { cardElement.classList.add('vibrate'); }
     }
     
-    // 2. Client Durumunu Güncelle (OpenedCards Set'i ile)
+    // 2. Client Durumunu Güncelle
     gameData.hostLives = hostLives;
     gameData.guestLives = guestLives;
     gameData.cardsLeft = cardsLeft;
-    // Açık kartlar listesini sunucudan gelen tam liste ile güncelleyelim.
     gameData.openedCards = new Set(openedCardsIndices); 
 
     // 3. Mesaj Göster
@@ -268,7 +274,6 @@ export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername,
     opponentNameEl.textContent = opponentName;
     roleStatusEl.textContent = isHost ? "Rol: HOST" : "Rol: GUEST";
     
-    // KRİTİK: initializeGame'e sadece initialData'yı gönderiyoruz
     initializeGame(initialData); 
     drawBoard();
     showScreen('game');
