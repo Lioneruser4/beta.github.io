@@ -13,7 +13,6 @@
             --text-color: #edf2f7;
         }
         
-        /* ... (Diğer CSS stilleriniz aynı kalır) ... */
         body { 
             font-family: sans-serif; background-color: var(--bg-color); color: var(--text-color); 
             min-height: 100vh; display: flex; align-items: center; justify-content: center; 
@@ -53,7 +52,7 @@
                 <span class="text-sm">veya</span>
                 <hr class="flex-grow border-gray-600">
             </div>
-            <input id="roomCodeInput" type="text" placeholder="Oda Kodunu Girin" class="w-full p-3 border border-gray-600 rounded-lg bg-gray-700 text-white focus:ring-blue-500 focus:border-blue-500 uppercase" maxlength="6">
+            <input id="roomCodeInput" type="text" placeholder="Oda Kodunu Girin (4 Haneli)" class="w-full p-3 border border-gray-600 rounded-lg bg-gray-700 text-white focus:ring-blue-500 focus:border-blue-500 uppercase" maxlength="4">
             <button id="joinBtn" class="w-full btn bg-blue-600 hover:bg-blue-700 text-white text-base py-3 rounded-lg font-semibold transition duration-200">
                 Odaya Katıl
             </button>
@@ -93,7 +92,6 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script type="module">
-        // game.js'deki UIElements'ı doğru şekilde import edin
         import { setupSocketHandlers, showScreen, UIElements } from './game.js';
 
         const { showGlobalMessage: showGlobalMessageClient } = UIElements;
@@ -104,28 +102,26 @@
         const roomCodeInput = document.getElementById('roomCodeInput');
         const usernameInput = document.getElementById('username');
         
-        let socket;
+        let socket = null;
         let currentUsername = '';
 
-        // --- Socket Bağlantısını Kurma ve Olay İşleyicileri ---
         function connectSocket(callback) {
             if (socket && socket.connected) {
                 callback();
                 return;
             }
             
-            // Socket bağlantısını kur
             socket = io(window.location.origin);
             
-            // --- GLOBAL SOCKET İŞLEYİCİLERİ BURADA OLMALI ---
             socket.on('connect', () => {
                 console.log('Socket.IO Bağlandı:', socket.id);
-                callback();
+                callback(); 
             });
 
             socket.on('connect_error', (err) => {
                 showGlobalMessageClient(`Bağlantı Hatası: ${err.message}`, true);
                 console.error("Bağlantı Hatası:", err);
+                socket = null;
             });
             
             socket.on('disconnect', (reason) => {
@@ -140,57 +136,51 @@
                 showGlobalMessageClient(message, true);
             });
 
-            // Oda Oluşturma Başarılı
             socket.on('roomCreated', (roomCode) => {
                 currentRoomCodeDisplay.textContent = `Oda Kodu: ${roomCode}`;
                 document.getElementById('waitMessage').textContent = "Bir rakibin bu koda katılması bekleniyor...";
             });
 
-            // Odaya Katılım Başarısız
             socket.on('joinFailed', (message) => {
                  showGlobalMessageClient(message, true);
                  showScreen('lobby');
+                 if(socket) socket.disconnect();
             });
 
-            // Oyun Başladı
             socket.on('gameStart', (players) => {
                 const self = players.find(p => p.id === socket.id);
                 const opponent = players.find(p => p.id !== socket.id);
-                
-                // game.js'deki ana oyun mantığını başlatır
                 setupSocketHandlers(socket, self.roomCode, self.isHost, opponent.username);
             });
-            
-            // Opponent Left - game.js tarafından ele alınır
         }
 
-        // --- Oda Yönetimi Fonksiyonları ---
         function validateAndConnect(isHost, roomCode = null) {
             currentUsername = usernameInput.value.trim();
             if (!currentUsername) {
                 showGlobalMessageClient("Lütfen bir kullanıcı adı girin.", true);
-                return false;
+                return;
             }
-            if (!isHost && (!roomCode || roomCode.length !== 4)) { // Sunucunuz 4 haneli kod üretiyor
+            // Sunucu 4 haneli kod üretiyor
+            if (!isHost && (!roomCode || roomCode.length !== 4)) { 
                 showGlobalMessageClient("Oda kodu 4 haneli olmalıdır.", true);
-                return false;
+                return;
             }
             
             connectSocket(() => {
                 showScreen('wait');
                 
                 if (isHost) {
-                    // Sunucudaki 'createRoom' sinyalini kullan
                     socket.emit('createRoom', { username: currentUsername });
                 } else if (roomCode) {
-                    // Sunucudaki 'joinRoom' sinyalini kullan
                     socket.emit('joinRoom', { username: currentUsername, roomCode: roomCode });
                 }
             });
         }
 
         // --- Olay Dinleyicileri ---
-        matchBtn.addEventListener('click', () => validateAndConnect(true));
+        matchBtn.addEventListener('click', () => {
+            validateAndConnect(true);
+        });
         
         joinBtn.addEventListener('click', () => {
             const code = roomCodeInput.value.trim().toUpperCase();
@@ -199,14 +189,12 @@
         
         cancelBtn.addEventListener('click', () => {
             if (socket && socket.connected) {
-                socket.emit('leaveRoom', {}); // Sunucu tarafında bu sinyali de işlemelisiniz!
+                socket.emit('leaveRoom', {}); 
+                socket.disconnect(); // Bağlantıyı tamamen kes
             }
             showScreen('lobby');
             currentRoomCodeDisplay.textContent = '';
         });
-
-        // Sayfa yüklendiğinde bağlantıyı denemeye başla
-        document.addEventListener('DOMContentLoaded', () => connectSocket(() => {}));
     </script>
 </body>
 </html>
