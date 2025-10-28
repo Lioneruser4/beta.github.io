@@ -1,4 +1,4 @@
-// Dosya Adı: server.js (BOMBALI HAFIZA OYUNU V10 - EŞ ZAMANLI VE SONSUZ SEVİYE)
+// Dosya Adı: server.js (BOMBALI HAFIZA OYUNU V7 - HOST FIX + SONSUZ SEVİYE)
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -21,18 +21,22 @@ const BOMB_COUNT = 4;
 const DEFAULT_LIVES = 2; 
 const EMOTICONS = ['🍉', '🍇', '🍒', '🍕', '🐱', '⭐', '🚀', '🔥', '🌈', '🎉'];
 
-// --- Yardımcı Fonksiyonlar (Aynı Kalır) ---
+// ... (createShuffledContents, selectRandomBombs, generateRoomCode fonksiyonları aynı kalır)
+
 function createShuffledContents(boardSize) {
     const pairs = boardSize / 2; 
     let cardContents = [];
+
     for (let i = 0; i < pairs; i++) {
         const emoji = EMOTICONS[i % EMOTICONS.length]; 
         cardContents.push(emoji, emoji);
     }
+    
     for (let i = cardContents.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [cardContents[i], cardContents[j]] = [cardContents[j], cardContents[i]];
     }
+
     return cardContents;
 }
 
@@ -51,13 +55,13 @@ function generateRoomCode() {
     return code;
 }
 
-// --- Oyun Durumu Başlatıcı (Yeni Seviye için kullanılır) ---
+// --- Oyun Durumu Başlatıcı (Yeni Seviye için de kullanılır) ---
 function initializeRoom(room) {
     room.hostBombs = selectRandomBombs(BOARD_SIZE, BOMB_COUNT);
     room.guestBombs = selectRandomBombs(BOARD_SIZE, BOMB_COUNT);
-    // Canlar korunur, sadece ilk başlangıçta ayarlanır.
-    if (typeof room.hostLives === 'undefined') room.hostLives = DEFAULT_LIVES;
-    if (typeof room.guestLives === 'undefined') room.guestLives = DEFAULT_LIVES;
+    // Canlar, oyunun başlangıcında ayarlanır, seviye geçişinde korunur.
+    if (!room.hostLives) room.hostLives = DEFAULT_LIVES;
+    if (!room.guestLives) room.guestLives = DEFAULT_LIVES;
     
     room.openedCards = new Set();
     
@@ -73,6 +77,7 @@ function initializeRoom(room) {
     room.cardsLeft = BOARD_SIZE;
     room.gameActive = true;
     
+    // Sadece yeni kart içeriğini ve canları döndür (Client'a göndermek için)
     return {
         cardContents: room.cardContents,
         hostLives: room.hostLives,
@@ -80,28 +85,16 @@ function initializeRoom(room) {
     };
 }
 
-
 // --- SOCKET.IO Olay Yönetimi ---
 io.on('connection', (socket) => {
     
-    // --- ODA OLUŞTURMA ---
     socket.on('createRoom', ({ username }) => {
         const code = generateRoomCode();
-        rooms[code] = { 
-            code, 
-            playerCount: 1, 
-            hostId: socket.id, 
-            hostUsername: username, 
-            guestId: null, 
-            guestUsername: null,
-            hostLives: DEFAULT_LIVES, // Canları ilk kez tanımla
-            guestLives: DEFAULT_LIVES
-        };
+        rooms[code] = { code, playerCount: 1, hostId: socket.id, hostUsername: username, guestId: null, guestUsername: null };
         socket.join(code);
         socket.emit('roomCreated', code);
     });
 
-    // --- ODAYA KATILMA ---
     socket.on('joinRoom', ({ username, roomCode }) => {
         const code = roomCode.toUpperCase();
         const room = rooms[code];
@@ -121,17 +114,14 @@ io.on('connection', (socket) => {
             { id: room.guestId, username: room.guestUsername, isHost: false }
         ];
 
-        // Odaya bağlı tüm client'lara oyunu başlat sinyalini gönder
         io.to(code).emit('gameStart', {
-            code: code,
             players, 
             cardContents: initialData.cardContents, 
             boardSize: BOARD_SIZE,
-            initialLives: DEFAULT_LIVES 
+            initialLives: DEFAULT_LIVES
         });
     });
 
-    // --- HAREKET (MOVE) MANTIĞI ---
     socket.on('MOVE', (data) => {
         const room = rooms[data.roomCode];
         if (!room || !room.gameActive) return;
@@ -151,7 +141,6 @@ io.on('connection', (socket) => {
         
         let moveResult = { cardIndex, hitBomb: false, gameOver: false, winner: null, moverName: playerName };
 
-        // Bu oyuncunun canını düşürecek olan, RAKİBİNİN bombalarıdır.
         const opponentBombs = isHostPlayer ? room.guestBombs : room.hostBombs;
         
         if (opponentBombs.has(cardIndex)) {
@@ -159,7 +148,7 @@ io.on('connection', (socket) => {
             
             if (isHostPlayer) { room.hostLives--; } else { room.guestLives--; }
 
-            // OYUN BİTİŞ KONTROLÜ (Can bittiyse)
+            // OYUN BİTİŞ KONTROLÜ (CAN BİTTİ Mİ?)
             if (room.hostLives <= 0 || room.guestLives <= 0) {
                  room.gameActive = false;
                  moveResult.gameOver = true;
@@ -167,19 +156,18 @@ io.on('connection', (socket) => {
             }
         } 
         
-        // SEVİYE TAMAMLANMA KONTROLÜ (Kartlar bittiyse ve oyun bitmediyse)
+        // SEVİYE TAMAMLANMA KONTROLÜ (KARTLAR BİTTİ Mİ?)
         if (room.cardsLeft === 0 && !moveResult.gameOver) {
-            
+            // YENİ SEVİYEYİ BAŞLAT
             const newLevelData = initializeRoom(room);
             
             io.to(data.roomCode).emit('levelUp', {
                 hostLives: room.hostLives,
                 guestLives: room.guestLives,
                 cardContents: newLevelData.cardContents,
-                cardCount: BOARD_SIZE,
                 message: "Tebrikler! Yeni seviyeye geçiliyor. Canlar korundu!"
             });
-            return; // Level up sinyali gönderildiği için aşağıdaki gameStateUpdate gönderilmez
+            return; // levelUp event'i gönderildiği için normal gameStateUpdate gönderilmez
         }
 
         // Normal oyun durumu güncellemesi
@@ -192,7 +180,8 @@ io.on('connection', (socket) => {
         });
     });
 
-    // --- SOHBET VE BAĞLANTI KESME OLAYLARI (Aynı Kalır) ---
+    // ... (sendMessage ve disconnect olayları aynı kalır)
+
     socket.on('sendMessage', (data) => {
         const room = rooms[data.roomCode];
         if (!room || !room.hostId || !room.guestId) return;
