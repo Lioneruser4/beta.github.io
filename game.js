@@ -1,11 +1,11 @@
-// Dosya Adı: game.js
+// Dosya Adı: game.js (SON STABİLİTE DÜZELTMESİ)
 let socket;
 let currentRoomCode = '';
 let isHost = false; 
 let opponentName = '';
-let isProcessingMove = false; // KRİTİK: Çift tıklamayı ve senkronizasyon hatasını engeller
+let isProcessingMove = false; // Tıklama kilidi
 
-// --- DOM Referansları ---
+// --- DOM Referansları (Aynı) ---
 const screens = { 
     lobby: document.getElementById('lobby'), 
     wait: document.getElementById('waitScreen'), 
@@ -19,7 +19,7 @@ const opponentLivesEl = document.getElementById('opponentLives');
 const opponentNameEl = document.getElementById('opponentName');
 const roleStatusEl = document.getElementById('roleStatus');
 
-// SESLER
+// SESLER (Aynı)
 const audioBomb = new Audio('sound1.mp3'); 
 const audioEmoji = new Audio('sound2.mp3');
 const audioWait = new Audio('sound3.mp3'); 
@@ -50,7 +50,7 @@ let gameData = {
 
 const EMOTICONS = ['🙂', '😂', '😍', '😎', '🤩', '👍', '🎉', '🌟', '🍕', '🐱'];
 
-// --- TEMEL UI FONKSİYONLARI ---
+// --- TEMEL UI FONKSİYONLARI (Aynı) ---
 export function showScreen(screenId) {
     Object.values(screens).forEach(screen => screen && screen.classList.remove('active'));
     if (screens[screenId]) {
@@ -78,6 +78,7 @@ function initializeGame(initialBoardSize, hostBombs, guestBombs, currentLevel, i
     gameData.hostBombs = hostBombs;
     gameData.guestBombs = guestBombs;
     
+    // Kart içerikleri oluşturma ve karıştırma
     const pairs = initialBoardSize / 2; 
     let cardContents = [];
     for (let i = 0; i < pairs; i++) {
@@ -102,9 +103,10 @@ function initializeGame(initialBoardSize, hostBombs, guestBombs, currentLevel, i
         gameData.guestLives = 2;
     }
     
-    gameData.turn = initialTurn; // Başlangıç sırası sunucudan gelir
+    gameData.turn = initialTurn; 
     gameData.isGameOver = false;
     gameStage = 'PLAY'; 
+    isProcessingMove = false; // Oyuna başlarken kilidin açık olduğundan emin ol
 }
 
 function drawBoard() {
@@ -152,9 +154,13 @@ function updateStatusDisplay() {
     myLivesEl.textContent = '❤️'.repeat(Math.max(0, myLives));
     opponentLivesEl.textContent = '❤️'.repeat(Math.max(0, opponentLives));
 
-    // Sıra kontrolü
     const myTurnId = isHost ? 0 : 1;
-    const isMyTurn = gameData.turn === myTurnId;
+    let isMyTurn = gameData.turn === myTurnId;
+    
+    // **EK GÜVENLİK KONTROLÜ:** Eğer hareket işleniyorsa, kimsenin sırası değildir.
+    if (isProcessingMove) {
+        isMyTurn = false;
+    }
     
     const bombCount = BOMB_COUNTS[level - 1];
 
@@ -167,7 +173,7 @@ function updateStatusDisplay() {
             turnStatusEl.classList.remove('text-red-600');
             turnStatusEl.classList.add('text-green-600');
         } else {
-            turnStatusEl.textContent = 'RAKİBİN SIRASI';
+            turnStatusEl.textContent = isProcessingMove ? 'HAREKET İŞLENİYOR...' : 'RAKİBİN SIRASI';
             actionMessageEl.textContent = levelInfo + " - Rakibini bekle.";
             turnStatusEl.classList.remove('text-green-600');
             turnStatusEl.classList.add('text-red-600');
@@ -181,7 +187,10 @@ function updateStatusDisplay() {
 // --- HAREKET İŞLEYİCİLERİ ---
 
 function handleCardClick(event) {
-    if (isProcessingMove) return; // Hareket işlenirken engelle
+    if (isProcessingMove) {
+        showGlobalMessage("Hareket işleniyor, lütfen bekleyin.", false);
+        return; 
+    }
 
     const cardContainer = event.currentTarget; 
     const cardElement = cardContainer.querySelector('.card');
@@ -194,7 +203,10 @@ function handleCardClick(event) {
         const myTurnId = isHost ? 0 : 1;
         const isMyTurn = gameData.turn === myTurnId;
         
-        if (!isMyTurn || gameData.isGameOver) return; 
+        if (!isMyTurn || gameData.isGameOver) {
+             showGlobalMessage("Sıra sende değil.", true);
+             return;
+        }
         
         if (gameData.board[cardIndex].opened) return;
         
@@ -204,8 +216,9 @@ function handleCardClick(event) {
 
 function sendMove(index) {
     if (socket && socket.connected) {
-        isProcessingMove = true; // Tıklamayı engelle
-        // Sadece hareketi sunucuya bildir.
+        isProcessingMove = true; // KRİTİK: Tıklamayı engelle
+        updateStatusDisplay(); // UI'da 'HAREKET İŞLENİYOR' göster
+        
         socket.emit('MOVE', {
             roomCode: currentRoomCode,
             cardIndex: index,
@@ -213,14 +226,11 @@ function sendMove(index) {
     }
 }
 
-// KRİTİK: applyMove sadece kartı açar ve canı düşürür, sıra değiştirmez.
 async function applyMove(index) {
     if (gameData.board[index].opened) return;
     
-    // Hareketi hangi oyuncu yaptıysa onun rolünü bulmak için mevcut sıraya bakılır.
     const isCurrentPlayerHost = gameData.turn === 0; 
     
-    // Rakibin bombasına bakılır
     const bombsToCheck = isCurrentPlayerHost ? gameData.guestBombs : gameData.hostBombs;
     const hitOpponentBomb = bombsToCheck.includes(index); 
     
@@ -248,9 +258,11 @@ async function applyMove(index) {
     
     drawBoard(); 
     
-    // Oyun bitiş kontrolü
+    // **KRİTİK:** Hareket işleme kilidini animasyon bitiminde kaldır.
     setTimeout(() => {
-        isProcessingMove = false; // Kart açma animasyonu bitince engel kalkar
+        isProcessingMove = false; 
+        updateStatusDisplay(); // Kilidin kalktığını UI'ye yansıt
+
         if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
             const winner = (gameData.hostLives <= 0 && gameData.guestLives <= 0) ? 'DRAW' : (gameData.hostLives <= 0 ? 'Guest' : 'Host');
             endGame(winner);
@@ -320,6 +332,8 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex, in
     // Rakibin hareketini al
     socket.on('playerMove', (data) => {
         if (gameStage !== 'PLAY') return;
+        isProcessingMove = true; // Rakip hamle yapınca kilitle
+        updateStatusDisplay();
         applyMove(data.cardIndex);
     });
 
