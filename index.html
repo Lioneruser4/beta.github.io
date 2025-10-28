@@ -136,10 +136,9 @@
     </div>
 
     <script type="module">
-        import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
+        import { setupSocketHandlers, showScreen, UIElements } from './game.js';
 
-        // Lütfen bu URL'yi KENDİ Render veya Sunucu URL'nizle değiştirin!
-        // Localhost için: 'http://localhost:3000'
+        // LÜTFEN BU URL'Yİ KENDİ SUNUCU ADRESİNİZLE DEĞİŞTİRİN!
         const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
         let socket;
         
@@ -154,8 +153,7 @@
 
         function connectToServer() {
             try {
-                // Eğer zaten bir socket varsa, eski bağlantıyı kes
-                if (socket) {
+                if (socket && socket.connected) {
                     socket.disconnect();
                 }
 
@@ -181,8 +179,8 @@
                 });
                 
                 socket.on('disconnect', () => {
-                    UIElements.showGlobalMessage('Bağlantı kesildi. Lütfen sayfayı yenileyin.', true);
-                    UIElements.matchBtn.disabled = true;
+                    UIElements.showGlobalMessage('Bağlantı kesildi. Lobiye dönülüyor.', true);
+                    UIElements.resetGame(); // Sayfayı yenileyerek lobiye döner
                 });
 
                 // --- Eşleşme Olayları ---
@@ -191,7 +189,7 @@
                     document.getElementById('waitTitle').textContent = 'Odanız Kuruldu!';
                     document.getElementById('codeArea').classList.remove('hidden');
                     document.getElementById('waitStatus').textContent = 'Oda kodunu rakibinizle paylaşın ve bağlanmasını bekleyin.';
-                    showScreen('wait'); // Ekranı bekleme ekranına geçir
+                    showScreen('wait'); // <--- Çözüm: Ekranı bekleme ekranına geçir
                 });
                 
                 socket.on('joinFailed', (message) => {
@@ -207,7 +205,7 @@
                     
                     const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase() || (self.isHost ? document.getElementById('roomCodeDisplay').textContent : '');
                     
-                    // game.js içindeki oyun mantığını başlat
+                    // game.js içindeki oyun mantığını başlatır (Bu, içerde showScreen('game') çağırır)
                     setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
                 });
 
