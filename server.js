@@ -1,4 +1,4 @@
-// Dosya Adı: server.js (BOMBALI HAFIZA OYUNU V3 - STABİL MİMARİ)
+// Dosya Adı: server.js (BOMBALI HAFIZA OYUNU V3 - GÜNCELLENMİŞ MİMARİ)
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -73,7 +73,6 @@ io.on('connection', (socket) => {
             guestId: null, 
             guestUsername: null, 
             currentLevel: 1,
-            // Diğer oyun durumları joinRoom'da atanacak
         };
         socket.join(code);
         socket.emit('roomCreated', code);
@@ -83,11 +82,17 @@ io.on('connection', (socket) => {
         const code = roomCode.toUpperCase();
         const room = rooms[code];
 
-        if (!room || room.playerCount >= 2) {
-            socket.emit('joinFailed', 'Oda bulunamadı veya dolu.');
+        if (!room) {
+            socket.emit('joinFailed', `HATA: ${code} kodlu oda bulunamadı.`);
+            return;
+        }
+        
+        if (room.playerCount >= 2) {
+            socket.emit('joinFailed', `HATA: ${code} kodlu oda zaten dolu.`);
             return;
         }
 
+        // --- Başarılı Bağlantı ---
         room.playerCount = 2;
         room.guestId = socket.id;
         room.guestUsername = username;
@@ -122,8 +127,12 @@ io.on('connection', (socket) => {
         const expectedTurn = isHostPlayer ? 0 : 1;
 
         // 1. Kural Kontrolü: Sıra ve Kart Kontrolü
-        if (room.currentTurn !== expectedTurn || room.board[cardIndex]) {
-             socket.emit('infoMessage', { message: 'Geçersiz hamle! Ya sıranız değil ya da kart zaten açık.', isError: true });
+        if (room.currentTurn !== expectedTurn) {
+             socket.emit('infoMessage', { message: 'Geçersiz hamle! Sıranız değil.', isError: true });
+             return; 
+        }
+        if (room.board[cardIndex]) {
+             socket.emit('infoMessage', { message: 'Geçersiz hamle! Kart zaten açık.', isError: true });
              return; 
         }
         
@@ -156,6 +165,7 @@ io.on('connection', (socket) => {
                  if (room.hostLives <= 0 && room.guestLives <= 0) {
                      moveResult.winner = 'DRAW';
                  } else {
+                     // Canı biten rakip (Host ise Guest kazanır, Guest ise Host kazanır)
                      moveResult.winner = room.hostLives <= 0 ? 'Guest' : 'Host';
                  }
             }
@@ -169,7 +179,10 @@ io.on('connection', (socket) => {
 
         // 3. Sırayı Değiştir (Oyun bitmediyse)
         if (!moveResult.gameOver) {
-            room.currentTurn = room.currentTurn === 0 ? 1 : 0;
+            // Bomba yoksa sıra rakibe geçer, Bomba varsa sıra aynı oyuncuda kalır (Opsiyonel kural)
+            if (!moveResult.hitBomb) {
+                room.currentTurn = room.currentTurn === 0 ? 1 : 0;
+            }
         }
 
         // 4. Tüm client'lara durumu yay
@@ -207,7 +220,7 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         for (const code in rooms) {
             const room = rooms[code];
-            if (room.hostId === socket.id || room.guestId === socket.id) {
+            if (room && (room.hostId === socket.id || room.guestId === socket.id)) {
                 const opponentId = (room.hostId === socket.id) ? room.guestId : room.hostId;
                 
                 if (opponentId) {
@@ -218,7 +231,6 @@ io.on('connection', (socket) => {
                     delete rooms[code];
                 } 
                 else if (room.guestId === socket.id) {
-                    // Host ayrılmadıysa, oda tek kişilik hale gelir
                     room.playerCount = 1;
                     room.guestId = null;
                     room.guestUsername = null;
