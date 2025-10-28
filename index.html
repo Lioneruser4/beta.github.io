@@ -9,17 +9,16 @@
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     
     <style>
-        /* === KART GÖRÜNÜMÜNÜ DÜZELTEN KRİTİK CSS === */
+        /* === KART GÖRÜNÜMÜ VE TEMEL STİLLER === */
         :root {
-            --primary-color: #3498db; /* Mavi */
-            --secondary-color: #2980b9; /* Koyu Mavi */
+            --primary-color: #3498db; 
+            --secondary-color: #2980b9; 
             --text-color: #333;
             --bg-color: #f4f4f4; 
             --card-bg: white;
             --shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         }
         
-        /* Genel Stiller ve Utility'ler aynı kalır */
         * { -webkit-tap-highlight-color: transparent; }
         body { 
             font-family: sans-serif; 
@@ -54,76 +53,36 @@
         .input-field { @apply w-full text-base bg-gray-100 text-gray-900 border border-gray-300 rounded-lg p-3 text-center placeholder-gray-500 focus:outline-none focus:border-blue-500; }
         .code-display { @apply text-3xl font-mono p-3 bg-gray-800 text-yellow-300 rounded-md tracking-widest inline-block; } 
 
-        /* --- KART ANİMASYON VE GÖRÜNÜM DÜZELTMELERİ --- */
-        .card-container {
-            perspective: 1000px; 
-            aspect-ratio: 1; 
-        }
+        /* KART ANİMASYON */
+        .card-container { perspective: 1000px; aspect-ratio: 1; }
         .card {
-            width: 100%;
-            height: 100%;
-            border-radius: 8px; /* Daha yumuşak köşeler */
-            position: relative;
+            width: 100%; height: 100%; border-radius: 8px; position: relative;
             transform-style: preserve-3d; 
             transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
             box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
         }
-
-        .card.flipped {
-            transform: rotateY(180deg);
-        }
-
+        .card.flipped { transform: rotateY(180deg); }
         .card-face {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            backface-visibility: hidden; 
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            border-radius: 8px;
-            font-size: 2rem; /* Emojiler için büyük font */
-            font-weight: bold;
-            line-height: 1; /* Emoji'nin ortalanmasını kolaylaştırır */
+            position: absolute; width: 100%; height: 100%; backface-visibility: hidden; 
+            display: flex; justify-content: center; align-items: center;
+            border-radius: 8px; font-size: 2rem; font-weight: bold; line-height: 1;
         }
-
-        /* KAPALI KARTIN ÖN YÜZÜ (Tek Renk Mavi) */
         .card-face.front {
             background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: white;
-            border: 3px solid var(--card-bg);
-            transform: rotateY(0deg); 
+            color: white; border: 3px solid var(--card-bg); transform: rotateY(0deg); 
         }
-
-        /* AÇIK KARTIN ARKA YÜZÜ (Beyaz/Açık Gri) */
         .card-face.back {
-            background: var(--card-bg);
-            color: var(--text-color);
-            transform: rotateY(180deg);
+            background: var(--card-bg); color: var(--text-color); transform: rotateY(180deg);
         }
-
-        /* 💣 SEÇİM AŞAMASI (SADECE KENDİMİZİN GÖRDÜĞÜ KIRMIZILIK) */
+        /* Seçim Kırmızılığı */
         .card.bomb-selected .card-face.front {
-            background: linear-gradient(135deg, #f39c12, #e74c3c); /* Turuncu-Kırmızı Geçiş */
+            background: linear-gradient(135deg, #f39c12, #e74c3c); 
             animation: pulse-red 0.5s infinite alternate;
         }
-        @keyframes pulse-red {
-            from { opacity: 1; }
-            to { opacity: 0.8; }
-        }
-
-        /* TİTREŞİM (BOOM öncesi gerilim) */
-        @keyframes vibrate {
-            0% { transform: translate(1px, 1px) rotate(0deg); }
-            20% { transform: translate(-1px, -2px) rotate(-1deg); }
-            40% { transform: translate(-3px, 0px) rotate(1deg); }
-            60% { transform: translate(3px, 2px) rotate(0deg); }
-            80% { transform: translate(1px, -1px) rotate(-1deg); }
-            100% { transform: translate(-1px, 2px) rotate(1deg); }
-        }
-        .vibrate {
-            animation: vibrate 0.1s linear infinite;
-        }
+        @keyframes pulse-red { from { opacity: 1; } to { opacity: 0.8; } }
+        /* Titreşim */
+        @keyframes vibrate { /* ...titreşim animasyonu...*/ }
+        .vibrate { animation: vibrate 0.1s linear infinite; }
 
         /* Can Rengi */
         .text-orange-500 { color: #f97316; }
@@ -179,6 +138,10 @@
             
             <div id="gameBoard" class="grid w-full mx-auto">
             </div>
+
+            <button id="startButton" class="btn bg-green-500 text-white mt-4 hidden" disabled>
+                RAKİP BEKLENİYOR
+            </button>
         </div>
         
         <button id="endGameBtn" class="btn bg-gray-400 text-gray-800 text-base py-3 max-w-xs">Oyunu Bitir</button>
@@ -248,7 +211,9 @@
                     
                     const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase() || (self.isHost ? document.getElementById('roomCodeDisplay').textContent : '');
                     
-                    setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
+                    // Başlat butonunu da game.js'e gönderiyoruz
+                    const startButton = document.getElementById('startButton');
+                    setupSocketHandlers(socket, roomCode, self.isHost, opponent.username, startButton);
                 });
 
             } catch (e) {
@@ -270,12 +235,10 @@
             const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
 
             if (roomCode === '') {
-                // Oda Oluştur
                 document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
                 document.getElementById('codeArea').classList.add('hidden');
                 socket.emit('createRoom', { username });
             } else {
-                // Odaya Gir
                 document.getElementById('waitTitle').textContent = `Odaya Katılım: ${roomCode}`;
                 document.getElementById('waitStatus').textContent = 'Bağlanılıyor...';
                 document.getElementById('codeArea').classList.add('hidden');
