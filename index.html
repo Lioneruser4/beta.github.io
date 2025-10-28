@@ -3,68 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>💣 Emoji Bomb 1v1</title>
+    <title>💣 Emoji Bomb 1v1 - Odalı Eşleşme</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     
     <style>
-        /* Ana Stiller ve Arka Plan */
-        body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(to bottom right, #1a1a1a, #333333);
-            color: #f0f0f0;
-            overflow: hidden; 
-        }
-
-        /* Ana ekran konteyneri */
-        .screen {
-            width: 100vw;
-            height: 100vh;
-            display: none; 
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 1.5rem;
-            box-sizing: border-box;
-            text-align: center;
-        }
-        
-        /* Aktif ekranı göster */
-        .screen.active {
-            display: flex;
-        }
-
-        /* Loader ve diğer stiller (Kısaltıldı) */
-        @keyframes pulse-spin {
-            0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
-            50% { transform: scale(1.2) rotate(180deg); opacity: 0.8; }
-        }
-        .loader-anim { animation: pulse-spin 2.5s infinite ease-in-out; }
+        /* Ana Stiller */
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(to bottom right, #1a1a1a, #333333); color: #f0f0f0; overflow: hidden; }
+        .screen { width: 100vw; height: 100vh; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; box-sizing: border-box; text-align: center; }
+        .screen.active { display: flex; }
         .btn { @apply w-full max-w-xs text-xl font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ease-in-out; }
         .btn-primary { @apply bg-blue-600 text-white hover:bg-blue-500 active:scale-95; }
         .btn-secondary { @apply bg-green-600 text-white hover:bg-green-500 active:scale-95; }
         .btn-danger { @apply bg-red-600 text-white hover:bg-red-500 active:scale-95; }
         .input-field { @apply w-full max-w-xs text-lg bg-gray-700 text-white border-2 border-gray-600 rounded-lg p-4 text-center placeholder-gray-400 focus:outline-none focus:border-blue-500; }
-        .signal-textarea { @apply w-full max-w-md h-24 text-xs bg-gray-800 text-gray-300 rounded-lg p-2 border border-gray-600 resize-none; }
-        .card-container { perspective: 1000px; aspect-ratio: 1 / 1; }
-        .card-inner { position: relative; width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; }
-        .card-container.flipped .card-inner { transform: rotateY(180deg); }
-        .card-front, .card-back { position: absolute; width: 100%; height: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden; @apply rounded-lg shadow-md flex items-center justify-center; }
-        .card-front { @apply bg-blue-500 text-3xl; }
-        .card-back { @apply bg-gray-600 text-4xl; transform: rotateY(180deg); }
-        @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); } 20%, 40%, 60%, 80% { transform: translateX(8px); } }
-        .shake { animation: shake 0.4s ease-in-out; }
-        @keyframes vibrate { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(1.5deg); } 75% { transform: rotate(-1.5deg); } }
-        .vibrating { animation: vibrate 0.2s infinite; }
-        #endScreen { background-color: rgba(0, 0, 0, 0.8); z-index: 100; }
         #globalMessage.show { display: block; animation: fadeInDown 0.3s ease-out; }
         @keyframes fadeInDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+        /* Oyun Kartı Stilleri (Basitçe) */
+        .game-card { @apply bg-gray-700 aspect-square rounded-lg flex items-center justify-center text-5xl cursor-pointer hover:bg-gray-600 transition-colors; }
     </style>
 </head>
 <body class="bg-gray-900 text-white select-none">
@@ -75,57 +37,37 @@
     </div>
 
     <div id="loader" class="screen active">
-        <div class="loader-anim text-center">
-            <div class="text-7xl">💣</div>
-            <h1 class="text-4xl font-black mt-4">Emoji Bomb</h1>
+        <div class="text-center">
+            <div class="text-7xl">📡</div>
+            <h1 class="text-4xl font-black mt-4">Sunucuya Bağlanıyor...</h1>
+            <p id="connectionStatus" class="mt-2 text-yellow-400">Yükleniyor...</p>
         </div>
     </div>
 
     <div id="lobby" class="screen">
-        <div class="w-full max-w-md space-y-4">
+        <div class="w-full max-w-md space-y-6">
             <h1 class="text-5xl font-black text-center">💣 Emoji Bomb</h1>
-            <p class="text-lg text-gray-300 text-center">Arkadaşınla 1v1 oyna! Oda kur veya bir odaya katıl.</p>
             
             <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adı">
             
-            <button id="createRoomBtn" class="btn btn-primary">🎮 Oda Kur</button>
-            <button id="joinRoomBtn" class="btn btn-secondary">🔍 Katıl</button>
+            <div class="space-y-3">
+                <button id="createRoomBtn" class="btn btn-primary">➕ Yeni Oda Kur</button>
+                <p id="currentRoomCode" class="text-2xl font-bold text-yellow-400 hidden">Oda Kodun: <span id="roomCodeDisplay"></span></p>
+            </div>
+            
+            <div class="space-y-3">
+                <input type="text" id="joinRoomCode" class="input-field" placeholder="Oda Kodu Gir">
+                <button id="joinRoomBtn" class="btn btn-secondary">🚪 Odaya Katıl</button>
+            </div>
         </div>
     </div>
     
-    <div id="connectScreen" class="screen">
-        <div class="w-full max-w-lg space-y-3">
-            <h2 id="connectTitle" class="text-2xl font-bold">Bağlantı Kuruluyor...</h2>
-            
-            <div id="hostConnect" class="space-y-3 hidden">
-                <p class="text-lg">Oda Kodu: <strong id="roomCodeDisplay" class="text-2xl text-yellow-400 tracking-widest"></strong></p>
-                
-                <label class="text-left w-full block">1. Bu Teklif Kodunu kopyala ve arkadaşına gönder:</label>
-                <p class="text-xs text-gray-400 text-left"><i>(Not: Bu kodun çok uzun olması normaldir.)</i></p>
-                <textarea id="offerText" class="signal-textarea" readonly></textarea>
-                <button id="copyOfferBtn" class="btn btn-primary text-sm py-2">Teklifi Kopyala</button>
-                
-                <label class="text-left w-full block">2. Arkadaşından gelen Cevap Kodunu buraya yapıştır:</label>
-                <textarea id="answerTextHost" class="signal-textarea" placeholder="Arkadaşının cevap kodunu bekle..."></textarea>
-                <button id="applyAnswerBtn" class="btn btn-secondary text-sm py-2">Cevabı Uygula</button>
-                
-                <p id="hostStatus" class="text-green-400">Teklif bekleniyor...</p>
-            </div>
-            
-            <div id="guestConnect" class="space-y-3 hidden">
-                <label class="text-left w-full block">1. Arkadaşının Teklif Kodunu buraya yapıştır:</label>
-                <textarea id="offerTextGuest" class="signal-textarea" placeholder="Arkadaşının teklif kodunu yapıştır..."></textarea>
-                
-                <button id="createAnswerBtn" class="btn btn-secondary">Cevap Oluştur</button>
-                
-                <label class="text-left w-full block">2. Bu Cevap Kodunu kopyala ve arkadaşına geri gönder:</label>
-                <p class="text-xs text-gray-400 text-left"><i>(Not: Bu kodun çok uzun olması normaldir.)</i></p>
-                <textarea id="answerTextGuest" class="signal-textarea" readonly></textarea>
-                <button id="copyAnswerBtn" class="btn btn-primary text-sm py-2 hidden">Cevabı Kopyala</button>
-
-                <p id="guestStatus" class="text-green-400">Teklif bekleniyor...</p>
-            </div>
-            <button id="cancelConnectBtn" class="btn btn-danger text-base py-2">İptal Et</button>
+    <div id="waitScreen" class="screen">
+        <div class="text-center space-y-4">
+            <h2 id="waitTitle" class="text-4xl font-bold">Rakip Bekleniyor...</h2>
+            <p class="text-xl">Oda Kodu: <strong id="waitRoomCode" class="text-yellow-400"></strong></p>
+            <p id="waitStatus" class="text-lg text-gray-300">Arkadaşın bu kodu girerek katılabilir.</p>
+            <button id="cancelWaitBtn" class="btn btn-danger text-base py-3 max-w-xs">İptal Et</button>
         </div>
     </div>
 
@@ -143,15 +85,13 @@
             </div>
             <p id="turnIndicator" class="text-center text-xl sm:text-2xl font-bold text-yellow-400 mt-4"></p>
         </div>
-        
         <div id="gameGrid" class="w-full max-w-3xl grid gap-2 sm:gap-3 p-4 mt-32">
-        </div>
+            </div>
     </div>
     
     <div id="endScreen" class="screen absolute top-0 left-0">
         <div class="text-center space-y-6">
-            <h1 id="endMessage" class="text-6xl font-black">Kazandın! 🎉</h1>
-            <button id="playAgainBtn" class="btn btn-primary">Tekrar Oyna</button>
+            <h1 id="endMessage" class="text-6xl font-black">Oyun Bitti!</h1>
             <button id="backToLobbyBtn" class="btn btn-secondary text-base py-3">Lobiye Dön</button>
         </div>
     </div>
@@ -162,131 +102,58 @@
             const screens = {
                 loader: document.getElementById('loader'),
                 lobby: document.getElementById('lobby'),
-                connect: document.getElementById('connectScreen'),
+                wait: document.getElementById('waitScreen'),
                 game: document.getElementById('gameScreen'),
                 end: document.getElementById('endScreen'),
             };
             const globalMessage = document.getElementById('globalMessage');
             const globalMessageText = document.getElementById('globalMessageText');
             const globalMessageClose = document.getElementById('globalMessageClose');
-
             const usernameInput = document.getElementById('username');
+            const connectionStatus = document.getElementById('connectionStatus');
             const createRoomBtn = document.getElementById('createRoomBtn');
+            const joinRoomCodeInput = document.getElementById('joinRoomCode');
             const joinRoomBtn = document.getElementById('joinRoomBtn');
-
-            const connectTitle = document.getElementById('connectTitle');
-            const hostConnect = document.getElementById('hostConnect');
-            const guestConnect = document.getElementById('guestConnect');
             const roomCodeDisplay = document.getElementById('roomCodeDisplay');
-            const offerText = document.getElementById('offerText');
-            const copyOfferBtn = document.getElementById('copyOfferBtn');
-            const answerTextHost = document.getElementById('answerTextHost');
-            const applyAnswerBtn = document.getElementById('applyAnswerBtn');
-            const hostStatus = document.getElementById('hostStatus');
-            const offerTextGuest = document.getElementById('offerTextGuest');
-            const createAnswerBtn = document.getElementById('createAnswerBtn');
-            const answerTextGuest = document.getElementById('answerTextGuest');
-            const copyAnswerBtn = document.getElementById('copyAnswerBtn');
-            const guestStatus = document.getElementById('guestStatus');
-            const cancelConnectBtn = document.getElementById('cancelConnectBtn');
-
-            const gameGrid = document.getElementById('gameGrid');
+            const currentRoomCodeDiv = document.getElementById('currentRoomCode');
+            const waitRoomCodeEl = document.getElementById('waitRoomCode');
+            const waitTitle = document.getElementById('waitTitle');
+            const waitStatusEl = document.getElementById('waitStatus');
+            const cancelWaitBtn = document.getElementById('cancelWaitBtn');
             const player1NameEl = document.getElementById('player1Name');
             const player2NameEl = document.getElementById('player2Name');
-            const player1LivesEl = document.getElementById('player1Lives');
-            const player2LivesEl = document.getElementById('player2Lives');
             const turnIndicator = document.getElementById('turnIndicator');
-            const endMessage = document.getElementById('endMessage');
-            const playAgainBtn = document.getElementById('playAgainBtn');
+            const gameGrid = document.getElementById('gameGrid');
             const backToLobbyBtn = document.getElementById('backToLobbyBtn');
 
             // --- Oyun Durumu (State) ---
-            let peerConnection;
-            let dataChannel;
-            let isHost = false;
+            let socket; 
             let username = '';
             let roomCode = '';
-            let gameStarted = false;
+            let isHost = false; 
             
-            // Oyunun dahili durumu (Kısaltıldı)
+            // Oyun içi durum simülasyonu
             const EMOJIS = ["🍎", "🍊", "🍋", "🥝", "🍇", "🍉", "🍓", "🍍"];
             let cards = [];
-            let lives = { player1: 2, player2: 2 };
             let myTurn = false;
-            let player1Username = '';
-            let player2Username = '';
+            let player1Username = 'Oyuncu 1';
+            let player2Username = 'Oyuncu 2';
             let flippedCards = [];
-            let matchCount = 0;
-            let totalPairs = 0;
-            let bombsToPlace = 0; 
-            
-            const config = {
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                ]
-            };
-
 
             // --- Temel Fonksiyonlar ---
-
             function showGlobalMessage(message, isError = true) {
                 globalMessageText.textContent = message;
                 globalMessage.classList.remove('bg-red-600', 'bg-green-600');
-                if (isError) {
-                    globalMessage.classList.add('bg-red-600');
-                } else {
-                    globalMessage.classList.add('bg-green-600');
-                }
+                globalMessage.classList.add(isError ? 'bg-red-600' : 'bg-green-600');
                 globalMessage.classList.remove('hidden');
                 globalMessage.classList.add('show');
-
-                setTimeout(hideGlobalMessage, 3000);
+                setTimeout(() => { globalMessage.classList.add('hidden'); globalMessage.classList.remove('show'); }, 3000);
             }
-            
-            function hideGlobalMessage() {
-                globalMessage.classList.add('hidden');
-                globalMessage.classList.remove('show');
-            }
-
             function showScreen(screenId) {
-                Object.values(screens).forEach(screen => {
-                    screen.classList.remove('active');
-                });
+                Object.values(screens).forEach(screen => screen.classList.remove('active'));
                 screens[screenId].classList.add('active');
             }
-
-            function copyToClipboard(text, btn) {
-                // Kopyalama mantığı önceki kodda olduğu gibi
-                if (!text) {
-                    showGlobalMessage('Kopyalanacak metin boş.');
-                    return;
-                }
-                const originalText = btn.textContent;
-                try {
-                    const ta = document.createElement('textarea');
-                    ta.value = text;
-                    document.body.appendChild(ta);
-                    ta.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(ta);
-
-                    btn.textContent = 'Kopyalandı!';
-                    setTimeout(() => {
-                        btn.textContent = originalText;
-                    }, 1500);
-                } catch(e) {
-                    showGlobalMessage('Kopyalama başarısız. Lütfen manuel kopyalayın.');
-                }
-            }
-
-            function generateRoomCode() {
-                // Sadece göstermelik bir kod
-                return Math.random().toString(36).substring(2, 8).toUpperCase();
-            }
-
             function validateUsername() {
-                // !!! BU KISIMDAKİ DEĞİŞKEN TANIMLAMASI ÖNEMLİ !!!
                 username = usernameInput.value.trim();
                 if (username.length < 2) {
                     showGlobalMessage('Lütfen geçerli bir kullanıcı adı girin (en az 2 karakter).');
@@ -294,294 +161,143 @@
                 }
                 return true;
             }
-            
-            function resetToLobby() {
-                // Bağlantı sıfırlama mantığı önceki kodda olduğu gibi
-                if (dataChannel) dataChannel.close();
-                if (peerConnection) peerConnection.close();
-                dataChannel = null;
-                peerConnection = null;
-                isHost = false;
-                gameStarted = false;
+            function resetState() {
                 roomCode = '';
-                
-                hostConnect.classList.add('hidden');
-                guestConnect.classList.add('hidden');
-                offerText.value = '';
-                answerTextHost.value = '';
-                offerTextGuest.value = '';
-                answerTextGuest.value = '';
-                copyAnswerBtn.classList.add('hidden');
-                
+                isHost = false;
+                myTurn = false;
+                currentRoomCodeDiv.classList.add('hidden');
+                joinRoomCodeInput.value = '';
+                // Diğer oyun durumlarını sıfırla (kartlar, skorlar vb.)
+            }
+
+            // --- Socket.IO Bağlantısı ve Olay Yönetimi ---
+            function connectToServer() {
+                const SERVER_URL = 'http://localhost:3000'; // Sunucu adresinizi kontrol edin
+                try {
+                    socket = io(SERVER_URL, {
+                         // Sunucuya CORS ayarı yapıldıysa bu satır zorunlu değil ama faydalıdır.
+                         transports: ['websocket'] 
+                    });
+
+                    socket.on('connect', () => {
+                        connectionStatus.textContent = 'Bağlandı! Hazır.';
+                        showScreen('lobby');
+                    });
+
+                    socket.on('connect_error', (err) => {
+                        console.error('Bağlantı Hatası:', err);
+                        connectionStatus.textContent = 'HATA: Sunucuya bağlanılamadı. Lütfen sunucuyu (server.js) çalıştırın.';
+                        showGlobalMessage('Sunucuya bağlanılamadı.', true);
+                    });
+                    
+                    // Sunucudan Gelen Olaylar
+                    socket.on('roomCreated', (code) => {
+                        roomCode = code;
+                        isHost = true;
+                        roomCodeDisplay.textContent = code;
+                        currentRoomCodeDiv.classList.remove('hidden');
+                        waitRoomCodeEl.textContent = code;
+                        waitStatusEl.textContent = `Oda kodunuz: ${code}. Arkadaşınızın katılmasını bekleyin.`;
+                        showScreen('wait');
+                        showGlobalMessage(`Oda ${code} koduyla kuruldu.`, false);
+                    });
+
+                    socket.on('roomJoined', (code) => {
+                        roomCode = code;
+                        isHost = false; 
+                        waitRoomCodeEl.textContent = code;
+                        waitTitle.textContent = 'Odaya Katıldınız.';
+                        waitStatusEl.textContent = `Host bekleniyor...`;
+                        showScreen('wait');
+                        showGlobalMessage(`Oda ${code} koduna katıldınız.`, false);
+                    });
+                    
+                    socket.on('roomFull', () => {
+                        showGlobalMessage('Oda dolu veya böyle bir oda bulunamadı.', true);
+                        resetState();
+                        showScreen('lobby');
+                    });
+
+                    socket.on('gameStart', (playerRoles) => {
+                        const myRole = playerRoles.find(p => p.id === socket.id);
+                        const opponentRole = playerRoles.find(p => p.id !== socket.id);
+                        
+                        // İsimleri Ayarla
+                        player1Username = myRole.isHost ? username : opponentRole.username;
+                        player2Username = myRole.isHost ? opponentRole.username : username;
+                        player1NameEl.textContent = player1Username;
+                        player2NameEl.textContent = player2Username;
+
+                        startGame(myRole.isHost); 
+                        showGlobalMessage(`${opponentRole.username} katıldı! Oyun Başlıyor!`, false);
+                    });
+                    
+                    socket.on('opponentLeft', () => {
+                        showGlobalMessage('Rakibiniz odadan ayrıldı veya bağlantısı kesildi. Lobiye dönülüyor.', true);
+                        resetState();
+                        showScreen('lobby');
+                    });
+
+                    socket.on('gameData', (data) => {
+                        // Rakip hamlelerini (örneğin kart çevirme, skor) burada işleyin.
+                        console.log("Rakibinizden gelen oyun verisi:", data);
+                        // handleRemoteGameAction(data);
+                    });
+                    
+                    socket.on('disconnect', () => {
+                        showGlobalMessage('Sunucu bağlantısı kesildi.', true);
+                        resetState();
+                        showScreen('loader'); // Tekrar bağlanmayı denemesi için loader'a dön
+                        setTimeout(connectToServer, 3000); // Yeniden bağlanmayı dene
+                    });
+
+                } catch (e) {
+                    console.error('Socket.IO hatası:', e);
+                    connectionStatus.textContent = 'HATA: Socket.IO yüklenemedi.';
+                }
+            }
+
+            // --- Lobi ve Oda İşlemleri ---
+            function initCreateRoom() {
+                if (!validateUsername() || !socket || !socket.connected) {
+                    showGlobalMessage('Önce sunucuya bağlanın ve kullanıcı adınızı girin.', true);
+                    return;
+                }
+                socket.emit('createRoom', { username: username });
+            }
+
+            function initJoinRoom() {
+                if (!validateUsername() || !socket || !socket.connected) {
+                    showGlobalMessage('Önce sunucuya bağlanın ve kullanıcı adınızı girin.', true);
+                    return;
+                }
+                const code = joinRoomCodeInput.value.trim().toUpperCase();
+                if (code.length < 4) {
+                    showGlobalMessage('Lütfen geçerli bir oda kodu girin (en az 4 haneli).');
+                    return;
+                }
+                socket.emit('joinRoom', { username: username, roomCode: code });
+            }
+            
+            function cancelWaiting() {
+                if (socket && roomCode) {
+                    socket.emit('leaveRoom', { roomCode: roomCode });
+                }
+                resetState();
+                showScreen('lobby');
+            }
+            
+            function backToLobby() {
+                 // Oyun bitince lobiye dönerken odayı terk et
+                 if (socket && roomCode) {
+                    socket.emit('leaveRoom', { roomCode: roomCode });
+                }
+                resetState();
                 showScreen('lobby');
             }
 
 
-            // --- WebRTC Sinyalleşme Fonksiyonları ---
-            // (Bu kısım önceki kodunuzdaki mantıkla aynı kaldı, sadece hata kontrolleri eklendi)
-
-            async function startConnection(is_Host) {
-                isHost = is_Host;
-                peerConnection = new RTCPeerConnection(config);
-
-                // Ortak ICE Adayı Toplama Olayı
-                peerConnection.onicecandidate = event => {
-                    if (!event.candidate) {
-                        console.log('ICE Toplama tamamlandı.');
-                        if (isHost) {
-                            if(offerText.value.length === 0) { 
-                                offerText.value = JSON.stringify(peerConnection.localDescription);
-                                hostStatus.textContent = 'Teklifi arkadaşına gönder ve cevabı bekle.';
-                            }
-                        } else {
-                            if(answerTextGuest.value.length === 0 && peerConnection.localDescription) { 
-                                answerTextGuest.value = JSON.stringify(peerConnection.localDescription);
-                                copyAnswerBtn.classList.remove('hidden');
-                                guestStatus.textContent = 'Cevabı kopyala ve arkadaşına geri gönder.';
-                            }
-                        }
-                    }
-                };
-
-                // Ağ durumu değiştiğinde
-                peerConnection.onconnectionstatechange = () => {
-                    if (peerConnection.connectionState === 'connected') {
-                        showGlobalMessage('Bağlantı Başarılı!', false);
-                        if (isHost) { hostStatus.textContent = 'Bağlandı! Oyun başlıyor...'; } 
-                        else { guestStatus.textContent = 'Bağlandı! Oyun başlıyor...'; }
-                    }
-                    if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
-                        showGlobalMessage('Bağlantı koptu veya kurulamadı. Lobiye dönülüyor.');
-                        resetToLobby();
-                    }
-                };
-                
-                if (isHost) {
-                    dataChannel = peerConnection.createDataChannel('gameChannel');
-                    dataChannel.onopen = onDataChannelOpen;
-                    dataChannel.onmessage = onDataChannelMessage;
-                    dataChannel.onclose = onDataChannelClose;
-                    
-                    try {
-                        const offer = await peerConnection.createOffer();
-                        await peerConnection.setLocalDescription(offer);
-                    } catch (e) {
-                        console.error("Teklif oluşturulamadı:", e);
-                        showGlobalMessage('Teklif oluşturulurken bir hata oluştu.');
-                        resetToLobby();
-                    }
-
-                } else {
-                    peerConnection.ondatachannel = event => {
-                        dataChannel = event.channel;
-                        dataChannel.onopen = onDataChannelOpen;
-                        dataChannel.onmessage = onDataChannelMessage;
-                        dataChannel.onclose = onDataChannelClose;
-                    };
-                }
-            }
-            
-            async function applyAnswer(answerText) {
-                if (!peerConnection || peerConnection.localDescription.type !== 'offer') {
-                    showGlobalMessage('Önce teklif kodu oluşturulmalıdır.');
-                    return;
-                }
-                
-                try {
-                    const remoteDesc = JSON.parse(answerText);
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(remoteDesc));
-                    hostStatus.textContent = 'Cevap uygulandı. Bağlantı bekleniyor...';
-                } catch (e) {
-                    console.error("Cevap uygulanamadı:", e);
-                    showGlobalMessage('Geçersiz cevap kodu veya hata oluştu.');
-                }
-            }
-
-            async function receiveOfferAndCreateAnswer(offerText) {
-                if (!peerConnection) {
-                     showGlobalMessage('Bağlantı objesi oluşmadı. Lobiye dönün.');
-                     return;
-                }
-                
-                try {
-                    const remoteDesc = JSON.parse(offerText);
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(remoteDesc));
-
-                    const answer = await peerConnection.createAnswer();
-                    await peerConnection.setLocalDescription(answer);
-                    
-                    guestStatus.textContent = 'Cevap oluşturuluyor...';
-                    
-                } catch (e) {
-                    console.error("Teklif alınamadı veya cevap oluşturulamadı:", e);
-                    showGlobalMessage('Geçersiz teklif kodu veya hata oluştu.');
-                }
-            }
-
-            // --- DataChannel Olayları ---
-            function onDataChannelOpen() {
-                gameStarted = true;
-                const myRole = isHost ? 'player1' : 'player2';
-                const message = JSON.stringify({
-                    type: 'START',
-                    role: myRole,
-                    username: username,
-                    isHost: isHost 
-                });
-                dataChannel.send(message);
-
-                startGame(isHost); 
-            }
-
-            function onDataChannelMessage(event) {
-                // Mesaj işleme (önceki kodunuzdaki gibi)
-                try {
-                    const msg = JSON.parse(event.data);
-                    handleRemoteMessage(msg);
-                } catch (e) {
-                    console.error('Mesaj işlenirken hata:', e);
-                }
-            }
-
-            function onDataChannelClose() {
-                if (gameStarted) { 
-                    showGlobalMessage('Rakibin bağlantısı koptu. Lobiye dönülüyor.');
-                    resetToLobby();
-                }
-            }
-
-            function handleRemoteMessage(msg) {
-                // Mesaj türlerini işleme (önceki kodunuzdaki gibi)
-                switch (msg.type) {
-                    case 'START':
-                        if (isHost && msg.role === 'player2') {
-                            player2Username = msg.username;
-                            player2NameEl.textContent = player2Username;
-                            showGlobalMessage(`Rakip (${player2Username}) bağlandı! Oyun Başlıyor.`, false);
-                            sendGameConfig(); 
-                            updateTurnIndicator();
-                        } else if (!isHost && msg.role === 'player1') {
-                            player1Username = msg.username;
-                            player1NameEl.textContent = player1Username;
-                            updateTurnIndicator();
-                        }
-                        break;
-                    case 'CONFIG':
-                        if (!isHost) {
-                            cards = msg.cards;
-                            totalPairs = msg.totalPairs;
-                            bombsToPlace = msg.bombsToPlace;
-                            createGameGrid();
-                            showGlobalMessage('Oyun bilgileri alındı. İyi şanslar!', false);
-                            updateTurnIndicator();
-                        }
-                        break;
-                    case 'FLIP':
-                        handleRemoteFlip(msg.index);
-                        break;
-                    case 'TURN_END':
-                        myTurn = true;
-                        updateTurnIndicator();
-                        break;
-                    case 'LIFE_UPDATE':
-                        lives = msg.lives;
-                        updateLivesDisplay();
-                        checkForGameEnd();
-                        break;
-                    case 'REMATCH':
-                    case 'LOBBY':
-                        showGlobalMessage('Rakip bağlantıyı sonlandırdı/yenilemek istiyor. Lobiye dönülüyor.');
-                        resetToLobby();
-                        break;
-                }
-            }
-
-            function sendGameConfig() {
-                 if (dataChannel && dataChannel.readyState === 'open') {
-                    const configMsg = JSON.stringify({
-                        type: 'CONFIG',
-                        cards: cards,
-                        totalPairs: totalPairs,
-                        bombsToPlace: bombsToPlace
-                    });
-                    dataChannel.send(configMsg);
-                }
-            }
-
-
-            // --- Lobi İşlemleri ---
-
-            function initCreateRoom() {
-                if (!validateUsername()) return;
-                
-                isHost = true;
-                roomCode = generateRoomCode();
-                player1Username = username;
-                
-                connectTitle.textContent = 'Oda Kuruluyor (Host)';
-                hostConnect.classList.remove('hidden');
-                guestConnect.classList.add('hidden');
-                roomCodeDisplay.textContent = roomCode; // Oda kodu gösterimi
-                
-                // Sinyalleşmeyi başlat
-                startConnection(true);
-                showScreen('connect');
-            }
-
-            function initJoinRoom() {
-                if (!validateUsername()) return;
-                
-                isHost = false;
-                player2Username = username;
-                
-                connectTitle.textContent = 'Odaya Katılınıyor (Guest)';
-                hostConnect.classList.add('hidden');
-                guestConnect.classList.remove('hidden');
-                
-                // Sinyalleşmeyi başlat (Teklifi beklemek için)
-                startConnection(false);
-                showScreen('connect');
-            }
-            
-            // --- Oyun Mantığı Fonksiyonları (Kısaltıldı) ---
-            
-            // ... shuffle, initializeGameVariables, createGameGrid, updateLivesDisplay, updateTurnIndicator, ...
-            // ... handleCardClick, flipCard, handleRemoteFlip, checkForMatch, handleEndTurn, sendTurnEndSignal, sendLifeUpdate, checkForGameEnd, endGame ...
-            
-            // Önemli: startGame ve oyun döngüsü fonksiyonlarının, önceki kodunuzda olduğu gibi tanımlı ve erişilebilir olduğundan emin olun.
-            
-            function startGame(isHost) {
-                // Basit oyun başlatma ve ekran değiştirme mantığı
-                initializeGameVariables();
-                
-                if (isHost) {
-                    // Host olarak kartları hazırla
-                    let gameEmojis = shuffle([...EMOJIS, ...EMOJIS]);
-                    bombsToPlace = 2; 
-                    for (let i = 0; i < bombsToPlace; i++) {
-                        gameEmojis.splice(Math.floor(Math.random() * gameEmojis.length), 0, '💣');
-                    }
-                    cards = gameEmojis.map((emoji, index) => ({
-                        id: index,
-                        emoji: emoji,
-                        isFlipped: false,
-                        isMatched: false,
-                        isBomb: emoji === '💣'
-                    }));
-                    totalPairs = EMOJIS.length;
-                    myTurn = true; 
-                    createGameGrid();
-                } else {
-                    // Misafir olarak hosttan kartları bekleyerek ekranı hazırla
-                    myTurn = false; 
-                }
-
-                showScreen('game');
-                updateTurnIndicator();
-            }
-
-            // Daha önce eklediğiniz diğer tüm oyun mantığı fonksiyonları buraya gelmelidir.
-            // Örnek:
+            // --- Oyun Mantığı Simülasyonu ---
             function shuffle(array) {
                 for (let i = array.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
@@ -589,57 +305,91 @@
                 }
                 return array;
             }
-            function initializeGameVariables() {
-                lives = { player1: 2, player2: 2 };
-                player1NameEl.textContent = player1Username || 'Oyuncu 1';
-                player2NameEl.textContent = player2Username || 'Oyuncu 2';
-                updateLivesDisplay();
-                flippedCards = [];
-                matchCount = 0;
-                gameGrid.innerHTML = '';
+
+            function startGame(isHost) {
+                // Host, kartları oluşturur ve rakibe gönderir.
+                if (isHost) {
+                    let gameEmojis = shuffle([...EMOJIS, ...EMOJIS]);
+                    // Basit kart yapısı
+                    cards = gameEmojis.map((emoji, index) => ({
+                        id: index,
+                        emoji: emoji,
+                        isFlipped: false,
+                        isMatched: false,
+                        // ... bomba vb. eklenebilir
+                    }));
+                    // Rakibe kart düzenini gönder (Gerekli 'gameData' olayı ile)
+                    // socket.emit('gameData', { roomCode: roomCode, type: 'CONFIG', cards: cards });
+                } 
+                // Misafir, Host'tan 'CONFIG' mesajını bekler.
+
+                myTurn = isHost; // Host başlar
+                updateTurnIndicator();
+                createGameGrid(cards);
+                showScreen('game');
             }
-            // ... Diğer tüm oyun fonksiyonları (createGameGrid, handleCardClick, vb.) ...
 
-            // --- Olay Dinleyicileri ---
+            function createGameGrid(cards) {
+                // Basit 4x4 ızgara (Toplam 16 kart)
+                gameGrid.style.gridTemplateColumns = 'repeat(4, 1fr)'; 
+                gameGrid.innerHTML = '';
+                
+                cards.forEach((card, index) => {
+                    const cardElement = document.createElement('div');
+                    cardElement.className = 'game-card';
+                    cardElement.dataset.index = index;
+                    cardElement.textContent = '?'; // Başlangıçta kapalı
+                    cardElement.addEventListener('click', () => handleCardClick(index));
+                    gameGrid.appendChild(cardElement);
+                });
+            }
+
+            function handleCardClick(index) {
+                if (!myTurn || flippedCards.length >= 2 || cards[index].isFlipped) {
+                    return;
+                }
+                
+                // Kartı çevir ve hamleyi rakibe yolla
+                flipCard(index, cards[index].emoji);
+                socket.emit('gameData', { roomCode: roomCode, type: 'FLIP', index: index, emoji: cards[index].emoji });
+                
+                // Oyun mantığı (Eşleşme kontrolü vb.) buraya gelir.
+            }
             
-            setTimeout(() => {
-                showScreen('lobby');
-            }, 1000); 
+            function flipCard(index, emoji) {
+                 // Kartı DOM'da göster
+                 const cardEl = gameGrid.querySelector(`[data-index="${index}"]`);
+                 if (cardEl) {
+                     cardEl.textContent = emoji;
+                     cardEl.classList.add('bg-blue-500'); // Açıldığını belirt
+                 }
+                 cards[index].isFlipped = true;
+                 flippedCards.push(index);
+            }
 
-            // Lobi Butonları
+            function updateTurnIndicator() {
+                const myName = isHost ? player1Username : player2Username;
+                const oppName = isHost ? player2Username : player1Username;
+                
+                if (myTurn) {
+                    turnIndicator.textContent = `Sıra Sende (${myName})`;
+                    turnIndicator.classList.add('text-yellow-400');
+                    turnIndicator.classList.remove('text-red-400');
+                } else {
+                    turnIndicator.textContent = `Rakip Oynuyor (${oppName}) - Bekle`;
+                    turnIndicator.classList.add('text-red-400');
+                    turnIndicator.classList.remove('text-yellow-400');
+                }
+            }
+            // --- Olay Dinleyicileri ---
+            globalMessageClose.addEventListener('click', () => globalMessage.classList.add('hidden'));
             createRoomBtn.addEventListener('click', initCreateRoom);
             joinRoomBtn.addEventListener('click', initJoinRoom);
+            cancelWaitBtn.addEventListener('click', cancelWaiting);
+            backToLobbyBtn.addEventListener('click', backToLobby);
             
-            // Bağlantı Butonları
-            cancelConnectBtn.addEventListener('click', resetToLobby);
-            
-            // Host Sinyalleşme
-            copyOfferBtn.addEventListener('click', () => copyToClipboard(offerText.value, copyOfferBtn));
-            applyAnswerBtn.addEventListener('click', () => {
-                const answer = answerTextHost.value.trim();
-                if (answer) {
-                    applyAnswer(answer);
-                } else {
-                    showGlobalMessage('Lütfen arkadaşının cevap kodunu yapıştırın.');
-                }
-            });
-            
-            // Guest Sinyalleşme
-            createAnswerBtn.addEventListener('click', () => {
-                const offer = offerTextGuest.value.trim();
-                if (offer) {
-                    receiveOfferAndCreateAnswer(offer);
-                } else {
-                    showGlobalMessage('Lütfen önce arkadaşının teklif kodunu yapıştır.');
-                }
-            });
-            copyAnswerBtn.addEventListener('click', () => copyToClipboard(answerTextGuest.value, copyAnswerBtn));
-
-            // Global Mesaj Kapatma
-            globalMessageClose.addEventListener('click', hideGlobalMessage);
-
-            // Oyun Sonu Butonları
-            // ...
+            // İlk bağlantıyı başlat
+            connectToServer();
         });
     </script>
 </body>
