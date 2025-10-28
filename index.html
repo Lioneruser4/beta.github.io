@@ -114,9 +114,8 @@
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage, resetGame } from './game.js';
 
-        // LÜTFEN AŞAĞIDAKİ ADRESİ KENDİ AKTİF RENDER ADRESİNİZLE DEĞİŞTİRİN!
-        // Örnek: 'https://sizin-render-adresiniz.onrender.com'
-        const LIVE_SERVER_URL = '<LIVE_RENDER_URL_ADRESİNİZ>'; 
+        // RENDER URL'NİZ BURAYA OTOMATİK OLARAK AYARLANDI:
+        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
         let socket;
         
         function validateInput() {
@@ -130,7 +129,7 @@
 
         function connectToServer() {
             try {
-                // Render'da port belirtilmez, sadece HTTPS/WSS protokolü kullanılır.
+                // Render uyumluluğu için transports dizisi önceliklendirildi.
                 socket = io(LIVE_SERVER_URL, {
                     transports: ['websocket', 'polling'], 
                     reconnectionAttempts: 5, 
@@ -144,7 +143,7 @@
                 
                 socket.on('connect_error', (err) => {
                     console.error('Bağlantı Hatası:', err);
-                    UIElements.showGlobalMessage('HATA: Sunucuya erişilemiyor. Render URL\'sini kontrol edin.', true);
+                    UIElements.showGlobalMessage('HATA: Sunucuya erişilemiyor veya URL yanlış. Konsolu kontrol edin.', true);
                     showScreen('lobby');
                 });
                 
