@@ -7,17 +7,16 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root {
-            --bg-color: #1a202c; /* Koyu arka plan */
-            --card-front: #4a5568; /* Koyu gri kart önü */
-            --card-back: #e9d8a6; /* Açık sarı/bej kart arkası */
-            --text-color: #edf2f7; /* Açık metin */
+            --bg-color: #1a202c; 
+            --card-front: #4a5568; 
+            --card-back: #e9d8a6; 
+            --text-color: #edf2f7; 
         }
         
         body { 
             font-family: sans-serif; 
             background-color: var(--bg-color); 
             color: var(--text-color);
-            /* Ekranı kapla ve içeriği ortala */
             min-height: 100vh; 
             display: flex; 
             align-items: center; 
@@ -28,21 +27,19 @@
             box-sizing: border-box;
         }
         
-        /* Genel konteyner stil ayarı */
         .container {
             width: 100%;
             max-width: 500px; 
             margin: auto;
-            display: none; /* Varsayılan olarak tüm ekranları gizle */
+            display: none; 
         }
 
         .container.active {
-            display: block; /* Aktif ekranı göster */
+            display: block; 
         }
 
-        /* Kart stilleri */
         .memory-board {
-            gap: 8px; /* Kartlar arası boşluk */
+            gap: 8px; 
         }
         
         .card-container {
@@ -62,7 +59,7 @@
 
         .card.flipped {
             transform: rotateY(180deg);
-            pointer-events: none; /* Açılmış kartlar tıklanmasın */
+            pointer-events: none; 
         }
 
         .card-face {
@@ -89,13 +86,11 @@
             transform: rotateY(180deg);
         }
 
-        /* Bomba Seçimi sırasında kartın görünümü */
         .card.bomb-selected .front {
-            background-color: #e53e3e; /* Kırmızı renk */
+            background-color: #e53e3e; 
             color: white;
         }
 
-        /* Durum Mesajı Stilleri */
         #globalMessage {
             position: fixed;
             top: 0;
@@ -113,7 +108,6 @@
             transform: translateY(0);
         }
 
-        /* Titreşim efekti */
         .card.vibrate {
             animation: vibrate-animation 0.5s infinite alternate;
         }
@@ -180,7 +174,7 @@
         </div>
 
         <div id="gameBoard" class="grid w-full max-w-sm mx-auto memory-board">
-            </div>
+        </div>
 
         <button id="readyToPlayBtn" class="w-full btn bg-indigo-600 hover:bg-indigo-700 text-white text-base py-3 rounded-lg font-semibold transition duration-200 mt-4" style="display:none;" disabled>
             HAZIR
@@ -206,11 +200,11 @@
                 callback();
                 return;
             }
-            // Sunucu adresini otomatik olarak tespit et
             socket = io(window.location.origin); 
             
             socket.on('connect', () => {
                 console.log('Socket.IO Bağlandı:', socket.id);
+                setupLobbyHandlers();
                 callback();
             });
 
@@ -229,6 +223,31 @@
             
             socket.on('error', (message) => {
                 showGlobalMessageClient(message, true);
+            });
+        }
+
+        // --- Lobby Olay İşleyicilerini Kurma ---
+        function setupLobbyHandlers() {
+            socket.on('roomCreated', (data) => {
+                // İstenen küçük oda kodu gösterimi
+                currentRoomCodeDisplay.textContent = `Oda Kodu: ${data.roomCode}`;
+                document.getElementById('waitMessage').textContent = "Bir rakibin bu koda katılması bekleniyor...";
+            });
+
+            socket.on('roomJoined', (data) => {
+                const isHost = data.hostSocketId === socket.id;
+                const opponentName = isHost ? data.guestUsername : data.hostUsername;
+                
+                setupSocketHandlers(socket, data.roomCode, isHost, opponentName);
+            });
+
+            socket.on('roomFull', () => {
+                showGlobalMessageClient("Oda dolu veya mevcut değil.", true);
+                showScreen('lobby');
+            });
+            
+            socket.on('opponentLeft', (message) => {
+                // game.js'deki handler tarafından ele alınır.
             });
         }
         
@@ -272,31 +291,6 @@
             showScreen('lobby');
             currentRoomCodeDisplay.textContent = '';
         });
-
-        // --- Socket Olay İşleyicileri ---
-        
-        socket.on('roomCreated', (data) => {
-            currentRoomCodeDisplay.textContent = `Oda Kodu: ${data.roomCode}`;
-            document.getElementById('waitMessage').textContent = "Bir rakibin bu koda katılması bekleniyor...";
-        });
-
-        socket.on('roomJoined', (data) => {
-             // Oyun başlama sinyali
-            const isHost = data.hostSocketId === socket.id;
-            const opponentName = isHost ? data.guestUsername : data.hostUsername;
-            
-            setupSocketHandlers(socket, data.roomCode, isHost, opponentName);
-        });
-
-        socket.on('roomFull', () => {
-            showGlobalMessageClient("Oda dolu veya mevcut değil.", true);
-            showScreen('lobby');
-        });
-        
-        socket.on('opponentLeft', (message) => {
-            // game.js'deki handler tarafından ele alınır.
-        });
-
     </script>
 </body>
 </html>
