@@ -45,7 +45,8 @@
             border-radius: 8px; 
             box-shadow: var(--shadow); 
         }
-        .screen.active { 
+        /* index.html'deki ilk lobi ekranı için active sınıfı */
+        #lobby.active { 
             display: flex; 
         }
         .btn { @apply w-full text-lg font-bold py-3 px-6 rounded-lg transition-all duration-200; }
@@ -80,7 +81,7 @@
 </head>
 <body class="bg-gray-100 select-none">
 
-    <div id="globalMessage" class="hidden w-11/12 max-w-md p-3 bg-red-600 text-white rounded-lg shadow-lg">
+    <div id="globalMessage" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-md p-3 bg-red-600 text-white rounded-lg shadow-lg text-center">
         <p id="globalMessageText"></p>
     </div>
 
@@ -131,17 +132,17 @@
             <button id="startButton" class="btn bg-gray-400 text-white mt-4 hidden" disabled></button>
         </div>
         
-        <button id="endGameBtn" class="btn bg-gray-400 text-gray-800 text-base py-3 max-w-xs">Oyunu Bitir</button>
+        <button id="endGameBtn" class="btn bg-gray-400 text-gray-800 text-base py-3 max-w-xs">Lobiye Dön</button>
     </div>
 
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
 
         // Lütfen bu URL'yi KENDİ Render veya Sunucu URL'nizle değiştirin!
+        // Localhost için: 'http://localhost:3000'
         const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
         let socket;
         
-        function validateInput() { /* ... */ }
         function validateInput() {
             const username = UIElements.usernameInput.value.trim();
             if (username.length < 2) {
@@ -153,6 +154,11 @@
 
         function connectToServer() {
             try {
+                // Eğer zaten bir socket varsa, eski bağlantıyı kes
+                if (socket) {
+                    socket.disconnect();
+                }
+
                 UIElements.matchBtn.disabled = true;
                 UIElements.matchBtn.textContent = 'Sunucuya Bağlanılıyor...';
 
@@ -185,6 +191,7 @@
                     document.getElementById('waitTitle').textContent = 'Odanız Kuruldu!';
                     document.getElementById('codeArea').classList.remove('hidden');
                     document.getElementById('waitStatus').textContent = 'Oda kodunu rakibinizle paylaşın ve bağlanmasını bekleyin.';
+                    showScreen('wait'); // Ekranı bekleme ekranına geçir
                 });
                 
                 socket.on('joinFailed', (message) => {
@@ -192,6 +199,7 @@
                     showScreen('lobby');
                 });
                 
+                // Rakip odaya katıldığında ve oyun başladığında tetiklenir
                 socket.on('gameStart', (players) => {
                     const selfId = socket.id;
                     const self = players.find(p => p.id === selfId);
@@ -199,7 +207,7 @@
                     
                     const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase() || (self.isHost ? document.getElementById('roomCodeDisplay').textContent : '');
                     
-                    // Başlat butonuna gerek kalmadı, kaldırıldı.
+                    // game.js içindeki oyun mantığını başlat
                     setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
                 });
 
@@ -217,12 +225,10 @@
                 return;
             }
             
-            showScreen('wait');
-            
             const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
 
             if (roomCode === '') {
-                document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
+                document.getElementById('waitStatus').textContent = 'Oda oluşturuluyor...';
                 document.getElementById('codeArea').classList.add('hidden');
                 socket.emit('createRoom', { username });
             } else {
@@ -233,6 +239,7 @@
             }
         });
 
+        // İptal Butonu ve Oyunu Bitir Butonu
         document.getElementById('cancelBtn').addEventListener('click', UIElements.resetGame);
         document.getElementById('endGameBtn').addEventListener('click', UIElements.resetGame);
         
@@ -243,6 +250,7 @@
                 .catch(() => UIElements.showGlobalMessage('Kopyalama başarısız.', true));
         });
 
+        // DOM yüklendiğinde sunucuya bağlan
         document.addEventListener('DOMContentLoaded', connectToServer);
     </script>
 </body>
