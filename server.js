@@ -6,6 +6,9 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
+// Static dosyaların sunulmasını sağlamak için
+app.use(express.static(__dirname));
+
 const io = new Server(server, {
     cors: {
         origin: "*", 
@@ -15,10 +18,10 @@ const io = new Server(server, {
 });
 
 const rooms = {}; 
-const LEVELS = [16, 20, 24]; // Client ile senkronize olmalı
+const LEVELS = [16, 20, 24]; 
 
 function generateRoomCode() {
-    let code = Math.random().toString(36).substring(2, 6).toUpperCase(); // 4 haneli kod
+    let code = Math.random().toString(36).substring(2, 6).toUpperCase(); 
     while (rooms[code]) {
         code = Math.random().toString(36).substring(2, 6).toUpperCase();
     }
@@ -43,6 +46,7 @@ io.on('connection', (socket) => {
         };
         socket.join(code);
         socket.emit('roomCreated', code);
+        console.log(`Oda ${code} oluşturuldu. Host: ${username}`);
     });
 
     // 2. Odaya Katılma
@@ -54,24 +58,31 @@ io.on('connection', (socket) => {
             socket.emit('joinFailed', 'Oda bulunamadı veya dolu.');
             return;
         }
+        if (room.hostId === socket.id) {
+            socket.emit('joinFailed', 'Aynı odaya katılamazsınız.');
+            return;
+        }
 
         room.playerCount = 2;
         room.guestId = socket.id;
         room.guestUsername = username;
         socket.join(code);
         
+        console.log(`Oda ${code}'a katılım. Guest: ${username}`);
+
         // Oyun Başlatma Sinyali (Her iki oyuncuya da gönderilir)
         const players = [
             { id: room.hostId, username: room.hostUsername, isHost: true, roomCode: code },
             { id: room.guestId, username: room.guestUsername, isHost: false, roomCode: code }
         ];
+        // Oda kodu client tarafından bilindiği için, bu sinyal sadece oyunun başlatılması için gerekli bilgileri taşır.
         io.to(code).emit('gameStart', players);
     });
     
     // 3. Bomb Seçimi Tamamlandı
     socket.on('bombSelectionComplete', ({ roomCode, bombs }) => {
         const room = rooms[roomCode];
-        if (!room || room.playerCount !== 2) return;
+        if (!room) return;
         
         const isHostPlayer = socket.id === room.hostId;
 
@@ -84,13 +95,11 @@ io.on('connection', (socket) => {
         // Seçimi diğer oyuncuya ilet
         socket.to(roomCode).emit('bombSelectionComplete', { isHost: isHostPlayer, bombs });
         
-        // Sunucuda da tam listeyi kontrol et
         const hostReady = room.hostBombs.length === 3;
         const guestReady = room.guestBombs.length === 3;
         
         if (hostReady && guestReady) {
-            // İki oyuncunun da bombası client'a iletildi. Oyun client tarafında başlayacak.
-            console.log(`Oda ${roomCode}: Oyun bomb seçiminden sonra başlatıldı.`);
+            console.log(`Oda ${roomCode}: İki oyuncu da hazır.`);
         }
     });
 
@@ -109,27 +118,54 @@ io.on('connection', (socket) => {
         if (!room || room.hostId !== socket.id || newLevel > LEVELS.length) return; 
 
         room.level = newLevel;
-        room.hostBombs = []; // Bombaları sıfırla
+        room.hostBombs = []; 
         room.guestBombs = [];
         
         // Tüm client'lara yeni seviyeyi bildir
         io.to(roomCode).emit('nextLevel', { newLevel: room.level });
     });
+    
+    // 6. Odadan Ayrılma (İptal Butonu)
+    socket.on('leaveRoom', () => {
+        for (const code in rooms) {
+            const room = rooms[code];
+            if (room.hostId === socket.id) {
+                // Oda sahibi ayrıldıysa tüm odayı sil
+                if (room.guestId) {
+                    io.to(room.guestId).emit('opponentLeft', 'Oda sahibi ayrıldı. Lobiye dönülüyor.');
+                }
+                delete rooms[code];
+                console.log(`Oda ${code} kapatıldı (Host ayrıldı).`);
+                break;
+            } else if (room.guestId === socket.id) {
+                // Misafir ayrıldıysa odayı tek kişilik hale getir
+                room.playerCount = 1;
+                room.guestId = null;
+                room.guestUsername = null;
+                io.to(room.hostId).emit('opponentLeft', 'Rakibiniz odadan ayrıldı. Yeni bir rakip bekleyin.');
+                console.log(`Oda ${code}: Guest ayrıldı.`);
+                break;
+            }
+        }
+    });
 
-    // 6. Bağlantı Kesilmesi
+    // 7. Bağlantı Kesilmesi
     socket.on('disconnect', () => {
         for (const code in rooms) {
             const room = rooms[code];
-            if (room.hostId === socket.id || room.guestId === socket.id) {
-                const opponentId = (room.hostId === socket.id) ? room.guestId : room.hostId;
-                
-                if (opponentId) {
-                    io.to(opponentId).emit('opponentLeft', 'Rakibiniz bağlantıyı kesti. Lobiye dönülüyor.');
+            if (room.hostId === socket.id) {
+                if (room.guestId) {
+                    io.to(room.guestId).emit('opponentLeft', 'Oda sahibi bağlantıyı kesti. Lobiye dönülüyor.');
                 }
-                
-                // Odayı kalıcı olarak sil
                 delete rooms[code];
-                console.log(`Oda ${code} kapatıldı.`);
+                console.log(`Oda ${code} kapatıldı (Host Disconnect).`);
+                break;
+            } else if (room.guestId === socket.id) {
+                room.playerCount = 1;
+                room.guestId = null;
+                room.guestUsername = null;
+                io.to(room.hostId).emit('opponentLeft', 'Rakibiniz bağlantıyı kesti. Yeni bir rakip bekleyin.');
+                console.log(`Oda ${code}: Guest Disconnect.`);
                 break;
             }
         }
