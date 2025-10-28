@@ -23,7 +23,6 @@ const audioBomb = new Audio('sound1.mp3');
 const audioEmoji = new Audio('sound2.mp3');
 const audioWait = new Audio('sound3.mp3'); 
 
-// Lag-free Sound Playback Function
 function playSound(audioElement) {
     if (!audioElement) return;
     const clone = audioElement.cloneNode();
@@ -36,7 +35,6 @@ let level = 1;
 const LEVELS = [12, 16, 20]; // Kart sayıları
 const BOMB_COUNTS = [2, 3, 4]; // Level'a göre bomba sayısı
 let gameStage = 'PLAY'; // Oyun her zaman PLAY olarak başlar
-let selectedBombs = []; // Kaldırıldı, ama hata vermemesi için tutuyoruz
 
 let gameData = {
     board: [], 
@@ -80,7 +78,6 @@ function initializeGame(initialBoardSize, hostBombs, guestBombs, currentLevel) {
     gameData.hostBombs = hostBombs;
     gameData.guestBombs = guestBombs;
     
-    // Kart içeriklerini rastgele dağıt
     const pairs = initialBoardSize / 2; 
     let cardContents = [];
     for (let i = 0; i < pairs; i++) {
@@ -90,7 +87,7 @@ function initializeGame(initialBoardSize, hostBombs, guestBombs, currentLevel) {
     
     for (let i = cardContents.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [cardContents[i], cardContents[j]] = [cardContents[j], cardContents[i]];
+        [cardContents[i], cardContents[j]] = [cardContents[i], cardContents[j]];
     }
 
     gameData.board = cardContents.map(content => ({
@@ -99,21 +96,20 @@ function initializeGame(initialBoardSize, hostBombs, guestBombs, currentLevel) {
     }));
 
     gameData.cardsLeft = initialBoardSize;
-    // Canlar level geçişinde sıfırlanmayacak
+
     if (level === 1) {
         gameData.hostLives = 2;
         gameData.guestLives = 2;
     }
     
-    selectedBombs = [];
-    gameData.turn = 0;
+    gameData.turn = 0; // Host Başlar
     gameData.isGameOver = false;
-    gameStage = 'PLAY'; // KRİTİK: Hemen PLAY aşamasına geç
+    gameStage = 'PLAY'; 
 }
 
 function drawBoard() {
     gameBoardEl.className = 'grid w-full max-w-sm mx-auto memory-board'; 
-    gameBoardEl.style.gridTemplateColumns = 'repeat(4, 1fr)'; // 4x4 veya 4x5 vs.
+    gameBoardEl.style.gridTemplateColumns = 'repeat(4, 1fr)'; 
 
     gameBoardEl.innerHTML = '';
     
@@ -133,6 +129,7 @@ function drawBoard() {
         back.className = 'card-face back';
         back.textContent = cardState.content;
 
+
         card.appendChild(front);
         card.appendChild(back);
         cardContainer.appendChild(card);
@@ -140,7 +137,6 @@ function drawBoard() {
         if (cardState.opened) {
             card.classList.add('flipped');
         } else {
-            // SELECTION aşaması yok, bomba UI'si kaldırıldı
             cardContainer.addEventListener('click', handleCardClick);
         }
         
@@ -164,12 +160,12 @@ function updateStatusDisplay() {
         
         if (isMyTurn) {
             turnStatusEl.textContent = 'SIRA SENDE!';
-            actionMessageEl.textContent = levelInfo;
+            actionMessageEl.textContent = levelInfo + " - Bir kart aç!";
             turnStatusEl.classList.remove('text-red-600');
             turnStatusEl.classList.add('text-green-600');
         } else {
             turnStatusEl.textContent = 'RAKİBİN SIRASI';
-            actionMessageEl.textContent = levelInfo;
+            actionMessageEl.textContent = levelInfo + " - Rakibini bekle.";
             turnStatusEl.classList.remove('text-green-600');
             turnStatusEl.classList.add('text-red-600');
         }
@@ -179,7 +175,7 @@ function updateStatusDisplay() {
     }
 }
 
-// Geri kalan yardımcı fonksiyonlar (startVibration, stopVibration vs.) aynı kalır.
+// --- HAREKET İŞLEYİCİLERİ (KRİTİK DÜZELTMELER BURADA) ---
 
 function handleCardClick(event) {
     const cardContainer = event.currentTarget; 
@@ -190,20 +186,23 @@ function handleCardClick(event) {
     const cardIndex = parseInt(cardElement.dataset.index);
 
     if (gameStage === 'PLAY') {
+        // Kontrol 1: Sıra bende mi?
         const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
         if (!isMyTurn || gameData.isGameOver) return; 
         
+        // Kontrol 2: Kart açılmış mı? (Zaten yukarıda kontrol ediliyor ama emin olalım)
+        if (gameData.board[cardIndex].opened) return;
+        
         sendMove(cardIndex);
     }
-    // SELECTION aşaması artık yok
 }
 
 function sendMove(index) {
     if (socket && socket.connected) {
-        // Hamleyi hemen uygula (Gecikmeyi azaltmak için)
-        const nextTurn = gameData.turn === 0 ? 1 : 0;
-        applyMove(index, nextTurn); 
-
+        // Kart açma hareketini yerel olarak uygula
+        applyMove(index); 
+        
+        // Hareketi rakibe ilet
         socket.emit('gameData', {
             roomCode: currentRoomCode,
             type: 'MOVE',
@@ -212,19 +211,20 @@ function sendMove(index) {
     }
 }
 
-async function applyMove(index, nextTurn) {
+async function applyMove(index) {
     if (gameData.board[index].opened) return;
 
+    // Şu anki oyuncunun rolünü belirle
     const isCurrentPlayerHost = gameData.turn === 0;
     
-    // Hangi bombaya bakılıyor? (Rakibin bombasına bakılır)
+    // Rakibin bombasına bakılır
     const bombsToCheck = isCurrentPlayerHost ? gameData.guestBombs : gameData.hostBombs;
 
     const hitOpponentBomb = bombsToCheck.includes(index); 
     
     
     if (hitOpponentBomb) {
-        // Can kaybeden oyuncunun Host mu Guest mi olduğunu belirle
+        // Can kaybeden oyuncu: Hareket yapan oyuncudur
         if (isCurrentPlayerHost) {
             gameData.hostLives--;
         } else {
@@ -232,15 +232,14 @@ async function applyMove(index, nextTurn) {
         }
     }
     
-    // await triggerWaitAndVibrate(); // Opsiyonel
-
     gameData.board[index].opened = true;
     gameData.cardsLeft -= 1;
     
     if (hitOpponentBomb) {
         gameData.board[index].content = '💣';
         playSound(audioBomb);
-        const loserRoleDisplay = (isHost === isCurrentPlayerHost) ? 'SİZ' : 'RAKİP';
+        // Can kaybeden tarafı kullanıcıya göster
+        const loserRoleDisplay = (isHost === isCurrentPlayerHost) ? 'SİZ' (isHost ? gameData.hostLives : gameData.guestLives) : 'RAKİP' ;
         showGlobalMessage(`BOOM! ${loserRoleDisplay} bombaya bastı! Can: -1`, true);
 
     } else {
@@ -249,7 +248,7 @@ async function applyMove(index, nextTurn) {
     
     drawBoard(); 
     
-    // Oyun bitti mi kontrol et (Can bitti veya Kart bitti)
+    // Oyun bitiş veya devam etme kontrolü
     setTimeout(() => {
         
         if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
@@ -258,12 +257,12 @@ async function applyMove(index, nextTurn) {
         } else if (gameData.cardsLeft === 0) {
             endGame('LEVEL_COMPLETE');
         } else {
-            // Eğer oyun bitmediyse sırayı değiştir ve devam et
-            gameData.turn = nextTurn;
-            updateStatusDisplay();
+            // KRİTİK DÜZELTME: Oyun devam ediyorsa, sırayı değiştir.
+            gameData.turn = gameData.turn === 0 ? 1 : 0;
+            updateStatusDisplay(); // Sıra değişimi yansıtılır
         }
         
-    }, 1000);
+    }, 1000); 
 }
 
 function endGame(winnerRole) {
@@ -279,7 +278,6 @@ function endGame(winnerRole) {
         
         setTimeout(() => {
             if (isHost) {
-                // Sadece Host, yeni seviye sinyalini gönderir.
                 socket.emit('nextLevel', { roomCode: currentRoomCode, newLevel: level + 1 });
             }
         }, 3000);
@@ -302,7 +300,7 @@ function endGame(winnerRole) {
 }
 
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
-// gameStart sinyali artık tüm bomba ve level bilgilerini getiriyor.
+
 export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex, initialData) {
     socket = s;
     currentRoomCode = roomCode;
@@ -312,7 +310,6 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex, in
     opponentNameEl.textContent = opponentName;
     roleStatusEl.textContent = isHost ? "Rolünüz: HOST" : "Rolünüz: GUEST";
     
-    // Oyun Başlatma (Hemen PLAY)
     initializeGame(
         LEVELS[initialData.level - 1], 
         initialData.hostBombs, 
@@ -330,8 +327,8 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex, in
         if (gameStage !== 'PLAY') return;
         
         if (data.type === 'MOVE') {
-            const nextTurn = gameData.turn === 0 ? 1 : 0; 
-            applyMove(data.cardIndex, nextTurn);
+            // applyMove fonksiyonu artık kendi içinde sırayı değiştiriyor.
+            applyMove(data.cardIndex);
         }
     });
 
