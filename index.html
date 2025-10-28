@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>💣 Emoji Bomb V3 - Stabil</title>
+    <title>💣 Emoji Bomb V4 - Eş Zamanlı</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -35,7 +35,7 @@
         @keyframes fadeInDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
         .memory-board { display: grid; gap: 8px; padding: 5px 0; }
-        /* Grid kolonları game.js'de dinamik ayarlanır */
+        /* 20 kart için 5x4 grid */
         .grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
         .grid-cols-5 { grid-template-columns: repeat(5, 1fr); }
 
@@ -62,8 +62,8 @@
     </div>
 
     <div id="lobby" class="screen active space-y-6 container">
-        <h1 class="text-5xl font-black text-gray-900">💣 Emoji Bomb V3</h1>
-        <p class="text-gray-700">Sunucuya bağlı. Kullanıcı adınızı girin.</p>
+        <h1 class="text-5xl font-black text-gray-900">💣 Emoji Bomb V4</h1>
+        <p class="text-gray-700">Eş Zamanlı Hafıza Avı. Kullanıcı adınızı girin.</p>
         
         <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adı">
         <input type="text" id="roomCodeInput" class="input-field uppercase" placeholder="Oda Numarası (Boş bırak=Oluştur)">
@@ -83,17 +83,17 @@
     </div>
 
     <div id="gameScreen" class="screen space-y-6 container">
-        <h1 class="text-5xl font-black text-gray-900">🕹️ Kart Oyunu</h1>
+        <h1 class="text-5xl font-black text-gray-900">🕹️ Eş Zamanlı Av</h1>
         
         <div class="flex justify-between w-full text-gray-800 font-bold p-2 border-b border-gray-300">
-            <p>Sen: <span id="myLives" class="text-green-600">❤️❤️</span></p>
-            <p>Rakip: <span id="opponentName" class="text-blue-600"></span></p>
-            <p>Can: <span id="opponentLives" class="text-green-600">❤️❤️</span></p>
+            <p><span id="myName" class="text-blue-600"></span>: <span id="myLives" class="text-green-600">❤️❤️</span></p>
+            <p>vs</p>
+            <p><span id="opponentName" class="text-blue-600"></span>: <span id="opponentLives" class="text-green-600">❤️❤️</span></p>
         </div>
         <p id="roleStatus" class="text-gray-700 text-sm"></p>
 
         <div id="gameContent" class="p-4 bg-gray-200 rounded-lg w-full space-y-4">
-            <h3 id="turnStatus" class="text-2xl font-bold text-red-600">Rakip bekleniyor...</h3>
+            <h3 id="turnStatus" class="text-2xl font-bold text-red-600">Yükleniyor...</h3>
             <p id="actionMessage" class="text-base text-purple-600 font-semibold"></p>
             
             <div id="gameBoard" class="grid w-full max-w-sm mx-auto">
@@ -101,7 +101,7 @@
             
         </div>
         
-        <button id="endGameBtn" class="btn bg-gray-600 text-white text-base py-3 max-w-xs" onclick="resetGame()">Oyunu Bitir</button>
+        <button id="endGameBtn" class="btn bg-gray-600 text-white text-base py-3 max-w-xs" onclick="resetGame()">Lobiye Dön</button>
     </div>
 
     <script type="module">
@@ -160,19 +160,18 @@
                 // OYUN BAŞLANGIÇ SİNYALİ
                 socket.on('gameStart', (data) => {
                     const players = data.players;
-                    const opponent = players.find(p => p.id !== socket.id);
                     const self = players.find(p => p.id === socket.id);
+                    const opponent = players.find(p => p.id !== socket.id);
                     
                     setupSocketHandlers(
                         socket, 
                         UIElements.roomCodeInput.value, 
-                        self.isHost, 
-                        opponent.username,
+                        self.username, // Kendi adımız
+                        opponent.username, // Rakip adı
                         {
+                            players: data.players,
                             hostBombs: data.hostBombs,
                             guestBombs: data.guestBombs,
-                            level: data.level,
-                            initialTurn: data.initialTurn,
                             boardSize: data.boardSize,
                             initialLives: data.initialLives
                         }
