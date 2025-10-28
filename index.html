@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>💣 Emoji Bomb V4 - Eş Zamanlı</title>
+    <title>💣 Emoji Bomb V4 - Eş Zamanlı + Sohbet</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -101,6 +101,15 @@
             
         </div>
         
+        <div id="chatArea" class="w-full max-w-sm mx-auto p-3 bg-white rounded-lg shadow-inner border border-gray-300">
+            <h4 class="text-lg font-bold mb-2 border-b pb-1">Oda Sohbeti</h4>
+            <div id="messages" class="h-40 overflow-y-auto mb-3 space-y-1 text-sm bg-gray-50 p-2 rounded">
+                </div>
+            <div class="flex space-x-2">
+                <input type="text" id="chatInput" class="flex-grow input-field p-2 text-sm" placeholder="Mesajınızı yazın...">
+                <button id="sendChatBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-indigo-500 transition duration-150">Gönder</button>
+            </div>
+        </div>
         <button id="endGameBtn" class="btn bg-gray-600 text-white text-base py-3 max-w-xs" onclick="resetGame()">Lobiye Dön</button>
     </div>
 
@@ -108,7 +117,7 @@
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage, resetGame } from './game.js';
 
         // LÜTFEN BU URL'Yİ KENDİ AKTİF RENDER URL'NİZLE DEĞİŞTİRİN!
-        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
+        const LIVE_SERVER_URL = 'http://localhost:3000'; // Örneğin
         let socket;
         
         function validateInput() {
@@ -122,6 +131,7 @@
 
         function connectToServer() {
             try {
+                // Not: Eğer localhost:3000 kullanmıyorsanız yukarıdaki LIVE_SERVER_URL'yi düzeltmelisiniz.
                 socket = io(LIVE_SERVER_URL, {
                     transports: ['websocket', 'polling'], 
                     reconnectionAttempts: 5, 
@@ -135,7 +145,7 @@
                 
                 socket.on('connect_error', (err) => {
                     console.error('Bağlantı Hatası:', err);
-                    UIElements.showGlobalMessage('HATA: Sunucuya erişilemiyor. Render URL\'sini veya Portu kontrol edin.', true);
+                    UIElements.showGlobalMessage('HATA: Sunucuya erişilemiyor. URL\'yi veya Portu kontrol edin.', true);
                     showScreen('lobby');
                 });
                 
@@ -159,22 +169,15 @@
                 
                 // OYUN BAŞLANGIÇ SİNYALİ
                 socket.on('gameStart', (data) => {
-                    const players = data.players;
-                    const self = players.find(p => p.id === socket.id);
-                    const opponent = players.find(p => p.id !== socket.id);
+                    const self = data.players.find(p => p.id === socket.id);
+                    const opponent = data.players.find(p => p.id !== socket.id);
                     
                     setupSocketHandlers(
                         socket, 
-                        UIElements.roomCodeInput.value, 
+                        UIElements.roomCodeInput.value || data.code, // Oda kodunu doğru al
                         self.username, // Kendi adımız
                         opponent.username, // Rakip adı
-                        {
-                            players: data.players,
-                            hostBombs: data.hostBombs,
-                            guestBombs: data.guestBombs,
-                            boardSize: data.boardSize,
-                            initialLives: data.initialLives
-                        }
+                        data
                     );
                 });
 
