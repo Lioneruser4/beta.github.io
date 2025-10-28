@@ -2,28 +2,22 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>💣 Emoji Bomb 1v1</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <title>Bomb Memory Game</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    
     <style>
-        /* CSS aynı kalır */
         :root {
-            --primary-color: #3498db; 
-            --secondary-color: #2980b9; 
-            --text-color: #333;
-            --bg-color: #f4f4f4; 
-            --card-bg: white;
-            --shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            --bg-color: #1a202c; /* Koyu arka plan */
+            --card-front: #4a5568; /* Koyu gri kart önü */
+            --card-back: #e9d8a6; /* Açık sarı/bej kart arkası */
+            --text-color: #edf2f7; /* Açık metin */
         }
         
-        * { -webkit-tap-highlight-color: transparent; }
         body { 
             font-family: sans-serif; 
             background-color: var(--bg-color); 
-            color: var(--text-color); 
+            color: var(--text-color);
+            /* Ekranı kapla ve içeriği ortala */
             min-height: 100vh; 
             display: flex; 
             align-items: center; 
@@ -31,225 +25,278 @@
             overflow-x: hidden; 
             overflow-y: auto; 
             padding: 10px;
+            box-sizing: border-box;
         }
-        .screen { 
-            width: 100%; 
-            max-width: 400px; 
-            display: none; 
-            flex-direction: column; 
-            align-items: center; 
-            padding: 1.5rem; 
-            box-sizing: border-box; 
-            text-align: center; 
-            background-color: var(--card-bg); 
-            border-radius: 8px; 
-            box-shadow: var(--shadow); 
+        
+        /* Genel konteyner stil ayarı */
+        .container {
+            width: 100%;
+            max-width: 500px; 
+            margin: auto;
+            display: none; /* Varsayılan olarak tüm ekranları gizle */
         }
-        /* index.html'deki ilk lobi ekranı için active sınıfı */
-        #lobby.active { 
-            display: flex; 
-        }
-        .btn { @apply w-full text-lg font-bold py-3 px-6 rounded-lg transition-all duration-200; }
-        .btn-primary { @apply bg-blue-600 text-white hover:bg-blue-700 active:scale-95; }
-        .input-field { @apply w-full text-base bg-gray-100 text-gray-900 border border-gray-300 rounded-lg p-3 text-center placeholder-gray-500 focus:outline-none focus:border-blue-500; }
-        .code-display { @apply text-3xl font-mono p-3 bg-gray-800 text-yellow-300 rounded-md tracking-widest inline-block; } 
 
-        /* KART ANİMASYON */
-        .card-container { perspective: 1000px; aspect-ratio: 1; }
+        .container.active {
+            display: block; /* Aktif ekranı göster */
+        }
+
+        /* Kart stilleri */
+        .memory-board {
+            gap: 8px; /* Kartlar arası boşluk */
+        }
+        
+        .card-container {
+            perspective: 1000px;
+        }
+
         .card {
-            width: 100%; height: 100%; border-radius: 8px; position: relative;
-            transform-style: preserve-3d; 
-            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            user-select: none;
         }
-        .card.flipped { transform: rotateY(180deg); }
+
+        .card.flipped {
+            transform: rotateY(180deg);
+            pointer-events: none; /* Açılmış kartlar tıklanmasın */
+        }
+
         .card-face {
-            position: absolute; width: 100%; height: 100%; backface-visibility: hidden; 
-            display: flex; justify-content: center; align-items: center;
-            border-radius: 8px; font-size: 2rem; font-weight: bold; line-height: 1;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem; 
+            border-radius: 8px;
+            font-weight: bold;
         }
-        .card-face.front {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: white; border: 3px solid var(--card-bg); transform: rotateY(0deg); 
+
+        .front {
+            background-color: var(--card-front);
+            color: var(--text-color);
+            border: 3px solid #2d3748;
         }
-        .card-face.back {
-            background: var(--card-bg); color: var(--text-color); transform: rotateY(180deg);
+
+        .back {
+            background-color: var(--card-back);
+            transform: rotateY(180deg);
         }
-        .text-orange-500 { color: #f97316; }
-        .text-green-600 { color: #16a34a; }
+
+        /* Bomba Seçimi sırasında kartın görünümü */
+        .card.bomb-selected .front {
+            background-color: #e53e3e; /* Kırmızı renk */
+            color: white;
+        }
+
+        /* Durum Mesajı Stilleri */
+        #globalMessage {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 1rem;
+            text-align: center;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            transform: translateY(-100%);
+            transition: transform 0.3s ease-out;
+        }
+        #globalMessage.show {
+            transform: translateY(0);
+        }
+
+        /* Titreşim efekti */
+        .card.vibrate {
+            animation: vibrate-animation 0.5s infinite alternate;
+        }
+
+        @keyframes vibrate-animation {
+            from { transform: translateX(-2px) rotate(0deg); }
+            to { transform: translateX(2px) rotate(0deg); }
+        }
+
     </style>
 </head>
-<body class="bg-gray-100 select-none">
+<body>
 
-    <div id="globalMessage" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-md p-3 bg-red-600 text-white rounded-lg shadow-lg text-center">
-        <p id="globalMessageText"></p>
+    <div id="globalMessage" class="hidden">
+        <span id="globalMessageText"></span>
     </div>
 
-    <div id="lobby" class="screen active space-y-5 container">
-        <h1 class="text-3xl font-bold text-gray-800">💣 Emoji Bomb</h1>
-        <p class="text-gray-600">Oda oluşturmak için kodu boş bırakın.</p>
+    <div id="lobby" class="container active p-6 bg-gray-800 rounded-lg shadow-xl">
+        <h1 class="text-3xl font-bold mb-6 text-center text-white">Bomba Hafıza Oyunu</h1>
         
-        <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adı" maxlength="15">
-        <input type="text" id="roomCodeInput" class="input-field uppercase" placeholder="Oda Numarası (Örn: RND45)" maxlength="6">
+        <input id="username" type="text" placeholder="Kullanıcı Adınız" class="w-full p-3 mb-4 border border-gray-600 rounded-lg bg-gray-700 text-white focus:ring-blue-500 focus:border-blue-500" maxlength="15">
         
-        <button id="matchBtn" class="btn btn-primary">🎮 Oda Oluştur / Odaya Gir</button>
-    </div>
-    
-    <div id="waitScreen" class="screen space-y-5 container">
-        <h2 id="waitTitle" class="text-2xl font-bold text-gray-800">Oda Kuruluyor...</h2>
-        
-        <div id="codeArea" class="space-y-3 hidden">
-            <p class="text-gray-600">Odanıza girmek için şu kodu kullanın:</p>
-            <div id="roomCodeDisplay" class="code-display"></div>
-            <button id="copyCodeBtn" class="btn bg-gray-400 text-gray-800 text-base py-2 max-w-xs">Kopyala</button>
+        <div class="space-y-4">
+            <button id="matchBtn" class="w-full btn bg-green-600 hover:bg-green-700 text-white text-base py-3 rounded-lg font-semibold transition duration-200">
+                Oda Bul/Oluştur
+            </button>
+            <div class="flex items-center space-x-2 text-gray-400">
+                <hr class="flex-grow border-gray-600">
+                <span class="text-sm">veya</span>
+                <hr class="flex-grow border-gray-600">
+            </div>
+            <input id="roomCodeInput" type="text" placeholder="Oda Kodunu Girin" class="w-full p-3 border border-gray-600 rounded-lg bg-gray-700 text-white focus:ring-blue-500 focus:border-blue-500" maxlength="6">
+            <button id="joinBtn" class="w-full btn bg-blue-600 hover:bg-blue-700 text-white text-base py-3 rounded-lg font-semibold transition duration-200">
+                Odaya Katıl
+            </button>
         </div>
-        
-        <p id="waitStatus" class="text-gray-700"></p>
-        <button id="cancelBtn" class="btn bg-red-500 text-white text-base py-3 max-w-xs">İptal Et</button>
     </div>
 
-    <div id="gameScreen" class="screen space-y-4 container max-w-lg">
-        <h1 class="text-3xl font-bold text-gray-800">🕹️ Emoji Bomb</h1>
-        
-        <div class="flex justify-between w-full text-gray-700 font-semibold p-2 border-b border-gray-300">
+    <div id="waitScreen" class="container p-6 bg-gray-800 rounded-lg shadow-xl text-center">
+        <h2 class="text-2xl font-bold mb-4 text-white">Rakip Bekleniyor...</h2>
+        <p class="text-gray-400 mb-6" id="waitMessage">Lütfen bir rakibin katılmasını bekleyin.</p>
+        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500 mx-auto mb-6"></div>
+        <p class="text-lg font-mono text-yellow-400" id="currentRoomCodeDisplay"></p>
+        <button id="cancelBtn" class="w-full btn bg-red-600 hover:bg-red-700 text-white text-base py-3 rounded-lg font-semibold transition duration-200 mt-4">
+            İptal Et
+        </button>
+    </div>
+
+    <div id="gameScreen" class="container p-4 bg-gray-800 rounded-lg shadow-xl">
+        <div class="flex justify-between items-center mb-4">
             <div class="text-left">
-                 <p class="text-sm" id="roleStatus">Rol: ...</p>
-                 <p>Sen: <span id="myLives" class="text-green-600">❤️❤️</span></p>
+                <p class="text-sm text-gray-400" id="roleStatus">Rol: ...</p>
+                <p class="text-xl font-bold text-green-400">Canım: <span id="myLives">❤️❤️</span></p>
             </div>
             <div class="text-right">
-                <p class="text-sm" id="opponentName">Rakip: ...</p>
-                <p>Can: <span id="opponentLives" class="text-green-600">❤️❤️</span></p>
+                <p class="text-sm text-gray-400" id="opponentName">Rakip: ...</p>
+                <p class="text-xl font-bold text-red-400">Rakip Canı: <span id="opponentLives">❤️❤️</span></p>
             </div>
         </div>
 
-        <div id="gameContent" class="p-3 bg-gray-200 rounded-lg w-full space-y-3">
-            <h3 id="turnStatus" class="text-xl font-bold text-green-600">SIRA SENDE!</h3>
-            <p id="actionMessage" class="text-sm text-gray-700">Bir kart aç!</p>
-            
-            <div id="gameBoard" class="grid w-full mx-auto">
+        <div class="text-center mb-4 p-3 rounded-lg bg-gray-700">
+            <p class="text-2xl font-extrabold" id="turnStatus">SIRA SENDE!</p>
+            <p class="text-sm text-gray-400" id="actionMessage">Bir kart aç!</p>
+        </div>
+
+        <div id="gameBoard" class="grid w-full max-w-sm mx-auto memory-board">
             </div>
 
-            <button id="startButton" class="btn bg-gray-400 text-white mt-4 hidden" disabled></button>
-        </div>
+        <button id="readyToPlayBtn" class="w-full btn bg-indigo-600 hover:bg-indigo-700 text-white text-base py-3 rounded-lg font-semibold transition duration-200 mt-4" style="display:none;" disabled>
+            HAZIR
+        </button>
         
-        <button id="endGameBtn" class="btn bg-gray-400 text-gray-800 text-base py-3 max-w-xs">Lobiye Dön</button>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script type="module">
-        import { setupSocketHandlers, showScreen, UIElements } from './game.js';
+        import { setupSocketHandlers, showScreen, showGlobalMessage, UIElements, resetGame } from './game.js';
 
-        // LÜTFEN BU URL'Yİ KENDİ SUNUCU ADRESİNİZLE DEĞİŞTİRİN!
-        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
+        const { matchBtn, roomCodeInput, usernameInput, showGlobalMessage: showGlobalMessageClient, resetGame: clientResetGame } = UIElements;
+        const joinBtn = document.getElementById('joinBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const currentRoomCodeDisplay = document.getElementById('currentRoomCodeDisplay');
+        
         let socket;
-        
-        function validateInput() {
-            const username = UIElements.usernameInput.value.trim();
-            if (username.length < 2) {
-                UIElements.showGlobalMessage('Lütfen geçerli bir kullanıcı adı girin (en az 2 harf).', true);
-                return false;
+        let currentUsername = '';
+
+        // --- Socket Bağlantısını Kurma ---
+        function connectSocket(callback) {
+            if (socket && socket.connected) {
+                callback();
+                return;
             }
-            return username;
-        }
+            // Sunucu adresini otomatik olarak tespit et
+            socket = io(window.location.origin); 
+            
+            socket.on('connect', () => {
+                console.log('Socket.IO Bağlandı:', socket.id);
+                callback();
+            });
 
-        function connectToServer() {
-            try {
-                if (socket && socket.connected) {
-                    socket.disconnect();
-                }
-
-                UIElements.matchBtn.disabled = true;
-                UIElements.matchBtn.textContent = 'Sunucuya Bağlanılıyor...';
-
-                socket = io(LIVE_SERVER_URL, {
-                    transports: ['websocket', 'polling'], 
-                    reconnectionAttempts: 5, 
-                    timeout: 20000 
-                });
-
-                socket.on('connect', () => {
-                    UIElements.showGlobalMessage('Sunucuya bağlandı. Hazırsınız.', false);
-                    UIElements.matchBtn.disabled = false;
-                    UIElements.matchBtn.textContent = '🎮 Oda Oluştur / Odaya Gir';
-                });
-                
-                socket.on('connect_error', (err) => {
-                    console.error('Bağlantı Hatası:', err);
-                    UIElements.showGlobalMessage('HATA: Sunucuya erişilemiyor. Lütfen sayfayı yenileyin.', true);
-                    UIElements.matchBtn.textContent = 'Bağlantı Hatası!';
-                });
-                
-                socket.on('disconnect', () => {
-                    UIElements.showGlobalMessage('Bağlantı kesildi. Lobiye dönülüyor.', true);
-                    UIElements.resetGame(); // Sayfayı yenileyerek lobiye döner
-                });
-
-                // --- Eşleşme Olayları ---
-                socket.on('roomCreated', (code) => {
-                    document.getElementById('roomCodeDisplay').textContent = code;
-                    document.getElementById('waitTitle').textContent = 'Odanız Kuruldu!';
-                    document.getElementById('codeArea').classList.remove('hidden');
-                    document.getElementById('waitStatus').textContent = 'Oda kodunu rakibinizle paylaşın ve bağlanmasını bekleyin.';
-                    showScreen('wait'); // <--- Çözüm: Ekranı bekleme ekranına geçir
-                });
-                
-                socket.on('joinFailed', (message) => {
-                    UIElements.showGlobalMessage(message, true);
+            socket.on('connect_error', (err) => {
+                showGlobalMessageClient(`Bağlantı Hatası: ${err.message}`, true);
+                console.error("Bağlantı Hatası:", err);
+            });
+            
+            socket.on('disconnect', (reason) => {
+                console.log('Socket.IO bağlantısı kesildi:', reason);
+                if (reason !== 'io client disconnect') {
+                    showGlobalMessageClient('Sunucuyla bağlantı koptu. Lütfen yeniden deneyin.', true);
                     showScreen('lobby');
-                });
-                
-                // Rakip odaya katıldığında ve oyun başladığında tetiklenir
-                socket.on('gameStart', (players) => {
-                    const selfId = socket.id;
-                    const self = players.find(p => p.id === selfId);
-                    const opponent = players.find(p => p.id !== selfId);
-                    
-                    const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase() || (self.isHost ? document.getElementById('roomCodeDisplay').textContent : '');
-                    
-                    // game.js içindeki oyun mantığını başlatır (Bu, içerde showScreen('game') çağırır)
-                    setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
-                });
-
-            } catch (e) {
-                console.error('Socket.IO genel hatası:', e);
-                UIElements.showGlobalMessage('Kritik bağlantı hatası oluştu.', true);
-            }
+                }
+            });
+            
+            socket.on('error', (message) => {
+                showGlobalMessageClient(message, true);
+            });
         }
         
-        // --- Olay Dinleyicileri ---
-        UIElements.matchBtn.addEventListener('click', () => {
-            const username = validateInput();
-            if (!username || !socket || !socket.connected) {
-                UIElements.showGlobalMessage('Lütfen önce sunucu bağlantısının kurulmasını bekleyin.', true);
+        // --- Oda Yönetimi Fonksiyonları ---
+
+        function handleJoinOrCreate(isHost, roomCode = null) {
+            currentUsername = usernameInput.value.trim();
+            if (!currentUsername) {
+                showGlobalMessageClient("Lütfen bir kullanıcı adı girin.", true);
                 return;
             }
             
-            const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
+            connectSocket(() => {
+                showScreen('wait');
+                
+                if (isHost) {
+                    socket.emit('createOrJoinRoom', { username: currentUsername, roomCode: null });
+                } else if (roomCode) {
+                    socket.emit('createOrJoinRoom', { username: currentUsername, roomCode: roomCode });
+                }
+            });
+        }
 
-            if (roomCode === '') {
-                document.getElementById('waitStatus').textContent = 'Oda oluşturuluyor...';
-                document.getElementById('codeArea').classList.add('hidden');
-                socket.emit('createRoom', { username });
-            } else {
-                document.getElementById('waitTitle').textContent = `Odaya Katılım: ${roomCode}`;
-                document.getElementById('waitStatus').textContent = 'Bağlanılıyor...';
-                document.getElementById('codeArea').classList.add('hidden');
-                socket.emit('joinRoom', { username, roomCode });
-            }
-        });
-
-        // İptal Butonu ve Oyunu Bitir Butonu
-        document.getElementById('cancelBtn').addEventListener('click', UIElements.resetGame);
-        document.getElementById('endGameBtn').addEventListener('click', UIElements.resetGame);
+        // --- Olay Dinleyicileri ---
         
-        document.getElementById('copyCodeBtn').addEventListener('click', () => {
-            const textToCopy = document.getElementById('roomCodeDisplay').textContent;
-            navigator.clipboard.writeText(textToCopy)
-                .then(() => UIElements.showGlobalMessage('Oda Kodu Kopyalandı!', false))
-                .catch(() => UIElements.showGlobalMessage('Kopyalama başarısız.', true));
+        matchBtn.addEventListener('click', () => handleJoinOrCreate(true));
+        
+        joinBtn.addEventListener('click', () => {
+            const code = roomCodeInput.value.trim().toUpperCase();
+            if (code.length !== 6) {
+                showGlobalMessageClient("Oda kodu 6 haneli olmalıdır.", true);
+                return;
+            }
+            handleJoinOrCreate(false, code);
+        });
+        
+        cancelBtn.addEventListener('click', () => {
+            if (socket) {
+                socket.emit('leaveRoom', {}); 
+            }
+            showScreen('lobby');
+            currentRoomCodeDisplay.textContent = '';
         });
 
-        // DOM yüklendiğinde sunucuya bağlan
-        document.addEventListener('DOMContentLoaded', connectToServer);
+        // --- Socket Olay İşleyicileri ---
+        
+        socket.on('roomCreated', (data) => {
+            currentRoomCodeDisplay.textContent = `Oda Kodu: ${data.roomCode}`;
+            document.getElementById('waitMessage').textContent = "Bir rakibin bu koda katılması bekleniyor...";
+        });
+
+        socket.on('roomJoined', (data) => {
+             // Oyun başlama sinyali
+            const isHost = data.hostSocketId === socket.id;
+            const opponentName = isHost ? data.guestUsername : data.hostUsername;
+            
+            setupSocketHandlers(socket, data.roomCode, isHost, opponentName);
+        });
+
+        socket.on('roomFull', () => {
+            showGlobalMessageClient("Oda dolu veya mevcut değil.", true);
+            showScreen('lobby');
+        });
+        
+        socket.on('opponentLeft', (message) => {
+            // game.js'deki handler tarafından ele alınır.
+        });
+
     </script>
 </body>
 </html>
