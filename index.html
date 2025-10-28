@@ -9,7 +9,7 @@
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     
     <style>
-        /* ... (CSS Kodları, Paylaştığınız Haliyle Bırakıldı) ... */
+        /* CSS'i önceki paylaştığınız haliyle bırakıyorum */
         :root {
             --primary-color: #3498db;
             --secondary-color: #2980b9;
@@ -145,7 +145,7 @@
                     document.getElementById('waitTitle').textContent = 'Odanız Kuruldu!';
                     document.getElementById('codeArea').classList.remove('hidden');
                     document.getElementById('waitStatus').textContent = 'Oda kodunu arkadaşınıza gönderin ve bağlanmasını bekleyin.';
-                    showScreen('wait'); // wait ekranına geçişi tetikle
+                    showScreen('wait'); 
                 });
                 
                 socket.on('joinFailed', (message) => {
@@ -153,12 +153,23 @@
                     UIElements.resetGame();
                 });
                 
-                socket.on('gameStart', (players) => {
+                // KRİTİK: gameStart olayından gelen veriyi yakala ve game.js'e ilet
+                socket.on('gameStart', (data) => {
+                    const players = data.players;
                     const opponent = players.find(p => p.id !== socket.id);
                     const self = players.find(p => p.id === socket.id);
                     
-                    // Oyunu başlatmak için game.js'deki fonksiyona devret
-                    setupSocketHandlers(socket, UIElements.roomCodeInput.value, self.isHost, opponent.username);
+                    setupSocketHandlers(
+                        socket, 
+                        UIElements.roomCodeInput.value, 
+                        self.isHost, 
+                        opponent.username,
+                        {
+                            hostBombs: data.hostBombs,
+                            guestBombs: data.guestBombs,
+                            level: data.level
+                        }
+                    );
                 });
 
             } catch (e) {
