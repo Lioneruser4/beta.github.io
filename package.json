@@ -1,7 +1,7 @@
 {
-  "name": "emoji-bomb-server",
+  "name": "emoji-bomb-socket-server",
   "version": "1.0.0",
-  "description": "Emoji Bomb Game Server",
+  "description": "Socket.IO server for 1v1 game.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
