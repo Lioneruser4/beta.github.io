@@ -33,7 +33,8 @@ function playSound(audioElement) {
 
 // --- OYUN DURUMU ---
 let level = 1; 
-const LEVELS = [18, 22, 28]; 
+// GÜNCELLENMİŞ KART SAYILARI: 12 (4x3), 16 (4x4), 20 (4x5)
+const LEVELS = [12, 16, 20]; 
 let gameStage = 'SELECTION'; // 'SELECTION' veya 'PLAY'
 let selectedBombs = []; // Kendi seçtiğimiz bombaların indexleri
 
@@ -90,9 +91,9 @@ function initializeGame(initialBoardSize) {
 function drawBoard() {
     const boardSize = LEVELS[level - 1];
     
-    // Mobil uyumluluk için 4 sütunlu grid yapısı
+    // Grid düzenini sadece 4 sütun (4 aşağı inme) olarak ayarla
     gameBoardEl.className = 'grid w-full max-w-sm mx-auto memory-board'; 
-    gameBoardEl.style.gridTemplateColumns = 'repeat(4, 1fr)'; // Her zaman 4 sütun
+    gameBoardEl.style.gridTemplateColumns = 'repeat(4, 1fr)'; // 4 sütun (4x3, 4x4, 4x5 için)
     
     gameBoardEl.innerHTML = '';
     
@@ -118,14 +119,14 @@ function drawBoard() {
         
         if (cardState.opened) {
             card.classList.add('flipped');
-            card.removeEventListener('click', handleCardClick); // Açık kart tıklanmamalı
         } else {
             // SADECE SEÇEN KİŞİNİN GÖRMESİ İÇİN KIRMIZILIK
             if (gameStage === 'SELECTION' && selectedBombs.includes(index)) {
                 card.classList.add('bomb-selected'); 
             }
             
-            card.addEventListener('click', handleCardClick);
+            // KRİTİK DÜZELTME: TIKLAMA OLAYINI CARD-CONTAINER'A EKLE!
+            cardContainer.addEventListener('click', handleCardClick);
         }
         
         gameBoardEl.appendChild(cardContainer);
@@ -211,11 +212,12 @@ function stopVibration() {
 
 function handleCardClick(event) {
     // Tıklama olayını başlatan card-container'ı bul
-    const cardContainer = event.currentTarget;
-    // İçindeki .card elementini bul
+    const cardContainer = event.currentTarget; 
+    // İçindeki asıl .card elementini bul
     const cardElement = cardContainer.querySelector('.card');
     
-    if (!cardElement) return; 
+    // Eğer card elementi zaten açılmışsa veya bulunamazsa dur.
+    if (!cardElement || cardElement.classList.contains('flipped')) return; 
     
     const cardIndex = parseInt(cardElement.dataset.index);
 
@@ -234,7 +236,7 @@ function handleCardClick(event) {
         }
     } else if (gameStage === 'PLAY') {
         const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
-        if (!isMyTurn || gameData.board[cardIndex].opened || gameData.isGameOver) return; 
+        if (!isMyTurn || gameData.isGameOver) return; 
         
         sendMove(cardIndex);
     }
@@ -361,9 +363,7 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         
         if (data.type === 'MOVE') {
             // Hareket eden kişinin sırası
-            const moverTurn = (data.cardIndex % 2 === 0) ? 0 : 1; // Basit kontrol, gerçek sırayı kullanın.
-            
-            // Eğer gelen hareket bizim sıramızda değilse, rakibin hareketidir
+            // Basitçe sırayı değiştiriyoruz
             const nextTurn = gameData.turn === 0 ? 1 : 0; 
             
             applyMove(data.cardIndex, nextTurn); 
