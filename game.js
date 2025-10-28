@@ -1,10 +1,10 @@
-// Dosya Adı: game.js (BOMBALI HAFIZA İSTEMCİ V4 - KESİN DÜZELTME)
+// Dosya Adı: game.js (BOMBALI HAFIZA İSTEMCİ V4 - KESİN DÜZELTME + CHAT)
 let socket;
 let currentRoomCode = '';
 let isHost = false; 
 let opponentName = '';
 let myName = '';
-const ANIMATION_DELAY = 1000; // Kart açma animasyonu süresi (MS)
+const ANIMATION_DELAY = 1000;
 
 // --- DOM Referansları ---
 const screens = { 
@@ -21,28 +21,31 @@ const opponentNameEl = document.getElementById('opponentName');
 const roleStatusEl = document.getElementById('roleStatus');
 const myNameEl = document.getElementById('myName');
 
+// --- SOHBET REFERANSLARI ---
+const chatInputEl = document.getElementById('chatInput');
+const sendChatBtn = document.getElementById('sendChatBtn');
+const messagesEl = document.getElementById('messages');
+// ----------------------------
+
 // --- OYUN DURUMU ---
 let gameData = {
-    board: [], // Tüm kartların emoji içeriklerini tutar
-    openedCards: [], // Açık kartların indeksleri
+    board: [], 
+    openedCards: [],
     hostLives: 2,
     guestLives: 2,
     cardsLeft: 0,
     hostBombs: [], 
     guestBombs: [],
     isGameOver: false,
-    isAnimating: false // Sadece animasyon süresince tıklamayı engeller
+    isAnimating: false
 };
 
-// 10 farklı emoji, 20 kart için
 const EMOTICONS = ['🍉', '🍇', '🍒', '🍕', '🐱', '⭐', '🚀', '🔥', '🌈', '🎉'];
 
 // --- TEMEL UI FONKSİYONLARI ---
 export function showScreen(screenId) {
     Object.values(screens).forEach(screen => screen && screen.classList.remove('active'));
-    if (screens[screenId]) {
-        screens[screenId].classList.add('active');
-    }
+    if (screens[screenId]) { screens[screenId].classList.add('active'); }
 }
 
 export function showGlobalMessage(message, isError = true) {
@@ -58,6 +61,29 @@ export function showGlobalMessage(message, isError = true) {
     setTimeout(() => { globalMessage.classList.add('hidden'); globalMessage.classList.remove('show'); }, 4000);
 }
 
+// --- SOHBET YARDIMCI FONKSİYONLARI ---
+function appendMessage(sender, text, isMe) {
+    const messageItem = document.createElement('p');
+    messageItem.className = `break-words ${isMe ? 'text-right text-blue-700' : 'text-left text-gray-800'}`;
+    messageItem.innerHTML = `<span class="font-bold">${sender}:</span> ${text}`;
+    messagesEl.appendChild(messageItem);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function handleSendMessage() {
+    const message = chatInputEl.value.trim();
+    if (message === "" || gameData.isGameOver || !socket || !socket.connected) return;
+
+    socket.emit('sendMessage', {
+        roomCode: currentRoomCode,
+        message: message
+    });
+    
+    chatInputEl.value = '';
+}
+// -------------------------------------
+
+
 // --- OYUN MANTIĞI VE ÇİZİM ---
 
 function initializeGame(boardSize, hostBombs, guestBombs, initialLives) {
@@ -70,15 +96,13 @@ function initializeGame(boardSize, hostBombs, guestBombs, initialLives) {
     gameData.isGameOver = false;
     gameData.isAnimating = false;
     
-    // Kart içerikleri oluşturma ve karıştırma
     const pairs = boardSize / 2; 
     let cardContents = [];
     for (let i = 0; i < pairs; i++) {
         const emoji = EMOTICONS[i % EMOTICONS.length]; 
-        cardContents.push(emoji, emoji); // Her emojiyi çift olarak ekle
+        cardContents.push(emoji, emoji);
     }
     
-    // Fisher-Yates shuffle ile karıştır
     for (let i = cardContents.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [cardContents[i], cardContents[j]] = [cardContents[j], cardContents[i]];
@@ -88,7 +112,6 @@ function initializeGame(boardSize, hostBombs, guestBombs, initialLives) {
 }
 
 function drawBoard() {
-    // 20 kart için 5x4 grid
     let columns = 5; 
     
     gameBoardEl.className = `grid w-full max-w-sm mx-auto memory-board grid-cols-${columns}`; 
@@ -112,13 +135,13 @@ function drawBoard() {
         // Bu oyuncunun canını düşürecek olan RAKİBİNİN bombasıdır.
         const isOpponentBomb = isHost ? gameData.guestBombs.includes(index) : gameData.hostBombs.includes(index);
         
-        let displayContent = content; // Karıştırılmış emojiyi alıyoruz
+        let displayContent = content;
         if (isOpponentBomb) {
             displayContent = '💣';
             back.classList.add('bg-red-200');
         }
 
-        back.textContent = displayContent; // Emoji veya Bomba göster
+        back.textContent = displayContent;
 
         card.appendChild(front);
         card.appendChild(back);
@@ -129,7 +152,7 @@ function drawBoard() {
         if (isOpened) {
             card.classList.add('flipped');
         } else if (!gameData.isGameOver && !gameData.isAnimating) {
-            // Oyun bitmediyse ve animasyon yoksa herkes tıklayabilir
+            // KRİTİK DÜZELTME: Sıra kontrolü yok, sadece animasyon/oyun sonu kontrolü var.
             card.classList.add('cursor-pointer');
             cardContainer.addEventListener('click', handleCardClick);
         }
@@ -173,7 +196,6 @@ function handleCardClick(event) {
     
     const cardIndex = parseInt(cardElement.dataset.index);
 
-    // Hamleyi sunucuya gönder, gerisini sunucu halledecek
     sendMove(cardIndex);
     gameData.isAnimating = true; // Animasyon bitene kadar tıklamayı engelle
 }
@@ -187,62 +209,44 @@ function sendMove(index) {
     }
 }
 
-// KRİTİK: Sunucudan gelen oyun durumunu işler
 async function handleGameStateUpdate(data) {
     
     const { moveResult, hostLives, guestLives, cardsLeft } = data;
     const { cardIndex, hitBomb, gameOver, winner, moverName } = moveResult;
     
-    // 1. Kartı Aç (Görsel Animasyon)
     const cardElement = document.querySelector(`.card[data-index="${cardIndex}"]`);
     if (cardElement) {
-        // Tıklanan kartı hemen çevir (animasyon kilidini aşmak için)
         cardElement.classList.add('flipped'); 
-        
-        if (hitBomb) {
-            cardElement.classList.add('vibrate');
-        }
+        if (hitBomb) { cardElement.classList.add('vibrate'); }
     }
     
-    // 2. Client Durumunu Güncelle (Hemen)
     gameData.hostLives = hostLives;
     gameData.guestLives = guestLives;
     gameData.cardsLeft = cardsLeft;
     gameData.openedCards.push(cardIndex);
 
-    // 3. Mesaj Göster
-    if (hitBomb) {
-         showGlobalMessage(`${moverName} bombaya bastı! Canı: -1`, true);
-    } else {
-         showGlobalMessage(`${moverName} güvenli kart açtı.`, false);
-    }
+    if (hitBomb) { showGlobalMessage(`${moverName} bombaya bastı! Canı: -1`, true); } 
+    else { showGlobalMessage(`${moverName} güvenli kart açtı.`, false); }
     
-    // 4. Animasyon Bitişini Bekle
     await new Promise(resolve => setTimeout(resolve, ANIMATION_DELAY));
     
-    // 5. Animasyon Kilitini Kaldır ve Titreşimi Temizle
     gameData.isAnimating = false;
-    if (cardElement) {
-        cardElement.classList.remove('vibrate');
-    }
+    if (cardElement) { cardElement.classList.remove('vibrate'); }
 
-    // 6. Oyun Bitiş Kontrolü
     if (gameOver) {
         gameData.isGameOver = true;
         handleGameEnd(winner, hostLives, guestLives);
         return;
     }
 
-    // 7. UI'yi Çiz (Yeni durumla ve güncellenmiş kartlar listesiyle)
     drawBoard();
 }
 
-function handleGameEnd(winnerRole, finalHostLives, finalGuestLives) {
-    
+function handleGameEnd(winnerRole) {
     let endMessage = "";
     
     if (winnerRole === 'DRAW') {
-        endMessage = "OYUN BERABERE! (Canlar eşit veya çakışan can bitişi)";
+        endMessage = "OYUN BERABERE!";
         showGlobalMessage(endMessage, true);
     } else {
         const winnerName = (winnerRole === 'Host') === isHost ? myName : opponentName;
@@ -253,12 +257,6 @@ function handleGameEnd(winnerRole, finalHostLives, finalGuestLives) {
         } else {
             endMessage = `OYUN BİTTİ. ${winnerName} KAZANDI!`;
             showGlobalMessage(endMessage, true);
-        }
-
-        if (gameData.cardsLeft === 0) {
-            endMessage += ` (Kartlar bittiği için can üstünlüğüyle kazandı.)`;
-        } else {
-            endMessage += ` (Canı 0'a düşen kaybetti.)`;
         }
     }
     
@@ -275,8 +273,7 @@ export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername,
     opponentName = opponentUsername;
     
     const selfPlayer = initialData.players.find(p => p.id === socket.id);
-    const hostPlayer = initialData.players.find(p => p.isHost);
-    isHost = selfPlayer.id === hostPlayer.id; // Rolü doğru ayarla
+    isHost = selfPlayer.isHost; // KRİTİK: Rolü direk gameStart verisinden alıyoruz.
     
     opponentNameEl.textContent = opponentName;
     roleStatusEl.textContent = isHost ? "Rol: HOST" : "Rol: GUEST";
@@ -291,7 +288,7 @@ export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername,
     showScreen('game');
     showGlobalMessage(`Oyun ${opponentName} ile başladı! Başarılar.`, false);
     
-    // --- SOCKET.IO İŞLEYİCİLERİ ---
+    // --- SOCKET.IO OYUN İŞLEYİCİLERİ ---
     socket.on('gameStateUpdate', handleGameStateUpdate);
 
     socket.on('infoMessage', (data) => {
@@ -303,11 +300,26 @@ export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername,
         showGlobalMessage(message || 'Rakibiniz ayrıldı. Lobiye dönülüyor.', true);
         resetGame();
     });
+
+    // --- SOCKET.IO SOHBET İŞLEYİCİLERİ ---
+    socket.on('newMessage', (data) => {
+        const isMe = data.sender === myName;
+        appendMessage(data.sender, data.text, isMe);
+    });
+
+    // 2. DOM olay dinleyicileri
+    sendChatBtn.addEventListener('click', handleSendMessage);
+    
+    // 3. Enter tuşu ile gönderme
+    chatInputEl.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault(); 
+            handleSendMessage();
+        }
+    });
 }
 
-export function resetGame() {
-    window.location.reload(); 
-}
+export function resetGame() { window.location.reload(); }
 
 export const UIElements = {
     matchBtn: document.getElementById('matchBtn'), 
