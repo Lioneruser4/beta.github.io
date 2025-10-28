@@ -13,68 +13,22 @@
         body { font-family: sans-serif; background: linear-gradient(to bottom right, #1a1a1a, #333333); color: #333; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
         .screen { width: 100%; max-width: 500px; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; box-sizing: border-box; text-align: center; background-color: #f0f0f0; border-radius: 12px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); }
         .screen.active { display: flex; }
-        
-        /* Bileşenler */
         .btn { @apply w-full text-xl font-bold py-3 px-6 rounded-xl shadow-lg transition-all duration-200 ease-in-out; }
         .btn-primary { @apply bg-blue-600 text-white hover:bg-blue-500 active:scale-95; }
         .input-field { @apply w-full text-lg bg-gray-200 text-gray-900 border-2 border-gray-400 rounded-lg p-3 text-center placeholder-gray-500 focus:outline-none focus:border-blue-500; }
         .code-display { @apply text-4xl font-extrabold p-4 bg-gray-800 text-yellow-300 rounded-lg tracking-widest; }
         #globalMessage.show { display: block; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 50; animation: fadeInDown 0.3s ease-out; }
-
         /* Kart Stilleri */
-        .card-container {
-            perspective: 1000px; /* 3D Efekti için gerekli */
-        }
-        .card {
-            width: 100%;
-            height: 100%;
-            transition: transform 0.6s;
-            transform-style: preserve-3d;
-            position: relative;
-            background-color: transparent;
-        }
-        .card.is-flipped {
-            transform: rotateY(180deg);
-        }
-        .card-face {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            backface-visibility: hidden; /* Ters yüzünü gizle */
-            border-radius: 8px;
-            @apply flex items-center justify-center text-4xl font-black shadow-md;
-        }
-        .card-front {
-            background-color: #4a5568; /* Kapalı Kart Rengi */
-            color: #f7fafc;
-        }
-        .card-back {
-            background-color: #e2e8f0; /* Açık Kart Arka Planı */
-            color: #333;
-            transform: rotateY(180deg);
-        }
-        .card.bomb-selected .card-front {
-            background-color: #e53e3e; /* Seçim Aşamasında Kırmızı */
-            animation: pulse-red 0.5s infinite alternate;
-        }
-        
-        /* Titreşim Animasyonu */
-        @keyframes vibrate {
-            0% { transform: translate(1px, 1px) rotate(0deg); }
-            20% { transform: translate(-1px, -2px) rotate(-1deg); }
-            40% { transform: translate(-3px, 0px) rotate(1deg); }
-            60% { transform: translate(3px, 2px) rotate(0deg); }
-            80% { transform: translate(1px, -1px) rotate(-1deg); }
-            100% { transform: translate(-1px, 2px) rotate(1deg); }
-        }
-        .vibrate {
-            animation: vibrate 0.1s linear infinite;
-        }
-        
-        @keyframes pulse-red {
-            from { opacity: 1; }
-            to { opacity: 0.7; }
-        }
+        .card-container { perspective: 1000px; }
+        .card { width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; position: relative; background-color: transparent; }
+        .card.is-flipped { transform: rotateY(180deg); }
+        .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 8px; @apply flex items-center justify-center text-4xl font-black shadow-md; }
+        .card-front { background-color: #4a5568; color: #f7fafc; }
+        .card-back { background-color: #e2e8f0; color: #333; transform: rotateY(180deg); }
+        .card.bomb-selected .card-front { background-color: #e53e3e; animation: pulse-red 0.5s infinite alternate; }
+        @keyframes vibrate { 0% { transform: translate(1px, 1px) rotate(0deg); } 20% { transform: translate(-1px, -2px) rotate(-1deg); } 40% { transform: translate(-3px, 0px) rotate(1deg); } 60% { transform: translate(3px, 2px) rotate(0deg); } 80% { transform: translate(1px, -1px) rotate(-1deg); } 100% { transform: translate(-1px, 2px) rotate(1deg); } }
+        .vibrate { animation: vibrate 0.1s linear infinite; }
+        @keyframes pulse-red { from { opacity: 1; } to { opacity: 0.7; } }
     </style>
 </head>
 <body class="bg-gray-900 select-none">
@@ -104,7 +58,7 @@
         <button id="cancelBtn" class="btn bg-red-600 text-base py-3 max-w-xs">İptal Et</button>
     </div>
 
-    <div id="gameScreen" class="screen active space-y-6">
+    <div id="gameScreen" class="screen space-y-6">
         <h1 class="text-5xl font-black text-gray-900">🕹️ Emoji Bomb</h1>
         
         <div class="flex justify-between w-full text-gray-800 font-bold">
@@ -126,381 +80,108 @@
         <button id="endGameBtn" class="btn bg-gray-600 text-white text-base py-3 max-w-xs">Oyunu Bitir</button>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // --- DOM Referansları ve Değişkenler ---
-            const screens = { lobby: document.getElementById('lobby'), wait: document.getElementById('waitScreen'), game: document.getElementById('gameScreen') };
-            // ... (diğer DOM referansları aynı kalır)
-            const gameBoardEl = document.getElementById('gameBoard');
-            const turnStatusEl = document.getElementById('turnStatus');
-            const actionMessageEl = document.getElementById('actionMessage');
-            const myLivesEl = document.getElementById('myLives');
-            const opponentLivesEl = document.getElementById('opponentLives');
-            const opponentNameEl = document.getElementById('opponentName');
-            const roleStatusEl = document.getElementById('roleStatus');
-            
-            // SESLER
-            const audioBomb = new Audio('sound1.mp3'); 
-            const audioEmoji = new Audio('sound2.mp3');
-            const audioWait = new Audio('sound3.mp3'); 
-            
-            // OYUN DURUMU
-            let socket;
-            let currentRoomCode = '';
-            let username = '';
-            let isHost = false;
-            let selectedBombs = []; // Seçim aşamasında kendi seçtiğimiz bombalar
-            let level = 1; 
-            const LEVELS = [18, 22, 28]; // Kart sayıları
-            let gameStage = 'SELECTION'; // 'SELECTION' (bomba seçme) veya 'PLAY' (kart açma)
-            
-            let gameData = {
-                board: [], // {opened: false, emoji: '?', isBomb: false}
-                turn: 0,   // 0: Host, 1: Guest
-                hostLives: 2,
-                guestLives: 2,
-                cardsLeft: 0,
-                hostBombs: [], // Rakip için gizli bombalar
-                guestBombs: [], // Rakip için gizli bombalar
-                //... diğer durumlar
-            };
-            
-            const EMOTICONS = ['🙂', '😂', '😍', '😎', '🤩', '👍', '🎉', '🌟', '🍕', '🐱'];
+    <script type="module">
+        import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
 
-            // Render URL'niz (KENDİ URL'nizle değiştirin)
-            const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
-            
-            // --- Temel Fonksiyonlar ---
-            function showGlobalMessage(message, isError = true) {
-                // ... (Aynı kalır)
-                globalMessageText.textContent = message;
-                globalMessage.classList.remove('bg-red-600', 'bg-green-600');
-                globalMessage.classList.add(isError ? 'bg-red-600' : 'bg-green-600');
-                globalMessage.classList.remove('hidden');
-                globalMessage.classList.add('show');
-                setTimeout(() => { globalMessage.classList.add('hidden'); globalMessage.classList.remove('show'); }, 4000);
+        // Render URL'niz: Lütfen bu kısmı KENDİ URL'nizle değiştirin!
+        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
+        let socket;
+        
+        function validateInput() {
+            const username = UIElements.usernameInput.value.trim();
+            if (username.length < 2) {
+                UIElements.showGlobalMessage('Lütfen geçerli bir kullanıcı adı girin.', true);
+                return false;
             }
-            function showScreen(screenId) {
-                 Object.values(screens).forEach(screen => screen.classList.remove('active'));
-                screens[screenId].classList.add('active');
-            }
-            // ... (resetGame, validateInput aynı kalır)
-            
-            // --- OYUN MANTIĞI ---
+            return username;
+        }
 
-            function initializeGame(initialBoardSize) {
-                gameData.board = Array(initialBoardSize).fill(null).map(() => ({
-                    opened: false,
-                    content: '?',
-                    isBomb: false
-                }));
-                gameData.cardsLeft = initialBoardSize;
-                gameData.hostLives = 2;
-                gameData.guestLives = 2;
-                gameData.hostBombs = [];
-                gameData.guestBombs = [];
-                selectedBombs = [];
-                gameData.turn = 0; // Host Başlar
-                gameStage = 'SELECTION'; 
-            }
-            
-            function drawBoard() {
-                const boardSize = LEVELS[level - 1];
-                gameBoardEl.style.gridTemplateColumns = `repeat(${boardSize <= 22 ? 6 : 7}, 1fr)`; // 18, 22 için 6 sütun, 28 için 7 sütun
-                gameBoardEl.innerHTML = '';
-                
-                gameData.board.forEach((cardState, index) => {
-                    const cardContainer = document.createElement('div');
-                    cardContainer.className = 'card-container aspect-square';
-
-                    const card = document.createElement('div');
-                    card.className = `card cursor-pointer`;
-                    card.dataset.index = index;
-
-                    const front = document.createElement('div');
-                    front.className = 'card-face card-front text-gray-100';
-                    front.textContent = '?';
-                    
-                    const back = document.createElement('div');
-                    back.className = 'card-face card-back';
-                    back.textContent = cardState.content;
-
-                    card.appendChild(front);
-                    card.appendChild(back);
-                    cardContainer.appendChild(card);
-                    
-                    if (cardState.opened) {
-                        card.classList.add('is-flipped');
-                    } else {
-                        // Seçim aşamasında tıklanabilir yap
-                        if (gameStage === 'SELECTION') {
-                           // Bu aşamada kartı işaretle
-                           if (selectedBombs.includes(index)) {
-                                card.classList.add('bomb-selected');
-                            }
-                        }
-                        card.addEventListener('click', handleCardClick);
-                    }
-                    
-                    gameBoardEl.appendChild(cardContainer);
+        function connectToServer() {
+            try {
+                // Socket.IO Bağlantısı
+                socket = io(LIVE_SERVER_URL, {
+                    transports: ['websocket', 'polling'], 
+                    reconnectionAttempts: 5, 
+                    timeout: 20000 
                 });
-                updateStatusDisplay();
-            }
 
-            function updateStatusDisplay() {
-                myLivesEl.textContent = '❤️'.repeat(isHost ? gameData.hostLives : gameData.guestLives);
-                myLivesEl.classList.toggle('text-red-600', (isHost ? gameData.hostLives : gameData.guestLives) <= 1);
-                myLivesEl.classList.toggle('text-green-600', (isHost ? gameData.hostLives : gameData.guestLives) > 1);
-                
-                opponentLivesEl.textContent = '❤️'.repeat(isHost ? gameData.guestLives : gameData.hostLives);
-                opponentLivesEl.classList.toggle('text-red-600', (isHost ? gameData.guestLives : gameData.hostLives) <= 1);
-                opponentLivesEl.classList.toggle('text-green-600', (isHost ? gameData.guestLives : gameData.hostLives) > 1);
-
-                const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
-
-                if (gameStage === 'SELECTION') {
-                    if (selectedBombs.length < 3) {
-                        turnStatusEl.textContent = `Bomba Seç: ${selectedBombs.length} / 3`;
-                        actionMessageEl.textContent = "3 adet gizli bombayı seçin.";
-                        turnStatusEl.classList.add('text-green-600');
-                    } else {
-                        turnStatusEl.textContent = `Rakip Bombasını Seçiyor...`;
-                        actionMessageEl.textContent = "Seçiminiz tamamlandı. Rakibi bekleyin.";
-                        turnStatusEl.classList.add('text-red-600');
-                    }
-                } else if (gameStage === 'PLAY') {
-                    if (isMyTurn) {
-                        turnStatusEl.textContent = 'SIRA SENDE!';
-                        turnStatusEl.classList.add('text-green-600');
-                        actionMessageEl.textContent = "Bir kart aç!";
-                    } else {
-                        turnStatusEl.textContent = 'RAKİBİN SIRASI';
-                        turnStatusEl.classList.add('text-red-600');
-                        actionMessageEl.textContent = "Rakibin hareketini bekle.";
-                    }
-                }
-                
-                // Oyun Bitti Kontrolü
-                if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
-                     endGame(gameData.hostLives <= 0 ? 'Guest' : 'Host');
-                }
-            }
-
-            // --- ANIMASYON VE SES ---
-
-            function startVibration() {
-                const cardContainers = gameBoardEl.querySelectorAll('.card-container');
-                cardContainers.forEach(container => {
-                    const card = container.querySelector('.card');
-                    if (!card.classList.contains('is-flipped')) {
-                        card.classList.add('vibrate');
-                    }
+                socket.on('connect', () => {
+                    UIElements.showGlobalMessage('Sunucuya bağlandı. Eşleşmeye hazırsınız.', false);
+                    showScreen('lobby');
                 });
-                audioWait.play().catch(() => {}); // Ses çalma hatası yönetimi
-            }
-
-            function stopVibration() {
-                const cardContainers = gameBoardEl.querySelectorAll('.card-container');
-                 cardContainers.forEach(container => {
-                    const card = container.querySelector('.card');
-                    card.classList.remove('vibrate');
+                
+                socket.on('connect_error', (err) => {
+                    console.error('Bağlantı Hatası:', err);
+                    UIElements.showGlobalMessage('HATA: Sunucuya erişilemiyor. Lütfen Render sayfasını kontrol edin.', true);
+                    showScreen('lobby');
                 });
-                audioWait.pause();
-                audioWait.currentTime = 0;
+                
+                socket.on('disconnect', () => {
+                    UIElements.showGlobalMessage('Bağlantı kesildi. Tekrar bağlanmaya çalışılıyor...', true);
+                });
+
+                // --- Eşleşme Olayları ---
+                socket.on('roomCreated', (code) => {
+                    document.getElementById('roomCodeDisplay').textContent = code;
+                    document.getElementById('waitTitle').textContent = 'Odanız Kuruldu!';
+                    document.getElementById('codeArea').classList.remove('hidden');
+                    document.getElementById('waitStatus').textContent = 'Oda kodunu arkadaşınıza gönderin ve bağlanmasını bekleyin.';
+                });
+                
+                socket.on('joinFailed', (message) => {
+                    UIElements.showGlobalMessage(message, true);
+                    UIElements.resetGame();
+                });
+                
+                socket.on('gameStart', (players) => {
+                    const opponent = players.find(p => p.id !== socket.id);
+                    const self = players.find(p => p.id === socket.id);
+                    
+                    // Oyunu başlatmak için game.js'deki fonksiyona devret
+                    setupSocketHandlers(socket, document.getElementById('roomCodeInput').value, self.isHost, opponent.username);
+                });
+
+            } catch (e) {
+                console.error('Socket.IO genel hatası:', e);
+                UIElements.showGlobalMessage('Kritik bağlantı hatası oluştu.', true);
             }
+        }
+        
+        // --- Olay Dinleyicileri ---
+        UIElements.matchBtn.addEventListener('click', () => {
+            const username = validateInput();
+            if (!username) return;
             
-            async function triggerWaitAndVibrate() {
-                 if (gameData.cardsLeft < 8 && gameStage === 'PLAY') { // Kalan kart sayısı azaldıysa
-                    startVibration();
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    stopVibration();
-                }
+            showScreen('wait');
+            const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
+
+            if (roomCode === '') {
+                // Oda Oluşturma
+                document.getElementById('waitTitle').textContent = 'Oda Kuruluyor...';
+                document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
+                document.getElementById('codeArea').classList.add('hidden');
+                socket.emit('createRoom', { username });
+            } else {
+                // Odaya Katılma
+                document.getElementById('waitTitle').textContent = `Odaya Katılım: ${roomCode}`;
+                document.getElementById('waitStatus').textContent = 'Bağlanılıyor...';
+                document.getElementById('codeArea').classList.add('hidden');
+                socket.emit('joinRoom', { username, roomCode });
             }
-
-            // --- KART TIKLAMA VE VERİ GÖNDERME ---
-            
-            function handleCardClick(event) {
-                const cardElement = event.currentTarget.querySelector('.card');
-                const cardIndex = parseInt(cardElement.dataset.index);
-
-                if (gameStage === 'SELECTION') {
-                    // Bomba Seçim Aşaması
-                    if (selectedBombs.includes(cardIndex)) {
-                        selectedBombs = selectedBombs.filter(i => i !== cardIndex);
-                    } else if (selectedBombs.length < 3) {
-                        selectedBombs.push(cardIndex);
-                    }
-                    drawBoard(); // Tahtayı tekrar çiz, seçimi göster
-                    
-                    if (selectedBombs.length === 3) {
-                        // 3 bomba seçildi, rakibe gönder
-                        socket.emit('bombSelectionComplete', { roomCode: currentRoomCode, bombs: selectedBombs });
-                        updateStatusDisplay();
-                    }
-                } else if (gameStage === 'PLAY') {
-                    // Kart Açma Aşaması
-                    const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
-                    if (!isMyTurn || gameData.board[cardIndex].opened || gameData.isGameOver) return; 
-                    
-                    sendMove(cardIndex);
-                }
-            }
-            
-            function sendMove(index) {
-                if (socket && socket.connected) {
-                    socket.emit('gameData', {
-                        roomCode: currentRoomCode,
-                        type: 'MOVE',
-                        cardIndex: index,
-                    });
-                }
-            }
-
-            // --- HAREKETİ UYGULAMA (KART AÇMA) ---
-            
-            async function applyMove(index, nextTurn) {
-                if (gameData.board[index].opened) return;
-
-                await triggerWaitAndVibrate(); // Bekleme ve titreşim
-
-                // Kartı aç
-                gameData.board[index].opened = true;
-                gameData.cardsLeft -= 1;
-                
-                // Bombayı kontrol et (Kendi rolüne göre rakibin bombasını kontrol et)
-                const opponentBombs = isHost ? gameData.guestBombs : gameData.hostBombs;
-                const hitBomb = opponentBombs.includes(index);
-                
-                if (hitBomb) {
-                    // BOMBA!
-                    gameData.board[index].content = '💣';
-                    const myLives = isHost ? --gameData.hostLives : --gameData.guestLives;
-                    
-                    audioBomb.play().catch(() => {});
-                    showGlobalMessage(`BOOM! Bomba buldun. Kalan can: ${myLives}`, true);
-                } else {
-                    // GÜVENLİ
-                    gameData.board[index].content = EMOTICONS[Math.floor(Math.random() * EMOTICONS.length)];
-                    audioEmoji.play().catch(() => {});
-                }
-                
-                // Animasyon için local çizim
-                drawBoard(); 
-                
-                // 1 saniye sonra sırayı değiştir
-                setTimeout(() => {
-                    gameData.turn = nextTurn;
-                    updateStatusDisplay();
-                    
-                    // Eğer oyun bittiyse (can kalmadıysa)
-                    if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
-                        endGame(gameData.hostLives <= 0 ? 'Guest' : 'Host');
-                    }
-                    
-                }, 1000); // Kart açılma animasyonu süresi kadar bekle
-            }
-            
-            function endGame(winnerRole) {
-                gameData.isGameOver = true;
-                gameStage = 'ENDED';
-                turnStatusEl.textContent = `OYUN BİTTİ! KAZANAN: ${winnerRole}!`;
-                actionMessageEl.textContent = `Tebrikler. Yeni seviyeye geçiliyor...`;
-                
-                // Bir sonraki seviyeye geçiş
-                setTimeout(() => {
-                    if (level < LEVELS.length) {
-                        level++;
-                        showGlobalMessage(`Yeni Seviye: ${LEVELS[level-1]} Kart!`, false);
-                        
-                        // Oyunu yeniden başlatma sinyalini Host'un göndermesi idealdir.
-                        if (isHost) {
-                            socket.emit('nextLevel', { roomCode: currentRoomCode, newLevel: level });
-                        }
-                    } else {
-                         showGlobalMessage("Oyunun tüm seviyeleri tamamlandı!", false);
-                         resetGame();
-                    }
-                }, 4000);
-            }
-
-
-            // --- SOCKET.IO İŞLEYİCİLERİ ---
-
-            // Socket.IO Bağlantısı (Aynı kalır)
-            // ... (connectToServer fonksiyonu aynı kalır, LIVE_SERVER_URL'nizle)
-            
-            // ODA OLUŞTURMA VE KATILMA (Aynı Kalır)
-            // ... (matchBtn olay dinleyicisi aynı kalır)
-
-            
-            // gameStart Olayı (Yeni Mantık)
-            socket.on('gameStart', (players) => {
-                const opponent = players.find(p => p.id !== socket.id);
-                const self = players.find(p => p.id === socket.id);
-
-                opponentNameEl.textContent = opponent.username;
-                isHost = self.isHost;
-                roleStatusEl.textContent = isHost ? "Rolünüz: HOST" : "Rolünüz: GUEST";
-                
-                showGlobalMessage(`Oyun ${opponent.username} ile başladı! Bomba seçimine geçiliyor.`, false);
-                
-                initializeGame(LEVELS[level - 1]); // Mevcut seviye kart sayısı ile başlat
-                drawBoard(); 
-                updateStatusDisplay();
-                showScreen('game');
-            });
-            
-            // Bomb Seçimi Tamamlandı (Rakip Bombasını Gönderdi)
-            socket.on('bombSelectionComplete', ({ isHost, bombs }) => {
-                if (isHost) {
-                    gameData.hostBombs = bombs;
-                } else {
-                    gameData.guestBombs = bombs;
-                }
-                
-                // Eğer iki taraf da seçimi tamamladıysa
-                if (gameData.hostBombs.length === 3 && gameData.guestBombs.length === 3) {
-                    gameStage = 'PLAY';
-                    showGlobalMessage('Herkes bombasını seçti! Kart açma aşaması başlıyor.', false);
-                    drawBoard(); // Kart seçim işaretlerini kaldırır
-                } else {
-                    actionMessageEl.textContent = "Rakip bombasını seçti. Lütfen siz de 3 bomba seçin.";
-                }
-                updateStatusDisplay();
-            });
-
-            // gameData Olayı (Rakibin Hareketi Geldi)
-            socket.on('gameData', (data) => {
-                if (gameStage !== 'PLAY') return;
-                
-                if (data.type === 'MOVE') {
-                    const opponentTurn = gameData.turn; // Hareket eden tarafın sırası
-                    const nextTurn = 1 - opponentTurn; // Sıra değişecek
-                    
-                    // Rakibin hareketini uygula
-                    applyMove(data.cardIndex, nextTurn); 
-                    
-                    // Rakibin hareketi olduğu için, canlar zaten applyMove içinde azalır
-                }
-            });
-
-            // Seviye Atlama Sinyali (Sadece Host gönderir)
-             socket.on('nextLevel', ({ newLevel }) => {
-                level = newLevel;
-                showGlobalMessage(`Yeni Seviye: ${LEVELS[level-1]} Kart! Tekrar Bomb Seçimi Başlıyor...`, false);
-                initializeGame(LEVELS[level - 1]);
-                drawBoard();
-                updateStatusDisplay();
-            });
-
-            // ... (Diğer socket olayları aynı kalır)
-            
-            // --- Olay Dinleyicileri (Lobi ve Bağlantı) ---
-            // ... (matchBtn, cancelBtn, endGameBtn, copyCodeBtn aynı kalır)
-            
-            // Başlangıçta sunucuya bağlan
-            // connectToServer(); // Bu fonksiyonu manuel olarak kendiniz çağırmalısınız.
         });
+
+        document.getElementById('cancelBtn').addEventListener('click', UIElements.resetGame);
+        document.getElementById('endGameBtn').addEventListener('click', UIElements.resetGame);
+        
+        document.getElementById('copyCodeBtn').addEventListener('click', () => {
+            const textToCopy = document.getElementById('roomCodeDisplay').textContent;
+            navigator.clipboard.writeText(textToCopy)
+                .then(() => UIElements.showGlobalMessage('Oda Kodu Kopyalandı!', false))
+                .catch(() => UIElements.showGlobalMessage('Kopyalama başarısız.', true));
+        });
+
+        // Sayfa yüklendiğinde bağlantıyı başlat
+        document.addEventListener('DOMContentLoaded', connectToServer);
     </script>
 </body>
 </html>
