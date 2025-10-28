@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🀩 1v1 Domino - Mobil Uyumlu</title>
+    <title>🀩 1v1 Domino Clash V2</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -32,14 +32,37 @@
         #globalMessage.show { display: block; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 50; animation: fadeInDown 0.3s ease-out; width: 90%; max-width: 400px; }
         @keyframes fadeInDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
-        /* DOMINO STİLLERİ */
+        /* DOMINO STİLLERİ V2 */
         .domino-tile {
-            @apply bg-white border-2 border-gray-800 text-gray-800 font-bold px-2 py-1 rounded-md shadow-md inline-flex justify-center items-center text-sm md:text-base;
+            @apply bg-white border-2 border-gray-800 text-gray-800 font-bold shadow-md inline-flex justify-center items-center text-xl;
             margin: 3px;
             white-space: nowrap;
+            height: 40px; /* Domino yüksekliği */
+            min-width: 25px;
+            border-radius: 4px;
+            overflow: hidden;
+            flex-shrink: 0; /* Taşların daralmasını engeller */
         }
-        .domino-tile:hover { @apply bg-gray-100; }
+        .domino-tile.cursor-pointer { @apply hover:bg-gray-100; }
         .domino-tile.selected-tile { @apply ring-4 ring-offset-2 ring-yellow-500 bg-yellow-100; }
+        
+        /* Taş İçeriği */
+        .domino-tile .p-part { @apply flex justify-center items-center w-5 h-full text-sm; }
+        .domino-tile .p-divider { @apply bg-gray-800 w-px h-full; }
+
+        /* Masadaki Taşlar */
+        .domino-tile:not(.cursor-pointer) {
+            @apply bg-gray-200 border-gray-900 text-gray-900;
+            width: 50px; 
+        }
+        /* Çift taş (6|6) dikey kalır */
+        .domino-tile.double-tile { 
+            height: 50px; /* Daha karemsi */
+            width: 40px;
+            flex-direction: column;
+        }
+        .domino-tile.double-tile .p-part { width: 100%; height: 25px; }
+        .domino-tile.double-tile .p-divider { height: 1px; width: 100%; }
 
         #playerHand { 
             @apply flex flex-wrap justify-center p-3 bg-gray-100 rounded-lg max-h-40 overflow-y-auto; 
@@ -47,9 +70,11 @@
         }
 
         #dominoTable {
-            @apply flex flex-row flex-wrap justify-center items-center p-3 bg-gray-700 rounded-lg min-h-24 overflow-x-auto;
+            @apply flex flex-row p-3 bg-gray-700 rounded-lg min-h-24 overflow-x-scroll;
+            /* Yatay kaydırma için */
+            scroll-behavior: smooth;
+            justify-content: flex-start; /* Taşlar soldan başlar */
         }
-        #dominoTable .domino-tile { @apply bg-gray-200 border-gray-900 text-gray-900; }
         
         .action-buttons button { @apply text-base py-2 px-3 rounded-lg shadow-md transition-colors duration-150; }
         .action-buttons button:disabled { @apply bg-gray-300 text-gray-500 cursor-not-allowed; }
@@ -63,7 +88,7 @@
     </div>
 
     <div id="lobby" class="screen active space-y-6 container">
-        <h1 class="text-5xl font-black text-green-700">🀩 Domino Clash</h1>
+        <h1 class="text-5xl font-black text-green-700">🀩 Domino Clash V2</h1>
         <p class="text-gray-700">Sunucuya bağlı. Kullanıcı adınızı girin.</p>
         
         <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adı">
@@ -84,7 +109,7 @@
     </div>
 
     <div id="gameScreen" class="screen space-y-6 container">
-        <h1 class="text-4xl font-black text-green-700">🕹️ Domino</h1>
+        <h1 class="text-4xl font-black text-green-700">🕹️ Domino Oyunu</h1>
         
         <div class="flex justify-between w-full text-gray-800 font-bold p-2 border-b border-gray-300">
             <p>Rakip: <span id="opponentName" class="text-blue-600"></span></p>
@@ -96,8 +121,10 @@
             <h3 id="turnStatus" class="text-2xl font-bold text-red-600">Rakip bekleniyor...</h3>
             <p id="actionMessage" class="text-base text-gray-600 font-semibold"></p>
             
-            <div id="dominoTable" class="w-full">
-                </div>
+            <div class="overflow-x-auto w-full">
+                <div id="dominoTable">
+                    </div>
+            </div>
             
         </div>
         
@@ -105,12 +132,12 @@
             <h4 class="text-xl font-bold text-gray-800">Hamleler</h4>
             
             <div class="flex justify-between action-buttons">
-                <button id="playLeftBtn" class="bg-blue-500 text-white hover:bg-blue-600" disabled>Sol Oyna</button>
-                <button id="drawTileBtn" class="bg-yellow-500 text-gray-800 hover:bg-yellow-600" disabled>Stok Çek (<span id="deckSize">14</span>)</button>
-                <button id="playRightBtn" class="bg-blue-500 text-white hover:bg-blue-600" disabled>Sağ Oyna</button>
+                <button id="playLeftBtn" class="bg-blue-500 text-white hover:bg-blue-600" disabled>SOL OYNA</button>
+                <button id="drawTileBtn" class="bg-yellow-500 text-gray-800 hover:bg-yellow-600" disabled>STOK ÇEK (<span id="deckSize">14</span>)</button>
+                <button id="playRightBtn" class="bg-blue-500 text-white hover:bg-blue-600" disabled>SAĞ OYNA</button>
             </div>
 
-            <h4 class="text-xl font-bold text-gray-800">Senin Elin (Taş Seç)</h4>
+            <h4 class="text-xl font-bold text-gray-800 mt-4">Senin Elin (Taş Seç)</h4>
             <div id="playerHand" class="w-full">
                 </div>
             
