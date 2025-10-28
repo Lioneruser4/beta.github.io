@@ -181,6 +181,11 @@
         
         // --- Olay Dinleyicileri ---
         UIElements.matchBtn.addEventListener('click', () => {
+            if (!socket || !socket.connected) {
+                UIElements.showGlobalMessage('Sunucuya henüz bağlanılmadı. Lütfen bekleyin.', true);
+                return;
+            }
+
             const username = validateInput();
             if (!username) return;
             
@@ -210,7 +215,6 @@
                 .catch(() => UIElements.showGlobalMessage('Kopyalama başarısız.', true));
         });
 
-        // KRİTİK: Bağlantıyı DOM yüklenince başlat.
         document.addEventListener('DOMContentLoaded', connectToServer); 
     </script>
 </body>
