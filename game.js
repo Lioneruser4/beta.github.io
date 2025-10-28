@@ -1,4 +1,4 @@
-// Dosya Adı: game.js (EŞ ZAMANLI V6 - HOST TIKLAMA KESİN ÇÖZÜM)
+// Dosya Adı: game.js (EŞ ZAMANLI V7 - HOST FIX + SONSUZ SEVİYE)
 let socket;
 let currentRoomCode = '';
 let isHost = false; 
@@ -29,8 +29,8 @@ const messagesEl = document.getElementById('messages');
 
 // --- OYUN DURUMU ---
 let gameData = {
-    cardContents: [], // Sunucudan gelen karıştırılmış ve atanmış içerikler
-    openedCards: new Set(), // Açık kartların indekslerini tutar
+    cardContents: [], 
+    openedCards: new Set(), 
     hostLives: 2,
     guestLives: 2,
     cardsLeft: 0,
@@ -84,10 +84,10 @@ function handleSendMessage() {
 
 function initializeGame(initialData) {
     gameData.cardContents = initialData.cardContents; 
-    gameData.hostLives = initialData.initialLives;
-    gameData.guestLives = initialData.initialLives;
+    gameData.hostLives = initialData.initialLives || gameData.hostLives; // Canı koru
+    gameData.guestLives = initialData.initialLives || gameData.guestLives; // Canı koru
     gameData.openedCards = new Set();
-    gameData.cardsLeft = initialData.boardSize;
+    gameData.cardsLeft = initialData.boardSize || gameData.cardContents.length;
     gameData.isGameOver = false;
     gameData.isAnimating = false;
 }
@@ -131,17 +131,17 @@ function drawBoard() {
             card.classList.add('flipped');
         } 
         
-        // KRİTİK DÜZELTME: Sadece açık olmayan kartlara event listener ekle
+        // KRİTİK DÜZELTME: Güvenilir tıklama dinleyicisi.
         if (!isOpened && !gameData.isGameOver) {
             card.classList.add('cursor-pointer');
             
-            // Mevcut dinleyicileri kaldır (güvenlik için)
-            cardContainer.removeEventListener('click', handleCardClick);
-            cardContainer.removeEventListener('touchstart', handleCardClick); 
-            
-            // KRİTİK: Hem click hem touchstart ekle (Tüm cihazlarda tıklamayı garanti eder)
-            cardContainer.addEventListener('click', handleCardClick);
-            cardContainer.addEventListener('touchstart', handleCardClick);
+            // Tüm dinleyicileri kaldır (kesin temizlik)
+            const newCardContainer = cardContainer.cloneNode(true);
+            cardContainer.parentNode.replaceChild(newCardContainer, cardContainer);
+
+            // Yeni dinleyici ekle (click ve touchstart)
+            newCardContainer.addEventListener('click', handleCardClick);
+            newCardContainer.addEventListener('touchstart', handleCardClick);
         }
         
         gameBoardEl.appendChild(cardContainer);
@@ -164,7 +164,7 @@ function updateStatusDisplay() {
         turnStatusEl.classList.add('text-red-600');
     } else {
         turnStatusEl.textContent = 'EŞ ZAMANLI AV';
-        actionMessageEl.textContent = `Toplam ${gameData.cardsLeft} kart kaldı. Hızlı ol!`;
+        actionMessageEl.textContent = `Toplam ${gameData.cardsLeft} kart kaldı.`;
         turnStatusEl.classList.remove('text-red-600');
         turnStatusEl.classList.add('text-green-600');
     }
@@ -173,17 +173,16 @@ function updateStatusDisplay() {
 // --- HAREKET İŞLEYİCİLERİ ---
 
 function handleCardClick(event) {
-    // KRİTİK: touchstart olayında click olayını engelle (çift tetiklenmeyi önler)
+    // touchstart olayında click olayını engelle (çift tetiklenmeyi önler)
     if (event.type === 'touchstart') {
         event.preventDefault(); 
     }
 
-    if (gameData.isAnimating || gameData.isGameOver) {
-        return;
-    } 
+    if (gameData.isAnimating || gameData.isGameOver) { return; } 
 
     const cardContainer = event.currentTarget; 
-    const cardElement = cardContainer.querySelector('.card');
+    // CloneNode sonrası cardContainer'ın içindeki .card elementini bul
+    const cardElement = cardContainer.querySelector('.card'); 
     
     if (!cardElement || cardElement.classList.contains('flipped')) return; 
     
@@ -202,12 +201,13 @@ function sendMove(index) {
     }
 }
 
+// Sunucudan gelen oyun durumunu işler
 async function handleGameStateUpdate(data) {
     
     const { moveResult, hostLives, guestLives, cardsLeft, openedCardsIndices } = data;
     const { cardIndex, hitBomb, gameOver, winner, moverName } = moveResult;
     
-    // 1. Yeni Açılan Kartı Bul ve Çevir (Görsel Animasyon)
+    // 1. Kartı Çevir
     const cardElement = document.querySelector(`.card[data-index="${cardIndex}"]`);
     if (cardElement) {
         cardElement.classList.add('flipped'); 
@@ -241,6 +241,31 @@ async function handleGameStateUpdate(data) {
     // 7. UI'yi Çiz (Yeni durumla)
     drawBoard();
 }
+
+// Sunucudan gelen levelUp olayını işler
+async function handleLevelUp(data) {
+    gameData.isAnimating = true; // Yeni level yüklenirken engelle
+    
+    showGlobalMessage(data.message, false);
+    
+    // 1. Canları güncelle
+    gameData.hostLives = data.hostLives;
+    gameData.guestLives = data.guestLives;
+    
+    // 2. Kartları temizle ve yeni içerikle başlat
+    initializeGame({
+        cardContents: data.cardContents,
+        boardSize: data.cardContents.length,
+        initialLives: null // Canlar korunacak
+    });
+
+    // 3. Animasyonu bekle
+    await new Promise(resolve => setTimeout(resolve, ANIMATION_DELAY * 2));
+    
+    gameData.isAnimating = false;
+    drawBoard();
+}
+
 
 function handleGameEnd(winnerRole) {
     let endMessage = "";
@@ -284,7 +309,8 @@ export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername,
     
     // --- SOCKET.IO OYUN İŞLEYİCİLERİ ---
     socket.on('gameStateUpdate', handleGameStateUpdate);
-
+    socket.on('levelUp', handleLevelUp); // YENİ: Level atlama işleyicisi
+    
     socket.on('infoMessage', (data) => {
         showGlobalMessage(data.message, data.isError);
         gameData.isAnimating = false; 
@@ -301,10 +327,7 @@ export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername,
         appendMessage(data.sender, data.text, isMe);
     });
 
-    // 2. DOM olay dinleyicileri
     sendChatBtn.addEventListener('click', handleSendMessage);
-    
-    // 3. Enter tuşu ile gönderme
     chatInputEl.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault(); 
