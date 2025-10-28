@@ -9,7 +9,7 @@
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     
     <style>
-        /* === KART GÖRÜNÜMÜ VE TEMEL STİLLER === */
+        /* CSS aynı kalır */
         :root {
             --primary-color: #3498db; 
             --secondary-color: #2980b9; 
@@ -74,17 +74,6 @@
         .card-face.back {
             background: var(--card-bg); color: var(--text-color); transform: rotateY(180deg);
         }
-        /* Seçim Kırmızılığı */
-        .card.bomb-selected .card-face.front {
-            background: linear-gradient(135deg, #f39c12, #e74c3c); 
-            animation: pulse-red 0.5s infinite alternate;
-        }
-        @keyframes pulse-red { from { opacity: 1; } to { opacity: 0.8; } }
-        /* Titreşim */
-        @keyframes vibrate { /* ...titreşim animasyonu...*/ }
-        .vibrate { animation: vibrate 0.1s linear infinite; }
-
-        /* Can Rengi */
         .text-orange-500 { color: #f97316; }
         .text-green-600 { color: #16a34a; }
     </style>
@@ -133,15 +122,13 @@
         </div>
 
         <div id="gameContent" class="p-3 bg-gray-200 rounded-lg w-full space-y-3">
-            <h3 id="turnStatus" class="text-xl font-bold text-green-600">Bomba Seç: 0 / 3</h3>
-            <p id="actionMessage" class="text-sm text-gray-700">3 adet gizli bombayı seçin.</p>
+            <h3 id="turnStatus" class="text-xl font-bold text-green-600">SIRA SENDE!</h3>
+            <p id="actionMessage" class="text-sm text-gray-700">Bir kart aç!</p>
             
             <div id="gameBoard" class="grid w-full mx-auto">
             </div>
 
-            <button id="startButton" class="btn bg-green-500 text-white mt-4 hidden" disabled>
-                RAKİP BEKLENİYOR
-            </button>
+            <button id="startButton" class="btn bg-gray-400 text-white mt-4 hidden" disabled></button>
         </div>
         
         <button id="endGameBtn" class="btn bg-gray-400 text-gray-800 text-base py-3 max-w-xs">Oyunu Bitir</button>
@@ -154,6 +141,7 @@
         const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
         let socket;
         
+        function validateInput() { /* ... */ }
         function validateInput() {
             const username = UIElements.usernameInput.value.trim();
             if (username.length < 2) {
@@ -211,9 +199,8 @@
                     
                     const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase() || (self.isHost ? document.getElementById('roomCodeDisplay').textContent : '');
                     
-                    // Başlat butonunu da game.js'e gönderiyoruz
-                    const startButton = document.getElementById('startButton');
-                    setupSocketHandlers(socket, roomCode, self.isHost, opponent.username, startButton);
+                    // Başlat butonuna gerek kalmadı, kaldırıldı.
+                    setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
                 });
 
             } catch (e) {
