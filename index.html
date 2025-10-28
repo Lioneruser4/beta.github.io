@@ -6,6 +6,7 @@
     <title>Bomb Memory Game</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        /* ... (CSS Kodları Aynı Kalır) ... */
         :root {
             --bg-color: #1a202c;
             --card-front: #4a5568;
@@ -85,10 +86,7 @@
             <p class="text-sm text-gray-400" id="actionMessage">Bir kart aç!</p>
         </div>
         <div id="gameBoard" class="grid w-full max-w-sm mx-auto memory-board"></div>
-        <button id="readyToPlayBtn" class="w-full btn bg-indigo-600 hover:bg-indigo-700 text-white text-base py-3 rounded-lg font-semibold transition duration-200 mt-4" style="display:none;" disabled>
-            HAZIR
-        </button>
-    </div>
+        </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script type="module">
@@ -122,6 +120,7 @@
                 showGlobalMessageClient(`Bağlantı Hatası: ${err.message}`, true);
                 console.error("Bağlantı Hatası:", err);
                 socket = null;
+                showScreen('lobby');
             });
             
             socket.on('disconnect', (reason) => {
@@ -139,6 +138,7 @@
             socket.on('roomCreated', (roomCode) => {
                 currentRoomCodeDisplay.textContent = `Oda Kodu: ${roomCode}`;
                 document.getElementById('waitMessage').textContent = "Bir rakibin bu koda katılması bekleniyor...";
+                showScreen('wait');
             });
 
             socket.on('joinFailed', (message) => {
@@ -147,10 +147,22 @@
                  if(socket) socket.disconnect();
             });
 
-            socket.on('gameStart', (players) => {
+            // YENİ: gameStart sinyali artık tüm oyun verilerini içeriyor
+            socket.on('gameStart', (data) => {
+                const { players, initialLevel, boardSize } = data;
                 const self = players.find(p => p.id === socket.id);
                 const opponent = players.find(p => p.id !== socket.id);
-                setupSocketHandlers(socket, self.roomCode, self.isHost, opponent.username);
+                
+                setupSocketHandlers(
+                    socket, 
+                    self.roomCode, 
+                    self.isHost, 
+                    opponent.username, 
+                    initialLevel,
+                    boardSize,
+                    players[0].bombIndexes, // Host'un bombası
+                    players[1].bombIndexes  // Guest'in bombası
+                );
             });
         }
 
@@ -160,15 +172,12 @@
                 showGlobalMessageClient("Lütfen bir kullanıcı adı girin.", true);
                 return;
             }
-            // Sunucu 4 haneli kod üretiyor
             if (!isHost && (!roomCode || roomCode.length !== 4)) { 
                 showGlobalMessageClient("Oda kodu 4 haneli olmalıdır.", true);
                 return;
             }
             
             connectSocket(() => {
-                showScreen('wait');
-                
                 if (isHost) {
                     socket.emit('createRoom', { username: currentUsername });
                 } else if (roomCode) {
@@ -189,8 +198,7 @@
         
         cancelBtn.addEventListener('click', () => {
             if (socket && socket.connected) {
-                socket.emit('leaveRoom', {}); 
-                socket.disconnect(); // Bağlantıyı tamamen kes
+                socket.emit('disconnect'); // Sunucudaki disconnect handler'ı tetikler
             }
             showScreen('lobby');
             currentRoomCodeDisplay.textContent = '';
