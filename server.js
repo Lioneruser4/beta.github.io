@@ -8,7 +8,6 @@ const server = http.createServer(app);
 
 app.use(express.static(__dirname));
 
-// CORS DÜZELTME: Tüm kaynaklardan gelen bağlantılara izin verir
 const io = new Server(server, {
     cors: {
         origin: "*",
@@ -19,6 +18,25 @@ const io = new Server(server, {
 
 const rooms = {};
 
+// Level'a göre bomba sayısını belirleyen fonksiyon
+function getBombCount(level) {
+    if (level === 1) return 2;
+    if (level === 2) return 3;
+    if (level === 3) return 4;
+    return 2; // Default
+}
+
+// Rastgele bomba indexleri seçen fonksiyon
+function selectRandomBombs(boardSize, bombCount) {
+    const indices = Array.from({ length: boardSize }, (_, i) => i);
+    // Fisher-Yates (Knuth) Shuffle
+    for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    return indices.slice(0, bombCount);
+}
+
 function generateRoomCode() {
     let code = Math.random().toString(36).substring(2, 6).toUpperCase();
     while (rooms[code]) {
@@ -26,6 +44,8 @@ function generateRoomCode() {
     }
     return code;
 }
+
+const LEVELS_SIZE = [12, 16, 20]; // Board boyutları
 
 io.on('connection', (socket) => {
     
@@ -38,12 +58,12 @@ io.on('connection', (socket) => {
             hostUsername: username,
             guestId: null, 
             guestUsername: null, 
-            hostBombs: null, // Bomba indexleri burada tutulacak
-            guestBombs: null, // Bomba indexleri burada tutulacak
+            currentLevel: 1, // Oyunun seviyesi
+            hostBombs: null, 
+            guestBombs: null, 
         };
         socket.join(code);
         socket.emit('roomCreated', code);
-        console.log(`Oda ${code} oluşturuldu. Host: ${username}`);
     });
 
     socket.on('joinRoom', ({ username, roomCode }) => {
@@ -60,50 +80,35 @@ io.on('connection', (socket) => {
         room.guestUsername = username;
         socket.join(code);
         
-        console.log(`Oda ${code}'a katılım. Guest: ${username}. Oyun Başlatılıyor.`);
+        // Yeni Seviye Başlatma Mantığı
+        const level = room.currentLevel;
+        const boardSize = LEVELS_SIZE[level - 1];
+        const bombCount = getBombCount(level);
+        
+        room.hostBombs = selectRandomBombs(boardSize, bombCount);
+        room.guestBombs = selectRandomBombs(boardSize, bombCount);
+
+        console.log(`Oda ${code}: Seviye ${level} Otomatik Bomba Seçimi Tamamlandı.`);
 
         const players = [
             { id: room.hostId, username: room.hostUsername, isHost: true },
             { id: room.guestId, username: room.guestUsername, isHost: false }
         ];
-        // İki oyuncuya da oyunun başladığını bildir
-        io.to(code).emit('gameStart', players);
+
+        // Oyun Başlangıcı Sinyali
+        io.to(code).emit('gameStart', {
+            players, 
+            hostBombs: room.hostBombs,
+            guestBombs: room.guestBombs,
+            level: level
+        });
     });
 
-    // KRİTİK DÜZELTME: Bomb Seçimini Senkronize Etme
-    socket.on('bombSelectionComplete', (data) => {
-        const { roomCode, isHost, bombs } = data;
-        const room = rooms[roomCode];
-
-        if (room) {
-            if (isHost) {
-                room.hostBombs = bombs;
-            } else {
-                room.guestBombs = bombs;
-            }
-            
-            // Bomb seçiminin diğer oyuncuya iletilmesi (UI güncellemesi için)
-            // Kendi sinyali kendisine geri gitmeyecektir (socket.to(code))
-            socket.to(roomCode).emit('opponentBombSelectionComplete', { 
-                isHost: isHost
-            });
-        
-            // Her iki oyuncunun da seçimi tamamlandıysa, oyunu 'PLAY' aşamasına geçirme sinyali gönder
-            if (room.hostBombs && room.hostBombs.length === 3 && room.guestBombs && room.guestBombs.length === 3) {
-                console.log(`Oda ${roomCode}: Her iki oyuncu da bomba seçti. Oyun Başlıyor (PLAY).`);
-                
-                io.to(roomCode).emit('allBombsSelected', {
-                    hostBombs: room.hostBombs,
-                    guestBombs: room.guestBombs
-                });
-            }
-        }
-    });
+    // BOMB SEÇİMİ KALDIRILDI
 
     socket.on('gameData', (data) => {
         const code = data.roomCode;
         if (code) {
-            // Hareketi sadece rakibe ilet
             socket.to(code).emit('gameData', data);
         }
     });
@@ -113,12 +118,23 @@ io.on('connection', (socket) => {
         const room = rooms[roomCode];
         
         if (room) {
-            // Bomba listelerini yeni seçim için sıfırla
-            room.hostBombs = null;
-            room.guestBombs = null;
+            room.currentLevel = newLevel;
+
+            // Yeni Seviye için OTOMATİK bomba seçimi
+            const boardSize = LEVELS_SIZE[newLevel - 1];
+            const bombCount = getBombCount(newLevel);
             
-            // Host seviye atlama sinyali gönderdiğinde tüm odaya ilet
-            io.to(roomCode).emit('nextLevel', { newLevel });
+            room.hostBombs = selectRandomBombs(boardSize, bombCount);
+            room.guestBombs = selectRandomBombs(boardSize, bombCount);
+
+            console.log(`Oda ${roomCode}: Yeni Seviye ${newLevel} Otomatik Bomba Seçimi Tamamlandı.`);
+            
+            // Tüm odaya yeni seviye ve bomba bilgilerini ilet
+            io.to(roomCode).emit('nextLevel', { 
+                newLevel,
+                hostBombs: room.hostBombs,
+                guestBombs: room.guestBombs
+            });
         }
     });
 
