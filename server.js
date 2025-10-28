@@ -1,4 +1,5 @@
 // Dosya Adı: server.js
+// Render'da yüklü olan kodunuzu bununla güncelleyin.
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -6,15 +7,17 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// CORS Ayarı: GitHub Pages veya Vercel'den gelen bağlantılara izin verir
+// CORS DÜZELTME: Tüm kaynaklardan gelen bağlantılara izin verir
 const io = new Server(server, {
     cors: {
         origin: "*", 
         methods: ["GET", "POST"]
-    }
+    },
+    // Bu ayarlar, bazı ağ kısıtlamalarını aşmaya yardımcı olabilir
+    transports: ['websocket', 'polling'] 
 });
 
-const rooms = {}; // Aktif odaları saklar
+const rooms = {}; 
 
 function generateRoomCode() {
     let code = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -25,9 +28,8 @@ function generateRoomCode() {
 }
 
 io.on('connection', (socket) => {
-    console.log(`[CONNECT] Yeni kullanıcı bağlandı: ${socket.id}`);
-
-    // --- ODA KURMA ---
+    // Tüm backend mantığı (createRoom, joinRoom, gameData, disconnect) AYNI KALIR
+    
     socket.on('createRoom', ({ username }) => {
         const code = generateRoomCode();
         rooms[code] = {
@@ -37,12 +39,9 @@ io.on('connection', (socket) => {
             hostUsername: username,
         };
         socket.join(code);
-        
-        console.log(`[ROOM] Oda Kuruldu: ${code} (Host: ${username})`);
         socket.emit('roomCreated', code);
     });
 
-    // --- ODAYA KATILMA ---
     socket.on('joinRoom', ({ username, roomCode }) => {
         const code = roomCode.toUpperCase();
         const room = rooms[code];
@@ -52,7 +51,6 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // Başarılı Katılım
         room.playerCount = 2;
         room.guestId = socket.id;
         room.guestUsername = username;
@@ -60,17 +58,13 @@ io.on('connection', (socket) => {
         
         socket.emit('roomJoined', code); 
 
-        // Her iki oyuncuya da oyunun başladığını ve rollerini bildir
         const players = [
             { id: room.hostId, username: room.hostUsername, isHost: true },
             { id: room.guestId, username: room.guestUsername, isHost: false }
         ];
-
         io.to(code).emit('gameStart', players);
-        console.log(`[START] Oyun Başladı: ${code}`);
     });
 
-    // --- OYUN İÇİ VERİ AKTARIMI ---
     socket.on('gameData', (data) => {
         const code = data.roomCode;
         if (code) {
@@ -78,7 +72,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- BAĞLANTI KESİLMESİ / ODADAN AYRILMA ---
     socket.on('disconnect', () => {
         for (const code in rooms) {
             const room = rooms[code];
@@ -101,7 +94,6 @@ io.on('connection', (socket) => {
     });
 });
 
-// Sunucuyu başlatırken, Render'ın atadığı PORT'u kullan
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Sunucu port ${PORT} üzerinde çalışıyor.`);
