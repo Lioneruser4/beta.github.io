@@ -1,4 +1,4 @@
-// Dosya Adı: server.js (BOMBALI HAFIZA OYUNU V5 - KESİN DÜZELTME)
+// Dosya Adı: server.js (BOMBALI HAFIZA OYUNU V7 - HOST FIX + SONSUZ SEVİYE)
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -21,18 +21,17 @@ const BOMB_COUNT = 4;
 const DEFAULT_LIVES = 2; 
 const EMOTICONS = ['🍉', '🍇', '🍒', '🍕', '🐱', '⭐', '🚀', '🔥', '🌈', '🎉'];
 
-// --- Kart İçeriği Hazırlama Fonksiyonu ---
+// ... (createShuffledContents, selectRandomBombs, generateRoomCode fonksiyonları aynı kalır)
+
 function createShuffledContents(boardSize) {
     const pairs = boardSize / 2; 
     let cardContents = [];
 
-    // Emoji Çiftlerini Ekle (10 çift)
     for (let i = 0; i < pairs; i++) {
         const emoji = EMOTICONS[i % EMOTICONS.length]; 
         cardContents.push(emoji, emoji);
     }
     
-    // Fisher-Yates shuffle (Sadece emojileri karıştır)
     for (let i = cardContents.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [cardContents[i], cardContents[j]] = [cardContents[j], cardContents[i]];
@@ -41,9 +40,7 @@ function createShuffledContents(boardSize) {
     return cardContents;
 }
 
-
 function selectRandomBombs(boardSize, bombCount) {
-    // Sadece bomba indekslerini seçer
     const indices = Array.from({ length: boardSize }, (_, i) => i);
     for (let i = indices.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -52,26 +49,25 @@ function selectRandomBombs(boardSize, bombCount) {
     return new Set(indices.slice(0, bombCount));
 }
 
-
 function generateRoomCode() {
     let code = Math.random().toString(36).substring(2, 6).toUpperCase();
     while (rooms[code]) { code = Math.random().toString(36).substring(2, 6).toUpperCase(); }
     return code;
 }
 
-// --- Oyun Durumu Başlatıcı ---
+// --- Oyun Durumu Başlatıcı (Yeni Seviye için de kullanılır) ---
 function initializeRoom(room) {
     room.hostBombs = selectRandomBombs(BOARD_SIZE, BOMB_COUNT);
     room.guestBombs = selectRandomBombs(BOARD_SIZE, BOMB_COUNT);
-    room.hostLives = DEFAULT_LIVES;
-    room.guestLives = DEFAULT_LIVES;
+    // Canlar, oyunun başlangıcında ayarlanır, seviye geçişinde korunur.
+    if (!room.hostLives) room.hostLives = DEFAULT_LIVES;
+    if (!room.guestLives) room.guestLives = DEFAULT_LIVES;
+    
     room.openedCards = new Set();
     
     const emojiBoard = createShuffledContents(BOARD_SIZE); 
     
-    // KRİTİK: Kartın arkasındaki görsel içeriği bir kez belirleyelim.
     room.cardContents = emojiBoard.map((content, index) => {
-        // Kartın görsel içeriği: Eğer kart bir bombaysa '💣', değilse eşleşme emojisi.
         if (room.guestBombs.has(index) || room.hostBombs.has(index)) {
              return '💣'; 
         } 
@@ -80,8 +76,14 @@ function initializeRoom(room) {
 
     room.cardsLeft = BOARD_SIZE;
     room.gameActive = true;
+    
+    // Sadece yeni kart içeriğini ve canları döndür (Client'a göndermek için)
+    return {
+        cardContents: room.cardContents,
+        hostLives: room.hostLives,
+        guestLives: room.guestLives
+    };
 }
-
 
 // --- SOCKET.IO Olay Yönetimi ---
 io.on('connection', (socket) => {
@@ -104,7 +106,7 @@ io.on('connection', (socket) => {
         room.guestId = socket.id;
         room.guestUsername = username;
         
-        initializeRoom(room);
+        const initialData = initializeRoom(room); // Oyunu başlat
         socket.join(code);
         
         const players = [
@@ -114,7 +116,7 @@ io.on('connection', (socket) => {
 
         io.to(code).emit('gameStart', {
             players, 
-            cardContents: room.cardContents, 
+            cardContents: initialData.cardContents, 
             boardSize: BOARD_SIZE,
             initialLives: DEFAULT_LIVES
         });
@@ -139,7 +141,6 @@ io.on('connection', (socket) => {
         
         let moveResult = { cardIndex, hitBomb: false, gameOver: false, winner: null, moverName: playerName };
 
-        // Bu oyuncunun canını düşürecek olan, RAKİBİNİN bombalarıdır.
         const opponentBombs = isHostPlayer ? room.guestBombs : room.hostBombs;
         
         if (opponentBombs.has(cardIndex)) {
@@ -147,6 +148,7 @@ io.on('connection', (socket) => {
             
             if (isHostPlayer) { room.hostLives--; } else { room.guestLives--; }
 
+            // OYUN BİTİŞ KONTROLÜ (CAN BİTTİ Mİ?)
             if (room.hostLives <= 0 || room.guestLives <= 0) {
                  room.gameActive = false;
                  moveResult.gameOver = true;
@@ -154,12 +156,21 @@ io.on('connection', (socket) => {
             }
         } 
         
+        // SEVİYE TAMAMLANMA KONTROLÜ (KARTLAR BİTTİ Mİ?)
         if (room.cardsLeft === 0 && !moveResult.gameOver) {
-            room.gameActive = false;
-            moveResult.gameOver = true;
-            moveResult.winner = room.hostLives === room.guestLives ? 'DRAW' : room.hostLives > room.guestLives ? 'Host' : 'Guest';
+            // YENİ SEVİYEYİ BAŞLAT
+            const newLevelData = initializeRoom(room);
+            
+            io.to(data.roomCode).emit('levelUp', {
+                hostLives: room.hostLives,
+                guestLives: room.guestLives,
+                cardContents: newLevelData.cardContents,
+                message: "Tebrikler! Yeni seviyeye geçiliyor. Canlar korundu!"
+            });
+            return; // levelUp event'i gönderildiği için normal gameStateUpdate gönderilmez
         }
 
+        // Normal oyun durumu güncellemesi
         io.to(data.roomCode).emit('gameStateUpdate', {
             moveResult,
             hostLives: room.hostLives,
@@ -169,7 +180,8 @@ io.on('connection', (socket) => {
         });
     });
 
-    // --- SOHBET OLAYI ---
+    // ... (sendMessage ve disconnect olayları aynı kalır)
+
     socket.on('sendMessage', (data) => {
         const room = rooms[data.roomCode];
         if (!room || !room.hostId || !room.guestId) return;
@@ -181,7 +193,6 @@ io.on('connection', (socket) => {
             text: data.message
         });
     });
-    // ----------------------
 
     socket.on('disconnect', () => {
         for (const code in rooms) {
