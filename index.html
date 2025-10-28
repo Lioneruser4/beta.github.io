@@ -117,7 +117,6 @@
 
         function connectToServer() {
             try {
-                // KRİTİK: Bağlantı burada kuruluyor
                 socket = io(LIVE_SERVER_URL, {
                     transports: ['websocket', 'polling'], 
                     reconnectionAttempts: 5, 
@@ -153,7 +152,6 @@
                     UIElements.resetGame();
                 });
                 
-                // KRİTİK: gameStart olayından gelen veriyi yakala ve game.js'e ilet
                 socket.on('gameStart', (data) => {
                     const players = data.players;
                     const opponent = players.find(p => p.id !== socket.id);
