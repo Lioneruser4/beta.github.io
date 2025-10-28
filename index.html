@@ -6,7 +6,7 @@
     <title>Bomb Memory Game</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* ... (CSS Kodları Aynı Kalır) ... */
+        /* ... (CSS Kodları) ... */
         :root {
             --bg-color: #1a202c;
             --card-front: #4a5568;
@@ -86,7 +86,7 @@
             <p class="text-sm text-gray-400" id="actionMessage">Bir kart aç!</p>
         </div>
         <div id="gameBoard" class="grid w-full max-w-sm mx-auto memory-board"></div>
-        </div>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script type="module">
@@ -109,22 +109,25 @@
                 return;
             }
             
-            socket = io(window.location.origin);
+            // LÜTFEN KONTROL EDİN: Sunucunuz 3000 portunda değilse burayı düzeltin!
+            // Örneğin 5000 portu ise: 'http://localhost:5000'
+            const serverUrl = 'http://localhost:3000'; 
+            socket = io(serverUrl, { transports: ['websocket', 'polling'] });
             
             socket.on('connect', () => {
-                console.log('Socket.IO Bağlandı:', socket.id);
+                console.log('✅ Socket.IO Bağlandı:', socket.id);
                 callback(); 
             });
 
             socket.on('connect_error', (err) => {
-                showGlobalMessageClient(`Bağlantı Hatası: ${err.message}`, true);
+                showGlobalMessageClient(`❌ Bağlantı Hatası: Sunucu kapalı olabilir veya adres (${serverUrl}) yanlış.`, true);
                 console.error("Bağlantı Hatası:", err);
                 socket = null;
                 showScreen('lobby');
             });
             
             socket.on('disconnect', (reason) => {
-                console.log('Socket.IO bağlantısı kesildi:', reason);
+                console.log('⚠️ Socket.IO bağlantısı kesildi:', reason);
                 if (reason !== 'io client disconnect') {
                     showGlobalMessageClient('Sunucuyla bağlantı koptu. Lobiye dönülüyor.', true);
                     showScreen('lobby');
@@ -147,7 +150,6 @@
                  if(socket) socket.disconnect();
             });
 
-            // YENİ: gameStart sinyali artık tüm oyun verilerini içeriyor
             socket.on('gameStart', (data) => {
                 const { players, initialLevel, boardSize } = data;
                 const self = players.find(p => p.id === socket.id);
@@ -160,8 +162,8 @@
                     opponent.username, 
                     initialLevel,
                     boardSize,
-                    players[0].bombIndexes, // Host'un bombası
-                    players[1].bombIndexes  // Guest'in bombası
+                    players[0].bombIndexes, 
+                    players[1].bombIndexes
                 );
             });
         }
@@ -198,7 +200,7 @@
         
         cancelBtn.addEventListener('click', () => {
             if (socket && socket.connected) {
-                socket.emit('disconnect'); // Sunucudaki disconnect handler'ı tetikler
+                socket.disconnect(); // Bağlantıyı keser ve sunucudaki 'disconnect' olayını tetikler
             }
             showScreen('lobby');
             currentRoomCodeDisplay.textContent = '';
