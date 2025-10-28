@@ -1,4 +1,4 @@
-// Dosya Adı: game.js (BOMBALI HAFIZA İSTEMCİ V3)
+// Dosya Adı: game.js (BOMBALI HAFIZA İSTEMCİ V3 - TAM)
 let socket;
 let currentRoomCode = '';
 let isHost = false; 
@@ -19,9 +19,6 @@ const opponentLivesEl = document.getElementById('opponentLives');
 const opponentNameEl = document.getElementById('opponentName');
 const roleStatusEl = document.getElementById('roleStatus');
 
-// --- SESLER (Kullanılmıyorsa kaldırılabilir, örnek amaçlı tutulmuştur)
-// const audioBomb = new Audio('sound1.mp3'); 
-// const audioEmoji = new Audio('sound2.mp3');
 
 // --- OYUN DURUMU ---
 let gameData = {
@@ -96,6 +93,7 @@ function drawBoard() {
     let columns = 4;
     if (gameData.board.length === 20) columns = 5;
     
+    // Tailwind'de dinamik grid kullanımı için class isimlendirmesi
     gameBoardEl.className = `grid w-full max-w-sm mx-auto memory-board grid-cols-${columns}`; 
     gameBoardEl.innerHTML = '';
     
@@ -115,15 +113,12 @@ function drawBoard() {
         back.className = 'card-face back';
         
         // Bomba mı emoji mi olduğunu belirle
-        const isMyBomb = isHost ? gameData.hostBombs.includes(index) : gameData.guestBombs.includes(index);
         const isOpponentBomb = isHost ? gameData.guestBombs.includes(index) : gameData.hostBombs.includes(index);
         
         let displayContent = content;
         if (isOpponentBomb) {
             displayContent = '💣';
             back.classList.add('bg-red-200');
-        } else if (isMyBomb) {
-            // Kendi bombamızı rakibe göstermeyiz, sadece rakibin bombası önemlidir
         }
 
         back.textContent = displayContent;
@@ -231,9 +226,11 @@ async function handleGameStateUpdate(data) {
     gameData.guestLives = guestLives;
     gameData.cardsLeft = cardsLeft;
     gameData.openedCards.push(cardIndex);
+    gameData.turn = newTurn; // Sırayı hemen güncelle
 
     // 3. Mesaj Göster
-    const playerWhoMoved = (gameData.turn === (isHost ? 0 : 1)) ? 'SİZ' : 'Rakibiniz';
+    const playerWhoMoved = (data.newTurn === (isHost ? 0 : 1)) ? 'Rakibiniz' : 'SİZ'; 
+    
     if (hitBomb) {
          showGlobalMessage(`${playerWhoMoved} bombaya bastı! Can: -1`, true);
     } else {
@@ -256,8 +253,7 @@ async function handleGameStateUpdate(data) {
         return;
     }
 
-    // 7. Sırayı Güncelle ve UI'yi Çiz
-    gameData.turn = newTurn;
+    // 7. UI'yi Çiz
     drawBoard();
 }
 
@@ -265,7 +261,7 @@ function handleGameEnd(winnerRole) {
     
     let endMessage = "";
     
-    if (winnerRole === 'LEVEL_COMPLETE' && gameData.level < 3) { // 3 Max seviye kabul edelim
+    if (winnerRole === 'LEVEL_COMPLETE' && gameData.level < 3) { 
         endMessage = `SEVİYE ${gameData.level} TAMAMLANDI! ${gameData.level + 1}. seviyeye geçiliyor...`;
         showGlobalMessage(endMessage, false);
         
@@ -317,17 +313,13 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex, in
     showGlobalMessage(`Oyun ${opponentName} ile başladı!`, false);
     
     // --- SOCKET.IO İŞLEYİCİLERİ ---
-
-    // Oyun Durumu Güncellemesi (Hareketin sonucu)
     socket.on('gameStateUpdate', handleGameStateUpdate);
 
-    // Sunucudan gelen bilgilendirme mesajları (örn: geçersiz hamle)
     socket.on('infoMessage', (data) => {
         showGlobalMessage(data.message, data.isError);
-        gameData.isAnimating = false; // Hata olduysa animasyon kilidini kaldır
+        gameData.isAnimating = false; 
     });
 
-    // Seviye Atlama Sinyali
     socket.on('nextLevel', (data) => {
         showGlobalMessage(`Yeni Seviye: ${data.boardSize} Kart!`, false);
         initializeGame(
@@ -341,7 +333,6 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex, in
         drawBoard();
     });
     
-    // Rakip Ayrıldı
     socket.on('opponentLeft', (message) => {
         showGlobalMessage(message || 'Rakibiniz ayrıldı. Lobiye dönülüyor.', true);
         resetGame();
