@@ -6,24 +6,21 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// Cors ayarlarını kendi alan adınızla güncelleyin (örneğin: 'http://localhost:3000')
+// Cors ayarlarını kendi alan adınızla güncelleyin
 const io = new Server(server, {
     cors: {
-        origin: "*", // Tüm alanlardan erişime izin verir (Geliştirme için uygundur)
+        origin: "*", 
         methods: ["GET", "POST"]
     }
 });
 
 const PORT = process.env.PORT || 3000;
+const LEVELS = [12, 16, 20]; // Seviye kart sayıları
+const BOMB_COUNT = 3; // Her oyuncu için 3 bomba
 
 // --- OYUN DURUMU YÖNETİMİ ---
-// Global oda nesnesi
 const rooms = {}; 
 
-/**
- * Rastgele 6 haneli oda kodu üretir.
- * @returns {string} Oda kodu
- */
 function generateRoomCode() {
     let code;
     do {
@@ -33,9 +30,7 @@ function generateRoomCode() {
 }
 
 /**
- * Belirtilen kart boyutu için rastgele 3 Host ve 3 Guest bombası seçer (toplam 6 benzersiz kart).
- * @param {number} boardSize - Toplam kart sayısı (12, 16, 20)
- * @returns {{hostBombs: number[], guestBombs: number[]}}
+ * Belirtilen kart boyutu için rastgele BOMB_COUNT adet Host ve Guest bombası seçer.
  */
 function generateRandomBombs(boardSize) {
     const indices = Array.from({ length: boardSize }, (_, i) => i);
@@ -46,11 +41,11 @@ function generateRandomBombs(boardSize) {
         [indices[i], indices[j]] = [indices[j], indices[i]];
     }
     
-    // İlk 6 kartı Host ve Guest arasında paylaştır
-    const uniqueBombs = indices.slice(0, 6);
+    // İlk 2*BOMB_COUNT kartı Host ve Guest arasında paylaştır
+    const uniqueBombs = indices.slice(0, 2 * BOMB_COUNT);
     
-    const hostBombs = uniqueBombs.slice(0, 3);
-    const guestBombs = uniqueBombs.slice(3, 6);
+    const hostBombs = uniqueBombs.slice(0, BOMB_COUNT);
+    const guestBombs = uniqueBombs.slice(BOMB_COUNT, 2 * BOMB_COUNT);
 
     return { hostBombs, guestBombs };
 }
@@ -68,7 +63,7 @@ io.on('connection', (socket) => {
             players: [{ id: socket.id, username, isHost: true }],
             turn: 0, // 0: Host, 1: Guest
             level: 1, 
-            maxLevel: 3,
+            maxLevel: LEVELS.length,
             gameData: null 
         };
         
@@ -99,8 +94,8 @@ io.on('connection', (socket) => {
         // 1. Her iki oyuncuya da oyunun başladığını bildir.
         io.to(roomCode).emit('gameStart', [host, guest]);
 
-        // 2. Host (Sunucu), rastgele bombaları seçer.
-        const boardSize = [12, 16, 20][0]; // Seviye 1: 12 kart
+        // 2. Sunucu rastgele bombaları seçer.
+        const boardSize = LEVELS[room.level - 1]; 
         const { hostBombs, guestBombs } = generateRandomBombs(boardSize);
         
         // 3. Her iki oyuncuya da rastgele seçilen bombaları ve başlatma sinyalini gönder.
@@ -123,26 +118,37 @@ io.on('connection', (socket) => {
     socket.on('gameData', (data) => {
         const { roomCode, type, cardIndex } = data;
         const room = rooms[roomCode];
-        if (!room) return;
+        if (!room || type !== 'MOVE') return;
 
-        // Hamleyi rakibe ilet
-        socket.to(roomCode).emit('gameData', {
-            type,
-            cardIndex
-        });
-        
-        // Sunucu tarafından turu güncelle (güvenlik için)
+        // Hamleyi yapanın sırası olup olmadığını kontrol et (Basit Güvenlik)
+        const playerIsHost = room.players.find(p => p.id === socket.id)?.isHost;
+        const isMyTurn = (playerIsHost && room.turn === 0) || (!playerIsHost && room.turn === 1);
+
+        if (!isMyTurn) {
+             console.log(`Hata: ${socket.id} sıra kendisinde değilken hamle yapmaya çalıştı.`);
+             return; // Sıra başkasındaysa hamleyi yoksay
+        }
+
+        // Sunucu tarafından turu güncelle
         room.turn = room.turn === 0 ? 1 : 0; 
+        
+        // Hamleyi ve yeni tur bilgisini tüm oyunculara ilet.
+        // Bu olay, game.js'te applyMove'u tetikler.
+        io.to(roomCode).emit('moveApplied', {
+            cardIndex: cardIndex,
+            nextTurn: room.turn 
+        });
     });
     
     // 4. Seviye Atlama İsteği (Sadece Host gönderir)
     socket.on('nextLevel', ({ roomCode, newLevel }) => {
         const room = rooms[roomCode];
-        if (!room || !room.players.find(p => p.id === socket.id && p.isHost)) return; // Sadece Host ilerletebilir
+        if (!room || !room.players.find(p => p.id === socket.id && p.isHost)) return; 
 
         if (newLevel <= room.maxLevel) {
             room.level = newLevel;
-            const boardSize = [12, 16, 20][newLevel - 1];
+            room.turn = 0; // Her yeni seviyede Host başlar
+            const boardSize = LEVELS[newLevel - 1];
             
             // Yeni seviye için rastgele bombaları seç
             const { hostBombs, guestBombs } = generateRandomBombs(boardSize);
