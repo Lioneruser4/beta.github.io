@@ -1,4 +1,4 @@
-// Dosya Adı: server.js (EN ESKİ STABİL VERSİYON)
+// Dosya Adı: server.js (STABİL BAŞLANGIÇ - SIRALI OYNAMA)
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -15,10 +15,12 @@ const io = new Server(server, {
 
 const rooms = {};
 
-// Sadece temel kart içeriği (Örn: 10 çift)
+// --- Sabitler ---
+const BOARD_SIZE = 20; 
 const EMOTICONS = ['🍉', '🍇', '🍒', '🍕', '🐱', '⭐', '🚀', '🔥', '🌈', '🎉'];
-const BOARD_SIZE = 20;
+const MATCH_DELAY = 1500; // Eşleşme kontrolü bekleme süresi
 
+// --- Yardımcı Fonksiyonlar ---
 function createShuffledContents(boardSize) {
     const pairs = boardSize / 2;
     let cardContents = [];
@@ -39,6 +41,18 @@ function generateRoomCode() {
     return code;
 }
 
+function initializeRoom(room) {
+    room.cardContents = createShuffledContents(BOARD_SIZE);
+    room.matchedCards = new Set();
+    room.flippedCards = []; // Açılan 2 kartın indeksi
+    room.turn = room.hostId; // İlk sıranın Host'ta olduğunu varsayalım
+    room.gameActive = true;
+    room.scoreHost = 0;
+    room.scoreGuest = 0;
+}
+
+
+// --- SOCKET.IO Olay Yönetimi ---
 io.on('connection', (socket) => {
     
     socket.on('createRoom', ({ username }) => {
@@ -58,32 +72,110 @@ io.on('connection', (socket) => {
         room.playerCount = 2;
         room.guestId = socket.id;
         room.guestUsername = username;
+        
+        initializeRoom(room);
         socket.join(code);
 
-        const cardContents = createShuffledContents(BOARD_SIZE);
-        
         const players = [
             { id: room.hostId, username: room.hostUsername, isHost: true },
             { id: room.guestId, username: room.guestUsername, isHost: false }
         ];
 
-        // Temel oyunu başlatma sinyali
         io.to(code).emit('gameStart', {
             players, 
-            cardContents, 
-            boardSize: BOARD_SIZE
+            cardContents: room.cardContents, 
+            boardSize: BOARD_SIZE,
+            turn: room.turn 
         });
     });
-    
-    // Disconnect ve diğer olaylar (basit hali)
+
+    socket.on('MOVE', async (data) => {
+        const room = rooms[data.roomCode];
+        if (!room || !room.gameActive) return;
+
+        const { cardIndex } = data;
+        
+        if (socket.id !== room.turn) {
+            socket.emit('infoMessage', { message: 'Sıra sizde değil!', isError: true });
+            return;
+        }
+
+        if (room.matchedCards.has(cardIndex) || room.flippedCards.length >= 2) {
+             socket.emit('infoMessage', { message: 'Geçersiz hareket.', isError: true });
+             return; 
+        }
+
+        room.flippedCards.push(cardIndex);
+
+        // Durumu tüm oyunculara gönder
+        io.to(data.roomCode).emit('gameStateUpdate', {
+            cardIndex: cardIndex,
+            flippedCards: room.flippedCards,
+            matchedCards: Array.from(room.matchedCards),
+            scoreHost: room.scoreHost,
+            scoreGuest: room.scoreGuest
+        });
+
+        if (room.flippedCards.length === 2) {
+            const [idx1, idx2] = room.flippedCards;
+            
+            // Eşleşme Kontrolü
+            if (room.cardContents[idx1] === room.cardContents[idx2]) {
+                
+                // Başarılı Eşleşme
+                room.matchedCards.add(idx1);
+                room.matchedCards.add(idx2);
+                
+                if (room.turn === room.hostId) { room.scoreHost++; } else { room.scoreGuest++; }
+                
+                room.flippedCards = []; // Yeni tura hazırla
+
+                // Oyun Bitti mi Kontrolü
+                if (room.matchedCards.size === BOARD_SIZE) {
+                    room.gameActive = false;
+                    const winner = room.scoreHost === room.scoreGuest ? 'DRAW' : room.scoreHost > room.scoreGuest ? 'Host' : 'Guest';
+                    io.to(data.roomCode).emit('gameEnd', { winner, scoreHost: room.scoreHost, scoreGuest: room.scoreGuest });
+                    return;
+                }
+                
+                // Başarılı eşleşmede sıra aynı oyuncuda kalır.
+                io.to(data.roomCode).emit('turnUpdate', { turn: room.turn, message: "Eşleşme! Sıra sizde kalıyor." });
+
+            } else {
+                
+                // Eşleşme Başarısız: Kartların kapanması için bekle
+                await new Promise(resolve => setTimeout(resolve, MATCH_DELAY));
+                
+                room.flippedCards = []; // Kartları kapat
+
+                // Sırayı Değiştir
+                room.turn = (room.turn === room.hostId) ? room.guestId : room.hostId;
+                
+                // Kartların kapandığı ve sıranın değiştiği bilgisini gönder
+                io.to(data.roomCode).emit('turnUpdate', { 
+                    turn: room.turn, 
+                    message: "Eşleşmedi. Sıra rakibe geçti." 
+                });
+            }
+        }
+    });
+
+    // --- SOHBET VE BAĞLANTI KESME OLAYLARI ---
+    socket.on('sendMessage', (data) => {
+        const room = rooms[data.roomCode];
+        if (!room || !room.hostId || !room.guestId) return;
+
+        let senderName = (socket.id === room.hostId) ? room.hostUsername : room.guestUsername;
+
+        io.to(data.roomCode).emit('newMessage', { sender: senderName, text: data.message });
+    });
+
     socket.on('disconnect', () => {
         for (const code in rooms) {
             const room = rooms[code];
             if (room && (room.hostId === socket.id || room.guestId === socket.id)) {
                 const opponentId = (room.hostId === socket.id) ? room.guestId : room.hostId;
-                
-                if (opponentId) { io.to(opponentId).emit('opponentLeft', 'Rakibiniz ayrıldı. Lobiye dönülüyor.'); }
-                
+                if (opponentId) { io.to(opponentId).emit('opponentLeft', 'Rakibiniz bağlantıyı kesti. Lobiye dönülüyor.'); }
                 if (room.hostId === socket.id) { delete rooms[code]; } 
                 else if (room.guestId === socket.id) {
                     room.playerCount = 1; room.guestId = null; room.guestUsername = null;
