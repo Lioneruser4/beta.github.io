@@ -1,4 +1,4 @@
-// Dosya Adı: game.js (EŞ ZAMANLI V5 - KESİN DÜZELTME)
+// Dosya Adı: game.js (EŞ ZAMANLI V6 - HOST TIKLAMA KESİN ÇÖZÜM)
 let socket;
 let currentRoomCode = '';
 let isHost = false; 
@@ -29,7 +29,7 @@ const messagesEl = document.getElementById('messages');
 
 // --- OYUN DURUMU ---
 let gameData = {
-    cardContents: [], // Sunucudan alınan karıştırılmış ve atanmış içerikler
+    cardContents: [], // Sunucudan gelen karıştırılmış ve atanmış içerikler
     openedCards: new Set(), // Açık kartların indekslerini tutar
     hostLives: 2,
     guestLives: 2,
@@ -115,12 +115,11 @@ function drawBoard() {
         
         let displayContent = content;
         
-        // Bomba ise özel sınıf ekle
         if (displayContent === '💣') {
             back.classList.add('bg-red-200');
         }
 
-        back.textContent = displayContent; // Emoji veya Bomba göster
+        back.textContent = displayContent;
 
         card.appendChild(front);
         card.appendChild(back);
@@ -132,13 +131,17 @@ function drawBoard() {
             card.classList.add('flipped');
         } 
         
-        // KRİTİK DÜZELTME: Tıklama dinleyicisini Host/Guest ayrımı yapmadan ekle.
+        // KRİTİK DÜZELTME: Sadece açık olmayan kartlara event listener ekle
         if (!isOpened && !gameData.isGameOver) {
             card.classList.add('cursor-pointer');
             
-            // Dinleyiciyi kaldırıp tekrar eklemek, çift tetiklenmeyi önler.
+            // Mevcut dinleyicileri kaldır (güvenlik için)
             cardContainer.removeEventListener('click', handleCardClick);
+            cardContainer.removeEventListener('touchstart', handleCardClick); 
+            
+            // KRİTİK: Hem click hem touchstart ekle (Tüm cihazlarda tıklamayı garanti eder)
             cardContainer.addEventListener('click', handleCardClick);
+            cardContainer.addEventListener('touchstart', handleCardClick);
         }
         
         gameBoardEl.appendChild(cardContainer);
@@ -170,23 +173,24 @@ function updateStatusDisplay() {
 // --- HAREKET İŞLEYİCİLERİ ---
 
 function handleCardClick(event) {
-    
-    // YALNIZCA KİLİT/ANİMASYON DURUMU VEYA OYUN SONU İSE ÇIK
+    // KRİTİK: touchstart olayında click olayını engelle (çift tetiklenmeyi önler)
+    if (event.type === 'touchstart') {
+        event.preventDefault(); 
+    }
+
     if (gameData.isAnimating || gameData.isGameOver) {
-        // console.log("Tıklama engellendi: Animasyon veya Oyun Bitti.");
         return;
     } 
 
     const cardContainer = event.currentTarget; 
     const cardElement = cardContainer.querySelector('.card');
     
-    // Kart zaten açıksa veya element yoksa çık
     if (!cardElement || cardElement.classList.contains('flipped')) return; 
     
     const cardIndex = parseInt(cardElement.dataset.index);
 
     sendMove(cardIndex);
-    gameData.isAnimating = true; // Sunucudan yanıt gelene kadar kilitler
+    gameData.isAnimating = true; 
 }
 
 function sendMove(index) {
@@ -261,7 +265,6 @@ function handleGameEnd(winnerRole) {
 }
 
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
-
 export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername, initialData) {
     socket = s;
     currentRoomCode = roomCode;
