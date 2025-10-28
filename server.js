@@ -22,22 +22,15 @@ const DEFAULT_LIVES = 2;
 const EMOTICONS = ['🍉', '🍇', '🍒', '🍕', '🐱', '⭐', '🚀', '🔥', '🌈', '🎉'];
 
 // --- Kart İçeriği Hazırlama Fonksiyonu ---
-function createShuffledContents(boardSize, hostBombs, guestBombs) {
+function createShuffledContents(boardSize) {
     const pairs = boardSize / 2; 
     let cardContents = [];
 
-    // 1. Emoji Çiftlerini Ekle (10 çift)
+    // Emoji Çiftlerini Ekle (10 çift)
     for (let i = 0; i < pairs; i++) {
         const emoji = EMOTICONS[i % EMOTICONS.length]; 
         cardContents.push(emoji, emoji);
     }
-
-    // 2. Host ve Guest Bombalarını Belirle (Her oyuncunun bombası RAKİBİNE can kaybettirir)
-    // KRİTİK: Bu fonksiyonda, kartın arkasında ne görüneceği değil, mantıksal olarak hangi kartın kime ait bomba olduğu belirlenir.
-    // Ancak istemciye göndereceğimiz dizi, kartın arkasında ne olacağını içermeli.
-    
-    // Bu mantıkta, kart içeriği sadece emojidir. Bomba bilgisi ayrılır.
-    // İstemci tarafında görselleştirme karmaşasını azaltmak için, cardContents'i sadece emojilerle yapalım
     
     // Fisher-Yates shuffle (Sadece emojileri karıştır)
     for (let i = cardContents.length - 1; i > 0; i--) {
@@ -72,25 +65,16 @@ function initializeRoom(room) {
     room.guestBombs = selectRandomBombs(BOARD_SIZE, BOMB_COUNT);
     room.hostLives = DEFAULT_LIVES;
     room.guestLives = DEFAULT_LIVES;
-    room.openedCards = new Set(); // Açık kart indeksleri
+    room.openedCards = new Set();
     
-    // Emojileri karıştır ve yerleştir
     const emojiBoard = createShuffledContents(BOARD_SIZE); 
     
     // KRİTİK: Kartın arkasındaki görsel içeriği bir kez belirleyelim.
     room.cardContents = emojiBoard.map((content, index) => {
-        // Eğer bir kart HEM Host'un HEM de Guest'in bombasıysa, kural gereği bu oyunun dışındadır.
-        // Basitlik adına, sadece bir oyuncunun bombası olarak kalmasını sağlayacağız.
-
-        // Eğer kart, Host'un canını düşürecek (yani Guest'in bombasıysa)
-        if (room.guestBombs.has(index)) {
+        // Kartın görsel içeriği: Eğer kart bir bombaysa '💣', değilse eşleşme emojisi.
+        if (room.guestBombs.has(index) || room.hostBombs.has(index)) {
              return '💣'; 
         } 
-        // Eğer kart, Guest'in canını düşürecek (yani Host'un bombasıysa)
-        else if (room.hostBombs.has(index)) {
-             return '💣';
-        }
-        // Değilse, bu kart bir emojidir (eşleşme kartı)
         return content;
     });
 
@@ -102,8 +86,6 @@ function initializeRoom(room) {
 // --- SOCKET.IO Olay Yönetimi ---
 io.on('connection', (socket) => {
     
-    // ... createRoom ve joinRoom olayları aynı kalır ...
-
     socket.on('createRoom', ({ username }) => {
         const code = generateRoomCode();
         rooms[code] = { code, playerCount: 1, hostId: socket.id, hostUsername: username, guestId: null, guestUsername: null };
@@ -122,7 +104,7 @@ io.on('connection', (socket) => {
         room.guestId = socket.id;
         room.guestUsername = username;
         
-        initializeRoom(room); // Oyunu başlat
+        initializeRoom(room);
         socket.join(code);
         
         const players = [
@@ -132,7 +114,7 @@ io.on('connection', (socket) => {
 
         io.to(code).emit('gameStart', {
             players, 
-            cardContents: room.cardContents, // KRİTİK: İstemciye kartların içeriğini gönder
+            cardContents: room.cardContents, 
             boardSize: BOARD_SIZE,
             initialLives: DEFAULT_LIVES
         });
@@ -147,14 +129,12 @@ io.on('connection', (socket) => {
         const isHostPlayer = socket.id === room.hostId;
         const playerName = isHostPlayer ? room.hostUsername : room.guestUsername;
 
-        // 1. Kural Kontrolü: Kart Kontrolü
         if (room.openedCards.has(cardIndex)) {
              socket.emit('infoMessage', { message: 'Kart zaten açık.', isError: true });
              return; 
         }
         
-        // 2. Hamleyi İşle
-        room.openedCards.add(cardIndex); // Kartı aç
+        room.openedCards.add(cardIndex);
         room.cardsLeft--;
         
         let moveResult = { cardIndex, hitBomb: false, gameOver: false, winner: null, moverName: playerName };
@@ -162,42 +142,30 @@ io.on('connection', (socket) => {
         // Bu oyuncunun canını düşürecek olan, RAKİBİNİN bombalarıdır.
         const opponentBombs = isHostPlayer ? room.guestBombs : room.hostBombs;
         
-        // Bombaya bastıysa
         if (opponentBombs.has(cardIndex)) {
             moveResult.hitBomb = true;
             
             if (isHostPlayer) { room.hostLives--; } else { room.guestLives--; }
 
-            // Oyun Bitiş Kontrolü (Can bitti mi?)
             if (room.hostLives <= 0 || room.guestLives <= 0) {
                  room.gameActive = false;
                  moveResult.gameOver = true;
                  moveResult.winner = room.hostLives <= 0 && room.guestLives <= 0 ? 'DRAW' : room.hostLives <= 0 ? 'Guest' : 'Host';
             }
-        } else {
-             // Emoji Eşleşme Kontrolü
-             const openedCardsArray = Array.from(room.openedCards);
-             const matchedCardIndices = [];
-             
-             // NOT: Eş zamanlı oyunda eşleştirme mantığı daha karmaşıktır.
-             // Şu an sadece bombaya odaklanıp, eşleşmeyi es geçiyoruz (Can Bitti/Tüm Kartlar Açıldı).
-             // Eğer eşleşme zorunluysa, açılan kartları 2'şerli kontrol etmeliyiz.
-        }
-
-        // Seviye Tamamlanma Kontrolü (Kart bitti mi?)
+        } 
+        
         if (room.cardsLeft === 0 && !moveResult.gameOver) {
             room.gameActive = false;
             moveResult.gameOver = true;
             moveResult.winner = room.hostLives === room.guestLives ? 'DRAW' : room.hostLives > room.guestLives ? 'Host' : 'Guest';
         }
 
-        // 3. Tüm client'lara durumu yay
         io.to(data.roomCode).emit('gameStateUpdate', {
             moveResult,
             hostLives: room.hostLives,
             guestLives: room.guestLives,
             cardsLeft: room.cardsLeft,
-            openedCardsIndices: Array.from(room.openedCards) // KRİTİK: Açık kartların tam listesini gönder
+            openedCardsIndices: Array.from(room.openedCards) 
         });
     });
 
