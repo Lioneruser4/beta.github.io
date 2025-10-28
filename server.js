@@ -6,7 +6,6 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// Cors ayarlarını kendi alan adınızla güncelleyin
 const io = new Server(server, {
     cors: {
         origin: "*", 
@@ -29,9 +28,6 @@ function generateRoomCode() {
     return code;
 }
 
-/**
- * Belirtilen kart boyutu için rastgele BOMB_COUNT adet Host ve Guest bombası seçer.
- */
 function generateRandomBombs(boardSize) {
     const indices = Array.from({ length: boardSize }, (_, i) => i);
     
@@ -126,14 +122,13 @@ io.on('connection', (socket) => {
 
         if (!isMyTurn) {
              console.log(`Hata: ${socket.id} sıra kendisinde değilken hamle yapmaya çalıştı.`);
-             return; // Sıra başkasındaysa hamleyi yoksay
+             return; 
         }
 
         // Sunucu tarafından turu güncelle
         room.turn = room.turn === 0 ? 1 : 0; 
         
         // Hamleyi ve yeni tur bilgisini tüm oyunculara ilet.
-        // Bu olay, game.js'te applyMove'u tetikler.
         io.to(roomCode).emit('moveApplied', {
             cardIndex: cardIndex,
             nextTurn: room.turn 
@@ -150,10 +145,8 @@ io.on('connection', (socket) => {
             room.turn = 0; // Her yeni seviyede Host başlar
             const boardSize = LEVELS[newLevel - 1];
             
-            // Yeni seviye için rastgele bombaları seç
             const { hostBombs, guestBombs } = generateRandomBombs(boardSize);
             
-            // Yeni bomb ve seviye verilerini kaydet
             room.gameData = {
                 hostBombs,
                 guestBombs,
@@ -161,7 +154,6 @@ io.on('connection', (socket) => {
                 cardsLeft: boardSize
             };
             
-            // Her iki oyuncuya da seviye atlama sinyalini yeni bombalarla gönder.
             io.to(roomCode).emit('nextLevel', { 
                 newLevel: room.level,
                 hostBombs,
@@ -179,7 +171,6 @@ io.on('connection', (socket) => {
             if (playerIndex !== -1) {
                 const disconnectedPlayer = room.players[playerIndex];
                 
-                // Odanın tüm üyelerine oyuncunun ayrıldığını bildir
                 socket.to(code).emit('opponentLeft', `${disconnectedPlayer.username} oyundan ayrıldı.`);
                 
                 // Odayı sil
