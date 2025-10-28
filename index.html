@@ -1,162 +1,223 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>💣 Emoji Bomb 1v1</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
-<style>
-body{font-family:'Inter',sans-serif;background:linear-gradient(to bottom right,#1a1a1a,#333);color:#f0f0f0;overflow:hidden;}
-.screen{width:100vw;height:100vh;display:none;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem;box-sizing:border-box;text-align:center;}
-.screen.active{display:flex;}
-.loader-anim{animation:pulse-spin 2.5s infinite ease-in-out;}
-@keyframes pulse-spin{0%,100%{transform:scale(1) rotate(0deg);opacity:1;}50%{transform:scale(1.2) rotate(180deg);opacity:.8;}}
-.btn{@apply w-full max-w-xs text-xl font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ease-in-out;}
-.btn-primary{@apply bg-blue-600 text-white hover:bg-blue-500 active:scale-95;}
-.btn-secondary{@apply bg-green-600 text-white hover:bg-green-500 active:scale-95;}
-.btn-danger{@apply bg-red-600 text-white hover:bg-red-500 active:scale-95;}
-.input-field{@apply w-full max-w-xs text-lg bg-gray-700 text-white border-2 border-gray-600 rounded-lg p-4 text-center placeholder-gray-400 focus:outline-none focus:border-blue-500;}
-.signal-textarea{@apply w-full max-w-md h-24 text-xs bg-gray-800 text-gray-300 rounded-lg p-2 border border-gray-600 resize-none;}
-.card-container{perspective:1000px;aspect-ratio:1/1;}
-.card-inner{position:relative;width:100%;height:100%;transition:transform .6s;transform-style:preserve-3d;}
-.card-container.flipped .card-inner{transform:rotateY(180deg);}
-.card-front,.card-back{position:absolute;width:100%;height:100%;backface-visibility:hidden;@apply rounded-lg shadow-md flex items-center justify-center;}
-.card-front{@apply bg-blue-500 text-3xl;}
-.card-back{@apply bg-gray-600 text-4xl;transform:rotateY(180deg);}
-@keyframes shake{0%,100%{transform:translateX(0);}10%,30%,50%,70%,90%{transform:translateX(-8px);}20%,40%,60%,80%{transform:translateX(8px);}}
-.shake{animation:shake .4s ease-in-out;}
-@keyframes vibrate{0%,100%{transform:rotate(0deg);}25%{transform:rotate(1.5deg);}75%{transform:rotate(-1.5deg);}}
-.vibrating{animation:vibrate .2s infinite;}
-#endScreen{background-color:rgba(0,0,0,.8);z-index:100;}
-#globalMessage.show{display:block;animation:fadeInDown .3s ease-out;}
-@keyframes fadeInDown{from{opacity:0;transform:translate(-50%,-20px);}to{opacity:1;transform:translate(-50%,0);}}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>💣 Emoji Bomb 1v1 - Profesyonel Eşleşme</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    
+    <style>
+        body { font-family: sans-serif; background: linear-gradient(to bottom right, #1a1a1a, #333333); color: #f0f0f0; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .screen { width: 100%; max-width: 400px; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; box-sizing: border-box; text-align: center; }
+        .screen.active { display: flex; }
+        .btn { @apply w-full text-xl font-bold py-3 px-6 rounded-xl shadow-lg transition-all duration-200 ease-in-out; }
+        .btn-primary { @apply bg-blue-600 text-white hover:bg-blue-500 active:scale-95; }
+        .input-field { @apply w-full text-lg bg-gray-700 text-white border-2 border-gray-600 rounded-lg p-3 text-center placeholder-gray-400 focus:outline-none focus:border-blue-500; }
+        .code-display { @apply text-4xl font-extrabold p-4 bg-gray-700 rounded-lg tracking-widest text-yellow-400; }
+        #globalMessage.show { display: block; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 50; animation: fadeInDown 0.3s ease-out; }
+    </style>
 </head>
 <body class="bg-gray-900 text-white select-none">
-<div id="globalMessage" class="hidden fixed top-5 left-1/2 -translate-x-1/2 w-11/12 max-w-md p-4 bg-red-600 text-white rounded-lg shadow-lg z-50">
-<p id="globalMessageText"></p>
-<button id="globalMessageClose" class="absolute top-2 right-3 text-2xl font-bold">&times;</button>
-</div>
 
-<div id="loader" class="screen active"><div class="loader-anim text-center"><div class="text-7xl">💣</div><h1 class="text-4xl font-black mt-4">Emoji Bomb</h1></div></div>
+    <div id="globalMessage" class="hidden w-11/12 max-w-md p-4 bg-red-600 text-white rounded-lg shadow-lg">
+        <p id="globalMessageText"></p>
+    </div>
 
-<div id="lobby" class="screen">
-<div class="w-full max-w-md space-y-4">
-<h1 class="text-5xl font-black text-center">💣 Emoji Bomb</h1>
-<p class="text-lg text-gray-300 text-center">Arkadaşınla 1v1 oyna! Oda kur veya bir odaya katıl.</p>
-<input type="text" id="username" class="input-field" placeholder="Kullanıcı Adı">
-<button id="createRoomBtn" class="btn btn-primary">🎮 Oda Kur</button>
-<button id="joinRoomBtn" class="btn btn-secondary">🔍 Katıl</button>
-</div>
-</div>
+    <div id="lobby" class="screen active space-y-6">
+        <h1 class="text-5xl font-black">💣 Emoji Bomb</h1>
+        
+        <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adı">
+        
+        <input type="text" id="roomCodeInput" class="input-field uppercase" placeholder="Oda Numarası (Boş bırak=Oluştur)">
+        
+        <button id="matchBtn" class="btn btn-primary">🎮 Oda Oluştur / Odaya Gir</button>
+    </div>
+    
+    <div id="waitScreen" class="screen space-y-6">
+        <h2 id="waitTitle" class="text-3xl font-bold">Oda Kuruluyor...</h2>
+        <div id="codeArea" class="space-y-3 hidden">
+            <p class="text-lg">Oda Kodunuz:</p>
+            <div id="roomCodeDisplay" class="code-display"></div>
+            <button id="copyCodeBtn" class="btn bg-gray-600 text-base py-2 max-w-xs">Kopyala</button>
+        </div>
+        <p id="waitStatus" class="text-lg text-gray-400"></p>
+        <button id="cancelBtn" class="btn bg-red-600 text-base py-3 max-w-xs">İptal Et</button>
+    </div>
 
-<div id="connectScreen" class="screen">
-<div class="w-full max-w-lg space-y-3">
-<h2 id="connectTitle" class="text-2xl font-bold">Bağlantı Kuruluyor...</h2>
+    <div id="gameScreen" class="screen space-y-6">
+        <h1 class="text-5xl font-black">🕹️ Oyun Başladı!</h1>
+        <p class="text-lg">Rakip: <span id="opponentName" class="text-yellow-400"></span></p>
+        <div id="gameContent" class="p-6 bg-gray-800 rounded-lg w-full">
+            <p id="roleStatus"></p>
+            <p>Oyun verileri takası için Socket.IO hazır.</p>
+        </div>
+        <button id="endGameBtn" class="btn bg-gray-600 text-base py-3 max-w-xs">Oyunu Bitir</button>
+    </div>
 
-<div id="hostConnect" class="space-y-3 hidden">
-<p class="text-lg">Oda Kodu: <strong id="roomCodeDisplay" class="text-2xl text-yellow-400 tracking-widest"></strong></p>
-<label class="text-left w-full block">1. Bu Teklif Kodunu kopyala ve arkadaşına gönder:</label>
-<p class="text-xs text-gray-400 text-left"><i>(Not: Bu kodun çok uzun olması normaldir.)</i></p>
-<textarea id="offerText" class="signal-textarea" readonly></textarea>
-<button id="copyOfferBtn" class="btn btn-primary text-sm py-2">Teklifi Kopyala</button>
-<label class="text-left w-full block">2. Arkadaşından gelen Cevap Kodunu buraya yapıştır:</label>
-<textarea id="answerTextHost" class="signal-textarea" placeholder="Arkadaşının cevap kodunu bekle..."></textarea>
-<p id="hostStatus" class="text-green-400">Bağlantı kuruluyor...</p>
-</div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Referansları ---
+            const screens = { lobby: document.getElementById('lobby'), wait: document.getElementById('waitScreen'), game: document.getElementById('gameScreen') };
+            const globalMessage = document.getElementById('globalMessage');
+            const globalMessageText = document.getElementById('globalMessageText');
+            const usernameInput = document.getElementById('username');
+            const roomCodeInput = document.getElementById('roomCodeInput');
+            const matchBtn = document.getElementById('matchBtn');
+            const waitTitle = document.getElementById('waitTitle');
+            const codeArea = document.getElementById('codeArea');
+            const roomCodeDisplay = document.getElementById('roomCodeDisplay');
+            const waitStatus = document.getElementById('waitStatus');
+            const opponentNameEl = document.getElementById('opponentName');
+            const copyCodeBtn = document.getElementById('copyCodeBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const endGameBtn = document.getElementById('endGameBtn');
+            const roleStatusEl = document.getElementById('roleStatus');
+            
+            // --- Oyun Durumu ---
+            let socket;
+            let currentRoomCode = '';
+            let username = '';
+            let isHost = false;
+            
+            // --- Canlı Sunucu Adresi ---
+            // BURAYI RENDER'DAN ALACAĞINIZ CANLI URL İLE DEĞİŞTİRECEKSİNİZ!
+            const LIVE_SERVER_URL = 'http://localhost:3000'; 
+            
+            // --- Temel Fonksiyonlar ---
+            function showGlobalMessage(message, isError = true) {
+                globalMessageText.textContent = message;
+                globalMessage.classList.remove('bg-red-600', 'bg-green-600');
+                globalMessage.classList.add(isError ? 'bg-red-600' : 'bg-green-600');
+                globalMessage.classList.remove('hidden');
+                globalMessage.classList.add('show');
+                setTimeout(() => { globalMessage.classList.add('hidden'); globalMessage.classList.remove('show'); }, 4000);
+            }
+            function showScreen(screenId) {
+                Object.values(screens).forEach(screen => screen.classList.remove('active'));
+                screens[screenId].classList.add('active');
+            }
+            function resetGame() {
+                if (socket && currentRoomCode) {
+                    // Sunucuya odadan ayrıldığımızı bildir
+                    socket.emit('leaveRoom', { roomCode: currentRoomCode });
+                }
+                currentRoomCode = '';
+                showScreen('lobby');
+            }
+            function validateInput() {
+                username = usernameInput.value.trim();
+                if (username.length < 2) {
+                    showGlobalMessage('Lütfen geçerli bir kullanıcı adı girin.', true);
+                    return false;
+                }
+                return true;
+            }
 
-<div id="guestConnect" class="space-y-3 hidden">
-<label class="text-left w-full block">1. Arkadaşının Teklif Kodunu buraya yapıştır:</label>
-<textarea id="offerTextGuest" class="signal-textarea" placeholder="Arkadaşının teklif kodunu yapıştır..."></textarea>
-<button id="createAnswerBtn" class="btn btn-secondary">Cevap Oluştur</button>
-<label class="text-left w-full block">2. Bu Cevap Kodunu kopyala ve arkadaşına geri gönder:</label>
-<p class="text-xs text-gray-400 text-left"><i>(Not: Bu kodun çok uzun olması normaldir.)</i></p>
-<textarea id="answerTextGuest" class="signal-textarea" readonly></textarea>
-<button id="copyAnswerBtn" class="btn btn-primary text-sm py-2 hidden">Cevabı Kopyala</button>
-<p id="guestStatus" class="text-green-400">Bağlantı bekleniyor...</p>
-</div>
-<button id="cancelConnectBtn" class="btn btn-danger text-base py-2">İptal Et</button>
-</div>
-</div>
+            // --- Socket.IO Bağlantısı ---
+            function connectToServer() {
+                if (socket && socket.connected) return;
 
-<div id="gameScreen" class="screen">
-<div class="w-full max-w-3xl absolute top-0 left-1/2 -translate-x-1/2 p-4">
-<div class="flex justify-between items-center text-lg sm:text-2xl font-bold">
-<div id="player1Info" class="text-left"><span id="player1Name">Oyuncu 1</span><div id="player1Lives" class="text-3xl">❤️❤️</div></div>
-<div id="player2Info" class="text-right"><span id="player2Name">Oyuncu 2</span><div id="player2Lives" class="text-3xl">❤️❤️</div></div>
-</div>
-<p id="turnIndicator" class="text-center text-xl sm:text-2xl font-bold text-yellow-400 mt-4"></p>
-</div>
-<div id="gameGrid" class="w-full max-w-3xl grid gap-2 sm:gap-3 p-4 mt-32"></div>
-</div>
+                try {
+                    // Bağlantı adresi artık canlı sunucunuz
+                    socket = io(LIVE_SERVER_URL, {
+                        transports: ['websocket'],
+                        // CORS sorunu yaşanırsa bu satırı açın:
+                        // extraHeaders: { "Access-Control-Allow-Origin": "*" } 
+                    });
 
-<div id="endScreen" class="screen absolute top-0 left-0">
-<div class="text-center space-y-6">
-<h1 id="endMessage" class="text-6xl font-black">Kazandın! 🎉</h1>
-<button id="playAgainBtn" class="btn btn-primary">Tekrar Oyna</button>
-<button id="backToLobbyBtn" class="btn btn-secondary text-base py-3">Lobiye Dön</button>
-</div>
-</div>
+                    socket.on('connect', () => {
+                        showGlobalMessage('Sunucuya bağlandı.', false);
+                        showScreen('lobby');
+                    });
+                    
+                    socket.on('connect_error', (err) => {
+                        console.error('Bağlantı Hatası:', err);
+                        showGlobalMessage('HATA: Canlı sunucuya bağlanılamadı. Lütfen sunucunuzun aktif olduğundan emin olun.', true);
+                        showScreen('lobby');
+                    });
 
-<script>
-document.addEventListener('DOMContentLoaded',()=>{
-const screens={loader:document.getElementById('loader'),lobby:document.getElementById('lobby'),connect:document.getElementById('connectScreen'),game:document.getElementById('gameScreen'),end:document.getElementById('endScreen')};
-const globalMessage=document.getElementById('globalMessage'),globalMessageText=document.getElementById('globalMessageText'),globalMessageClose=document.getElementById('globalMessageClose');
-const usernameInput=document.getElementById('username'),createRoomBtn=document.getElementById('createRoomBtn'),joinRoomBtn=document.getElementById('joinRoomBtn'),cancelConnectBtn=document.getElementById('cancelConnectBtn');
-const hostConnect=document.getElementById('hostConnect'),guestConnect=document.getElementById('guestConnect'),roomCodeDisplay=document.getElementById('roomCodeDisplay'),offerText=document.getElementById('offerText'),answerTextHost=document.getElementById('answerTextHost'),hostStatus=document.getElementById('hostStatus');
-const offerTextGuest=document.getElementById('offerTextGuest'),answerTextGuest=document.getElementById('answerTextGuest'),guestStatus=document.getElementById('guestStatus'),createAnswerBtn=document.getElementById('createAnswerBtn'),copyOfferBtn=document.getElementById('copyOfferBtn'),copyAnswerBtn=document.getElementById('copyAnswerBtn');
+                    // --- Eşleşme Olayları ---
+                    socket.on('roomCreated', (code) => {
+                        currentRoomCode = code;
+                        isHost = true;
+                        waitTitle.textContent = 'Odanız Kuruldu!';
+                        roomCodeDisplay.textContent = code;
+                        codeArea.classList.remove('hidden');
+                        waitStatus.textContent = 'Oda kodunu arkadaşınıza gönderin ve bağlanmasını bekleyin.';
+                    });
+                    
+                    socket.on('joinFailed', (message) => {
+                        showGlobalMessage(message, true);
+                        resetGame();
+                    });
+                    
+                    socket.on('gameStart', (players) => {
+                        // Rakip ismini bul
+                        const opponent = players.find(p => p.id !== socket.id);
+                        const self = players.find(p => p.id === socket.id);
 
-let username='',peerConnection,dataChannel;
-const config={iceServers:[{urls:'stun:stun.l.google.com:19302'}]};
+                        opponentNameEl.textContent = opponent.username;
+                        isHost = self.isHost;
+                        roleStatusEl.textContent = isHost ? "Rolünüz: HOST (Oda Kurucu)" : "Rolünüz: GUEST (Katılımcı)";
+                        
+                        showGlobalMessage(`Oyun ${opponent.username} ile başladı!`, false);
+                        showScreen('game');
+                    });
 
-function showGlobalMessage(msg,isError=true){globalMessageText.textContent=msg;globalMessage.className=isError?'fixed top-5 left-1/2 -translate-x-1/2 w-11/12 max-w-md p-4 bg-red-600 text-white rounded-lg shadow-lg z-50':'fixed top-5 left-1/2 -translate-x-1/2 w-11/12 max-w-md p-4 bg-green-600 text-white rounded-lg shadow-lg z-50';globalMessage.classList.remove('hidden');setTimeout(()=>globalMessage.classList.add('hidden'),3000);}
-globalMessageClose.addEventListener('click',()=>globalMessage.classList.add('hidden'));
+                    socket.on('opponentLeft', (message) => {
+                        showGlobalMessage(message || 'Rakibiniz ayrıldı.', true);
+                        resetGame();
+                    });
 
-function showScreen(id){Object.values(screens).forEach(s=>s.classList.remove('active'));screens[id].classList.add('active');}
-function validateUsername(){username=usernameInput.value.trim();if(username.length<2){showGlobalMessage('En az 2 karakter girin.');return false;}return true;}
-function generateRoomCode(){return Math.floor(10000+Math.random()*90000).toString();}
+                    // --- Oyun Verisi Aktarımı ---
+                    socket.on('gameData', (data) => {
+                        // Örn: data.type === 'FLIP' ise kartı çevir, data.type === 'SCORE' ise skoru güncelle
+                        console.log('Rakip Verisi:', data);
+                    });
 
-function initCreateRoom(){
-if(!validateUsername())return;
-showScreen('connect');
-hostConnect.classList.remove('hidden');guestConnect.classList.add('hidden');
-roomCodeDisplay.textContent=generateRoomCode();
-peerConnection=new RTCPeerConnection(config);
-dataChannel=peerConnection.createDataChannel('gameChannel');
-dataChannel.onopen=()=>{showScreen('game');console.log('DataChannel açık');};
-dataChannel.onmessage=e=>console.log('Mesaj geldi:',e.data);
+                } catch (e) {
+                    console.error('Socket.IO hatası:', e);
+                    showGlobalMessage('Bağlantı kurulamadı. Tarayıcı konsolunu kontrol edin.', true);
+                }
+            }
+            
+            // --- Olay Dinleyicileri ---
+            matchBtn.addEventListener('click', () => {
+                if (!validateInput()) return;
+                
+                showScreen('wait');
+                const roomCode = roomCodeInput.value.trim().toUpperCase();
 
-peerConnection.onicecandidate=e=>{if(!e.candidate){offerText.value=JSON.stringify(peerConnection.localDescription);hostStatus.textContent='Teklifi arkadaşına gönder.';}};
-peerConnection.createOffer().then(offer=>peerConnection.setLocalDescription(offer));
-answerTextHost.addEventListener('input',()=>{if(answerTextHost.value){peerConnection.setRemoteDescription(JSON.parse(answerTextHost.value));hostStatus.textContent='Bağlandı!';}});
-copyOfferBtn.addEventListener('click',()=>{navigator.clipboard.writeText(offerText.value).then(()=>showGlobalMessage('Teklif kopyalandı!',false));});
-}
+                if (roomCode === '') {
+                    // Oda Oluşturma
+                    waitTitle.textContent = 'Oda Kuruluyor...';
+                    waitStatus.textContent = 'Lütfen bekleyin...';
+                    codeArea.classList.add('hidden');
+                    socket.emit('createRoom', { username });
+                } else {
+                    // Odaya Katılma
+                    waitTitle.textContent = `Odaya Katılım: ${roomCode}`;
+                    waitStatus.textContent = 'Bağlanılıyor...';
+                    codeArea.classList.add('hidden');
+                    socket.emit('joinRoom', { username, roomCode });
+                }
+            });
 
-function initJoinRoom(){
-if(!validateUsername())return;
-showScreen('connect');
-guestConnect.classList.remove('hidden');hostConnect.classList.add('hidden');
-peerConnection=new RTCPeerConnection(config);
-peerConnection.ondatachannel=e=>{dataChannel=e.channel;dataChannel.onopen=()=>showScreen('game');dataChannel.onmessage=e=>console.log('Mesaj geldi:',e.data);};
-peerConnection.onicecandidate=e=>{if(!e.candidate){answerTextGuest.value=JSON.stringify(peerConnection.localDescription);copyAnswerBtn.classList.remove('hidden');guestStatus.textContent='Cevabı arkadaşına gönder.';}};
-createAnswerBtn.addEventListener('click',()=>{
-if(!offerTextGuest.value){showGlobalMessage('Lütfen arkadaşınızın teklif kodunu girin.');return;}
-peerConnection.setRemoteDescription(JSON.parse(offerTextGuest.value)).then(()=>peerConnection.createAnswer().then(answer=>peerConnection.setLocalDescription(answer)));
-});
+            cancelBtn.addEventListener('click', resetGame);
+            endGameBtn.addEventListener('click', resetGame);
+            
+            copyCodeBtn.addEventListener('click', () => {
+                const textToCopy = roomCodeDisplay.textContent;
+                navigator.clipboard.writeText(textToCopy)
+                    .then(() => showGlobalMessage('Oda Kodu Kopyalandı!', false))
+                    .catch(() => showGlobalMessage('Kopyalama başarısız.', true));
+            });
 
-copyAnswerBtn.addEventListener('click',()=>{navigator.clipboard.writeText(answerTextGuest.value).then(()=>showGlobalMessage('Cevap kopyalandı!',false));});
-}
-
-function resetToLobby(){peerConnection&&peerConnection.close();peerConnection=null;dataChannel=null;showScreen('lobby');hostConnect.classList.add('hidden');guestConnect.classList.add('hidden');}
-
-createRoomBtn.addEventListener('click',initCreateRoom);
-joinRoomBtn.addEventListener('click',initJoinRoom);
-cancelConnectBtn.addEventListener('click',resetToLobby);
-});
-</script>
+            // Başlangıçta sunucuya bağlan
+            connectToServer();
+        });
+    </script>
 </body>
 </html>
