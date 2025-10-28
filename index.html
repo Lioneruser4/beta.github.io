@@ -3,22 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>💣 Emoji Bomb 1v1 - Mobil Uyumlu</title>
+    <title>💣 Emoji Bomb 1v1</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     
     <style>
-        /* === Sade Tema ve Akış Stilleri === */
+        /* === KART GÖRÜNÜMÜNÜ DÜZELTEN KRİTİK CSS === */
         :root {
-            --primary-color: #3498db;
-            --secondary-color: #2980b9;
+            --primary-color: #3498db; /* Mavi */
+            --secondary-color: #2980b9; /* Koyu Mavi */
             --text-color: #333;
-            --bg-color: #f4f4f4; /* Açık Gri Arkaplan */
+            --bg-color: #f4f4f4; 
             --card-bg: white;
             --shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         }
         
+        /* Genel Stiller ve Utility'ler aynı kalır */
+        * { -webkit-tap-highlight-color: transparent; }
         body { 
             font-family: sans-serif; 
             background-color: var(--bg-color); 
@@ -33,7 +35,7 @@
         }
         .screen { 
             width: 100%; 
-            max-width: 400px; /* Daha kompakt hale getirildi */
+            max-width: 400px; 
             display: none; 
             flex-direction: column; 
             align-items: center; 
@@ -47,50 +49,83 @@
         .screen.active { 
             display: flex; 
         }
-        
-        /* Utility */
         .btn { @apply w-full text-lg font-bold py-3 px-6 rounded-lg transition-all duration-200; }
         .btn-primary { @apply bg-blue-600 text-white hover:bg-blue-700 active:scale-95; }
         .input-field { @apply w-full text-base bg-gray-100 text-gray-900 border border-gray-300 rounded-lg p-3 text-center placeholder-gray-500 focus:outline-none focus:border-blue-500; }
-        
-        /* İstenen KISA KOD GÖRÜNÜMÜ */
         .code-display { @apply text-3xl font-mono p-3 bg-gray-800 text-yellow-300 rounded-md tracking-widest inline-block; } 
 
-        /* Global Mesaj Stili */
-        #globalMessage.show { 
-            display: block; 
-            position: fixed; 
-            top: 20px; 
-            left: 50%; 
-            transform: translateX(-50%); 
-            z-index: 50; 
-            animation: fadeInDown 0.3s ease-out; 
-            width: 90%;
-            max-width: 350px;
+        /* --- KART ANİMASYON VE GÖRÜNÜM DÜZELTMELERİ --- */
+        .card-container {
+            perspective: 1000px; 
+            aspect-ratio: 1; 
         }
-        @keyframes fadeInDown {
-            from { opacity: 0; transform: translate(-50%, -20px); }
-            to { opacity: 1; transform: translate(-50%, 0); }
+        .card {
+            width: 100%;
+            height: 100%;
+            border-radius: 8px; /* Daha yumuşak köşeler */
+            position: relative;
+            transform-style: preserve-3d; 
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
         }
 
-        /* Kart Stilleri - game.js ile uyumlu olması için */
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+
         .card-face {
-            font-size: 1.8rem; 
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 8px;
+            font-size: 2rem; /* Emojiler için büyük font */
+            font-weight: bold;
+            line-height: 1; /* Emoji'nin ortalanmasını kolaylaştırır */
         }
+
+        /* KAPALI KARTIN ÖN YÜZÜ (Tek Renk Mavi) */
         .card-face.front {
-             background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-             color: white;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border: 3px solid var(--card-bg);
+            transform: rotateY(0deg); 
         }
+
+        /* AÇIK KARTIN ARKA YÜZÜ (Beyaz/Açık Gri) */
         .card-face.back {
-             background: var(--card-bg);
-             color: var(--text-color);
+            background: var(--card-bg);
+            color: var(--text-color);
+            transform: rotateY(180deg);
         }
+
+        /* 💣 SEÇİM AŞAMASI (SADECE KENDİMİZİN GÖRDÜĞÜ KIRMIZILIK) */
         .card.bomb-selected .card-face.front {
-             background: linear-gradient(135deg, #f39c12, #e74c3c); 
-             animation: pulse-red 0.5s infinite alternate;
+            background: linear-gradient(135deg, #f39c12, #e74c3c); /* Turuncu-Kırmızı Geçiş */
+            animation: pulse-red 0.5s infinite alternate;
         }
-        
-        /* Can Rengi Değişiklikleri */
+        @keyframes pulse-red {
+            from { opacity: 1; }
+            to { opacity: 0.8; }
+        }
+
+        /* TİTREŞİM (BOOM öncesi gerilim) */
+        @keyframes vibrate {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            20% { transform: translate(-1px, -2px) rotate(-1deg); }
+            40% { transform: translate(-3px, 0px) rotate(1deg); }
+            60% { transform: translate(3px, 2px) rotate(0deg); }
+            80% { transform: translate(1px, -1px) rotate(-1deg); }
+            100% { transform: translate(-1px, 2px) rotate(1deg); }
+        }
+        .vibrate {
+            animation: vibrate 0.1s linear infinite;
+        }
+
+        /* Can Rengi */
         .text-orange-500 { color: #f97316; }
         .text-green-600 { color: #16a34a; }
     </style>
@@ -167,7 +202,6 @@
 
         function connectToServer() {
             try {
-                // Bağlantı kurulana kadar butonları devre dışı bırak
                 UIElements.matchBtn.disabled = true;
                 UIElements.matchBtn.textContent = 'Sunucuya Bağlanılıyor...';
 
@@ -208,12 +242,10 @@
                 });
                 
                 socket.on('gameStart', (players) => {
-                    // Host ve Guest ayrımını yapıp game.js'deki başlatma fonksiyonuna gönder
                     const selfId = socket.id;
                     const self = players.find(p => p.id === selfId);
                     const opponent = players.find(p => p.id !== selfId);
                     
-                    // Oda kodu bilgisini al
                     const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase() || (self.isHost ? document.getElementById('roomCodeDisplay').textContent : '');
                     
                     setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
