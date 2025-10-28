@@ -1,4 +1,4 @@
-// Dosya Adı: server.js (YENİ TASARIM)
+// Dosya Adı: server.js
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -29,7 +29,7 @@ function selectRandomBombs(boardSize, bombCount) {
     const indices = Array.from({ length: boardSize }, (_, i) => i);
     for (let i = indices.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [indices[i], indices[j]] = [indices[j], indices[i]];
+        [indices[i], indices[j]] = [indices[i], indices[j]];
     }
     return indices.slice(0, bombCount);
 }
@@ -58,8 +58,8 @@ io.on('connection', (socket) => {
             currentLevel: 1,
             hostBombs: null, 
             guestBombs: null, 
-            currentTurn: 0, // 0: Host, 1: Guest (YENİ)
-            boardState: [], // Oyun tahtasının güncel durumu (YENİ)
+            currentTurn: 0, // 0: Host (ilk başlayan)
+            boardState: [], 
         };
         socket.join(code);
         socket.emit('roomCreated', code);
@@ -91,13 +91,12 @@ io.on('connection', (socket) => {
             { id: room.guestId, username: room.guestUsername, isHost: false }
         ];
 
-        // Oyun Başlangıcı Sinyali
         io.to(code).emit('gameStart', {
             players, 
             hostBombs: room.hostBombs,
             guestBombs: room.guestBombs,
             level: level,
-            initialTurn: room.currentTurn, // Başlangıç sırası
+            initialTurn: room.currentTurn, 
         });
     });
 
@@ -106,27 +105,24 @@ io.on('connection', (socket) => {
         const room = rooms[data.roomCode];
         if (!room) return;
 
-        // İstemciden gelen hareket bilgisini doğrula (Güvenlik için basit kontrol)
         const isHostPlayer = socket.id === room.hostId;
         const expectedTurn = isHostPlayer ? 0 : 1;
 
+        // Yetki kontrolü
         if (room.currentTurn !== expectedTurn) {
-             // Sıra oyuncuda değilse, hareket reddedilir (hata mesajı yok, sadece yoksayılır)
-             return;
+             return; 
         }
         
-        // Hareketi her iki istemciye de gönder (client'lar uygulayacak)
+        // 1. Hareketi her iki istemciye de gönder (client'lar kartı açacak)
         io.to(data.roomCode).emit('playerMove', {
             cardIndex: data.cardIndex,
-            // Sadece hareketin kimden geldiği ve hangi kart olduğu bilgisi gönderilir.
         });
         
-        // KRİTİK: Sırayı sunucuda değiştir
+        // 2. Sırayı sunucuda değiştir
         room.currentTurn = room.currentTurn === 0 ? 1 : 0;
         
-        // KRİTİK: Yeni sıra bilgisini tüm client'lara gönder
+        // 3. Yeni sıra bilgisini tüm client'lara gönder
         io.to(data.roomCode).emit('turnChange', { newTurn: room.currentTurn });
-
     });
 
     socket.on('nextLevel', (data) => {
