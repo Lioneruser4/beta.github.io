@@ -34,7 +34,7 @@ function playSound(audioElement) {
 let level = 1; 
 const LEVELS = [12, 16, 20]; // Kart sayıları
 const BOMB_COUNTS = [2, 3, 4]; // Level'a göre bomba sayısı
-let gameStage = 'PLAY'; // Oyun her zaman PLAY olarak başlar
+let gameStage = 'PLAY'; 
 
 let gameData = {
     board: [], 
@@ -50,7 +50,6 @@ let gameData = {
 const EMOTICONS = ['🙂', '😂', '😍', '😎', '🤩', '👍', '🎉', '🌟', '🍕', '🐱'];
 
 // --- TEMEL UI FONKSİYONLARI ---
-
 export function showScreen(screenId) {
     Object.values(screens).forEach(screen => screen && screen.classList.remove('active'));
     if (screens[screenId]) {
@@ -152,6 +151,7 @@ function updateStatusDisplay() {
     myLivesEl.textContent = '❤️'.repeat(Math.max(0, myLives));
     opponentLivesEl.textContent = '❤️'.repeat(Math.max(0, opponentLives));
 
+    // KRİTİK KONTROL: Sıra benim mi? (Host = 0, Guest = 1)
     const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
     const bombCount = BOMB_COUNTS[level - 1];
 
@@ -175,7 +175,7 @@ function updateStatusDisplay() {
     }
 }
 
-// --- HAREKET İŞLEYİCİLERİ (KRİTİK DÜZELTMELER BURADA) ---
+// --- HAREKET İŞLEYİCİLERİ ---
 
 function handleCardClick(event) {
     const cardContainer = event.currentTarget; 
@@ -186,11 +186,9 @@ function handleCardClick(event) {
     const cardIndex = parseInt(cardElement.dataset.index);
 
     if (gameStage === 'PLAY') {
-        // Kontrol 1: Sıra bende mi?
         const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
         if (!isMyTurn || gameData.isGameOver) return; 
         
-        // Kontrol 2: Kart açılmış mı? (Zaten yukarıda kontrol ediliyor ama emin olalım)
         if (gameData.board[cardIndex].opened) return;
         
         sendMove(cardIndex);
@@ -199,10 +197,10 @@ function handleCardClick(event) {
 
 function sendMove(index) {
     if (socket && socket.connected) {
-        // Kart açma hareketini yerel olarak uygula
+        // 1. Kart açma hareketini yerel olarak uygula (Kartı çevir, canı düşür, sırayı değiştir)
         applyMove(index); 
         
-        // Hareketi rakibe ilet
+        // 2. Hareketi rakibe ilet
         socket.emit('gameData', {
             roomCode: currentRoomCode,
             type: 'MOVE',
@@ -212,19 +210,19 @@ function sendMove(index) {
 }
 
 async function applyMove(index) {
+    // Aynı kartın tekrar açılmasını engelle
     if (gameData.board[index].opened) return;
 
-    // Şu anki oyuncunun rolünü belirle
+    // Hareket sırasındaki oyuncunun rolünü belirle
     const isCurrentPlayerHost = gameData.turn === 0;
     
-    // Rakibin bombasına bakılır
+    // Rakibin bombasına bakılır (Kartı açan oyuncu için tehlikeli olan, rakibinin bombasıdır)
     const bombsToCheck = isCurrentPlayerHost ? gameData.guestBombs : gameData.hostBombs;
-
     const hitOpponentBomb = bombsToCheck.includes(index); 
     
     
     if (hitOpponentBomb) {
-        // Can kaybeden oyuncu: Hareket yapan oyuncudur
+        // Can kaybeden oyuncu: Kartı açan oyuncudur
         if (isCurrentPlayerHost) {
             gameData.hostLives--;
         } else {
@@ -238,17 +236,16 @@ async function applyMove(index) {
     if (hitOpponentBomb) {
         gameData.board[index].content = '💣';
         playSound(audioBomb);
-        // Can kaybeden tarafı kullanıcıya göster
-        const loserRoleDisplay = (isHost === isCurrentPlayerHost) ? 'SİZ' (isHost ? gameData.hostLives : gameData.guestLives) : 'RAKİP' ;
+        const loserRoleDisplay = (isHost === isCurrentPlayerHost) ? 'SİZ' : 'RAKİP';
         showGlobalMessage(`BOOM! ${loserRoleDisplay} bombaya bastı! Can: -1`, true);
 
     } else {
         playSound(audioEmoji);
     }
     
-    drawBoard(); 
+    drawBoard(); // Kartı çevir ve UI'yi güncelle
     
-    // Oyun bitiş veya devam etme kontrolü
+    // Oyun bitiş veya sıra geçiş kontrolü
     setTimeout(() => {
         
         if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
@@ -289,7 +286,6 @@ function endGame(winnerRole) {
         setTimeout(resetGame, 5000);
         
     } else {
-        // Can bitimiyle biten oyun
         winnerDisplay = (winnerRole === 'Host') === isHost ? 'SİZ KAZANDINIZ' : 'RAKİP KAZANDI';
         if (winnerRole === 'DRAW') winnerDisplay = "BERABERLİK";
 
@@ -327,7 +323,7 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex, in
         if (gameStage !== 'PLAY') return;
         
         if (data.type === 'MOVE') {
-            // applyMove fonksiyonu artık kendi içinde sırayı değiştiriyor.
+            // Rakibin hareketini uygula. applyMove içindeki sıra değişimi çalışacak.
             applyMove(data.cardIndex);
         }
     });
