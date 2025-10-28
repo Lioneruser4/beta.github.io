@@ -1,6 +1,4 @@
 // Dosya Adı: server.js
-// Gerekli Paketler: npm install express socket.io
-
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -8,20 +6,16 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// Socket.IO Sunucusu başlatılıyor.
-// Not: index.html dosyasını bir web sunucusu (live server vb.) üzerinden açıyorsanız
-// CORS ayarını kendi adresinize göre düzenlemeniz gerekebilir.
+// CORS Ayarı: GitHub Pages veya Vercel'den gelen bağlantılara izin verir
 const io = new Server(server, {
     cors: {
-        // index.html dosyasının açıldığı adres (Tarayıcı dosya yolunu kabul etmez, genellikle http://127.0.0.1:port veya http://localhost:port olmalıdır)
-        origin: "*", // Geliştirme aşamasında her yerden gelen bağlantıyı kabul et (DİKKAT: Üretimde bu güvensizdir)
+        origin: "*", 
         methods: ["GET", "POST"]
     }
 });
 
-const rooms = {}; // Aktif odaları saklar: { 'ABCD': { hostId: 'socketId1', hostUsername: 'userA', guestId: null, ... } }
+const rooms = {}; // Aktif odaları saklar
 
-// Rastgele 4 haneli oda kodu oluşturucu
 function generateRoomCode() {
     let code = Math.random().toString(36).substring(2, 6).toUpperCase();
     while (rooms[code]) {
@@ -31,7 +25,7 @@ function generateRoomCode() {
 }
 
 io.on('connection', (socket) => {
-    console.log(`Yeni bir kullanıcı bağlandı: ${socket.id}`);
+    console.log(`[CONNECT] Yeni kullanıcı bağlandı: ${socket.id}`);
 
     // --- ODA KURMA ---
     socket.on('createRoom', ({ username }) => {
@@ -41,13 +35,10 @@ io.on('connection', (socket) => {
             playerCount: 1,
             hostId: socket.id,
             hostUsername: username,
-            guestId: null,
-            guestUsername: null
         };
         socket.join(code);
         
-        console.log(`Oda Kuruldu: ${code} (Host: ${username})`);
-        // Host'a oda kodunu bildir
+        console.log(`[ROOM] Oda Kuruldu: ${code} (Host: ${username})`);
         socket.emit('roomCreated', code);
     });
 
@@ -56,15 +47,8 @@ io.on('connection', (socket) => {
         const code = roomCode.toUpperCase();
         const room = rooms[code];
 
-        if (!room) {
-            console.log(`Katılma Başarısız: Oda bulunamadı ${code}`);
-            socket.emit('roomFull'); // Oda bulunamadı
-            return;
-        }
-
-        if (room.playerCount >= 2) {
-             console.log(`Katılma Başarısız: Oda dolu ${code}`);
-            socket.emit('roomFull'); // Oda dolu
+        if (!room || room.playerCount >= 2) {
+            socket.emit('joinFailed', 'Oda bulunamadı veya dolu.');
             return;
         }
 
@@ -74,8 +58,7 @@ io.on('connection', (socket) => {
         room.guestUsername = username;
         socket.join(code);
         
-        console.log(`Odaya Katılım: ${code} (Guest: ${username})`);
-        socket.emit('roomJoined', code); // Guest'e katılımı bildir
+        socket.emit('roomJoined', code); 
 
         // Her iki oyuncuya da oyunun başladığını ve rollerini bildir
         const players = [
@@ -84,74 +67,42 @@ io.on('connection', (socket) => {
         ];
 
         io.to(code).emit('gameStart', players);
-        console.log(`Oyun Başladı: ${code}`);
-    });
-
-    // --- ODADAN AYRILMA/BAĞLANTI KOPMASI/İPTAL ---
-    socket.on('leaveRoom', ({ roomCode }) => {
-        const code = roomCode.toUpperCase();
-        const room = rooms[code];
-        if (room) {
-            // Eğer ayrılan kişi Host ise
-            if (room.hostId === socket.id) {
-                if (room.guestId) {
-                    io.to(room.guestId).emit('opponentLeft');
-                }
-                delete rooms[code]; // Odayı tamamen sil
-                console.log(`Oda Silindi (Host Ayrıldı): ${code}`);
-            } 
-            // Eğer ayrılan kişi Guest ise
-            else if (room.guestId === socket.id) {
-                room.playerCount = 1;
-                room.guestId = null;
-                room.guestUsername = null;
-                io.to(room.hostId).emit('opponentLeft');
-                console.log(`Misafir Ayrıldı: ${code}`);
-            }
-        }
-        socket.leave(code);
+        console.log(`[START] Oyun Başladı: ${code}`);
     });
 
     // --- OYUN İÇİ VERİ AKTARIMI ---
     socket.on('gameData', (data) => {
-        // Gelen veriyi (kart çevirme, skor vb.) odadaki diğer oyuncuya yolla
         const code = data.roomCode;
         if (code) {
-            // Veriyi gönderen hariç odadaki herkese yolla
             socket.to(code).emit('gameData', data); 
         }
     });
 
-    // --- BAĞLANTI KESİLMESİ ---
+    // --- BAĞLANTI KESİLMESİ / ODADAN AYRILMA ---
     socket.on('disconnect', () => {
-        console.log(`Kullanıcı bağlantısı kesildi: ${socket.id}`);
-        // Bağlantı kesildiğinde, bu kullanıcının hangi odada olduğunu bul ve odayı temizle
         for (const code in rooms) {
             const room = rooms[code];
             if (room.hostId === socket.id || room.guestId === socket.id) {
-                // Diğer oyuncuya bildirim gönderilmesi için 'leaveRoom' olayını tetikle
                 const opponentId = (room.hostId === socket.id) ? room.guestId : room.hostId;
+                
                 if (opponentId) {
-                    io.to(opponentId).emit('opponentLeft');
+                    io.to(opponentId).emit('opponentLeft', 'Rakibiniz bağlantıyı kesti. Lobiye dönülüyor.');
                 }
                 
-                // Odayı temizle
                 if (room.hostId === socket.id) {
                     delete rooms[code];
-                    console.log(`Oda Silindi (Host Disconnect): ${code}`);
                 } else if (room.guestId === socket.id) {
                     room.playerCount = 1;
                     room.guestId = null;
                     room.guestUsername = null;
-                    console.log(`Misafir Ayrıldı (Guest Disconnect): ${code}`);
                 }
             }
         }
     });
 });
 
-// Sunucuyu 3000 portunda başlat
-const PORT = 3000;
+// Sunucuyu başlatırken, Render'ın atadığı PORT'u kullan
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Sunucu http://localhost:${PORT} adresinde çalışıyor`);
+    console.log(`Sunucu port ${PORT} üzerinde çalışıyor.`);
 });
