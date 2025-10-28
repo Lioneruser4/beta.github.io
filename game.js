@@ -168,34 +168,35 @@ function updateStatusDisplay() {
 
     if (gameStage === 'SELECTION') {
         const myBombsCount = selectedBombs.length;
-        const opponentBombsReady = isHost ? gameData.guestBombs.length === 3 : gameData.hostBombs.length === 3;
-        const mySelectionComplete = myBombsCount === 3;
         
         // Hazır butonu başlangıçta gizli
         if (myBombsCount < 3) {
             turnStatusEl.textContent = `Bomba Seç: ${myBombsCount} / 3`;
             actionMessageEl.textContent = "3 adet gizli bombayı seçin.";
-            readyToPlayBtn.style.display = 'none'; 
+            // readyToPlayBtn null kontrolü eklendi
+            if (readyToPlayBtn) readyToPlayBtn.style.display = 'none'; 
             turnStatusEl.classList.remove('text-red-600');
             turnStatusEl.classList.add('text-green-600');
         } else {
             // Seçim tamamlandı
-            if (readyToPlayBtn.classList.contains('ready-sent')) {
-                 // Hazır sinyali gönderilmiş
-                 turnStatusEl.textContent = `Rakip bekleniyor...`;
-                 actionMessageEl.textContent = "Hazır sinyaliniz gönderildi. Rakip bekleniyor.";
-                 readyToPlayBtn.style.display = 'none'; 
-            } else {
-                 // Hazır butonu aktifleşti
-                 turnStatusEl.textContent = `HAZIR MISIN?`;
-                 actionMessageEl.textContent = "3 bombayı seçtin. BAŞLAMAK İÇİN HAZIR'a bas.";
-                 readyToPlayBtn.style.display = 'block';
-                 readyToPlayBtn.disabled = false; 
+            if (readyToPlayBtn) {
+                if (readyToPlayBtn.classList.contains('ready-sent')) {
+                     // Hazır sinyali gönderilmiş
+                     turnStatusEl.textContent = `Rakip bekleniyor...`;
+                     actionMessageEl.textContent = "Hazır sinyaliniz gönderildi. Rakip bekleniyor.";
+                     readyToPlayBtn.style.display = 'none'; 
+                } else {
+                     // Hazır butonu aktifleşti
+                     turnStatusEl.textContent = `HAZIR MISIN?`;
+                     actionMessageEl.textContent = "3 bombayı seçtin. BAŞLAMAK İÇİN HAZIR'a bas.";
+                     readyToPlayBtn.style.display = 'block';
+                     readyToPlayBtn.disabled = false; 
+                }
             }
         }
         
     } else if (gameStage === 'PLAY') {
-        readyToPlayBtn.style.display = 'none'; // Oyun başlayınca butonu gizle
+        if (readyToPlayBtn) readyToPlayBtn.style.display = 'none'; // Oyun başlayınca butonu gizle
         
         if (isMyTurn) {
             turnStatusEl.textContent = 'SIRA SENDE!';
@@ -211,7 +212,7 @@ function updateStatusDisplay() {
     }
     
     if (gameData.isGameOver) {
-        readyToPlayBtn.style.display = 'none';
+        if (readyToPlayBtn) readyToPlayBtn.style.display = 'none';
         turnStatusEl.textContent = "OYUN BİTTİ!";
         actionMessageEl.textContent = "Sonuç bekleniyor...";
     }
@@ -270,7 +271,7 @@ function handleCardClick(event) {
         
         // Bu kısım butonu aktif eder, sinyal gönderme butona basılınca olur.
         if (selectedBombs.length === 3) {
-            readyToPlayBtn.disabled = false;
+            if (readyToPlayBtn) readyToPlayBtn.disabled = false;
         }
     } else if (gameStage === 'PLAY') {
         const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
@@ -390,8 +391,10 @@ function endGame(winnerRole) {
             updateStatusDisplay();
             
             // Seviye atlandığında butonu sıfırla
-            readyToPlayBtn.classList.remove('ready-sent');
-            readyToPlayBtn.textContent = 'HAZIR';
+            if (readyToPlayBtn) {
+                readyToPlayBtn.classList.remove('ready-sent');
+                readyToPlayBtn.textContent = 'HAZIR';
+            }
         } else {
              showGlobalMessage("Oyunun tüm seviyeleri tamamlandı!", false);
              resetGame();
