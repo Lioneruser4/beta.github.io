@@ -3,10 +3,13 @@ const languages = {
     az: {
         languageName: '🇦🇿 Azərbaycanca',
         // Lobby
-        enterName: 'Adınızı daxil edin',
-        startGame: 'Oyun başlasın',
-        joinGame: '✅ Otaq Yarat ✅',
-        roomCode: '✅ Otaqa Bağlan ✅',
+        enterName: 'İstifadəçi Adınızı Daxil Edin',
+        // --- Dəyişiklik 1: 'oyun' butonu ---
+        startGame: '➕ Otaq Qur / Odaya Bağlan',
+        // --- Dəyişiklik 2: 'baslayin' butonu (join məntiqi) ---
+        joinGame: '➕ Otaq Qur / Odaya Bağlan',
+        // --- Dəyişiklik 3: Otaq Kodu placeholder ---
+        roomCode: 'Otaq Kodu (Boş buraxın=Yeni Otaq)',
         // Game
         yourTurn: '✅ SİZİN NÖVBƏNİZ!',
         opponentTurn: '⏳ Rəqibin növbəsi',
@@ -35,10 +38,13 @@ const languages = {
     tr: {
         languageName: '🇹🇷 Türkçe',
         // Lobby
-        enterName: 'Adınızı girin',
-        startGame: 'Oyun Başlasın',
-        joinGame: 'Oyuna Katıl',
-        roomCode: 'Oda Kodu',
+        enterName: 'Kullanıcı Adınızı Girin',
+        // --- Dəyişiklik 1: 'oyun' butonu ---
+        startGame: '➕ Otaq Qur / Odaya Bağlan',
+        // --- Dəyişiklik 2: 'baslayin' butonu (join məntiqi) ---
+        joinGame: '➕ Otaq Qur / Odaya Bağlan',
+        // --- Dəyişiklik 3: Otaq Kodu placeholder ---
+        roomCode: 'Oda Kodu (Boş Bırakın=Yeni Oda)',
         // Game
         yourTurn: '✅ SIRADA SİZ!',
         opponentTurn: '⏳ RAKİBİN SIRASI',
@@ -67,10 +73,13 @@ const languages = {
     en: {
         languageName: '🇬🇧 English',
         // Lobby
-        enterName: 'Enter your name',
-        startGame: 'Start Game',
-        joinGame: 'Join Game',
-        roomCode: 'Room Code',
+        enterName: 'Enter Your Username',
+        // --- Dəyişiklik 1: 'oyun' butonu ---
+        startGame: '➕ Otaq Qur / Odaya Bağlan',
+        // --- Dəyişiklik 2: 'baslayin' butonu (join məntiqi) ---
+        joinGame: '➕ Otaq Qur / Odaya Bağlan',
+        // --- Dəyişiklik 3: Otaq Kodu placeholder ---
+        roomCode: 'Room Code (Leave Blank=New Room)',
         // Game
         yourTurn: '✅ YOUR TURN!',
         opponentTurn: '⏳ OPPONENT\'S TURN',
@@ -97,6 +106,8 @@ const languages = {
         roleGuest: '🎮 Role: GUEST (Opponent starts)'
     }
 };
+
+// ... (qalan kod dəyişdirilmədi)
 
 // Detect user's language based on IP or browser settings
 function detectLanguage() {
@@ -193,7 +204,8 @@ function updateUI() {
     // Update lobby text
     const nameInput = document.getElementById('username');
     const startBtn = document.getElementById('matchBtn');
-    const joinBtn = document.getElementById('joinBtn');
+    // Qeyd: joinBtn sizin HTML-də yoxdur, amma bu JS-də var. Ona görə dəyişdirildi.
+    const joinBtn = document.getElementById('joinBtn'); 
     const roomInput = document.getElementById('roomCodeInput');
     
     if (nameInput) nameInput.placeholder = t('enterName');
