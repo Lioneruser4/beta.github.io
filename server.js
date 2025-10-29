@@ -109,50 +109,52 @@ io.on('connection', (socket) => {
         }
     });
     
-    // Odaya katılma
+    // Basit odaya katılma işlemi
     socket.on('joinRoom', ({ username, roomCode }) => {
-        try {
-            const room = rooms.get(roomCode);
-            
-            // Oda yoksa hata döndür
-            if (!room) {
-                socket.emit('joinFailed', 'Böyle bir oda bulunamadı.');
-                return;
-            }
-            
-            // Oda doluysa hata döndür
-            if (room.players.length >= 2) {
-                socket.emit('joinFailed', 'Oda dolu.');
-                return;
-            }
-            
-            // Oyuncuyu odaya ekle
-            const player = {
-                id: socket.id,
-                username: username || 'Oyuncu-' + socket.id.substring(0, 4),
-                isHost: false,
-                score: 0,
-                lives: 3
-            };
-            
-            room.players.push(player);
-            room.status = 'playing';
-            
-            // İkinci oyuncuyu odaya ekle
-            socket.join(roomCode);
-            
-            // Her iki oyuncuya da oyun başladı bilgisini gönder
+        console.log('Odaya katılma isteği:', username, roomCode);
+        
+        // Odayı bul
+        const room = rooms.get(roomCode);
+        
+        // Oda yoksa hata gönder
+        if (!room) {
+            console.log('Oda bulunamadı:', roomCode);
+            socket.emit('joinFailed', 'Bu oda bulunamadı. Lütfen kodu kontrol edin.');
+            return;
+        }
+        
+        // Oda dolu mu kontrol et
+        if (room.players.length >= 2) {
+            console.log('Oda dolu:', roomCode);
+            socket.emit('joinFailed', 'Bu oda zaten dolu.');
+            return;
+        }
+        
+        // Yeni oyuncuyu ekle
+        const player = {
+            id: socket.id,
+            username: username || 'Oyuncu-' + socket.id.substring(0, 4),
+            isHost: false,
+            score: 0,
+            lives: 3
+        };
+        
+        room.players.push(player);
+        socket.join(roomCode);
+        
+        console.log(`Kullanıcı odaya eklendi: ${player.username} (${roomCode})`);
+        
+        // İkinci oyuncu geldiğinde oyunu başlat
+        if (room.players.length === 2) {
+            console.log('İki oyuncu da hazır, oyun başlıyor:', roomCode);
             io.to(roomCode).emit('gameStart', {
                 players: room.players,
                 roomCode: roomCode,
                 level: room.level
             });
-            
-            console.log(`Odaya katılım: ${roomCode} - Kullanıcı: ${username}`);
-            
-        } catch (error) {
-            console.error('Odaya katılma hatası:', error);
-            socket.emit('joinFailed', 'Odaya katılırken bir hata oluştu.');
+        } else {
+            // İlk oyuncuya onay gönder
+            socket.emit('joinSuccess', { roomCode });
         }
     });
     
