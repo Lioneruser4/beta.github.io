@@ -438,8 +438,8 @@
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
 
-        // Render URL'niz: Lütfen bu kısmı KENDİ URL'nizle değiştirin!
-        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
+        // Otomatik olarak mevcut domaini kullan
+        const LIVE_SERVER_URL = window.location.origin;
         let socket;
         let clientRoomCode = '';
         
@@ -454,10 +454,21 @@
 
         function connectToServer() {
             try {
-                socket = io(LIVE_SERVER_URL, {
-                    transports: ['websocket', 'polling'], 
-                    reconnectionAttempts: 5, 
-                    timeout: 20000 
+                const socket = io(LIVE_SERVER_URL, {
+                    reconnection: true,
+                    reconnectionAttempts: 5,
+                    reconnectionDelay: 1000,
+                    timeout: 20000
+                });
+
+                // Hata yönetimi
+                socket.on('connect_error', (error) => {
+                    console.error('Bağlantı hatası:', error);
+                    showGlobalMessage('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin ve sayfayı yenileyin.', true);
+                });
+
+                socket.on('connect_timeout', () => {
+                    showGlobalMessage('Sunucu bağlantısı zaman aşımına uğradı. Lütfen tekrar deneyin.', true);
                 });
 
                 socket.on('connect', () => {
