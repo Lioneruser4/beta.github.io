@@ -438,9 +438,19 @@
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
 
-        // Render URL'niz: Lütfen bu kısmı KENDİ URL'nizle değiştirin!
-        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
-        let socket;
+        // Sunucu bağlantı URL'si
+        const LIVE_SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://beta-github-io.onrender.com';
+        console.log('Sunucuya bağlanılıyor:', LIVE_SERVER_URL);
+        
+        // Socket bağlantısını oluştur
+        const socket = io(LIVE_SERVER_URL, {
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+            timeout: 20000,
+            transports: ['websocket']
+        });
+        
         let clientRoomCode = '';
         
         function validateInput() {
@@ -452,32 +462,71 @@
             return username;
         }
 
-        function connectToServer() {
-            try {
-                socket = io(LIVE_SERVER_URL, {
-                    transports: ['websocket', 'polling'], 
-                    reconnectionAttempts: 5, 
-                    timeout: 20000 
-                });
+        // Socket event listeners
+        socket.on('connect', () => {
+            console.log('Sunucuya bağlandı. Socket ID:', socket.id);
+            showGlobalMessage('Sunucuya bağlanıldı!', false);
+            showScreen('lobby');
+        });
 
-                socket.on('connect', () => {
-                    UIElements.showGlobalMessage('Sunucuya bağlandı. Eşleşmeye hazırsınız.', false);
-                    showScreen('lobby');
-                });
-                
-                socket.on('connect_error', (err) => {
-                    console.error('Bağlantı Hatası:', err);
-                    UIElements.showGlobalMessage('HATA: Sunucuya erişilemiyor.', true);
-                    showScreen('lobby');
-                });
-                
-                socket.on('disconnect', () => {
-                    UIElements.showGlobalMessage('Bağlantı kesildi. Tekrar bağlanmaya çalışılıyor...', true);
-                });
+        socket.on('connect_error', (error) => {
+            console.error('Bağlantı hatası:', error);
+            showGlobalMessage('Sunucuya bağlanılamadı. Lütfen sayfayı yenileyin.', true);
+            showScreen('lobby');
+        });
 
-                // --- Eşleşme Olayları ---
-                socket.on('roomCreated', (code) => {
-                    document.getElementById('roomCodeDisplay').textContent = code;
+        socket.on('disconnect', (reason) => {
+            console.log('Bağlantı kesildi:', reason);
+            if (reason === 'io server disconnect') {
+                // Sunucu tarafından bağlantı kesildiyse yeniden bağlanmayı dene
+                socket.connect();
+            }
+        });
+
+        // Oda oluşturulduğunda
+        socket.on('roomCreated', (roomCode) => {
+            console.log('Oda oluşturuldu:', roomCode);
+            clientRoomCode = roomCode;
+            document.getElementById('waitTitle').textContent = 'Rakip Bekleniyor...';
+            document.getElementById('roomCodeDisplay').textContent = roomCode;
+            document.getElementById('codeArea').classList.remove('hidden');
+        });
+
+        // Odaya katıldığında
+        socket.on('joinedRoom', (roomCode) => {
+            console.log('Odaya katıldı:', roomCode);
+            clientRoomCode = roomCode;
+            document.getElementById('waitTitle').textContent = 'Oyun Başlatılıyor...';
+        });
+
+        // Oyun başladığında
+        socket.on('gameStart', ({ players, roomCode }) => {
+            const opponent = players.find(p => p.id !== socket.id);
+            const self = players.find(p => p.id === socket.id);
+            
+            if (opponent && self) {
+                clientRoomCode = roomCode;
+                const selfName = UIElements.usernameInput.value.trim();
+                setupSocketHandlers(socket, roomCode, self.isHost, opponent.username, selfName);
+                showScreen('game');
+            } else {
+                showGlobalMessage('Oyun başlatılırken bir hata oluştu.', true);
+                showScreen('lobby');
+            }
+        });
+
+        // Bağlantı kesildiğinde
+        socket.on('disconnect', () => {
+            UIElements.showGlobalMessage('Bağlantı kesildi. Tekrar bağlanmaya çalışılıyor...', true);
+        });
+
+        // Oda kodu kopyalama
+        document.getElementById('copyCodeBtn').addEventListener('click', () => {
+            const textToCopy = document.getElementById('roomCodeDisplay').textContent;
+            navigator.clipboard.writeText(textToCopy)
+                .then(() => UIElements.showGlobalMessage('Oda Kodu Kopyalandı!', false))
+                .catch(() => UIElements.showGlobalMessage('Kopyalama başarısız.', true));
+        });
                     document.getElementById('waitTitle').textContent = 'Odanız Kuruldu!';
                     document.getElementById('codeArea').classList.remove('hidden');
                     document.getElementById('waitStatus').textContent = 'Oda kodunu arkadaşınıza gönderin ve bağlanmasını bekleyin.';
@@ -498,12 +547,40 @@
                     setupSocketHandlers(socket, roomCode, self.isHost, opponent.username, selfName);
                 });
 
-            } catch (e) {
-                console.error('Socket.IO genel hatası:', e);
-                UIElements.showGlobalMessage('Kritik bağlantı hatası oluştu.', true);
             }
+            return username;
         }
-        
+
+        function createRoom(username) {
+            console.log('Oda oluşturuluyor...');
+            showScreen('wait');
+            document.getElementById('waitTitle').textContent = 'Oda Kuruluyor...';
+            document.getElementById('codeArea').classList.add('hidden');
+            
+            socket.emit('createRoom', { username }, (response) => {
+                if (response && response.error) {
+                    console.error('Oda oluşturma hatası:', response.error);
+                    showGlobalMessage(response.error, true);
+                    showScreen('lobby');
+                }
+            });
+        }
+
+        function joinRoom(username, roomCode) {
+            console.log('Odaya katılım deniyor:', { username, roomCode });
+            showScreen('wait');
+            document.getElementById('waitTitle').textContent = 'Odaya Katılıyor...';
+            document.getElementById('codeArea').classList.add('hidden');
+            
+            socket.emit('joinRoom', { username, roomCode: roomCode.toUpperCase() }, (response) => {
+                if (response && response.error) {
+                    console.error('Odaya katılma hatası:', response.error);
+                    showGlobalMessage(response.error, true);
+                    showScreen('lobby');
+                }
+            });
+        }
+
         // --- Chat Yardımcıları ---
         const chatMessagesEl = document.getElementById('chatMessages');
         const chatInputEl = document.getElementById('chatInput');
@@ -621,38 +698,32 @@
         document.getElementById('chatInput').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') sendChat();
         });
+        
+        // Oyun sonu butonları
+        document.getElementById('cancelBtn').addEventListener('click', UIElements.resetGame);
+        document.getElementById('endGameBtn').addEventListener('click', UIElements.resetGame);
 
         // --- Olay Dinleyicileri ---
         UIElements.createBtn.addEventListener('click', () => {
             const username = validateInput();
             if (!username) return;
-            showScreen('wait');
-            document.getElementById('waitTitle').textContent = 'Oda Kuruluyor...';
-            document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
-            document.getElementById('codeArea').classList.add('hidden');
-            socket.emit('createRoom', { username });
+            createRoom(username);
         });
 
         UIElements.joinBtn.addEventListener('click', () => {
             const username = validateInput();
-            if (!username) return;
             const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
-            if (!roomCode) { UIElements.showGlobalMessage('Oda kodu girin.', true); return; }
-            showScreen('wait');
-            document.getElementById('waitTitle').textContent = `Odaya Katılım: ${roomCode}`;
-            document.getElementById('waitStatus').textContent = 'Bağlanılıyor...';
-            document.getElementById('codeArea').classList.add('hidden');
-            socket.emit('joinRoom', { username, roomCode });
+            
+            if (!username) return;
+            if (!roomCode || roomCode.length !== 4) {
+                showGlobalMessage('Lütfen geçerli bir oda kodu girin (4 karakter)', true);
+                return;
+            }
+            
+            joinRoom(username, roomCode);
         });
 
-        document.getElementById('cancelBtn').addEventListener('click', UIElements.resetGame);
-        document.getElementById('endGameBtn').addEventListener('click', UIElements.resetGame);
-        
-        document.getElementById('copyCodeBtn').addEventListener('click', () => {
-            const textToCopy = document.getElementById('roomCodeDisplay').textContent;
-            navigator.clipboard.writeText(textToCopy)
-                .then(() => UIElements.showGlobalMessage('Oda Kodu Kopyalandı!', false))
-                .catch(() => UIElements.showGlobalMessage('Kopyalama başarısız.', true));
+        // Oda kopyalama butonu zaten yukarıda tanımlandı
         });
 
         document.addEventListener('DOMContentLoaded', connectToServer);
