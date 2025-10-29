@@ -35,10 +35,28 @@ function generateRoomCode() {
 function initializeRoomGameData(room, levelIndex = 0) {
     const boardSize = LEVELS[levelIndex];
     
+    // Rastgele emoji içeriği oluştur
+    let contents = [];
+    const pairCount = boardSize / 2;
+    // 5 emojiden 2, 3 veya 4 çift seçilir (5. seviye yok)
+    const availableEmoticons = EMOTICONS.slice(0, Math.ceil(boardSize / 4) + 2); 
+    
+    // Eşli kartları oluştur
+    for (let i = 0; i < pairCount; i++) {
+        const emoji = availableEmoticons[i % availableEmoticons.length];
+        contents.push(emoji, emoji);
+    }
+    
+    // Kartları karıştır (Fisher-Yates)
+    for (let i = contents.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [contents[i], contents[j]] = [contents[j], contents[i]];
+    }
+    
     // Oyun durumunu sunucuda sakla
     room.gameData = {
         level: levelIndex + 1,
-        board: Array(boardSize).fill(null).map(() => ({ opened: false, content: '?' })),
+        board: contents.map(content => ({ opened: false, content: content })), // Artık içerik dolu
         turn: 0,   // 0 = Host, 1 = Guest
         hostLives: 2,
         guestLives: 2,
@@ -73,8 +91,13 @@ io.on('connection', (socket) => {
         const code = roomCode.toUpperCase();
         const room = rooms[code];
 
-        if (!room || room.playerCount >= 2) {
-            socket.emit('joinFailed', 'Oda bulunamadı veya dolu.');
+        if (!room) {
+            socket.emit('joinFailed', 'Oda bulunamadı.');
+            return;
+        }
+        
+        if (room.playerCount >= 2) {
+             socket.emit('joinFailed', 'Oda dolu.');
             return;
         }
 
@@ -97,7 +120,7 @@ io.on('connection', (socket) => {
     // Bomb Seçimi Olayı
     socket.on('bombSelectionComplete', ({ roomCode, isHost: selectionHost, bombs }) => {
         const room = rooms[roomCode];
-        if (!room || room.gameData.gameStage !== 'SELECTION') return;
+        if (!room || room.gameData.gameStage !== 'SELECTION' || bombs.length !== BOMB_COUNT) return;
 
         if (selectionHost) {
             room.gameData.hostBombs = bombs;
@@ -113,7 +136,7 @@ io.on('connection', (socket) => {
             // Tüm oyunculara oyunun başladığını bildir
             io.to(roomCode).emit('selectionComplete', { gameStage: 'PLAY', turn: room.gameData.turn });
         } else {
-            // Rakip bombasını seçti bilgisini gönder (Client'taki "bekleniyor..." durumunu güncellemek için)
+            // Rakip bombasını seçti bilgisini gönder
             socket.to(roomCode).emit('opponentSelectionMade');
         }
     });
@@ -137,19 +160,22 @@ io.on('connection', (socket) => {
 
         room.gameData.isHandlingMove = true; // Hareketi kilitle
         
-        // Kartı Açma ve Can Kontrolü
+        // Kartı Açma
         gameData.board[cardIndex].opened = true;
         gameData.cardsLeft--;
 
-        const isHit = isHostTurn ? gameData.guestBombs.includes(cardIndex) : gameData.hostBombs.includes(cardIndex);
-        let message = isHit ? 'BOMBA VURDU!' : 'Emoji Açıldı!';
+        const isHit = isHostTurn 
+            ? gameData.guestBombs.includes(cardIndex) // Host oynuyorsa, Guest'in bombasına basar mı?
+            : gameData.hostBombs.includes(cardIndex);  // Guest oynuyorsa, Host'un bombasına basar mı?
+        
+        let hitBomb = false;
 
         if (isHit) {
             if (isHostTurn) { gameData.hostLives--; } else { gameData.guestLives--; }
             gameData.board[cardIndex].content = '💣';
-        } else {
-            gameData.board[cardIndex].content = EMOTICONS[Math.floor(Math.random() * EMOTICONS.length)];
-        }
+            hitBomb = true;
+        } 
+        // Not: Emojiler initializeRoomGameData'da atanmıştır, burada tekrar atamaya gerek yoktur.
         
         // Sırayı Değiştir
         const nextTurn = gameData.turn === 0 ? 1 : 0;
@@ -175,10 +201,9 @@ io.on('connection', (socket) => {
             newBoardState: gameData.board,
             turn: gameData.turn,
             hostLives: gameData.hostLives,
-            guestLives: gameData.guestLives, // Düzeltildi
+            guestLives: gameData.guestLives,
             cardsLeft: gameData.cardsLeft,
-            message: message,
-            hitBomb: isHit,
+            hitBomb: hitBomb,
             winner: winner 
         });
 
@@ -188,13 +213,16 @@ io.on('connection', (socket) => {
     // Seviye Atlama Sinyali (Sadece Host gönderir)
     socket.on('nextLevel', ({ roomCode }) => {
         const room = rooms[roomCode];
-        // Host ve seviye limitini aşmamışsa
-        if (!room || socket.id !== room.hostId || room.gameData.level >= LEVELS.length) return; 
+        if (!room || socket.id !== room.hostId) return; 
 
-        const newLevelIndex = room.gameData.level; 
-        initializeRoomGameData(room, newLevelIndex); 
+        const currentLevelIndex = room.gameData.level - 1;
         
-        io.to(roomCode).emit('levelStart', { initialGameData: room.gameData, newLevel: room.gameData.level });
+        if (currentLevelIndex < LEVELS.length - 1) { // Son seviyeye gelmediyse
+            const newLevelIndex = currentLevelIndex + 1;
+            initializeRoomGameData(room, newLevelIndex); 
+            
+            io.to(roomCode).emit('levelStart', { initialGameData: room.gameData, newLevel: room.gameData.level });
+        }
     });
 
     // Bağlantı Kesilmesi
@@ -208,14 +236,13 @@ io.on('connection', (socket) => {
                     io.to(opponentId).emit('opponentLeft', 'Rakibiniz bağlantıyı kesti. Lobiye dönülüyor.');
                 }
                 
-                // Odayı Temizle/Yenile
+                // Host ayrılırsa odayı sil, Guest ayrılırsa Host'a tekrar bekleme moduna geçmesi için izin ver
                 if (room.hostId === socket.id) {
-                    delete rooms[code]; // Host ayrılırsa odayı tamamen sil
+                    delete rooms[code]; 
                 } else if (room.guestId === socket.id) {
                     room.playerCount = 1;
                     room.guestId = null;
                     room.guestUsername = null;
-                    // Host'a bilgi gönderilebilir: "Rakip ayrıldı, yeni oyuncu bekleniyor"
                 }
             }
         }
