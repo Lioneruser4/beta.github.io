@@ -420,9 +420,106 @@ export function resetGame() {
 
 // Lobi Butonlarını dışarıdan erişilebilir yapıyoruz (index.html'in kullanması için)
 export const UIElements = {
-    matchBtn: document.getElementById('matchBtn'), 
+    matchBtn: document.getElementById('matchBtn'),
+    createRoomBtn: document.getElementById('createRoomBtn'),
+    showJoinRoomBtn: document.getElementById('showJoinRoomBtn'),
+    joinRoomBtn: document.getElementById('joinRoomBtn'),
+    roomCodeContainer: document.getElementById('roomCodeContainer'),
     roomCodeInput: document.getElementById('roomCodeInput'), 
-    usernameInput: document.getElementById('username'), 
-    showGlobalMessage, 
-    resetGame
+    usernameInput: document.getElementById('username'),
+    showGlobalMessage: showGlobalMessage,
+    showScreen: showScreen,
+    waitTitle: document.getElementById('waitTitle'),
+    codeArea: document.getElementById('codeArea'),
+    roomCodeDisplay: document.getElementById('roomCodeDisplay'),
+    copyCodeBtn: document.getElementById('copyCodeBtn'),
+    waitStatus: document.getElementById('waitStatus'),
+    cancelBtn: document.getElementById('cancelBtn')
 };
+
+// Yeni oda oluşturma butonu
+document.getElementById('createRoomBtn').addEventListener('click', () => {
+    const username = UIElements.usernameInput.value.trim();
+    if (username.length < 2) {
+        showGlobalMessage('Lütfen geçerli bir kullanıcı adı girin (en az 2 karakter)', true);
+        return;
+    }
+    
+    // Eğer zaten bir oda kodu varsa temizle
+    UIElements.roomCodeInput.value = '';
+    
+    // Sunucuya yeni oda oluşturma isteği gönder
+    socket.emit('createRoom', { username });
+    
+    // Bekleme ekranını göster
+    UIElements.waitTitle.textContent = 'Oda Kuruluyor...';
+    UIElements.codeArea.classList.add('hidden');
+    showScreen('wait');
+});
+
+// Odaya katıl butonuna basıldığında
+UIElements.showJoinRoomBtn.addEventListener('click', () => {
+    UIElements.roomCodeContainer.classList.remove('hidden');
+    UIElements.showJoinRoomBtn.classList.add('hidden');
+    UIElements.joinRoomBtn.classList.remove('hidden');
+    UIElements.createRoomBtn.classList.add('opacity-50', 'pointer-events-none');
+});
+
+// Odaya bağlan butonuna basıldığında
+UIElements.joinRoomBtn.addEventListener('click', () => {
+    const username = UIElements.usernameInput.value.trim();
+    const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
+    
+    if (username.length < 2) {
+        showGlobalMessage('Lütfen geçerli bir kullanıcı adı girin (en az 2 karakter)', true);
+        return;
+    }
+    
+    if (roomCode.length !== 4) {
+        showGlobalMessage('Lütfen geçerli bir oda kodu girin (4 karakter)', true);
+        return;
+    }
+    
+    // Sunucuya odaya katılma isteği gönder
+    socket.emit('joinRoom', { username, roomCode });
+    
+    // Bekleme ekranını göster
+    UIElements.waitTitle.textContent = `Odaya Katılılıyor: ${roomCode}`;
+    UIElements.codeArea.classList.add('hidden');
+    showScreen('wait');
+});
+
+// İptal butonu
+UIElements.cancelBtn.addEventListener('click', () => {
+    if (socket) {
+        socket.emit('cancelMatchmaking');
+    }
+    showScreen('lobby');
+    resetUI();
+});
+
+// Oda kodunu kopyala butonu
+UIElements.copyCodeBtn.addEventListener('click', () => {
+    const roomCode = UIElements.roomCodeDisplay.textContent;
+    navigator.clipboard.writeText(roomCode).then(() => {
+        const originalText = UIElements.copyCodeBtn.textContent;
+        UIElements.copyCodeBtn.textContent = 'Kopyalandı!';
+        UIElements.copyCodeBtn.classList.add('bg-green-600', 'hover:bg-green-500');
+        UIElements.copyCodeBtn.classList.remove('bg-gray-600', 'hover:bg-gray-500');
+        
+        setTimeout(() => {
+            UIElements.copyCodeBtn.textContent = originalText;
+            UIElements.copyCodeBtn.classList.remove('bg-green-600', 'hover:bg-green-500');
+            UIElements.copyCodeBtn.classList.add('bg-gray-600', 'hover:bg-gray-500');
+        }, 2000);
+    });
+});
+
+// UI'ı sıfırlama fonksiyonu
+function resetUI() {
+    UIElements.roomCodeContainer.classList.add('hidden');
+    UIElements.showJoinRoomBtn.classList.remove('hidden');
+    UIElements.joinRoomBtn.classList.add('hidden');
+    UIElements.createRoomBtn.classList.remove('opacity-50', 'pointer-events-none');
+    UIElements.roomCodeInput.value = '';
+}
