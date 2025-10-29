@@ -64,14 +64,10 @@
         }
         
         /* Utility */
-        .btn { width: 100%; font-size: 1.25rem; font-weight: 800; padding: 0.75rem 1.5rem; border-radius: 0.75rem; box-shadow: var(--shadow); transition: all 200ms ease-in-out; }
-        .btn-primary { background: #2563eb; color: #fff; }
-        .btn-primary:hover { background: #3b82f6; }
-        .btn:active { transform: scale(0.98); }
-        .input-field { width: 100%; font-size: 1.125rem; background: #e5e7eb; color: #111827; border: 2px solid #9ca3af; border-radius: 0.5rem; padding: 0.75rem; text-align: center; }
-        .input-field:focus { outline: none; border-color: #3b82f6; }
-        .code-display { font-size: 2rem; font-weight: 900; padding: 1rem; background: #1f2937; color: #f59e0b; border-radius: 0.5rem; letter-spacing: 0.3rem; }
-        .screen { min-height: 100vh; }
+        .btn { @apply w-full text-xl font-bold py-3 px-6 rounded-xl shadow-lg transition-all duration-200 ease-in-out; }
+        .btn-primary { @apply bg-blue-600 text-white hover:bg-blue-500 active:scale-95; }
+        .input-field { @apply w-full text-lg bg-gray-200 text-gray-900 border-2 border-gray-400 rounded-lg p-3 text-center placeholder-gray-500 focus:outline-none focus:border-blue-500; }
+        .code-display { @apply text-4xl font-extrabold p-4 bg-gray-800 text-yellow-300 rounded-lg tracking-widest; }
         
         /* Global Mesaj */
         #globalMessage.show { 
@@ -173,144 +169,6 @@
         .vibrate {
             animation: vibrate 0.1s linear infinite;
         }
-
-        /* CHAT STİLLERİ */
-        /* Yeni Sohbet Stilleri */
-        .chat-container { 
-            width: 100%; 
-            background: #f8f9fa; 
-            border-radius: 12px; 
-            border: 1px solid #e0e0e0; 
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            height: 280px;
-        }
-        .chat-header { 
-            padding: 12px 16px; 
-            font-size: 0.95rem; 
-            font-weight: 600;
-            color: #2d3748; 
-            border-bottom: 1px solid #e2e8f0; 
-            background: #ffffff; 
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .chat-header:before {
-            content: '';
-            display: block;
-            width: 10px;
-            height: 10px;
-            background: #48bb78;
-            border-radius: 50%;
-        }
-        .chat-messages { 
-            flex: 1; 
-            overflow-y: auto; 
-            padding: 16px; 
-            background: #f0f2f5;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        .chat-input { 
-            display: flex; 
-            align-items: center; 
-            gap: 8px; 
-            padding: 12px 16px; 
-            border-top: 1px solid #e2e8f0; 
-            background: #ffffff; 
-        }
-        .chat-input input {
-            flex: 1;
-            padding: 10px 16px;
-            border: 1px solid #e2e8f0;
-            border-radius: 20px;
-            font-size: 0.95rem;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        .chat-input input:focus {
-            border-color: #4299e1;
-            box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.2);
-        }
-        .chat-input button {
-            background: #4299e1;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .chat-input button:hover {
-            background: #3182ce;
-        }
-        .bubble { 
-            display: inline-block; 
-            padding: 10px 14px; 
-            border-radius: 18px; 
-            max-width: 80%; 
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-            word-break: break-word;
-            line-height: 1.4;
-            position: relative;
-            animation: messageIn 0.2s ease-out;
-            font-size: 0.95rem;
-        }
-        @keyframes messageIn {
-            from { transform: translateY(5px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        .bubble.me { 
-            background: #4299e1; 
-            color: white;
-            border-top-right-radius: 4px;
-            margin-left: auto;
-        }
-        .bubble.other { 
-            background: #ffffff; 
-            color: #1a202c;
-            border-top-left-radius: 4px;
-            margin-right: auto;
-            border: 1px solid #e2e8f0;
-        }
-        .msg-row { 
-            display: flex; 
-            margin: 4px 0; 
-            gap: 8px;
-            max-width: 90%;
-        }
-        .msg-row.me { 
-            margin-left: auto;
-            flex-direction: row-reverse;
-        }
-        .msg-row.other {
-            margin-right: auto;
-        }
-        .msg-meta { 
-            font-size: 0.7rem; 
-            color: #718096; 
-            margin-top: 4px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .msg-row.me .msg-meta {
-            justify-content: flex-end;
-        }
-
-        /* Küçük toast (chat bildirimi) */
-        #chatToast { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 60; display: none; }
-        #chatToast.show { display: block; animation: fadeInOut 3s ease forwards; }
-        .chat-toast-content { background: rgba(17,24,39,0.9); color: #fff; padding: 8px 12px; border-radius: 14px; font-size: 12px; box-shadow: var(--shadow); }
-        @keyframes fadeInOut { 0% { opacity: 0; transform: translate(-50%, 10px);} 10% { opacity: 1; transform: translate(-50%, 0);} 80% { opacity: 1;} 100% { opacity: 0; transform: translate(-50%, 10px);} }
     </style>
 </head>
 <body class="bg-gray-900 select-none">
@@ -333,29 +191,10 @@
             </ul>
         </div>
         
-        <div class="w-full space-y-3">
-            <input type="text" id="username" class="input-field w-full" placeholder="Kullanıcı Adınızı Girin" maxlength="15">
-            
-            <button id="createBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-colors">
-                ➕ Yeni Oda Kur
-            </button>
-            
-            <div class="relative flex items-center">
-                <div class="absolute left-3 text-gray-500">#</div>
-                <input 
-                    type="text" 
-                    id="roomCodeInput" 
-                    class="input-field w-full pl-8 pr-4 py-3 text-center tracking-widest font-mono" 
-                    placeholder="ODA KODU" 
-                    maxlength="6" 
-                    style="letter-spacing: 0.2em;"
-                />
-            </div>
-            
-            <button id="joinBtn" class="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md transition-colors">
-                🔗 Odaya Katıl
-            </button>
-        </div>
+        <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adınızı Girin" maxlength="15">
+        <input type="text" id="roomCodeInput" class="input-field uppercase" placeholder="Oda Kodu (Boş bırak=Yeni Oda)" maxlength="6">
+        
+        <button id="matchBtn" class="btn btn-primary">🎮 Oyuna Başla</button>
     </div>
     
     <div id="waitScreen" class="screen space-y-6 container">
@@ -374,7 +213,7 @@
         
         <div class="flex justify-between w-full text-gray-800 font-bold p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border-2 border-gray-300">
             <div class="text-center">
-                <p class="text-xs text-gray-600" id="myName">SEN</p>
+                <p class="text-xs text-gray-600">SEN</p>
                 <p id="myLives" class="text-2xl text-green-600">❤️❤️</p>
             </div>
             <div class="text-center">
@@ -382,7 +221,7 @@
                 <p id="opponentName" class="text-lg text-blue-600 font-bold"></p>
             </div>
             <div class="text-center">
-                <p class="text-xs text-gray-600">RAKİP</p>
+                <p class="text-xs text-gray-600">CANLAR</p>
                 <p id="opponentLives" class="text-2xl text-green-600">❤️❤️</p>
             </div>
         </div>
@@ -394,55 +233,18 @@
             
             <div id="gameBoard" class="grid w-full max-w-sm mx-auto">
                 </div>
+            
+        </div>
         
-        </div>
-
-        <!-- CHAT BÖLMESİ -->
-        <div class="chat-container">
-            <div class="chat-header">
-                <span>💬 Sohbet</span>
-                <span id="typingIndicator" class="text-xs font-normal text-gray-500 ml-2 hidden">
-                    <span class="typing-dots">
-                        <span>.</span><span>.</span><span>.</span>
-                    </span>
-                </span>
-            </div>
-            <div id="chatMessages" class="chat-messages">
-                <div class="flex-1 flex items-center justify-center text-gray-400 text-sm">
-                    Sohbet başlatmak için mesaj yazın...
-                </div>
-            </div>
-            <div class="chat-input">
-                <input 
-                    id="chatInput" 
-                    type="text" 
-                    class="flex-1 input-field !text-base !py-2 !px-4 !bg-white !border-gray-200 !text-gray-900 placeholder-gray-400" 
-                    placeholder="Mesaj yaz..." 
-                    maxlength="300" 
-                    autocomplete="off"
-                />
-                <button id="chatSend" class="w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd" />
-                    </svg>
-                </button>
-            </div>
-        </div>
-    
         <button id="endGameBtn" class="btn bg-red-600 hover:bg-red-500 text-white text-sm py-2 max-w-xs">🚪 Oyundan Çık</button>
     </div>
-
-    <!-- CHAT TOAST -->
-    <div id="chatToast"><div class="chat-toast-content" id="chatToastText"></div></div>
 
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
 
-        // Gelişmiş bağlantı ayarları
-        const LIVE_SERVER_URL = window.location.protocol + '//' + window.location.hostname + ':3000';
-        console.log('Sunucu adresi:', LIVE_SERVER_URL);
+        // Render URL'niz: Lütfen bu kısmı KENDİ URL'nizle değiştirin!
+        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
         let socket;
-        let clientRoomCode = '';
         
         function validateInput() {
             const username = UIElements.usernameInput.value.trim();
@@ -455,35 +257,10 @@
 
         function connectToServer() {
             try {
-                // Socket bağlantısını global değişkene ata
                 socket = io(LIVE_SERVER_URL, {
-                    reconnection: true,
-                    reconnectionAttempts: 10,
-                    reconnectionDelay: 3000,
-                    timeout: 20000,
-                    forceNew: true,
-                    transports: ['websocket'] // Sadece WebSocket kullan
-                });
-                
-                // Bağlantı durumunu logla
-                console.log('Socket bağlantısı başlatılıyor...');
-
-                // Hata yönetimi
-                socket.on('connect_error', (error) => {
-                    console.error('Bağlantı hatası:', error);
-                    const errorMsg = `Sunucuya bağlanılamadı (${error.message || 'Bilinmeyen hata'}). Lütfen sayfayı yenileyin.`;
-                    console.error(errorMsg);
-                    showGlobalMessage(errorMsg, true);
-                    
-                    // 5 saniye sonra tekrar bağlanmayı dene
-                    setTimeout(() => {
-                        console.log('Tekrar bağlanılıyor...');
-                        socket.connect();
-                    }, 5000);
-                });
-
-                socket.on('connect_timeout', () => {
-                    showGlobalMessage('Sunucu bağlantısı zaman aşımına uğradı. Lütfen tekrar deneyin.', true);
+                    transports: ['websocket', 'polling'], 
+                    reconnectionAttempts: 5, 
+                    timeout: 20000 
                 });
 
                 socket.on('connect', () => {
@@ -519,9 +296,7 @@
                     const self = players.find(p => p.id === socket.id);
                     
                     // Server'dan gelen gerçek oda kodunu aktar
-                    clientRoomCode = roomCode;
-                    const selfName = UIElements.usernameInput.value.trim();
-                    setupSocketHandlers(socket, roomCode, self.isHost, opponent.username, selfName);
+                    setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
                 });
 
             } catch (e) {
@@ -530,145 +305,25 @@
             }
         }
         
-        // --- Chat Yardımcıları ---
-        const chatMessagesEl = document.getElementById('chatMessages');
-        const chatInputEl = document.getElementById('chatInput');
-        const chatSendBtn = document.getElementById('chatSend');
-        const chatToast = document.getElementById('chatToast');
-        const chatToastText = document.getElementById('chatToastText');
-
-        function renderChatMessage({ text, name, ts, senderId }) {
-            const isMe = senderId === socket.id;
-            const row = document.createElement('div');
-            row.className = 'msg-row' + (isMe ? ' me' : ' other');
-            
-            // Avatar (sadece karşı taraf için)
-            if (!isMe) {
-                const avatar = document.createElement('div');
-                avatar.className = 'flex-shrink-0 w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold';
-                avatar.textContent = name ? name.charAt(0).toUpperCase() : '?';
-                row.appendChild(avatar);
-            }
-            
-            const messageContent = document.createElement('div');
-            messageContent.className = 'flex flex-col' + (isMe ? ' items-end' : ' items-start');
-            
-            // Kullanıcı adı (sadece karşı taraf ve ilk mesajda)
-            const lastMessage = chatMessagesEl.lastElementChild;
-            const showName = !isMe && (!lastMessage || 
-                !lastMessage.classList.contains('other') || 
-                lastMessage.getAttribute('data-sender') !== senderId);
-                
-            if (showName && !isMe) {
-                const nameEl = document.createElement('div');
-                nameEl.className = 'text-xs font-medium text-gray-700 mb-1 ml-2';
-                nameEl.textContent = name;
-                messageContent.appendChild(nameEl);
-            }
-            
-            // Mesaj balonu
-            const bubble = document.createElement('div');
-            bubble.className = 'bubble ' + (isMe ? 'me' : 'other');
-            bubble.textContent = text;
-            
-            // Mesaj zamanı
-            const meta = document.createElement('div');
-            meta.className = 'msg-meta';
-            const date = new Date(ts);
-            const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            
-            if (isMe) {
-                // Sağ tarafta (kullanıcı) sadece saat ve onay işareti
-                meta.innerHTML = `${timeString} <span>✓✓</span>`;
-            } else {
-                // Sol tarafta (karşı taraf) sadece saat
-                meta.textContent = timeString;
-            }
-            
-            const messageBubble = document.createElement('div');
-            messageBubble.className = 'flex flex-col' + (isMe ? ' items-end' : ' items-start');
-            messageBubble.appendChild(bubble);
-            messageBubble.appendChild(meta);
-            
-            messageContent.appendChild(messageBubble);
-            row.appendChild(messageContent);
-            
-            // Avatar (kullanıcı için sağ tarafa)
-            if (isMe) {
-                const avatar = document.createElement('div');
-                avatar.className = 'flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold';
-                avatar.textContent = 'S';
-                row.appendChild(avatar);
-            }
-            
-            row.setAttribute('data-sender', senderId);
-            chatMessagesEl.appendChild(row);
-            
-            // Otomatik scroll
-            chatMessagesEl.scrollTo({
-                top: chatMessagesEl.scrollHeight,
-                behavior: 'smooth'
-            });
-        }
-
-        function showChatPopup(text) {
-            chatToastText.textContent = text;
-            chatToast.classList.remove('show');
-            // yeniden tetiklemek için reflow
-            void chatToast.offsetWidth;
-            chatToast.classList.add('show');
-            setTimeout(() => chatToast.classList.remove('show'), 3000);
-        }
-
-        function sendChat() {
-            const text = chatInputEl.value.trim();
-            if (!text || !socket || !socket.connected || !clientRoomCode) return;
-            socket.emit('chatMessage', { roomCode: clientRoomCode, text });
-            chatInputEl.value = '';
-        }
-
-        // Socket chat dinleyici
-        function attachChatHandlers() {
-            if (!socket) return;
-            socket.on('chatMessage', (payload) => {
-                renderChatMessage(payload);
-                // Toast: küçük balon popup
-                showChatPopup(`${payload.name}: ${payload.text}`);
-            });
-        }
-
-        // İlk bağlantıda handlerları bağla
-        document.addEventListener('DOMContentLoaded', () => {
-            attachChatHandlers();
-        });
-
-        // UI eventleri
-        document.getElementById('chatSend').addEventListener('click', sendChat);
-        document.getElementById('chatInput').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') sendChat();
-        });
-
         // --- Olay Dinleyicileri ---
-        UIElements.createBtn.addEventListener('click', () => {
+        UIElements.matchBtn.addEventListener('click', () => {
             const username = validateInput();
             if (!username) return;
+            
             showScreen('wait');
-            document.getElementById('waitTitle').textContent = 'Oda Kuruluyor...';
-            document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
-            document.getElementById('codeArea').classList.add('hidden');
-            socket.emit('createRoom', { username });
-        });
-
-        UIElements.joinBtn.addEventListener('click', () => {
-            const username = validateInput();
-            if (!username) return;
             const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
-            if (!roomCode) { UIElements.showGlobalMessage('Oda kodu girin.', true); return; }
-            showScreen('wait');
-            document.getElementById('waitTitle').textContent = `Odaya Katılım: ${roomCode}`;
-            document.getElementById('waitStatus').textContent = 'Bağlanılıyor...';
-            document.getElementById('codeArea').classList.add('hidden');
-            socket.emit('joinRoom', { username, roomCode });
+
+            if (roomCode === '') {
+                document.getElementById('waitTitle').textContent = 'Oda Kuruluyor...';
+                document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
+                document.getElementById('codeArea').classList.add('hidden');
+                socket.emit('createRoom', { username });
+            } else {
+                document.getElementById('waitTitle').textContent = `Odaya Katılım: ${roomCode}`;
+                document.getElementById('waitStatus').textContent = 'Bağlanılıyor...';
+                document.getElementById('codeArea').classList.add('hidden');
+                socket.emit('joinRoom', { username, roomCode });
+            }
         });
 
         document.getElementById('cancelBtn').addEventListener('click', UIElements.resetGame);
