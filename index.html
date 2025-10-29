@@ -228,7 +228,7 @@
                     const opponent = players.find(p => p.id !== socket.id);
                     const self = players.find(p => p.id === socket.id);
                     
-                    // setupSocketHandlers imzasına uyumlu gönderim (6 parametre)
+                    // setupSocketHandlers imzasına uyumlu gönderim
                     setupSocketHandlers(socket, UIElements.roomCodeInput.value, self.username, opponent.username, self.isHost, initialGameData);
                 });
 
@@ -256,7 +256,6 @@
         
         // Yeni Seviye/Oyunu Bitir Butonunun Dinleyicisi
         document.getElementById('endGameBtn').addEventListener('click', () => {
-            // gameData ve isHost değişkenleri game.js'den import edildi.
             if (gameData && gameData.gameStage === 'ENDED' && isHost) {
                 if (level < LEVELS.length) {
                     // Host olarak bir sonraki seviyeye geçme sinyalini gönder
