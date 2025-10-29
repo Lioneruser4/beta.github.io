@@ -15,8 +15,8 @@ const screens = {
 const gameBoardEl = document.getElementById('gameBoard');
 const turnStatusEl = document.getElementById('turnStatus');
 const actionMessageEl = document.getElementById('actionMessage');
-const myNameEl = document.getElementById('myName'); // index.html'deki ID'ye göre düzeltildi
-const opponentNameEl = document.getElementById('opponentName'); // index.html'deki ID'ye göre düzeltildi
+const myNameEl = document.getElementById('myName'); 
+const opponentNameEl = document.getElementById('opponentName'); 
 
 // Sohbet Referansları
 const chatInputEl = document.getElementById('chatInput');
@@ -34,7 +34,7 @@ let gameData = {
     scoreGuest: 0
 };
 
-// --- TEMEL UI FONKSİYONLARI ---
+// --- TEMEL UI FONKSİYONLARI (Değişiklik Yok) ---
 export function showScreen(screenId) {
     Object.values(screens).forEach(screen => screen && screen.classList.remove('active'));
     if (screens[screenId]) { screens[screenId].classList.add('active'); }
@@ -50,7 +50,6 @@ export function showGlobalMessage(message, isError = true) {
     globalMessage.classList.add(isError ? 'bg-red-600' : 'bg-green-600');
     globalMessage.classList.remove('hidden');
     globalMessage.classList.add('show');
-    // Global mesajı gösterip, 4 saniye sonra gizle
     setTimeout(() => { globalMessage.classList.add('hidden'); globalMessage.classList.remove('show'); }, 4000);
 }
 
@@ -66,7 +65,6 @@ function handleSendMessage() {
     const message = chatInputEl.value.trim();
     if (message === "" || gameData.isGameOver || !socket || !socket.connected) return;
 
-    // Sunucuya mesajı gönder
     socket.emit('sendMessage', {
         roomCode: currentRoomCode,
         message: message
@@ -110,7 +108,7 @@ function drawBoard() {
         
         const back = document.createElement('div');
         back.className = 'card-face back';
-        back.textContent = content;
+        back.textContent = content; // EMOJİ BURADA DOĞRU GÖSTERİLİYOR
 
         card.appendChild(front);
         card.appendChild(back);
@@ -152,7 +150,9 @@ function updateStatusDisplay() {
         turnStatusEl.classList.remove('text-gray-600', 'text-red-600');
         turnStatusEl.classList.add('text-green-600');
     } else {
-        turnStatusEl.textContent = `RAKİP OYNUYOR (${opponentName})...`;
+        // Rakibin sırası geldiğinde, rakip kart çevirirken kilitle
+        const opponentIsPlaying = gameData.currentTurnId !== socket.id && !gameData.isAnimating;
+        turnStatusEl.textContent = opponentIsPlaying ? `RAKİP OYNUYOR (${opponentName})...` : 'Bekleniyor...';
         turnStatusEl.classList.remove('text-green-600');
         turnStatusEl.classList.add('text-red-600');
     }
@@ -173,14 +173,21 @@ function handleCardClick(event) {
     
     const cardIndex = parseInt(cardElement.dataset.index);
     
-    // Tıklanan kart zaten açık kartlardan biri mi? (Kontrol tekrarı)
-    if (gameData.flippedCards.includes(cardIndex)) return;
+    // Tıklanan kart zaten açık veya eşleşmişse gönderimi engelle
+    if (gameData.flippedCards.includes(cardIndex) || gameData.matchedCards.has(cardIndex)) return;
 
     sendMove(cardIndex);
-    gameData.isAnimating = true; // Sunucudan yanıt gelene kadar animasyonu kilitle
     
-    // UI'da hemen çevir (iyi kullanıcı deneyimi için, sunucudan doğrulama gelecek)
+    // 1. Kart açılırken animasyon kilidi kaldırılmaz, sadece 2. karttan sonra kilitlenir.
+    if (gameData.flippedCards.length === 1) { // Eğer bu hamle 2. hamle ise
+        gameData.isAnimating = true; // Sunucudan sonuç gelene kadar kilitle
+    }
+    
+    // Görsel geri bildirim hemen
     cardElement.classList.add('flipped');
+    // Tıklama olayını hemen kaldır
+    cardContainer.removeEventListener('click', handleCardClick);
+    cardContainer.classList.remove('cursor-pointer');
 }
 
 function sendMove(index) {
@@ -196,32 +203,32 @@ function sendMove(index) {
 function handleGameStateUpdate(data) {
     const { cardIndex, flippedCards, matchedCards, scoreHost, scoreGuest } = data;
     
-    // Yeni kartı ekle
     gameData.flippedCards = flippedCards;
-    
     gameData.matchedCards = new Set(matchedCards);
     gameData.scoreHost = scoreHost;
     gameData.scoreGuest = scoreGuest;
 
-    // Kartı görsel olarak çevir (Eğer tıklayan rakipse)
+    // RAKİP HAREKETİNİ GÖRSEL OLARAK ÇEVİR
     const cardElement = document.querySelector(`.card[data-index="${cardIndex}"]`);
     if (cardElement && !cardElement.classList.contains('flipped')) {
         cardElement.classList.add('flipped'); 
     }
     
-    // Eğer 2. kart açılmışsa, animasyon kilidi kaldırılmaz, sıranın değişmesi beklenir.
-    if (flippedCards.length < 2) {
-        gameData.isAnimating = false; // 1. karttan sonra oyuncu 2. kartı seçebilmeli
+    // 2. kart açıldığında, oyuncu kim olursa olsun, sıra değişimi beklenirken tahtayı kitle
+    if (flippedCards.length === 2) {
+        gameData.isAnimating = true; 
+    } else {
+        gameData.isAnimating = false;
     }
     
-    drawBoard(); // Tahtayı güncelleyerek tıklama olaylarını yeniden bağla
+    drawBoard(); // Tahtayı güncelleyerek tıklama olaylarını doğru ayarla
 }
 
 // Sunucudan Sıra Değişikliği Bilgisi Geldiğinde
 function handleTurnUpdate(data) {
     gameData.currentTurnId = data.turn;
     
-    // Sunucudan gelen eşleşmeyen kartları kapatma (flippedCards: [])
+    // Eşleşme yoksa kartları kapat ve puanı güncelle
     if (data.flippedCards && data.flippedCards.length === 0) {
         // Görsel olarak kapanan kartları UI'dan kaldır
         gameData.flippedCards.forEach(index => {
@@ -233,13 +240,14 @@ function handleTurnUpdate(data) {
         gameData.flippedCards = [];
     }
 
-    // Sunucudan gelen eşleşme durumunu güncelle
     gameData.matchedCards = new Set(data.matchedCards || gameData.matchedCards);
+    gameData.scoreHost = data.scoreHost;
+    gameData.scoreGuest = data.scoreGuest;
     
     showGlobalMessage(data.message, data.message.includes('Eşleşmedi') ? true : false);
     
     gameData.isAnimating = false;
-    drawBoard(); // Sıra değişince tahtayı yeniden çiz ve yeni tıklama olaylarını bağla
+    drawBoard(); // Sıra değişince tahtayı yeniden çiz
 }
 
 function handleGameEnd(data) {
@@ -248,7 +256,6 @@ function handleGameEnd(data) {
     let endMessage = `OYUN BİTTİ! ${winnerText}. Skorlar - Siz: ${isHost ? data.scoreHost : data.scoreGuest}, Rakip: ${isHost ? data.scoreGuest : data.scoreHost}`;
     showGlobalMessage(endMessage, data.winner === 'DRAW' ? false : data.winner === (isHost ? 'Host' : 'Guest') ? false : true);
     updateStatusDisplay();
-    // setTimeout(resetGame, 5000); // Otomatik reset iptal edildi
 }
 
 
@@ -266,25 +273,21 @@ export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername,
     drawBoard();
     showScreen('game');
     
-    // Host/Guest rolünü ekranda göster
     document.getElementById('roleStatus').textContent = `Rolünüz: ${isHost ? 'Host' : 'Guest'}`;
     
-    // --- SOCKET.IO OYUN İŞLEYİCİLERİ ---
+    // Eski eventleri kaldırıp yenilerini ekle (çakışmayı önler)
     socket.off('gameStateUpdate').on('gameStateUpdate', handleGameStateUpdate);
     socket.off('turnUpdate').on('turnUpdate', handleTurnUpdate); 
     socket.off('gameEnd').on('gameEnd', handleGameEnd);
-    
     socket.off('opponentLeft').on('opponentLeft', (message) => {
         showGlobalMessage(message || 'Rakibiniz ayrıldı. Lobiye dönülüyor.', true);
         resetGame();
     });
-
     socket.off('newMessage').on('newMessage', (data) => {
         const isMe = data.sender === myName;
         appendMessage(data.sender, data.text, isMe);
     });
 
-    // Sohbet olay dinleyicileri (tekrarlayan dinleyiciyi önle)
     sendChatBtn.onclick = handleSendMessage;
     chatInputEl.onkeypress = (e) => {
         if (e.key === 'Enter') {
@@ -296,7 +299,6 @@ export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername,
 }
 
 export function resetGame() { 
-    // Tüm socket eventlerini temizle ve sayfayı yenile
     if (socket) {
         socket.disconnect();
     }
