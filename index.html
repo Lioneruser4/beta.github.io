@@ -323,8 +323,13 @@
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
 
         // Render URL'niz: Lütfen bu kısmı KENDİ URL'nizle değiştirin!
-        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
+        const LIVE_SERVER_URL = 'http://localhost:3000'; // Local server for development
         let socket;
+        
+        // Initialize connection when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            connectToServer();
+        });
         
         function validateInput() {
             const username = UIElements.usernameInput.value.trim();
