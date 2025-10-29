@@ -231,6 +231,7 @@ function handleCardClick(event) {
         
         if (selectedBombs.length === 3) {
             // Bombaları sunucuya gönder
+            console.log(`💣 Bombalar gönderiliyor: ${isHost ? 'Host' : 'Guest'}`, selectedBombs);
             socket.emit('bombSelectionComplete', { roomCode: currentRoomCode, isHost: isHost, bombs: selectedBombs });
             updateStatusDisplay();
         }
@@ -358,23 +359,28 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     
     // --- SOCKET.IO İŞLEYİCİLERİ ---
 
-    // Bomb Seçimi Tamamlandı
+    // Bomb Seçimi Tamamlandı (Tek oyuncu seçti)
     socket.on('bombSelectionComplete', ({ isHost: selectionHost, bombs }) => {
+        console.log(`Bomba seçimi alındı: ${selectionHost ? 'Host' : 'Guest'}`, bombs);
         if (selectionHost) {
             gameData.hostBombs = bombs;
         } else {
             gameData.guestBombs = bombs;
         }
+        actionMessageEl.textContent = "Rakip bombasını seçti. Şimdi siz de 3 bomba seçin!";
+        updateStatusDisplay();
+    });
+
+    // Her İki Oyuncu da Bombasını Seçti - Oyun Başlasın!
+    socket.on('bothBombsSelected', ({ hostBombs, guestBombs }) => {
+        console.log('🚀 HER İKİ BOMBA SETİ ALINDI! Oyun başlıyor...', { hostBombs, guestBombs });
+        gameData.hostBombs = hostBombs;
+        gameData.guestBombs = guestBombs;
+        gameStage = 'PLAY';
+        gameData.turn = 0; // Host başlar
         
-        if (gameData.hostBombs.length === 3 && gameData.guestBombs.length === 3) {
-            gameStage = 'PLAY';
-            showGlobalMessage('🚀 Her iki oyuncu da hazır! Kart açma aşaması başlıyor!', false);
-            // Sadece bir oyuncu (HOST) başlar (Turn = 0)
-            gameData.turn = 0; 
-            drawBoard(); 
-        } else {
-            actionMessageEl.textContent = "Rakip bombasını seçti. Şimdi siz de 3 bomba seçin!";
-        }
+        showGlobalMessage('🚀 Her iki oyuncu da hazır! Kart açma aşaması başlıyor!', false);
+        drawBoard();
         updateStatusDisplay();
     });
 
