@@ -6,6 +6,7 @@
     <title>💣 Emoji Bomb V4 - Hafıza Oyunu</title>
     
     <style>
+        /* ... (CSS STİLLERİ BURADA DEVAM EDİYOR) ... */
         body {
             font-family: sans-serif;
             margin: 0;
@@ -245,12 +246,8 @@
             }
 
             try {
-                // KRİTİK BAĞLANTI AYARI: Yeni bağlantı zorlama ve tüm transportları deneme
-                socket = io(LIVE_SERVER_URL, { 
-                    transports: ['websocket', 'polling'], 
-                    forceNew: true, 
-                    reconnectionAttempts: 3 
-                });
+                // Bağlantı ayarları kaldırıldı, en basit haliyle bağlantı kurmayı deniyoruz
+                socket = io(LIVE_SERVER_URL); 
                 
                 socket.on('connect', () => {
                     if (roomCode) {
