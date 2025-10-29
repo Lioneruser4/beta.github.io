@@ -183,13 +183,31 @@
     <audio id="MATCH_SOUND" src="sounds/match_success.mp3" preload="auto"></audio>
     <audio id="MISMATCH_SOUND" src="sounds/mismatch.mp3" preload="auto"></audio>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
+    
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage, resetGame } from './game.js';
 
-        // ! ÖNEMLİ: Sunucu adresini buraya kopyalayın. 
-        const LIVE_SERVER_URL = 'http://localhost:10000'; // LÜTFEN KONTROL EDİN!
+        // ! KRİTİK ADRES: Lütfen burayı kontrol edin!
+        const LIVE_SERVER_URL = 'http://localhost:10000'; 
 
-        let socket;
+        // 1. ADIM: SAYFA YÜKLENİR YÜKLENMEZ BAĞLANTIYI DENE
+        // Bağlantıyı hemen başlatıyoruz.
+        const socket = io(LIVE_SERVER_URL, { 
+             transports: ['websocket', 'polling'], // En güvenilir metotları zorla
+             reconnectionAttempts: 3,
+             reconnectionDelay: 1000
+        });
+
+        // 2. ADIM: BAĞLANTI DURUMUNU DİNLE
+        socket.on('connect', () => {
+             UIElements.showGlobalMessage(`Sunucuya başarıyla bağlandı. Kullanıcı adı giriniz.`, false);
+        });
+
+        socket.on('connect_error', (err) => {
+             UIElements.showGlobalMessage(`Bağlantı Hatası: Sunucuya ulaşılamıyor. URL: ${LIVE_SERVER_URL}`, true);
+             console.error("Socket bağlantı hatası:", err.message);
+        });
         
         function handleMatchAction() {
             const username = UIElements.usernameInput.value.trim();
@@ -200,60 +218,41 @@
                 return;
             }
             
-            if (socket && socket.connected) {
-                socket.disconnect();
+            // 3. ADIM: BUTONA BASILDIĞINDA ODA OLUŞTUR/KATIL
+            if (!socket.connected) {
+                 UIElements.showGlobalMessage('HATA: Sunucuya bağlı değil. Lütfen F12 konsolunu kontrol edin.', true);
+                 return;
             }
-
-            try {
-                // Güvenilir bağlantı denemesi
-                socket = io(LIVE_SERVER_URL, { 
-                    transports: ['websocket', 'polling'], // Client tarafında da zorlama
-                    reconnectionAttempts: 3 
-                });
-                
-                socket.on('connect', () => {
-                    UIElements.showGlobalMessage(`Sunucuya bağlandı.`, false);
-                    if (roomCode) {
-                        socket.emit('joinRoom', { username, roomCode });
-                    } else {
-                        socket.emit('createRoom', { username }); 
-                    }
-                });
-
-                socket.on('connect_error', (err) => {
-                    UIElements.showGlobalMessage(`Bağlantı Hatası: Sunucuya ulaşılamıyor. URL: ${LIVE_SERVER_URL}`, true);
-                    console.error("Socket bağlantı hatası:", err.message);
-                    socket.disconnect();
-                    showScreen('lobby');
-                });
-                
-                socket.on('roomCreated', (code) => {
-                    UIElements.waitRoomCodeEl.textContent = code;
-                    showScreen('wait');
-                });
-
-                socket.on('joinFailed', (message) => {
-                    UIElements.showGlobalMessage(message, true);
-                    socket.disconnect();
-                    showScreen('lobby');
-                });
-
-                socket.on('gameStart', (initialData) => {
-                    const selfUsername = initialData.players.find(p => p.id === socket.id).username;
-                    const opponentUsername = initialData.players.find(p => p.id !== socket.id).username;
-                    setupSocketHandlers(socket, initialData.code, selfUsername, opponentUsername, initialData);
-                });
-                
-            } catch (e) {
-                UIElements.showGlobalMessage('Socket.IO yüklenemedi. Lütfen konsolu kontrol edin.', true);
-                console.error("Socket.IO yükleme hatası:", e);
+            
+            if (roomCode) {
+                UIElements.showGlobalMessage(`Oda (${roomCode}) aranıyor...`, false);
+                socket.emit('joinRoom', { username, roomCode });
+            } else {
+                UIElements.showGlobalMessage('Yeni oda oluşturuluyor...', false);
+                socket.emit('createRoom', { username }); 
             }
         }
 
+        // 4. ADIM: SUNUCU OLAYLARINI DİNLE
+        socket.on('roomCreated', (code) => {
+            UIElements.waitRoomCodeEl.textContent = code;
+            showScreen('wait');
+            UIElements.showGlobalMessage(`Oda oluşturuldu: ${code}. Rakip bekleniyor.`, false);
+        });
+
+        socket.on('joinFailed', (message) => {
+            UIElements.showGlobalMessage(message, true);
+        });
+
+        socket.on('gameStart', (initialData) => {
+            const selfUsername = initialData.players.find(p => p.id === socket.id).username;
+            const opponentUsername = initialData.players.find(p => p.id !== socket.id).username;
+            setupSocketHandlers(socket, initialData.code, selfUsername, opponentUsername, initialData);
+            UIElements.showGlobalMessage("Oyun Başladı! İyi Eğlenceler!", false);
+        });
+        
         UIElements.matchBtn.addEventListener('click', handleMatchAction);
     </script>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
 
 </body>
 </html>
