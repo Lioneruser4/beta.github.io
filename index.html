@@ -64,10 +64,14 @@
         }
         
         /* Utility */
-        .btn { @apply w-full text-xl font-bold py-3 px-6 rounded-xl shadow-lg transition-all duration-200 ease-in-out; }
-        .btn-primary { @apply bg-blue-600 text-white hover:bg-blue-500 active:scale-95; }
-        .input-field { @apply w-full text-lg bg-gray-200 text-gray-900 border-2 border-gray-400 rounded-lg p-3 text-center placeholder-gray-500 focus:outline-none focus:border-blue-500; }
-        .code-display { @apply text-4xl font-extrabold p-4 bg-gray-800 text-yellow-300 rounded-lg tracking-widest; }
+        .btn { width: 100%; font-size: 1.25rem; font-weight: 800; padding: 0.75rem 1.5rem; border-radius: 0.75rem; box-shadow: var(--shadow); transition: all 200ms ease-in-out; }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-primary:hover { background: #3b82f6; }
+        .btn:active { transform: scale(0.98); }
+        .input-field { width: 100%; font-size: 1.125rem; background: #e5e7eb; color: #111827; border: 2px solid #9ca3af; border-radius: 0.5rem; padding: 0.75rem; text-align: center; }
+        .input-field:focus { outline: none; border-color: #3b82f6; }
+        .code-display { font-size: 2rem; font-weight: 900; padding: 1rem; background: #1f2937; color: #f59e0b; border-radius: 0.5rem; letter-spacing: 0.3rem; }
+        .screen { min-height: 100vh; }
         
         /* Global Mesaj */
         #globalMessage.show { 
@@ -210,9 +214,11 @@
         </div>
         
         <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adınızı Girin" maxlength="15">
-        <input type="text" id="roomCodeInput" class="input-field uppercase" placeholder="Oda Kodu (Boş bırak=Yeni Oda)" maxlength="6">
-        
-        <button id="matchBtn" class="btn btn-primary">🎮 Oyuna Başla</button>
+        <div class="flex gap-3 w-full">
+            <button id="createBtn" class="btn btn-primary">➕ Oda Kur</button>
+            <input type="text" id="roomCodeInput" class="input-field uppercase" placeholder="Oda Kodu" maxlength="6" style="flex:1" />
+            <button id="joinBtn" class="btn btn-primary" style="width:auto; min-width: 140px">🔗 Bağlan</button>
+        </div>
     </div>
     
     <div id="waitScreen" class="screen space-y-6 container">
@@ -231,7 +237,7 @@
         
         <div class="flex justify-between w-full text-gray-800 font-bold p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border-2 border-gray-300">
             <div class="text-center">
-                <p class="text-xs text-gray-600">SEN</p>
+                <p class="text-xs text-gray-600" id="myName">SEN</p>
                 <p id="myLives" class="text-2xl text-green-600">❤️❤️</p>
             </div>
             <div class="text-center">
@@ -239,7 +245,7 @@
                 <p id="opponentName" class="text-lg text-blue-600 font-bold"></p>
             </div>
             <div class="text-center">
-                <p class="text-xs text-gray-600">CANLAR</p>
+                <p class="text-xs text-gray-600">RAKİP</p>
                 <p id="opponentLives" class="text-2xl text-green-600">❤️❤️</p>
             </div>
         </div>
@@ -329,7 +335,8 @@
                     
                     // Server'dan gelen gerçek oda kodunu aktar
                     clientRoomCode = roomCode;
-                    setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
+                    const selfName = UIElements.usernameInput.value.trim();
+                    setupSocketHandlers(socket, roomCode, self.isHost, opponent.username, selfName);
                 });
 
             } catch (e) {
@@ -403,24 +410,26 @@
         });
 
         // --- Olay Dinleyicileri ---
-        UIElements.matchBtn.addEventListener('click', () => {
+        UIElements.createBtn.addEventListener('click', () => {
             const username = validateInput();
             if (!username) return;
-            
             showScreen('wait');
-            const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
+            document.getElementById('waitTitle').textContent = 'Oda Kuruluyor...';
+            document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
+            document.getElementById('codeArea').classList.add('hidden');
+            socket.emit('createRoom', { username });
+        });
 
-            if (roomCode === '') {
-                document.getElementById('waitTitle').textContent = 'Oda Kuruluyor...';
-                document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
-                document.getElementById('codeArea').classList.add('hidden');
-                socket.emit('createRoom', { username });
-            } else {
-                document.getElementById('waitTitle').textContent = `Odaya Katılım: ${roomCode}`;
-                document.getElementById('waitStatus').textContent = 'Bağlanılıyor...';
-                document.getElementById('codeArea').classList.add('hidden');
-                socket.emit('joinRoom', { username, roomCode });
-            }
+        UIElements.joinBtn.addEventListener('click', () => {
+            const username = validateInput();
+            if (!username) return;
+            const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
+            if (!roomCode) { UIElements.showGlobalMessage('Oda kodu girin.', true); return; }
+            showScreen('wait');
+            document.getElementById('waitTitle').textContent = `Odaya Katılım: ${roomCode}`;
+            document.getElementById('waitStatus').textContent = 'Bağlanılıyor...';
+            document.getElementById('codeArea').classList.add('hidden');
+            socket.emit('joinRoom', { username, roomCode });
         });
 
         document.getElementById('cancelBtn').addEventListener('click', UIElements.resetGame);
