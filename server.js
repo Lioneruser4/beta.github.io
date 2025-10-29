@@ -7,44 +7,16 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// Gelişmiş CORS ve bağlantı ayarları
+// CORS DÜZELTME: Tüm kaynaklardan gelen bağlantılara izin verir
 const io = new Server(server, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST", "OPTIONS"],
-        allowedHeaders: ["my-custom-header"],
-        credentials: true
+        origin: "*", 
+        methods: ["GET", "POST"]
     },
-    // Sadece WebSocket kullan
-    transports: ['websocket'],
-    // Zaman aşımı ayarları
-    pingTimeout: 60000, // 60 saniye
-    pingInterval: 30000, // 30 saniyede bir ping
-    cookie: false,
-    // Hata ayıklama modu
-    allowEIO3: true
-});
-
-// HTTP isteklerini dinle
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    next();
-});
-
-// Basit bir kök endpoint
-app.get('/', (req, res) => {
-    res.send('Sunucu çalışıyor!');
+    transports: ['websocket', 'polling'] 
 });
 
 const rooms = {}; 
-
-// Seviye başına board boyutu ve bomba sayısı
-const BOARD_SIZES = [12, 16, 20];
-function bombsPerPlayer(level) {
-    // 1. seviye: 2 bomba, her seviyede +1 artsın
-    return Math.max(2, 1 + level); // level=1 -> 2, 2->3, 3->4
-}
 
 // Oyun için kullanılacak rastgele emojiler
 const EMOJIS = ['😀','😎','🦄','🐱','🍀','🍕','🌟','⚽','🎵','🚀','🎲','🥇'];
@@ -58,12 +30,7 @@ function generateRoomCode() {
 }
 
 io.on('connection', (socket) => {
-    console.log(`Yeni bağlantı: ${socket.id} - IP: ${socket.handshake.address}`);
-    
-    // Bağlantı zaman aşımı ayarı
-    socket.conn.on('heartbeat', () => {
-        socket.conn.transport.socket.refreshTimeout();
-    });
+    console.log(`Yeni bağlantı: ${socket.id}`);
     
     socket.on('createRoom', ({ username }) => {
         const code = generateRoomCode();
@@ -88,26 +55,6 @@ io.on('connection', (socket) => {
         socket.join(code);
         socket.emit('roomCreated', code);
         console.log(`Oda oluşturuldu: ${code} - Host: ${username}`);
-    });
-
-    // Sohbet mesajı
-    socket.on('chatMessage', ({ roomCode, text }) => {
-        const code = (roomCode || '').toUpperCase();
-        const room = rooms[code];
-        if (!room || !text || typeof text !== 'string') return;
-
-        // Gönderenin adını belirle
-        let name = 'Oyuncu';
-        if (socket.id === room.hostId) name = room.hostUsername || 'Host';
-        else if (socket.id === room.guestId) name = room.guestUsername || 'Guest';
-
-        const payload = {
-            text: text.slice(0, 300), // uzunluğu sınırla
-            name,
-            ts: Date.now(),
-            senderId: socket.id
-        };
-        io.to(code).emit('chatMessage', payload);
     });
 
     socket.on('joinRoom', ({ username, roomCode }) => {
@@ -135,17 +82,16 @@ io.on('connection', (socket) => {
         io.to(code).emit('gameStart', { players, roomCode: code });
         console.log(`${username} odaya katıldı: ${code}`);
         
-        // Otomatik bomba seçimi yap (seviye bazlı)
-        const boardSize = BOARD_SIZES[0]; // İlk seviye
+        // Otomatik bomba seçimi yap (her oyuncu için rastgele 2 bomba)
+        const boardSize = 12; // İlk seviye
         const allIndices = Array.from({ length: boardSize }, (_, i) => i);
         
         // Karıştır
         allIndices.sort(() => Math.random() - 0.5);
         
-        // Host ve Guest için seviye bazlı bomba sayısı
-        const bpp = bombsPerPlayer(1);
-        room.gameState.hostBombs = allIndices.slice(0, bpp);
-        room.gameState.guestBombs = allIndices.slice(bpp, bpp * 2);
+        // Host için ilk 2, Guest için sonraki 2
+        room.gameState.hostBombs = allIndices.slice(0, 2);
+        room.gameState.guestBombs = allIndices.slice(2, 4);
         room.gameState.stage = 'PLAY';
         room.gameState.turn = 0;
         
@@ -221,17 +167,17 @@ io.on('connection', (socket) => {
         room.gameState.level = newLevel;
         room.gameState.stage = 'PLAY';
         room.gameState.turn = 0;
-        room.gameState.opened = [];
         
         // Yeni seviye için board size
-        const boardSize = BOARD_SIZES[newLevel - 1] || BOARD_SIZES[BOARD_SIZES.length - 1];
+        const boardSizes = [12, 16, 20];
+        const boardSize = boardSizes[newLevel - 1];
         
         // Otomatik bomba seçimi
         const allIndices = Array.from({ length: boardSize }, (_, i) => i);
         allIndices.sort(() => Math.random() - 0.5);
-        const bpp = bombsPerPlayer(newLevel);
-        room.gameState.hostBombs = allIndices.slice(0, bpp);
-        room.gameState.guestBombs = allIndices.slice(bpp, bpp * 2);
+        
+        room.gameState.hostBombs = allIndices.slice(0, 2);
+        room.gameState.guestBombs = allIndices.slice(2, 4);
 
         console.log(`Yeni seviye: ${newLevel} - Oda: ${roomCode}, Bombalar: Host ${room.gameState.hostBombs}, Guest ${room.gameState.guestBombs}`);
 
@@ -276,18 +222,6 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || '0.0.0.0';
-
-server.listen(PORT, HOST, () => {
-    console.log(`✅ Sunucu http://${HOST}:${PORT} adresinde çalışıyor`);
-    console.log(`🔄 Socket.io dinlemede`);
-});
-
-// İşlenmeyen hataları yakala
-process.on('uncaughtException', (err) => {
-    console.error('Yakalanmamış Hata:', err);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('İşlenmemiş Reddedilme:', reason);
+server.listen(PORT, () => {
+    console.log(`Sunucu port ${PORT} üzerinde çalışıyor.`);
 });
