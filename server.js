@@ -18,6 +18,13 @@ const io = new Server(server, {
 
 const rooms = {}; 
 
+// Seviye başına board boyutu ve bomba sayısı
+const BOARD_SIZES = [12, 16, 20];
+function bombsPerPlayer(level) {
+    // 1. seviye: 2 bomba, her seviyede +1 artsın
+    return Math.max(2, 1 + level); // level=1 -> 2, 2->3, 3->4
+}
+
 // Oyun için kullanılacak rastgele emojiler
 const EMOJIS = ['😀','😎','🦄','🐱','🍀','🍕','🌟','⚽','🎵','🚀','🎲','🥇'];
 
@@ -102,16 +109,17 @@ io.on('connection', (socket) => {
         io.to(code).emit('gameStart', { players, roomCode: code });
         console.log(`${username} odaya katıldı: ${code}`);
         
-        // Otomatik bomba seçimi yap (her oyuncu için rastgele 2 bomba)
-        const boardSize = 12; // İlk seviye
+        // Otomatik bomba seçimi yap (seviye bazlı)
+        const boardSize = BOARD_SIZES[0]; // İlk seviye
         const allIndices = Array.from({ length: boardSize }, (_, i) => i);
         
         // Karıştır
         allIndices.sort(() => Math.random() - 0.5);
         
-        // Host için ilk 2, Guest için sonraki 2
-        room.gameState.hostBombs = allIndices.slice(0, 2);
-        room.gameState.guestBombs = allIndices.slice(2, 4);
+        // Host ve Guest için seviye bazlı bomba sayısı
+        const bpp = bombsPerPlayer(1);
+        room.gameState.hostBombs = allIndices.slice(0, bpp);
+        room.gameState.guestBombs = allIndices.slice(bpp, bpp * 2);
         room.gameState.stage = 'PLAY';
         room.gameState.turn = 0;
         
@@ -187,17 +195,17 @@ io.on('connection', (socket) => {
         room.gameState.level = newLevel;
         room.gameState.stage = 'PLAY';
         room.gameState.turn = 0;
+        room.gameState.opened = [];
         
         // Yeni seviye için board size
-        const boardSizes = [12, 16, 20];
-        const boardSize = boardSizes[newLevel - 1];
+        const boardSize = BOARD_SIZES[newLevel - 1] || BOARD_SIZES[BOARD_SIZES.length - 1];
         
         // Otomatik bomba seçimi
         const allIndices = Array.from({ length: boardSize }, (_, i) => i);
         allIndices.sort(() => Math.random() - 0.5);
-        
-        room.gameState.hostBombs = allIndices.slice(0, 2);
-        room.gameState.guestBombs = allIndices.slice(2, 4);
+        const bpp = bombsPerPlayer(newLevel);
+        room.gameState.hostBombs = allIndices.slice(0, bpp);
+        room.gameState.guestBombs = allIndices.slice(bpp, bpp * 2);
 
         console.log(`Yeni seviye: ${newLevel} - Oda: ${roomCode}, Bombalar: Host ${room.gameState.hostBombs}, Guest ${room.gameState.guestBombs}`);
 
