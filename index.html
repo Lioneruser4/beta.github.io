@@ -225,12 +225,11 @@
     <audio id="MISMATCH_SOUND" src="sounds/mismatch.mp3" preload="auto"></audio>
 
     <script type="module">
-        // game.js dosyasından gerekli fonksiyonları ve değişkenleri içe aktar
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage, resetGame } from './game.js';
 
         // ! ÖNEMLİ: Sunucu adresini buraya kopyalayın. 
         // ! server.js konsolunda çıkan "Bağlantı Adresi" olmalıdır.
-        const LIVE_SERVER_URL = 'http://localhost:10000'; // ÖRNEK ADRES
+        const LIVE_SERVER_URL = 'http://localhost:10000'; // ÖRNEK ADRES - LÜTFEN KENDİ ADRESİNİZLE DEĞİŞTİRİN
 
         let socket;
         
@@ -242,26 +241,32 @@
                 UIElements.showGlobalMessage('Lütfen bir kullanıcı adı girin.', true);
                 return;
             }
+            
+            if (socket && socket.connected) {
+                socket.disconnect();
+            }
 
             try {
                 // Socket bağlantısını kur
                 socket = io(LIVE_SERVER_URL, { transports: ['websocket', 'polling'] });
                 
-                // Bağlantı olayları
+                // Bağlantı başarılı olduğunda (CRITICAL)
                 socket.on('connect', () => {
                     if (roomCode) {
+                        UIElements.showGlobalMessage(`Oda (${roomCode}) aranıyor...`, false);
                         socket.emit('joinRoom', { username, roomCode });
                     } else {
-                        socket.emit('createRoom', { username });
+                        UIElements.showGlobalMessage('Yeni oda oluşturuluyor...', false);
+                        socket.emit('createRoom', { username }); // Oda oluşturma isteği
                     }
                 });
 
                 socket.on('connect_error', (err) => {
-                    UIElements.showGlobalMessage(`Bağlantı Hatası: Sunucuya ulaşılamıyor (${LIVE_SERVER_URL})`, true);
-                    console.error("Socket bağlantı hatası:", err);
+                    UIElements.showGlobalMessage(`Bağlantı Hatası: Sunucuya ulaşılamıyor. URL: ${LIVE_SERVER_URL}`, true);
+                    console.error("Socket bağlantı hatası:", err.message);
                     socket.disconnect();
                 });
-
+                
                 // Sunucu olayları
                 socket.on('roomCreated', (code) => {
                     UIElements.waitRoomCodeEl.textContent = code;
