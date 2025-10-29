@@ -317,6 +317,8 @@ function endGame(winnerRole) {
 
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
 export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
+    console.log('🎯 setupSocketHandlers ÇAĞRILDI!', { roomCode, isHost: host, opponent: opponentNameFromIndex });
+    
     socket = s;
     currentRoomCode = roomCode;
     isHost = host;
@@ -332,21 +334,27 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     showScreen('game');
     showGlobalMessage(`🎮 Oyun ${opponentName} ile başladı! 🚀 Bombalar yerleştiriliyor...`, false);
     
+    console.log('📡 Socket dinleyicileri kuruluyor...');
+    
     // --- SOCKET.IO İŞLEYİCİLERİ ---
 
     // Oyun Başlasın! (Bombalar otomatik seçildi)
     socket.on('gameReady', ({ hostBombs, guestBombs }) => {
-        console.log('🚀 OYUN HAZIRLANDI! Bombalar yerleştirildi.', { hostBombs, guestBombs });
+        console.log('🚀 gameReady EVENT ALINDI!', { hostBombs, guestBombs, gameStage, isHost });
         
         gameData.hostBombs = hostBombs;
         gameData.guestBombs = guestBombs;
         gameStage = 'PLAY';
         gameData.turn = 0; // Host başlar
         
+        console.log('✅ Oyun durumu PLAY olarak ayarlandı, board çiziliyor...');
+        
         playSound(audioEmoji); // Başlama sesi
         showGlobalMessage('🚀 Oyun başlıyor! Kart açmayı başlatın!', false);
         drawBoard();
         updateStatusDisplay();
+        
+        console.log('✅ Board çizildi ve durum güncellendi!');
     });
 
     // gameData Olayı (Hamle Geldi - Kendi veya Rakip)
