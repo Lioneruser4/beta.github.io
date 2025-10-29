@@ -122,21 +122,23 @@ function drawBoard() {
         card.appendChild(back);
         cardContainer.appendChild(card);
         
+        // Add click event listener to the card container
+        cardContainer.addEventListener('click', handleCardClick);
+        
+        // Visual feedback based on card state
         if (cardState.opened) {
             card.classList.add('flipped');
             card.style.transform = 'rotateY(180deg)';
+            cardContainer.style.cursor = 'default';
         } else {
             // SADECE SEÇEN KİŞİNİN GÖRMESİ İÇİN KIRMIZILIK
             if (gameStage === 'SELECTION' && selectedBombs.includes(index)) {
                 card.classList.add('bomb-selected');
                 front.classList.add('bg-red-100');
+                cardContainer.style.cursor = 'not-allowed';
+            } else {
+                cardContainer.style.cursor = 'pointer';
             }
-            
-            // Add click event to the container
-            cardContainer.addEventListener('click', handleCardClick);
-            
-            // Also add pointer cursor to indicate it's clickable
-            cardContainer.style.cursor = 'pointer';
         }
         
         gameBoardEl.appendChild(cardContainer);
