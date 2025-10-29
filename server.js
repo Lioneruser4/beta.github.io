@@ -8,8 +8,13 @@ const server = http.createServer(app);
 
 app.use(express.static('.')); 
 
+// KRİTİK GÜVENLİK DÜZELTMESİ: CORS ayarları genişletildi.
 const io = new Server(server, {
-    cors: { origin: "*", methods: ["GET", "POST"] },
+    cors: { 
+        origin: "*", 
+        methods: ["GET", "POST", "PUT", "DELETE"],
+        credentials: true
+    },
     transports: ['websocket', 'polling']
 });
 
@@ -26,16 +31,13 @@ function createShuffledContents(boardSize) {
     const pairs = boardSize / 2;
     let cardContents = [];
     
-    // Normal Eşleşen Kartlar
-    for (let i = 0; i < pairs - 1; i++) { // 9 Çift (18 Kart)
+    for (let i = 0; i < pairs - 1; i++) { 
         const emoji = EMOTICONS[i % (EMOTICONS.length - 1)]; 
         cardContents.push(emoji, emoji);
     }
     
-    // 2 adet BOMBA Kartı Ekle
     cardContents.push(BOMB_EMOJI, BOMB_EMOJI); 
 
-    // Karıştır
     for (let i = cardContents.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [cardContents[i], cardContents[j]] = [cardContents[j], cardContents[i]];
@@ -117,7 +119,6 @@ io.on('connection', (socket) => {
 
         const { cardIndex } = data;
         
-        // Sıra kontrolü
         if (socket.id !== room.turn) return; 
         if (room.matchedCards.has(cardIndex) || room.flippedCards.includes(cardIndex) || room.flippedCards.length >= 2) return; 
 
@@ -128,7 +129,7 @@ io.on('connection', (socket) => {
         room.flippedCards.push(cardIndex);
         const cardContent = room.cardContents[cardIndex];
 
-        // 1. ADIM: Kart açma bilgisini anında tüm odaya gönder (Senkronizasyon Düzeltmesi)
+        // 1. ADIM: Kart açma bilgisini anında tüm odaya gönder (Senkronizasyon)
         io.to(data.roomCode).emit('gameStateUpdate', {
             flippedCardIndex: cardIndex, 
             flippedCards: room.flippedCards,
@@ -148,7 +149,6 @@ io.on('connection', (socket) => {
             let turnChange = true;
             let playSound = null; 
 
-            // Bomba Kontrolü
             if (content1 === BOMB_EMOJI || content2 === BOMB_EMOJI) {
                 
                 message = "💣 BOMBA! Rakibe bir eşleşme hakkı kazandırdınız!";
@@ -160,7 +160,6 @@ io.on('connection', (socket) => {
 
             } else if (content1 === content2) {
                 
-                // Başarılı Eşleşme
                 message = "✅ Eşleşme! Sıra sizde kalıyor.";
                 playSound = 'MATCH_SOUND';
 
@@ -174,7 +173,6 @@ io.on('connection', (socket) => {
 
             } else {
                 
-                // Eşleşme Başarısız
                 message = "❌ Eşleşmedi. Sıra rakibe geçti.";
                 playSound = 'MISMATCH_SOUND';
                 
@@ -183,7 +181,6 @@ io.on('connection', (socket) => {
             }
 
             
-            // Kartların Kapanması için bekleme
             await new Promise(resolve => setTimeout(resolve, MATCH_DELAY));
             
             // Oyun Bitti mi Kontrolü
@@ -217,7 +214,7 @@ io.on('connection', (socket) => {
         room.isHandlingMove = false; 
     });
 
-    // --- SOHBET VE BAĞLANTI KESME OLAYLARI (Aynı) ---
+    // --- SOHBET VE BAĞLANTI KESME OLAYLARI ---
     socket.on('sendMessage', (data) => {
         const room = rooms[data.roomCode];
         if (!room) return;
@@ -262,4 +259,6 @@ server.listen(PORT, () => {
     console.log(`🔥 Bağlantı Adresi: ${host}`);
     console.log(`📢 index.html dosyasındaki LIVE_SERVER_URL değişkenini bu adresle EŞLEŞTİRMEYİ UNUTMAYIN.`);
     console.log(`--------------------------------------------------------------------------------`);
+    
+    // SUNUCU BAĞLANTISINI TEST ETMEK İÇİN: Tarayıcınızda ${host} adresine gitmeyi deneyin.
 });
