@@ -37,11 +37,10 @@ function initializeGame(boardSize) {
     gameData.cardsLeft = boardSize;
     gameData.turn = 0; // Host başlar
     gameData.isGameOver = false;
-    
-    // Her seviyede canları sıfırlama (server'dan gelen değerler kullanılacak)
-    gameData.hostLives = 0;
-    gameData.guestLives = 0;
-    
+    if (level === 1) {
+        gameData.hostLives = 2;
+        gameData.guestLives = 2;
+    }
     gameStage = 'WAITING';
 }
 
@@ -55,8 +54,8 @@ let selectedBombs = []; // Kendi seçtiğimiz bombaların indexleri
 let gameData = {
     board: [], 
     turn: 0,   // 0 = Host, 1 = Guest
-    hostLives: 0,  // Server'dan gelen değerlerle güncellenecek
-    guestLives: 0, // Server'dan gelen değerlerle güncellenecek
+    hostLives: 2,
+    guestLives: 2,
     cardsLeft: 0,
     hostBombs: [], 
     guestBombs: [],
@@ -293,16 +292,22 @@ function endGame(winnerRole) {
     }
     
     setTimeout(() => {
-        const nextLevel = level + 1;
-        showGlobalMessage(`🎮 Seviye ${nextLevel} Başlıyor!`, false);
-        
-        // Sadece Host, yeni seviye sinyalini gönderir.
-        if (isHost) {
-            socket.emit('nextLevel', { roomCode: currentRoomCode, newLevel: nextLevel });
+        if (level < LEVELS.length) {
+            level++;
+            showGlobalMessage(`🎮 Seviye ${level} Başlıyor! (${LEVELS[level-1]} Kart)`, false);
+            
+            // Sadece Host, yeni seviye sinyalini gönderir.
+            if (isHost) {
+                socket.emit('nextLevel', { roomCode: currentRoomCode, newLevel: level });
+            }
+            // Tüm oyuncular initializeGame'i çağırır (ya sinyalle ya da kendisi).
+            initializeGame(LEVELS[level - 1]);
+            drawBoard();
+            updateStatusDisplay();
+        } else {
+             showGlobalMessage("🏆 Tüm seviyeler tamamlandı! Harika oyund!", false);
+             setTimeout(() => resetGame(), 2000);
         }
-        
-        // Oyun durumunu sıfırla (bombalar ve canlar server'dan gelecek)
-        // Bu kısım nextLevel event'i ile otomatik olarak yapılacak
     }, 4000);
 }
 
@@ -320,18 +325,7 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
 
     // Oyun başlatılıyor
     level = 1; // Yeni oyuna başlarken seviyeyi 1'e sıfırla
-    
-    // İlk seviye için board boyutunu ayarla (12, 16 veya 20)
-    const boardSize = LEVELS[0]; // İlk seviye her zaman 12 kart
-    initializeGame(boardSize);
-    
-    // Can sayılarını server'dan gelen bilgiyle güncelle
-    socket.once('gameReady', ({ hostBombs, guestBombs }) => {
-        gameData.hostLives = hostBombs.length;
-        gameData.guestLives = guestBombs.length;
-        updateStatusDisplay();
-    });
-    
+    initializeGame(LEVELS[level - 1]);
     drawBoard();
     showScreen('game');
     showGlobalMessage(`🎮 Oyun ${opponentName} ile başladı! 🚀 Bombalar yerleştiriliyor...`, false);
@@ -341,32 +335,22 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     // --- SOCKET.IO İŞLEYİCİLERİ ---
 
     // Oyun Başlasın! (Bombalar otomatik seçildi)
-    socket.on('gameReady', (gameState) => {
-        console.log('🚀 gameReady EVENT ALINDI!', gameState);
+    socket.on('gameReady', ({ hostBombs, guestBombs }) => {
+        console.log('🚀 gameReady EVENT ALINDI!', { hostBombs, guestBombs, gameStage, isHost });
         
-        // Oyun durumunu güncelle
-        gameData.hostBombs = gameState.hostBombs || [];
-        gameData.guestBombs = gameState.guestBombs || [];
-        gameData.hostLives = gameState.hostLives || 2;
-        gameData.guestLives = gameState.guestLives || 2;
-        gameData.turn = gameState.turn || 0;
-        
+        gameData.hostBombs = hostBombs;
+        gameData.guestBombs = guestBombs;
         gameStage = 'PLAY';
+        gameData.turn = 0; // Host başlar
         
-        console.log('✅ Oyun durumu güncellendi:', {
-            hostBombs: gameData.hostBombs,
-            guestBombs: gameData.guestBombs,
-            hostLives: gameData.hostLives,
-            guestLives: gameData.guestLives,
-            turn: gameData.turn
-        });
+        console.log('✅ Oyun durumu PLAY olarak ayarlandı, board çiziliyor...');
         
         playSound(audioEmoji); // Başlama sesi
         showGlobalMessage('🚀 Oyun başlıyor! Kart açmayı başlatın!', false);
-        
-        // Oyun tahtasını çiz ve durumu güncelle
         drawBoard();
         updateStatusDisplay();
+        
+        console.log('✅ Board çizildi ve durum güncellendi!');
     });
 
     // gameData Olayı (Hamle Geldi - Kendi veya Rakip)
@@ -387,21 +371,8 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     // Seviye Atlama Sinyali
     socket.on('nextLevel', ({ newLevel }) => {
         level = newLevel;
-        
-        // Seviyeye göre board boyutunu hesapla (12, 16, 20, 20, 20, ...)
-        let boardSize = 12 + ((level - 1) * 4);
-        boardSize = Math.min(boardSize, 20); // Maksimum 20 kart
-        
-        showGlobalMessage(`🎆 Seviye ${level} - ${boardSize} Kart! Bombalar yerleştiriliyor...`, false);
-        
-        // Can sayılarını güncelle (server'dan gelen yeni bombalara göre)
-        socket.once('gameReady', ({ hostBombs, guestBombs }) => {
-            gameData.hostLives = hostBombs.length;
-            gameData.guestLives = guestBombs.length;
-            updateStatusDisplay();
-        });
-        
-        initializeGame(boardSize);
+        showGlobalMessage(`🎆 Seviye ${level} - ${LEVELS[level-1]} Kart! Bombalar yerleştiriliyor...`, false);
+        initializeGame(LEVELS[level - 1]);
         drawBoard();
         updateStatusDisplay();
     });
@@ -420,106 +391,9 @@ export function resetGame() {
 
 // Lobi Butonlarını dışarıdan erişilebilir yapıyoruz (index.html'in kullanması için)
 export const UIElements = {
-    matchBtn: document.getElementById('matchBtn'),
-    createRoomBtn: document.getElementById('createRoomBtn'),
-    showJoinRoomBtn: document.getElementById('showJoinRoomBtn'),
-    joinRoomBtn: document.getElementById('joinRoomBtn'),
-    roomCodeContainer: document.getElementById('roomCodeContainer'),
+    matchBtn: document.getElementById('matchBtn'), 
     roomCodeInput: document.getElementById('roomCodeInput'), 
-    usernameInput: document.getElementById('username'),
-    showGlobalMessage: showGlobalMessage,
-    showScreen: showScreen,
-    waitTitle: document.getElementById('waitTitle'),
-    codeArea: document.getElementById('codeArea'),
-    roomCodeDisplay: document.getElementById('roomCodeDisplay'),
-    copyCodeBtn: document.getElementById('copyCodeBtn'),
-    waitStatus: document.getElementById('waitStatus'),
-    cancelBtn: document.getElementById('cancelBtn')
+    usernameInput: document.getElementById('username'), 
+    showGlobalMessage, 
+    resetGame
 };
-
-// Yeni oda oluşturma butonu
-document.getElementById('createRoomBtn').addEventListener('click', () => {
-    const username = UIElements.usernameInput.value.trim();
-    if (username.length < 2) {
-        showGlobalMessage('Lütfen geçerli bir kullanıcı adı girin (en az 2 karakter)', true);
-        return;
-    }
-    
-    // Eğer zaten bir oda kodu varsa temizle
-    UIElements.roomCodeInput.value = '';
-    
-    // Sunucuya yeni oda oluşturma isteği gönder
-    socket.emit('createRoom', { username });
-    
-    // Bekleme ekranını göster
-    UIElements.waitTitle.textContent = 'Oda Kuruluyor...';
-    UIElements.codeArea.classList.add('hidden');
-    showScreen('wait');
-});
-
-// Odaya katıl butonuna basıldığında
-UIElements.showJoinRoomBtn.addEventListener('click', () => {
-    UIElements.roomCodeContainer.classList.remove('hidden');
-    UIElements.showJoinRoomBtn.classList.add('hidden');
-    UIElements.joinRoomBtn.classList.remove('hidden');
-    UIElements.createRoomBtn.classList.add('opacity-50', 'pointer-events-none');
-});
-
-// Odaya bağlan butonuna basıldığında
-UIElements.joinRoomBtn.addEventListener('click', () => {
-    const username = UIElements.usernameInput.value.trim();
-    const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
-    
-    if (username.length < 2) {
-        showGlobalMessage('Lütfen geçerli bir kullanıcı adı girin (en az 2 karakter)', true);
-        return;
-    }
-    
-    if (roomCode.length !== 4) {
-        showGlobalMessage('Lütfen geçerli bir oda kodu girin (4 karakter)', true);
-        return;
-    }
-    
-    // Sunucuya odaya katılma isteği gönder
-    socket.emit('joinRoom', { username, roomCode });
-    
-    // Bekleme ekranını göster
-    UIElements.waitTitle.textContent = `Odaya Katılılıyor: ${roomCode}`;
-    UIElements.codeArea.classList.add('hidden');
-    showScreen('wait');
-});
-
-// İptal butonu
-UIElements.cancelBtn.addEventListener('click', () => {
-    if (socket) {
-        socket.emit('cancelMatchmaking');
-    }
-    showScreen('lobby');
-    resetUI();
-});
-
-// Oda kodunu kopyala butonu
-UIElements.copyCodeBtn.addEventListener('click', () => {
-    const roomCode = UIElements.roomCodeDisplay.textContent;
-    navigator.clipboard.writeText(roomCode).then(() => {
-        const originalText = UIElements.copyCodeBtn.textContent;
-        UIElements.copyCodeBtn.textContent = 'Kopyalandı!';
-        UIElements.copyCodeBtn.classList.add('bg-green-600', 'hover:bg-green-500');
-        UIElements.copyCodeBtn.classList.remove('bg-gray-600', 'hover:bg-gray-500');
-        
-        setTimeout(() => {
-            UIElements.copyCodeBtn.textContent = originalText;
-            UIElements.copyCodeBtn.classList.remove('bg-green-600', 'hover:bg-green-500');
-            UIElements.copyCodeBtn.classList.add('bg-gray-600', 'hover:bg-gray-500');
-        }, 2000);
-    });
-});
-
-// UI'ı sıfırlama fonksiyonu
-function resetUI() {
-    UIElements.roomCodeContainer.classList.add('hidden');
-    UIElements.showJoinRoomBtn.classList.remove('hidden');
-    UIElements.joinRoomBtn.classList.add('hidden');
-    UIElements.createRoomBtn.classList.remove('opacity-50', 'pointer-events-none');
-    UIElements.roomCodeInput.value = '';
-}
