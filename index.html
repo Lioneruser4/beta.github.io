@@ -452,11 +452,12 @@
         });
         
         let clientRoomCode = '';
+        let isConnecting = false;
         
         function validateInput() {
             const username = UIElements.usernameInput.value.trim();
             if (username.length < 2) {
-                UIElements.showGlobalMessage('Lütfen geçerli bir kullanıcı adı girin.', true);
+                showGlobalMessage('Lütfen geçerli bir kullanıcı adı girin (en az 2 karakter)', true);
                 return false;
             }
             return username;
@@ -465,6 +466,7 @@
         // Socket event listeners
         socket.on('connect', () => {
             console.log('Sunucuya bağlandı. Socket ID:', socket.id);
+            isConnecting = false;
             showGlobalMessage('Sunucuya bağlanıldı!', false);
             showScreen('lobby');
         });
@@ -487,9 +489,11 @@
         socket.on('roomCreated', (roomCode) => {
             console.log('Oda oluşturuldu:', roomCode);
             clientRoomCode = roomCode;
-            document.getElementById('waitTitle').textContent = 'Rakip Bekleniyor...';
+            document.getElementById('waitTitle').textContent = 'Oda Kuruldu!';
             document.getElementById('roomCodeDisplay').textContent = roomCode;
             document.getElementById('codeArea').classList.remove('hidden');
+            document.getElementById('waitStatus').textContent = 'Oda kodunu arkadaşınızla paylaşın.';
+            showScreen('wait');
         });
 
         // Odaya katıldığında
@@ -501,6 +505,7 @@
 
         // Oyun başladığında
         socket.on('gameStart', ({ players, roomCode }) => {
+            console.log('Oyun başladı:', { players, roomCode });
             const opponent = players.find(p => p.id !== socket.id);
             const self = players.find(p => p.id === socket.id);
             
@@ -509,8 +514,10 @@
                 const selfName = UIElements.usernameInput.value.trim();
                 setupSocketHandlers(socket, roomCode, self.isHost, opponent.username, selfName);
                 showScreen('game');
+                showGlobalMessage('Oyun başladı! İyi eğlenceler!', false);
             } else {
-                showGlobalMessage('Oyun başlatılırken bir hata oluştu.', true);
+                console.error('Oyun başlatılırken hata: Oyuncu bilgileri eksik');
+                showGlobalMessage('Oyun başlatılırken bir hata oluştu. Lütfen tekrar deneyin.', true);
                 showScreen('lobby');
             }
         });
@@ -552,16 +559,27 @@
         }
 
         function createRoom(username) {
+            if (isConnecting) {
+                console.log('Zaten bağlantı kuruluyor...');
+                return;
+            }
+            
             console.log('Oda oluşturuluyor...');
+            isConnecting = true;
+            
             showScreen('wait');
             document.getElementById('waitTitle').textContent = 'Oda Kuruluyor...';
             document.getElementById('codeArea').classList.add('hidden');
+            document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
             
             socket.emit('createRoom', { username }, (response) => {
+                isConnecting = false;
                 if (response && response.error) {
                     console.error('Oda oluşturma hatası:', response.error);
-                    showGlobalMessage(response.error, true);
+                    showGlobalMessage('Oda oluşturulamadı: ' + response.error, true);
                     showScreen('lobby');
+                } else {
+                    console.log('Oda oluşturma isteği gönderildi');
                 }
             });
         }
@@ -707,7 +725,22 @@
         UIElements.createBtn.addEventListener('click', () => {
             const username = validateInput();
             if (!username) return;
-            createRoom(username);
+            
+            // Socket bağlı değilse bağlanmayı dene
+            if (!socket.connected) {
+                console.log('Socket bağlı değil, yeniden bağlanılıyor...');
+                socket.connect();
+                // Kısa bir bekleme süresi ekle
+                setTimeout(() => {
+                    if (socket.connected) {
+                        createRoom(username);
+                    } else {
+                        showGlobalMessage('Sunucuya bağlanılamadı. Lütfen sayfayı yenileyin.', true);
+                    }
+                }, 500);
+            } else {
+                createRoom(username);
+            }
         });
 
         UIElements.joinBtn.addEventListener('click', () => {
