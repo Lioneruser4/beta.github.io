@@ -9,7 +9,7 @@
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     
     <style>
-        /* === KENDİ OYUNUNUZDAN ALINAN CSS STİLLERİ VE MOBİL UYUM === */
+        /* === CSS STİLLERİ === */
         
         :root {
             --primary-color: #3498db;
@@ -164,7 +164,8 @@
     <audio id="WAIT_SOUND" src="sound3.mp3" preload="auto"></audio>
 
     <script type="module">
-        import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage, gameData, isHost, level, LEVELS } from './game.js';
+        // KRİTİK: game.js bir modül olarak yükleniyor
+        import { setupSocketHandlers, showScreen, UIElements, gameData, isHost, level, LEVELS } from './game.js';
 
         // KRİTİK ADRES: Kendi Render URL'niz
         const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
@@ -227,7 +228,7 @@
                     const opponent = players.find(p => p.id !== socket.id);
                     const self = players.find(p => p.id === socket.id);
                     
-                    // setupSocketHandlers imzasına uyumlu gönderim
+                    // setupSocketHandlers imzasına uyumlu gönderim (6 parametre)
                     setupSocketHandlers(socket, UIElements.roomCodeInput.value, self.username, opponent.username, self.isHost, initialGameData);
                 });
 
@@ -255,7 +256,7 @@
         
         // Yeni Seviye/Oyunu Bitir Butonunun Dinleyicisi
         document.getElementById('endGameBtn').addEventListener('click', () => {
-            // gameData ve isHost değişkenleri game.js'den import edildiği varsayılır.
+            // gameData ve isHost değişkenleri game.js'den import edildi.
             if (gameData && gameData.gameStage === 'ENDED' && isHost) {
                 if (level < LEVELS.length) {
                     // Host olarak bir sonraki seviyeye geçme sinyalini gönder
