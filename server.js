@@ -7,13 +7,17 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// CORS DÜZELTME: Tüm kaynaklardan gelen bağlantılara izin verir
+// Gelişmiş CORS ve bağlantı ayarları
 const io = new Server(server, {
     cors: {
-        origin: "*", 
-        methods: ["GET", "POST"]
+        origin: "*",
+        methods: ["GET", "POST"],
+        credentials: true
     },
-    transports: ['websocket', 'polling'] 
+    transports: ['websocket', 'polling'],
+    pingTimeout: 30000, // 30 saniye
+    pingInterval: 25000, // 25 saniyede bir ping
+    cookie: false
 });
 
 const rooms = {}; 
@@ -37,7 +41,12 @@ function generateRoomCode() {
 }
 
 io.on('connection', (socket) => {
-    console.log(`Yeni bağlantı: ${socket.id}`);
+    console.log(`Yeni bağlantı: ${socket.id} - IP: ${socket.handshake.address}`);
+    
+    // Bağlantı zaman aşımı ayarı
+    socket.conn.on('heartbeat', () => {
+        socket.conn.transport.socket.refreshTimeout();
+    });
     
     socket.on('createRoom', ({ username }) => {
         const code = generateRoomCode();
