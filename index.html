@@ -572,14 +572,34 @@
             document.getElementById('codeArea').classList.add('hidden');
             document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
             
-            socket.emit('createRoom', { username }, (response) => {
-                isConnecting = false;
-                if (response && response.error) {
-                    console.error('Oda oluşturma hatası:', response.error);
-                    showGlobalMessage('Oda oluşturulamadı: ' + response.error, true);
+            console.log('Sunucuya oda oluşturma isteği gönderiliyor...');
+            
+            // 10 saniyelik timeout ekle
+            const timeout = setTimeout(() => {
+                if (isConnecting) {
+                    console.error('Oda oluşturma zaman aşımına uğradı');
+                    showGlobalMessage('Sunucu yanıt vermiyor. Lütfen tekrar deneyin.', true);
                     showScreen('lobby');
+                    isConnecting = false;
+                }
+            }, 10000);
+            
+            socket.emit('createRoom', { username }, (response) => {
+                clearTimeout(timeout);
+                isConnecting = false;
+                
+                if (response && response.success) {
+                    console.log('Oda başarıyla oluşturuldu:', response.roomCode);
+                    clientRoomCode = response.roomCode;
+                    document.getElementById('waitTitle').textContent = 'Oda Kuruldu!';
+                    document.getElementById('roomCodeDisplay').textContent = response.roomCode;
+                    document.getElementById('codeArea').classList.remove('hidden');
+                    document.getElementById('waitStatus').textContent = 'Oda kodunu arkadaşınızla paylaşın.';
                 } else {
-                    console.log('Oda oluşturma isteği gönderildi');
+                    const errorMessage = (response && response.error) || 'Bilinmeyen bir hata oluştu';
+                    console.error('Oda oluşturma hatası:', errorMessage);
+                    showGlobalMessage('Oda oluşturulamadı: ' + errorMessage, true);
+                    showScreen('lobby');
                 }
             });
         }
