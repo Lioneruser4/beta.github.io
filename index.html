@@ -169,6 +169,24 @@
         .vibrate {
             animation: vibrate 0.1s linear infinite;
         }
+
+        /* CHAT STİLLERİ */
+        .chat-container { width: 100%; background: #ffffff; border-radius: 0.5rem; border: 1px solid #d1d5db; box-shadow: var(--shadow); }
+        .chat-header { padding: 6px 12px; font-size: 0.875rem; color: #4b5563; border-bottom: 1px solid #e5e7eb; background: #f9fafb; border-top-left-radius: 0.5rem; border-top-right-radius: 0.5rem; }
+        .chat-messages { height: 180px; overflow-y: auto; padding: 8px; background: #f9fafb; }
+        .chat-input { display: flex; align-items: center; gap: 8px; padding: 8px; border-top: 1px solid #e5e7eb; background: #ffffff; border-bottom-left-radius: 0.5rem; border-bottom-right-radius: 0.5rem; }
+        .bubble { display: inline-block; padding: 8px 10px; border-radius: 16px; max-width: 75%; box-shadow: var(--shadow); word-break: break-word; }
+        .bubble.me { background: #dcf8c6; align-self: flex-end; }
+        .bubble.other { background: #ffffff; align-self: flex-start; }
+        .msg-row { display: flex; margin: 4px 0; gap: 6px; }
+        .msg-row.me { justify-content: flex-end; }
+        .msg-meta { font-size: 10px; color: #6b7280; margin-top: 2px; }
+
+        /* Küçük toast (chat bildirimi) */
+        #chatToast { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 60; display: none; }
+        #chatToast.show { display: block; animation: fadeInOut 3s ease forwards; }
+        .chat-toast-content { background: rgba(17,24,39,0.9); color: #fff; padding: 8px 12px; border-radius: 14px; font-size: 12px; box-shadow: var(--shadow); }
+        @keyframes fadeInOut { 0% { opacity: 0; transform: translate(-50%, 10px);} 10% { opacity: 1; transform: translate(-50%, 0);} 80% { opacity: 1;} 100% { opacity: 0; transform: translate(-50%, 10px);} }
     </style>
 </head>
 <body class="bg-gray-900 select-none">
@@ -233,11 +251,24 @@
             
             <div id="gameBoard" class="grid w-full max-w-sm mx-auto">
                 </div>
-            
-        </div>
         
+        </div>
+
+        <!-- CHAT BÖLMESİ -->
+        <div class="chat-container">
+            <div class="chat-header">💬 Sohbet</div>
+            <div id="chatMessages" class="chat-messages"></div>
+            <div class="chat-input">
+                <input id="chatInput" type="text" class="flex-1 input-field !text-base !py-2 !px-3 !bg-white !border-gray-300 !text-gray-900" placeholder="Mesaj yaz..." maxlength="300" />
+                <button id="chatSend" class="btn bg-blue-600 text-white text-sm py-2 px-3 max-w-xs w-auto">Gönder</button>
+            </div>
+        </div>
+    
         <button id="endGameBtn" class="btn bg-red-600 hover:bg-red-500 text-white text-sm py-2 max-w-xs">🚪 Oyundan Çık</button>
     </div>
+
+    <!-- CHAT TOAST -->
+    <div id="chatToast"><div class="chat-toast-content" id="chatToastText"></div></div>
 
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
@@ -245,6 +276,7 @@
         // Render URL'niz: Lütfen bu kısmı KENDİ URL'nizle değiştirin!
         const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
         let socket;
+        let clientRoomCode = '';
         
         function validateInput() {
             const username = UIElements.usernameInput.value.trim();
@@ -296,6 +328,7 @@
                     const self = players.find(p => p.id === socket.id);
                     
                     // Server'dan gelen gerçek oda kodunu aktar
+                    clientRoomCode = roomCode;
                     setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
                 });
 
@@ -305,6 +338,70 @@
             }
         }
         
+        // --- Chat Yardımcıları ---
+        const chatMessagesEl = document.getElementById('chatMessages');
+        const chatInputEl = document.getElementById('chatInput');
+        const chatSendBtn = document.getElementById('chatSend');
+        const chatToast = document.getElementById('chatToast');
+        const chatToastText = document.getElementById('chatToastText');
+
+        function renderChatMessage({ text, name, ts, senderId }) {
+            const isMe = senderId === socket.id;
+            const row = document.createElement('div');
+            row.className = 'msg-row' + (isMe ? ' me' : '');
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble ' + (isMe ? 'me' : 'other');
+            bubble.textContent = text;
+            const meta = document.createElement('div');
+            meta.className = 'msg-meta';
+            const date = new Date(ts);
+            meta.textContent = (isMe ? 'Sen' : name) + ' • ' + date.toLocaleTimeString();
+            const wrapper = document.createElement('div');
+            wrapper.style.maxWidth = '85%';
+            wrapper.appendChild(bubble);
+            wrapper.appendChild(meta);
+            row.appendChild(wrapper);
+            chatMessagesEl.appendChild(row);
+            chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+        }
+
+        function showChatPopup(text) {
+            chatToastText.textContent = text;
+            chatToast.classList.remove('show');
+            // yeniden tetiklemek için reflow
+            void chatToast.offsetWidth;
+            chatToast.classList.add('show');
+            setTimeout(() => chatToast.classList.remove('show'), 3000);
+        }
+
+        function sendChat() {
+            const text = chatInputEl.value.trim();
+            if (!text || !socket || !socket.connected || !clientRoomCode) return;
+            socket.emit('chatMessage', { roomCode: clientRoomCode, text });
+            chatInputEl.value = '';
+        }
+
+        // Socket chat dinleyici
+        function attachChatHandlers() {
+            if (!socket) return;
+            socket.on('chatMessage', (payload) => {
+                renderChatMessage(payload);
+                // Toast: küçük balon popup
+                showChatPopup(`${payload.name}: ${payload.text}`);
+            });
+        }
+
+        // İlk bağlantıda handlerları bağla
+        document.addEventListener('DOMContentLoaded', () => {
+            attachChatHandlers();
+        });
+
+        // UI eventleri
+        document.getElementById('chatSend').addEventListener('click', sendChat);
+        document.getElementById('chatInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sendChat();
+        });
+
         // --- Olay Dinleyicileri ---
         UIElements.matchBtn.addEventListener('click', () => {
             const username = validateInput();
