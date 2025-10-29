@@ -291,12 +291,12 @@
                     UIElements.resetGame();
                 });
                 
-                socket.on('gameStart', (players) => {
+                socket.on('gameStart', ({ players, roomCode }) => {
                     const opponent = players.find(p => p.id !== socket.id);
                     const self = players.find(p => p.id === socket.id);
                     
-                    // Oyunu başlatmak için game.js'deki fonksiyona devret
-                    setupSocketHandlers(socket, UIElements.roomCodeInput.value, self.isHost, opponent.username);
+                    // Server'dan gelen gerçek oda kodunu aktar
+                    setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
                 });
 
             } catch (e) {
