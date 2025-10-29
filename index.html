@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>💣 Emoji Bomb 1v1 - Mobil Uyumlu</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -61,6 +62,170 @@
         }
         .screen.active { 
             display: flex; 
+        }
+        
+        /* Language Selector */
+        .language-selector {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            z-index: 100;
+        }
+        
+        .language-button {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #3498db;
+            border-radius: 20px;
+            padding: 5px 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: all 0.2s;
+        }
+        
+        .language-button:hover {
+            background: #f0f0f0;
+        }
+        
+        .language-options {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-top: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            z-index: 101;
+            min-width: 150px;
+        }
+        
+        .language-option {
+            padding: 8px 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .language-option:hover {
+            background: #f5f5f5;
+        }
+        
+        /* Chat Interface */
+        .chat-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 280px;
+            max-height: 400px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            z-index: 90;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .chat-header {
+            background: #3498db;
+            color: white;
+            padding: 12px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+            max-height: 300px;
+        }
+        
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 15px;
+            max-width: 80%;
+            word-wrap: break-word;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .message.self {
+            background: #e3f2fd;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+        
+        .message.opponent {
+            background: #f1f1f1;
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+        }
+        
+        .chat-input-container {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #eee;
+            background: #f9f9f9;
+        }
+        
+        .chat-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+            font-size: 14px;
+        }
+        
+        .send-button {
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            margin-left: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .send-button:hover {
+            background: #2980b9;
+        }
+        
+        .chat-notification {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            max-width: 250px;
+            display: none;
+            z-index: 100;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
         
         /* Utility */
@@ -172,6 +337,36 @@
     </style>
 </head>
 <body class="bg-gray-900 select-none">
+    <!-- Language Selector -->
+    <div class="language-selector">
+        <button id="language-button" class="language-button" onclick="toggleLanguageSelector()">
+            <span id="current-language">🇦🇿 AZ</span>
+            <i class="fas fa-chevron-down"></i>
+        </button>
+        <div id="language-selector" class="language-options">
+            <div class="language-option" onclick="setLanguage('az')">🇦🇿 Azərbaycanca</div>
+            <div class="language-option" onclick="setLanguage('tr')">🇹🇷 Türkçe</div>
+            <div class="language-option" onclick="setLanguage('en')">🇬🇧 English</div>
+        </div>
+    </div>
+    
+    <!-- Chat Notification -->
+    <div id="chat-notification" class="chat-notification"></div>
+    
+    <!-- Chat Interface -->
+    <div id="chat-container" class="chat-container">
+        <div class="chat-header" onclick="toggleChat()">
+            <span>💬 Chat</span>
+            <i id="chat-toggle-icon" class="fas fa-chevron-down"></i>
+        </div>
+        <div id="chat-messages" class="chat-messages"></div>
+        <div class="chat-input-container">
+            <input type="text" id="chat-input" class="chat-input" placeholder="Type a message...">
+            <button id="send-message" class="send-button" onclick="sendChatMessage()">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
 
     <div id="globalMessage" class="hidden w-11/12 max-w-md p-4 bg-red-600 text-white rounded-lg shadow-lg">
         <p id="globalMessageText"></p>
@@ -239,8 +434,104 @@
         <button id="endGameBtn" class="btn bg-red-600 hover:bg-red-500 text-white text-sm py-2 max-w-xs">🚪 Oyundan Çık</button>
     </div>
 
+    <!-- Include the language manager -->
+    <script src="languages.js"></script>
+    
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
+        
+        // Initialize language manager
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize language after DOM is loaded
+            window.languageManager.initLanguage();
+            
+            // Set up chat input to send on Enter key
+            const chatInput = document.getElementById('chat-input');
+            if (chatInput) {
+                chatInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        sendChatMessage();
+                    }
+                });
+            }
+        });
+        
+        // Chat functions
+        function toggleChat() {
+            const chatContainer = document.getElementById('chat-container');
+            const chatMessages = document.getElementById('chat-messages');
+            const chatToggleIcon = document.getElementById('chat-toggle-icon');
+            
+            if (chatContainer.classList.contains('collapsed')) {
+                chatContainer.classList.remove('collapsed');
+                chatMessages.style.display = 'block';
+                chatToggleIcon.className = 'fas fa-chevron-down';
+            } else {
+                chatContainer.classList.add('collapsed');
+                chatMessages.style.display = 'none';
+                chatToggleIcon.className = 'fas fa-chevron-up';
+            }
+        }
+        
+        function showChatNotification(message) {
+            const notification = document.getElementById('chat-notification');
+            if (notification) {
+                notification.textContent = message;
+                notification.style.display = 'block';
+                
+                // Play notification sound
+                const notificationSound = new Audio('sound4.mp3');
+                notificationSound.play().catch(e => console.log('Could not play notification sound:', e));
+                
+                // Hide after 3 seconds
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 3000);
+            }
+        }
+        
+        function addChatMessage(message, isSelf = false) {
+            const chatMessages = document.getElementById('chat-messages');
+            if (chatMessages) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${isSelf ? 'self' : 'opponent'}`;
+                messageDiv.textContent = message;
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+                // Show notification if chat is collapsed or not visible
+                const chatContainer = document.getElementById('chat-container');
+                if (chatContainer && chatContainer.classList.contains('collapsed')) {
+                    showChatNotification(message);
+                }
+            }
+        }
+        
+        function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            
+            if (message && socket) {
+                // Emit chat message to server
+                socket.emit('chatMessage', {
+                    roomCode: currentRoomCode,
+                    message: message
+                });
+                
+                // Add to own chat
+                addChatMessage(message, true);
+                
+                // Clear input
+                input.value = '';
+            }
+        }
+        
+        // Make functions globally available
+        window.toggleChat = toggleChat;
+        window.sendChatMessage = sendChatMessage;
+        window.addChatMessage = addChatMessage;
+        window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
+        window.setLanguage = languageManager.setLanguage;
 
         // Render URL'niz: Lütfen bu kısmı KENDİ URL'nizle değiştirin!
         const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
