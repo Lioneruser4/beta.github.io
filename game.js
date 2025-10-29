@@ -162,7 +162,6 @@ function drawBoard() {
             }
         }
         
-        // SADECE sırası gelen, eşleşmemiş ve açık olmayan kartlara tıklama ekle
         if (canClick && !isMatched && !isFlipped) {
             cardContainer.addEventListener('click', handleCardClick);
             cardContainer.classList.add('cursor-pointer');
@@ -209,7 +208,6 @@ function sendMove(index) {
     }
 }
 
-// Sunucudan Kart Açma Bilgisi Geldiğinde (Senkronizasyon Düzeltmesi)
 function handleGameStateUpdate(data) {
     const { flippedCardIndex, flippedCards, matchedCards, scoreHost, scoreGuest, cardContent } = data;
     
@@ -230,7 +228,6 @@ function handleGameStateUpdate(data) {
     drawBoard(); 
 }
 
-// Sunucudan Sıra Değişikliği Bilgisi Geldiğinde 
 function handleTurnUpdate(data) {
     gameData.currentTurnId = data.turn;
     
