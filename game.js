@@ -19,7 +19,6 @@ const actionMessageEl = document.getElementById('actionMessage');
 const myNameEl = document.getElementById('myName'); 
 const opponentNameEl = document.getElementById('opponentName'); 
 
-// Sohbet Referansları
 const chatInputEl = document.getElementById('chatInput');
 const sendChatBtn = document.getElementById('sendChatBtn');
 const messagesEl = document.getElementById('messages');
@@ -45,7 +44,7 @@ let gameData = {
     scoreGuest: 0
 };
 
-// --- TEMEL UI FONKSİYONLARI (Aynı) ---
+// --- TEMEL UI FONKSİYONLARI ---
 export function showScreen(screenId) {
     Object.values(screens).forEach(screen => screen && screen.classList.remove('active'));
     if (screens[screenId]) { screens[screenId].classList.add('active'); }
@@ -158,13 +157,12 @@ function drawBoard() {
         if (isMatched || isFlipped) {
             card.classList.add('flipped');
             if (isMatched) { cardContainer.classList.add('matched'); }
-            // Bomba seçildiyse bomb-chosen sınıfını ekle (Görsel geri bildirim için)
             if (content === BOMB_EMOJI && isFlipped && !isMatched) {
                  card.classList.add('bomb-chosen');
             }
         }
         
-        // SADECE sırası gelen, eşleşmemiş ve açık olmayan kartlara tıklama ekle (KRİTİK)
+        // SADECE sırası gelen, eşleşmemiş ve açık olmayan kartlara tıklama ekle
         if (canClick && !isMatched && !isFlipped) {
             cardContainer.addEventListener('click', handleCardClick);
             cardContainer.classList.add('cursor-pointer');
@@ -193,12 +191,10 @@ function handleCardClick(event) {
     
     if (gameData.flippedCards.includes(cardIndex) || gameData.matchedCards.has(cardIndex)) return;
     
-    // 2. kart çevriliyorsa, animasyon kilidini aç
     if (gameData.flippedCards.length === 1) { 
         gameData.isAnimating = true; 
     }
     
-    // Tıklamaları hemen engelle (2. kartı beklerken)
     gameBoardEl.querySelectorAll('.card-container').forEach(el => el.removeEventListener('click', handleCardClick));
     
     sendMove(cardIndex);
@@ -222,7 +218,6 @@ function handleGameStateUpdate(data) {
     gameData.scoreHost = scoreHost;
     gameData.scoreGuest = scoreGuest;
 
-    // Açılan kartı görsel olarak çevir (Hem kendi hareketin hem rakibinki)
     const cardElement = document.querySelector(`.card[data-index="${flippedCardIndex}"]`);
     if (cardElement && !cardElement.classList.contains('flipped')) {
         cardElement.classList.add('flipped'); 
@@ -239,7 +234,6 @@ function handleGameStateUpdate(data) {
 function handleTurnUpdate(data) {
     gameData.currentTurnId = data.turn;
     
-    // Kart Kapatma İşlemi
     if (data.flippedCards && data.flippedCards.length === 0) {
         gameData.flippedCards.forEach(index => {
             const cardElement = document.querySelector(`.card[data-index="${index}"]`);
@@ -251,12 +245,10 @@ function handleTurnUpdate(data) {
         gameData.flippedCards = [];
     }
     
-    // Puan ve Eşleşme Güncelleme
     gameData.matchedCards = new Set(data.matchedCards || gameData.matchedCards);
     gameData.scoreHost = data.scoreHost;
     gameData.scoreGuest = data.scoreGuest;
 
-    // Ses ve Animasyon
     if (data.playSound) {
         playSound(data.playSound); 
     }
