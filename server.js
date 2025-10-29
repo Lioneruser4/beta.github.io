@@ -86,15 +86,16 @@ io.on('connection', (socket) => {
         if (isHost) {
             room.gameState.hostBombs = bombs;
             room.gameState.hostBombsSelected = true;
-            console.log(`Host bombaları seçti: ${roomCode}`);
+            console.log(`Host bombaları seçti (${bombs.length} adet): ${roomCode}`, bombs);
         } else {
             room.gameState.guestBombs = bombs;
             room.gameState.guestBombsSelected = true;
-            console.log(`Guest bombaları seçti: ${roomCode}`);
+            console.log(`Guest bombaları seçti (${bombs.length} adet): ${roomCode}`, bombs);
         }
 
         // Her iki oyuncu da seçtiyse oyunu başlat
         if (room.gameState.hostBombsSelected && room.gameState.guestBombsSelected) {
+            console.log(`✅ Her iki bomba seti hazır! Host: ${room.gameState.hostBombs.length}, Guest: ${room.gameState.guestBombs.length}`);
             room.gameState.stage = 'PLAY';
             room.gameState.turn = 0; // Host başlar
             
