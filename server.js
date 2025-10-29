@@ -109,53 +109,97 @@ io.on('connection', (socket) => {
         }
     });
     
-    // Basit odaya katılma işlemi
+    // Odaya katılma işlemi
     socket.on('joinRoom', ({ username, roomCode }) => {
-        console.log('Odaya katılma isteği:', username, roomCode);
+        console.log('Odaya katılma isteği alındı:', { 
+            socketId: socket.id, 
+            username: username, 
+            roomCode: roomCode 
+        });
         
-        // Odayı bul
-        const room = rooms.get(roomCode);
-        
-        // Oda yoksa hata gönder
-        if (!room) {
-            console.log('Oda bulunamadı:', roomCode);
-            socket.emit('joinFailed', 'Bu oda bulunamadı. Lütfen kodu kontrol edin.');
-            return;
-        }
-        
-        // Oda dolu mu kontrol et
-        if (room.players.length >= 2) {
-            console.log('Oda dolu:', roomCode);
-            socket.emit('joinFailed', 'Bu oda zaten dolu.');
-            return;
-        }
-        
-        // Yeni oyuncuyu ekle
-        const player = {
-            id: socket.id,
-            username: username || 'Oyuncu-' + socket.id.substring(0, 4),
-            isHost: false,
-            score: 0,
-            lives: 3
-        };
-        
-        room.players.push(player);
-        socket.join(roomCode);
-        
-        console.log(`Kullanıcı odaya eklendi: ${player.username} (${roomCode})`);
-        
-        // İkinci oyuncu geldiğinde oyunu başlat
-        if (room.players.length === 2) {
-            console.log('İki oyuncu da hazır, oyun başlıyor:', roomCode);
-            io.to(roomCode).emit('gameStart', {
-                players: room.players,
-                roomCode: roomCode,
-                level: room.level
+        try {
+            // Eksik parametre kontrolü
+            if (!username || !roomCode) {
+                const errorMsg = 'Eksik bilgi: Kullanıcı adı veya oda kodu eksik';
+                console.error(errorMsg);
+                socket.emit('joinFailed', 'Lütfen geçerli bir oda kodu girin');
+                return;
+            }
+            
+            // Oda kodunu temizle ve büyük harfe çevir
+            roomCode = roomCode.trim().toUpperCase();
+            console.log('Temizlenmiş oda kodu:', roomCode);
+            
+            // Odayı bul
+            const room = rooms.get(roomCode);
+            
+            // Oda yoksa hata gönder
+            if (!room) {
+                console.error('Oda bulunamadı:', roomCode);
+                socket.emit('joinFailed', 'Bu oda bulunamadı. Lütfen kodu kontrol edin.');
+                return;
+            }
+            
+            // Oda dolu mu kontrol et
+            if (room.players.length >= 2) {
+                console.error('Oda dolu:', roomCode);
+                socket.emit('joinFailed', 'Bu oda zaten dolu. Lütfen başka bir oda seçin.');
+                return;
+            }
+            
+            // Aynı kullanıcı adı kontrolü
+            const isUsernameTaken = room.players.some(p => p.username === username);
+            if (isUsernameTaken) {
+                console.error('Kullanıcı adı zaten alınmış:', username);
+                socket.emit('joinFailed', 'Bu kullanıcı adı zaten alınmış. Lütfen farklı bir isim seçin.');
+                return;
+            }
+            
+            // Yeni oyuncuyu oluştur
+            const player = {
+                id: socket.id,
+                username: username,
+                isHost: false,
+                score: 0,
+                lives: 3,
+                joinedAt: new Date()
+            };
+            
+            // Oyuncuyu odaya ekle
+            room.players.push(player);
+            socket.join(roomCode);
+            
+            console.log(`Kullanıcı odaya eklendi: ${player.username} (${roomCode})`);
+            console.log('Oda bilgisi:', {
+                odaKodu: roomCode,
+                oyuncuSayisi: room.players.length,
+                oyuncular: room.players.map(p => p.username)
             });
-        } else {
-            // İlk oyuncuya onay gönder
-            socket.emit('joinSuccess', { roomCode });
-        }
+            
+            // İkinci oyuncu geldiğinde oyunu başlat
+            if (room.players.length === 2) {
+                console.log('İki oyuncu da hazır, oyun başlıyor:', roomCode);
+                
+                // Oyun başlangıç zamanını ayarla
+                room.startedAt = new Date();
+                room.status = 'playing';
+                
+                // Tüm oyunculara oyunun başladığını bildir
+                io.to(roomCode).emit('gameStart', {
+                    players: room.players,
+                    roomCode: roomCode,
+                    level: room.level || 1
+                });
+                
+                console.log('Oyun başlatıldı:', roomCode);
+            } else {
+                // İlk oyuncuya başarılı katılım bilgisi gönder
+                socket.emit('joinSuccess', { 
+                    roomCode: roomCode,
+                    message: 'Odaya başarıyla katıldınız. İkinci oyuncu bekleniyor...'
+                });
+                console.log('İkinci oyuncu bekleniyor:', roomCode);
+            }
     });
     
     // Oyun verilerini işle
