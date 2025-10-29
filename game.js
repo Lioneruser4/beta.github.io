@@ -16,6 +16,7 @@ const actionMessageEl = document.getElementById('actionMessage');
 const myLivesEl = document.getElementById('myLives');
 const opponentLivesEl = document.getElementById('opponentLives');
 const opponentNameEl = document.getElementById('opponentName');
+const myNameEl = document.getElementById('myName');
 const roleStatusEl = document.getElementById('roleStatus');
 
 // SESLER
@@ -42,6 +43,12 @@ function initializeGame(boardSize) {
         gameData.guestLives = 2;
     }
     gameStage = 'WAITING';
+    bombsHitThisLevel = 0;
+}
+
+function bombsThreshold(lv) {
+    // 1. level: 2, her seviyede +1 (server ile uyumlu)
+    return Math.max(2, 1 + lv);
 }
 
 // --- OYUN DURUMU ---
@@ -61,6 +68,7 @@ let gameData = {
     guestBombs: [],
     isGameOver: false
 };
+let bombsHitThisLevel = 0;
 
 const EMOTICONS = ['🙂', '😂', '😍', '😎', '🤩', '👍', '🎉', '🌟', '🍕', '🐱'];
 
@@ -245,6 +253,7 @@ async function applyMove(index, emoji, isBomb) {
         } else { 
             gameData.guestLives--;
         }
+        bombsHitThisLevel++;
         
         playSound(audioBomb);
         showGlobalMessage(`BOOM! Bombaya bastınız!`, true);
@@ -260,7 +269,27 @@ async function applyMove(index, emoji, isBomb) {
         gameData.turn = gameData.turn === 0 ? 1 : 0;
         updateStatusDisplay();
         
-        // Oyun bitişini kontrol et
+        // Seviye atlama kuralı: toplam patlayan bomba eşiğe ulaştıysa yeni seviyeye geç
+        const threshold = bombsThreshold(level);
+        if (bombsHitThisLevel >= threshold) {
+            setTimeout(() => {
+                if (level < LEVELS.length) {
+                    level++;
+                    if (isHost) {
+                        socket.emit('nextLevel', { roomCode: currentRoomCode, newLevel: level });
+                    }
+                    initializeGame(LEVELS[level - 1]);
+                    drawBoard();
+                    updateStatusDisplay();
+                    showGlobalMessage(`🎮 Seviye ${level} Başlıyor! (${LEVELS[level-1]} Kart)`, false);
+                } else {
+                    showGlobalMessage('🏆 Tüm seviyeler tamamlandı!', false);
+                }
+            }, 400);
+            return;
+        }
+
+        // Oyun bitişini kontrol et (canlar biterse)
         if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
             const winner = (gameData.hostLives <= 0 && gameData.guestLives <= 0) ? 'DRAW' : (gameData.hostLives <= 0 ? 'Guest' : 'Host');
             endGame(winner);
@@ -312,7 +341,7 @@ function endGame(winnerRole) {
 }
 
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
-export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
+export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex, selfName) {
     console.log('🎯 setupSocketHandlers ÇAĞRILDI!', { roomCode, isHost: host, opponent: opponentNameFromIndex });
     
     socket = s;
@@ -321,6 +350,7 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     opponentName = opponentNameFromIndex;
     
     opponentNameEl.textContent = opponentName;
+    if (selfName) myNameEl.textContent = selfName;
     roleStatusEl.textContent = isHost ? "🎮 Rol: HOST (Sen başla)" : "🎮 Rol: GUEST (Rakip başlar)";
 
     // Oyun başlatılıyor
@@ -386,12 +416,13 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
 
 export function resetGame() {
     // Tüm oyun ayarlarını sıfırlar ve lobiye döner (En güvenli yol: Sayfayı yenilemek)
-    window.location.reload(); 
+    window.location.reload();
 }
 
 // Lobi Butonlarını dışarıdan erişilebilir yapıyoruz (index.html'in kullanması için)
 export const UIElements = {
-    matchBtn: document.getElementById('matchBtn'), 
+    createBtn: document.getElementById('createBtn'), 
+    joinBtn: document.getElementById('joinBtn'), 
     roomCodeInput: document.getElementById('roomCodeInput'), 
     usernameInput: document.getElementById('username'), 
     showGlobalMessage, 
