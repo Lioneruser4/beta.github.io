@@ -411,31 +411,63 @@
         
         // Odaya katıl butonu için event listener
         document.getElementById('joinRoomBtn').addEventListener('click', () => {
-            const username = validateInput();
-            if (!username) return;
-            
-            const roomCodeInput = document.getElementById('roomCodeInput');
-            const roomCode = roomCodeInput.value.trim().toUpperCase();
-            
-            if (roomCode.length !== 4) {
-                showGlobalMessage('Lütfen geçerli bir oda kodu girin (4 karakter)', true);
-                return;
-            }
-            
-            showScreen('wait');
-            document.getElementById('waitTitle').textContent = `Odaya Katılım: ${roomCode}`;
-            document.getElementById('waitStatus').textContent = 'Bağlanılıyor...';
-            document.getElementById('codeArea').classList.add('hidden');
-            
-            console.log('Odaya katılma isteği gönderiliyor:', roomCode);
-            socket.emit('joinRoom', { username, roomCode }, (response) => {
-                console.log('Sunucu yanıtı:', response);
-                if (response && response.error) {
-                    console.error('Odaya katılma hatası:', response.error);
-                    showGlobalMessage('Odaya katılırken bir hata oluştu: ' + response.error, true);
-                    showScreen('lobby');
+            try {
+                const username = validateInput();
+                if (!username) return;
+                
+                const roomCodeInput = document.getElementById('roomCodeInput');
+                const roomCode = roomCodeInput.value.trim().toUpperCase();
+                
+                if (roomCode.length !== 4) {
+                    showGlobalMessage('Lütfen geçerli bir oda kodu girin (4 karakter)', true);
+                    return;
                 }
-            });
+                
+                showScreen('wait');
+                document.getElementById('waitTitle').textContent = `Odaya Katılım: ${roomCode}`;
+                document.getElementById('waitStatus').textContent = 'Bağlanılıyor...';
+                document.getElementById('codeArea').classList.add('hidden');
+                
+                console.log('Odaya katılma isteği gönderiliyor:', roomCode);
+                
+                // Sunucuya odaya katılma isteği gönder
+                socket.emit('joinRoom', { 
+                    username: username,
+                    roomCode: roomCode
+                }, (response) => {
+                    console.log('Sunucu yanıtı (callback):', response);
+                    if (response && response.error) {
+                        console.error('Odaya katılma hatası (callback):', response.error);
+                        showGlobalMessage('Odaya katılırken bir hata oluştu: ' + response.error, true);
+                        showScreen('lobby');
+                    }
+                });
+                
+                // Oda oluşturulduğunda tetiklenen event
+                socket.on('roomCreated', (code) => {
+                    console.log('Oda oluşturuldu, oda kodu:', code);
+                    document.getElementById('roomCodeDisplay').textContent = code;
+                    document.getElementById('codeArea').classList.remove('hidden');
+                    document.getElementById('waitStatus').textContent = 'Oda kodunu arkadaşınıza gönderin...';
+                });
+                
+                // Odaya katılma başarılı olduğunda tetiklenen event
+                socket.on('joinSuccess', (data) => {
+                    console.log('Odaya başarıyla katıldı:', data);
+                });
+                
+                // Odaya katılma başarısız olduğunda tetiklenen event
+                socket.on('joinFailed', (message) => {
+                    console.error('Odaya katılamadı:', message);
+                    showGlobalMessage('Odaya katılamadı: ' + message, true);
+                    showScreen('lobby');
+                });
+                
+            } catch (error) {
+                console.error('Odaya katılırken beklenmeyen hata:', error);
+                showGlobalMessage('Bir hata oluştu: ' + error.message, true);
+                showScreen('lobby');
+            }
         });
         
         // Oda kodu input'unda enter tuşuna basınca da katılma işlemi yap
