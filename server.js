@@ -92,11 +92,14 @@ io.on('connection', (socket) => {
         
         console.log(`🎲 Otomatik bombalar yerleştirildi - Host: ${room.gameState.hostBombs}, Guest: ${room.gameState.guestBombs}`);
         
-        // Oyunu başlat
-        io.to(code).emit('gameReady', {
-            hostBombs: room.gameState.hostBombs,
-            guestBombs: room.gameState.guestBombs
-        });
+        // Client'ın socket dinleyicilerini kurması için kısa bir gecikme
+        setTimeout(() => {
+            io.to(code).emit('gameReady', {
+                hostBombs: room.gameState.hostBombs,
+                guestBombs: room.gameState.guestBombs
+            });
+            console.log(`🚀 gameReady sinyali gönderildi: ${code}`);
+        }, 500);
     });
 
     // Oyun hamlesi
@@ -168,11 +171,14 @@ io.on('connection', (socket) => {
         // Her iki oyuncuya da yeni seviyeyi bildir
         io.to(roomCode).emit('nextLevel', { newLevel });
         
-        // Yeni bombaları gönder
-        io.to(roomCode).emit('gameReady', {
-            hostBombs: room.gameState.hostBombs,
-            guestBombs: room.gameState.guestBombs
-        });
+        // Yeni bombaları kısa gecikme ile gönder
+        setTimeout(() => {
+            io.to(roomCode).emit('gameReady', {
+                hostBombs: room.gameState.hostBombs,
+                guestBombs: room.gameState.guestBombs
+            });
+            console.log(`🚀 Yeni seviye gameReady gönderildi: ${roomCode}`);
+        }, 500);
     });
 
     socket.on('disconnect', () => {
