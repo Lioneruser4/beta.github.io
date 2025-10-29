@@ -227,6 +227,28 @@ io.on('connection', (socket) => {
         }, 500);
     });
 
+    // Chat mesajlarını işle
+    socket.on('chatMessage', ({ roomCode, message }) => {
+        const room = rooms[roomCode];
+        if (!room) return;
+        
+        // Gönderen oyuncuyu bul
+        const player = [
+            { id: room.hostId, username: room.hostUsername },
+            { id: room.guestId, username: room.guestUsername }
+        ].find(p => p.id === socket.id);
+        if (!player) return;
+        
+        // Odaya mesajı yayınla
+        io.to(roomCode).emit('chatMessage', {
+            senderId: socket.id,
+            username: player.username,
+            message: message,
+            timestamp: new Date().toISOString()
+        });
+    });
+
+    // Bağlantı kesildiğinde
     socket.on('disconnect', () => {
         console.log(`Bağlantı kesildi: ${socket.id}`);
         for (const code in rooms) {
