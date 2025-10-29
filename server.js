@@ -6,14 +6,29 @@ const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
+const PORT = process.env.PORT || 10000;
 
-// CORS DÜZELTME: Tüm kaynaklardan gelen bağlantılara izin verir
+// CORS ve Socket.IO yapılandırması
 const io = new Server(server, {
     cors: {
-        origin: "*", 
-        methods: ["GET", "POST"]
+        origin: [
+            'https://beta-github-io.onrender.com',
+            'http://localhost:3000',
+            'http://127.0.0.1:5500',
+            'http://localhost:5500',
+            'https://xaliq2008.github.io'
+        ],
+        methods: ["GET", "POST"],
+        credentials: true
     },
-    transports: ['websocket', 'polling'] 
+    transports: ['websocket', 'polling'],
+    path: '/socket.io/'
+});
+
+// Sunucuyu başlat
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Sunucu ${PORT} portunda çalışıyor`);
+    console.log(`🔌 Socket.IO yolu: ${io.path()}`);
 });
 
 const rooms = {}; 
@@ -271,7 +286,4 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Sunucu port ${PORT} üzerinde çalışıyor.`);
-});
+// Sunucu zaten yukarıda başlatıldı
