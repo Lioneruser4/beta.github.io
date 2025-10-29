@@ -38,9 +38,10 @@ function initializeGame(boardSize) {
     gameData.turn = 0; // Host başlar
     gameData.isGameOver = false;
     
-    // Her seviyede canları sıfırlama (server'dan gelen değerler kullanılacak)
-    gameData.hostLives = 0;
-    gameData.guestLives = 0;
+    // Seviyeye göre can ve bomba sayısını ayarla
+    const bombCount = level === 1 ? 2 : 3;
+    gameData.hostLives = bombCount;
+    gameData.guestLives = bombCount;
     
     gameStage = 'WAITING';
 }
@@ -321,8 +322,8 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     // Oyun başlatılıyor
     level = 1; // Yeni oyuna başlarken seviyeyi 1'e sıfırla
     
-    // İlk seviye için board boyutunu ayarla (12, 16 veya 20)
-    const boardSize = LEVELS[0]; // İlk seviye her zaman 12 kart
+    // İlk seviye için board boyutunu ayarla (8 kart ile başla)
+    const boardSize = 8; //LEVELS[0]; // İlk seviye her zaman 12 kart
     initializeGame(boardSize);
     
     // Can sayılarını server'dan gelen bilgiyle güncelle
@@ -388,9 +389,9 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     socket.on('nextLevel', ({ newLevel }) => {
         level = newLevel;
         
-        // Seviyeye göre board boyutunu hesapla (12, 16, 20, 20, 20, ...)
-        let boardSize = 12 + ((level - 1) * 4);
-        boardSize = Math.min(boardSize, 20); // Maksimum 20 kart
+        // Seviyeye göre board boyutunu hesapla (8, 12, 16, 20, 20, ...)
+            let boardSize = 8 + ((level - 1) * 4);
+            boardSize = Math.min(boardSize, 20); // Maksimum 20 kart
         
         showGlobalMessage(`🎆 Seviye ${level} - ${boardSize} Kart! Bombalar yerleştiriliyor...`, false);
         
