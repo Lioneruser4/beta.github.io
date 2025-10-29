@@ -1,33 +1,51 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 
-// Statik dosyalar
-app.use(express.static(path.join(__dirname, '/')));
-
-// Ana sayfa
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// CORS ayarları
+// Gelişmiş CORS ve bağlantı ayarları
 const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  },
-  transports: ['websocket', 'polling']
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST", "OPTIONS"],
+        allowedHeaders: ["my-custom-header"],
+        credentials: true
+    },
+    // Sadece WebSocket kullan
+    transports: ['websocket'],
+    // Zaman aşımı ayarları
+    pingTimeout: 60000, // 60 saniye
+    pingInterval: 30000, // 30 saniyede bir ping
+    cookie: false,
+    // Hata ayıklama modu
+    allowEIO3: true
 });
 
-// Oda yönetimi
-const rooms = new Map();
+// HTTP isteklerini dinle
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    next();
+});
 
-// Oyun için kullanılacak emojiler
-const EMOJIS = ['😀', '😎', '🦄', '🐱', '🍀', '🍕', '🌟', '⚽', '🎵', '🚀', '🎲', '🥇'];
+// Basit bir kök endpoint
+app.get('/', (req, res) => {
+    res.send('Sunucu çalışıyor!');
+});
+
+const rooms = {}; 
+
+// Seviye başına board boyutu ve bomba sayısı
+const BOARD_SIZES = [12, 16, 20];
+function bombsPerPlayer(level) {
+    // 1. seviye: 2 bomba, her seviyede +1 artsın
+    return Math.max(2, 1 + level); // level=1 -> 2, 2->3, 3->4
+}
+
+// Oyun için kullanılacak rastgele emojiler
+const EMOJIS = ['😀','😎','🦄','🐱','🍀','🍕','🌟','⚽','🎵','🚀','🎲','🥇'];
 
 // Oda kodu oluşturma
 function generateRoomCode() {
