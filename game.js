@@ -31,6 +31,19 @@ function playSound(audioElement) {
     clone.play().catch(() => {});
 }
 
+// Oyun başlatma / seviye hazırlama
+function initializeGame(boardSize) {
+    gameData.board = Array.from({ length: boardSize }, () => ({ opened: false, content: '' }));
+    gameData.cardsLeft = boardSize;
+    gameData.turn = 0; // Host başlar
+    gameData.isGameOver = false;
+    if (level === 1) {
+        gameData.hostLives = 2;
+        gameData.guestLives = 2;
+    }
+    gameStage = 'WAITING';
+}
+
 // --- OYUN DURUMU ---
 let level = 1; 
 // GÜNCELLENMİŞ KART SAYILARI: 12 (4x3), 16 (4x4), 20 (4x5)
@@ -70,23 +83,6 @@ export function showGlobalMessage(message, isError = true) {
 }
 
 // --- OYUN MANTIĞI VE ÇİZİM ---
-
-function initializeGame(initialBoardSize) {
-    gameData.board = Array(initialBoardSize).fill(null).map(() => ({
-        opened: false,
-        content: '?',
-        isBomb: false
-    }));
-    gameData.cardsLeft = initialBoardSize;
-    gameData.hostLives = 2;
-    gameData.guestLives = 2;
-    gameData.hostBombs = [];
-    gameData.guestBombs = [];
-    selectedBombs = [];
-    gameData.turn = 0;
-    gameData.isGameOver = false;
-    gameStage = 'WAITING'; // Otomatik seçim bekleniyor
-}
 
 function drawBoard() {
     const boardSize = LEVELS[level - 1];
