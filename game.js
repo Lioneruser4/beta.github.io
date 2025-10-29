@@ -1,11 +1,11 @@
-// Dosya Adı: game.js (Sıra Kontrollü Güncel Sürüm)
+// Dosya Adı: game.js (Sıra Kontrollü ve Düzeltilmiş Sürüm)
 let socket;
 let currentRoomCode = '';
-export let isHost = false; // index.html'den gelen değerle güncellenecek
-let opponentName = '';
-export let myName = ''; 
+export let isHost = false; 
+let opponentName = ''; 
+let myName = ''; 
 
-// --- DOM Referansları ---
+// --- DOM Referansları (Arayüzde kullanıldığı varsayılır) ---
 const screens = { 
     lobby: document.getElementById('lobby'), 
     wait: document.getElementById('waitScreen'), 
@@ -23,7 +23,6 @@ const endGameBtn = document.getElementById('endGameBtn');
 // SESLER (index.html'den alınır)
 const audioBomb = document.getElementById('BOMB_SOUND'); 
 const audioEmoji = document.getElementById('EMOJI_SOUND');
-// const audioWait = document.getElementById('WAIT_SOUND'); // Şu an kullanılmıyor
 
 function playSound(audioElement) {
     if (!audioElement) return;
@@ -33,7 +32,7 @@ function playSound(audioElement) {
 }
 
 // --- OYUN DURUMU (Server'dan senkronize edilir) ---
-export const LEVELS = [12, 16, 20]; // Dışarıya açıldı
+export const LEVELS = [12, 16, 20]; 
 export let level = 1; 
 let selectedBombs = []; 
 export let gameData = {
@@ -45,7 +44,6 @@ export let gameData = {
     hostBombs: [], 
     guestBombs: [],
     gameStage: 'SELECTION', // 'SELECTION', 'PLAY', 'ENDED'
-    isGameOver: false // Kullanılmıyor, gameStage ile yönetiliyor
 };
 
 
@@ -74,7 +72,7 @@ export function showGlobalMessage(message, isError = true) {
 
 function drawBoard() {
     
-    // Grid düzenini 4 sütun (4x3, 4x4, 4x5 için)
+    // Grid düzenini 4 sütun için ayarla
     gameBoardEl.className = 'grid w-full max-w-sm mx-auto memory-board'; 
     gameBoardEl.style.gridTemplateColumns = 'repeat(4, 1fr)'; 
     
@@ -112,10 +110,11 @@ function drawBoard() {
             }
             
             // Tıklama Olayı: Sadece sırası gelene veya seçim aşamasında
-            const canClick = (gameData.gameStage === 'SELECTION') || (gameData.gameStage === 'PLAY' && isMyTurn);
+            const canClick = (gameData.gameStage === 'SELECTION' && selectedBombs.length < 3) || (gameData.gameStage === 'PLAY' && isMyTurn);
             
-            // Tıklama olayını her çizimde temizle ve yeniden ata
+            // Önceki olay dinleyicisini kaldır
             cardContainer.removeEventListener('click', handleCardClick);
+            
             if (canClick) {
                 cardContainer.classList.add('cursor-pointer');
                 cardContainer.addEventListener('click', handleCardClick);
@@ -143,6 +142,10 @@ function updateStatusDisplay() {
         turnStatusEl.textContent = 'OYUN BİTTİ!';
         turnStatusEl.classList.remove('text-green-600', 'text-red-600');
         turnStatusEl.classList.add('text-blue-700');
+        
+        if (isHost) {
+             endGameBtn.textContent = "Yeni Seviye / Oyunu Bitir";
+        }
         return;
     }
     
@@ -186,17 +189,16 @@ function handleCardClick(event) {
     if (gameData.gameStage === 'SELECTION') {
         if (selectedBombs.includes(cardIndex)) {
             selectedBombs = selectedBombs.filter(i => i !== cardIndex);
-            cardElement.classList.remove('bomb-selected');
         } else if (selectedBombs.length < 3) {
             selectedBombs.push(cardIndex);
-            cardElement.classList.add('bomb-selected');
+        } else {
+            return; // 3 tane seçildiyse daha fazlasına izin verme
         }
         drawBoard(); 
         
         if (selectedBombs.length === 3) {
             // Bombaları sunucuya gönder
             socket.emit('bombSelectionComplete', { roomCode: currentRoomCode, isHost: isHost, bombs: selectedBombs });
-            // Hemen durumu güncelle ki tekrar tıklamasın
             updateStatusDisplay();
         }
     } else if (gameData.gameStage === 'PLAY') {
@@ -209,13 +211,13 @@ function handleCardClick(event) {
 
 function sendMove(index) {
     if (socket && socket.connected) {
-        // Tıklanan kartı hemen çevir (kullanıcıya anında geri bildirim)
+        // Tıklamayı devredışı bırak (Sunucudan yanıt gelene kadar)
+        gameBoardEl.querySelectorAll('.card-container').forEach(el => el.removeEventListener('click', handleCardClick));
+        
+        // Tıklanan kartı anında çevir (UX için)
         const cardElement = document.querySelector(`.card[data-index="${index}"]`);
         if(cardElement) cardElement.classList.add('flipped');
 
-        // Tıklamayı devredışı bırak
-        gameBoardEl.querySelectorAll('.card-container').forEach(el => el.removeEventListener('click', handleCardClick));
-        
         socket.emit('gameData', {
             roomCode: currentRoomCode,
             type: 'MOVE',
@@ -226,13 +228,13 @@ function sendMove(index) {
 
 
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
-// KRİTİK: isHostStatus parametresi index.html'den doğru gelmeli!
+
 export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername, isHostStatus, initialGameData) {
     socket = s;
     currentRoomCode = roomCode;
     myName = selfUsername;
     opponentName = opponentUsername;
-    isHost = isHostStatus; // Host bilgisi index.html'den alındı
+    isHost = isHostStatus; 
 
     opponentNameEl.textContent = opponentName;
     roleStatusEl.textContent = isHost ? "Rolünüz: HOST (Başlatıcı)" : "Rolünüz: GUEST (Katılımcı)";
@@ -240,7 +242,7 @@ export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername,
     // Oyun durumunu sunucudan gelenle başlat
     gameData = { ...gameData, ...initialGameData };
     level = gameData.level;
-    selectedBombs = isHost ? gameData.hostBombs : gameData.guestBombs; // Bombası önceden seçilmişse yükle
+    selectedBombs = isHost ? gameData.hostBombs : gameData.guestBombs;
 
     drawBoard();
     showScreen('game');
@@ -248,12 +250,12 @@ export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername,
     
     // --- SOCKET.IO İŞLEYİCİLERİ ---
 
-    // YENİ: Rakip Seçim Yaptı
+    // Rakip Seçim Yaptı
     socket.off('opponentSelectionMade').on('opponentSelectionMade', () => {
         actionMessageEl.textContent = "Rakip bombasını seçti. Lütfen siz de 3 bomba seçin.";
     });
 
-    // YENİ: Seçim Tamamlandı
+    // Seçim Tamamlandı
     socket.off('selectionComplete').on('selectionComplete', (data) => {
         gameData.gameStage = data.gameStage;
         gameData.turn = data.turn;
@@ -261,7 +263,7 @@ export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername,
         drawBoard(); 
     });
 
-    // YENİ VE KRİTİK: Oyun Durumu Güncellemesi (Hareketten Sonra)
+    // KRİTİK: Oyun Durumu Güncellemesi (Hareketten Sonra)
     socket.off('gameStateUpdate').on('gameStateUpdate', (data) => {
         
         // 1. Oyun Verilerini Güncelle
@@ -274,7 +276,7 @@ export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername,
         // 2. Ses ve Mesaj
         if (data.hitBomb) {
             playSound(audioBomb);
-            showGlobalMessage(`BOOM! ${isHost ? opponentName : myName} bombaya bastı!`, true);
+            showGlobalMessage(`BOOM! ${data.turn === (isHost ? 1 : 0) ? 'Rakibiniz' : 'Siz'} bombaya bastı!`, true);
         } else {
             playSound(audioEmoji);
         }
@@ -288,15 +290,11 @@ export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername,
             const winnerText = data.winner === 'DRAW' ? 'BERABERE' : 
                                (data.winner === (isHost ? 'Host' : 'Guest') ? 'SİZ KAZANDINIZ 🎉' : `${opponentName} KAZANDI 😢`);
             turnStatusEl.textContent = `OYUN BİTTİ! ${winnerText}`;
-            actionMessageEl.textContent = isHost ? 'Yeni seviyeye geçmek için butona basın.' : 'Host yeni seviyeye geçmesini bekleyin.';
-            
-            if (isHost) {
-                 endGameBtn.textContent = "Yeni Seviye / Oyunu Bitir";
-            }
+            actionMessageEl.textContent = isHost ? 'Yeni seviyeye geçmek için butona basın.' : 'Host\'un yeni seviyeye geçmesini bekleyin.';
         }
     });
 
-    // YENİ: Seviye Başlatma Sinyali (Host'tan Gelir)
+    // Seviye Başlatma Sinyali (Host'tan Gelir)
     socket.off('levelStart').on('levelStart', ({ initialGameData: newGameData, newLevel }) => {
         level = newLevel;
         gameData = { ...gameData, ...newGameData };
