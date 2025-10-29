@@ -404,38 +404,89 @@
             });
         });
         
-        // Odaya katıl butonu için basit event listener
-        document.getElementById('joinRoomBtn').addEventListener('click', () => {
-            const username = validateInput();
-            if (!username) return;
-            
-            const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-            if (!roomCode) {
-                showGlobalMessage('Lütfen bir oda kodu girin', true);
-                return;
-            }
-            
-            showScreen('wait');
-            document.getElementById('waitTitle').textContent = 'Odaya Bağlanılıyor...';
-            document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
-            
-            console.log('Odaya katılım denemesi:', roomCode);
-            socket.emit('joinRoom', { username, roomCode });
-        });
+        // Odaya katıl butonu için geliştirilmiş event listener
+        document.getElementById('joinRoomBtn').addEventListener('click', joinRoom);
         
         // Oda kodu input'unda enter tuşu desteği
         document.getElementById('roomCodeInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                document.getElementById('joinRoomBtn').click();
+                joinRoom();
             }
         });
         
-        // Oda kodu input'unda enter tuşuna basınca da katılma işlemi yap
-        document.getElementById('roomCodeInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                document.getElementById('joinRoomBtn').click();
+        // Odaya katılma fonksiyonu
+        function joinRoom() {
+            console.log('Odaya katılma işlemi başlatılıyor...');
+            
+            // Kullanıcı adını kontrol et
+            const username = validateInput();
+            if (!username) {
+                console.log('Geçersiz kullanıcı adı');
+                return;
             }
-        });
+            
+            // Oda kodunu al ve temizle
+            const roomCodeInput = document.getElementById('roomCodeInput');
+            const roomCode = roomCodeInput.value.trim().toUpperCase();
+            
+            console.log('Girilen oda kodu:', roomCode);
+            
+            // Oda kodunu kontrol et
+            if (!roomCode) {
+                console.log('Oda kodu boş');
+                showGlobalMessage('Lütfen bir oda kodu girin', true);
+                roomCodeInput.focus();
+                return;
+            }
+            
+            // Oda kodu formatını kontrol et (4 karakter)
+            if (roomCode.length !== 4) {
+                console.log('Geçersiz oda kodu uzunluğu:', roomCode.length);
+                showGlobalMessage('Oda kodu 4 karakter olmalıdır', true);
+                roomCodeInput.focus();
+                roomCodeInput.select();
+                return;
+            }
+            
+            // Bekleme ekranını göster
+            showScreen('wait');
+            document.getElementById('waitTitle').textContent = 'Odaya Bağlanılıyor...';
+            document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
+            
+            console.log('Sunucuya odaya katılma isteği gönderiliyor...');
+            
+            // Sunucuya odaya katılma isteği gönder
+            socket.emit('joinRoom', { 
+                username: username,
+                roomCode: roomCode 
+            });
+            
+            // 5 saniye içinde yanıt gelmezse hata göster
+            const timeout = setTimeout(() => {
+                if (currentScreen === 'wait') {
+                    console.log('Sunucu yanıt vermedi, zaman aşımı');
+                    showGlobalMessage('Sunucuya bağlanılamadı. Lütfen tekrar deneyin.', true);
+                    showScreen('lobby');
+                }
+            }, 5000);
+            
+            // Başarılı katılım
+            socket.once('joinSuccess', (data) => {
+                clearTimeout(timeout);
+                console.log('Odaya başarıyla katıldı:', data);
+                // Oyun ekranına geçiş gameStart event'inde yapılacak
+            });
+            
+            // Hata durumu
+            socket.once('joinFailed', (message) => {
+                clearTimeout(timeout);
+                console.error('Odaya katılamadı:', message);
+                showGlobalMessage('Odaya katılamadı: ' + message, true);
+                showScreen('lobby');
+                roomCodeInput.focus();
+                roomCodeInput.select();
+            });
+        }
 
         document.getElementById('cancelBtn').addEventListener('click', UIElements.resetGame);
         document.getElementById('endGameBtn').addEventListener('click', UIElements.resetGame);
