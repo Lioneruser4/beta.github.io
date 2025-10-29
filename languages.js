@@ -5,8 +5,8 @@ const languages = {
         // Lobby
         enterName: 'Adınızı daxil edin',
         startGame: 'Oyun başlasın',
-        joinGame: 'Oyuna qoşul',
-        roomCode: 'Otaq kodu',
+        joinGame: '✅ Otaq Yarat ✅',
+        roomCode: '✅ Otaqa Bağlan ✅',
         // Game
         yourTurn: '✅ SİZİN NÖVBƏNİZ!',
         opponentTurn: '⏳ Rəqibin növbəsi',
