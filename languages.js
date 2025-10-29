@@ -4,11 +4,11 @@ const languages = {
         languageName: '🇦🇿 Azərbaycanca',
         // Lobby
         enterName: 'İstifadəçi Adınızı Daxil Edin',
-        // --- Dəyişiklik 1: 'oyun' butonu ---
-        startGame: '✅ Otaq Qur ✅/ ➕ Odaya Bağlan ➕',
-        // --- Dəyişiklik 2: 'baslayin' butonu (join məntiqi) ---
-        joinGame: '✅ Otaq Qur ✅ / ➕ Odaya Bağlan ➕',
-        // --- Dəyişiklik 3: Otaq Kodu placeholder ---
+        // --- Dəyişiklik 1: 'oyun' butonu (Otaq Qur) ---
+        startGame: '✅ Otaq Qur ✅   ➕ Otağa Bağlan ➕',
+        // --- Dəyişiklik 2: 'baslayin' butonu (Odaya Bağlan) ---
+        joinGame: '✅ Otaq Qur ✅    ➕ Otağa Bağlan ➕',
+        // --- Dəyişiklik 3: Otaq Kodu placeholder (əvvəlki kimi) ---
         roomCode: 'Otaq Kodu (Boş buraxın=Yeni Otaq)',
         // Game
         yourTurn: '✅ SİZİN NÖVBƏNİZ!',
@@ -39,11 +39,11 @@ const languages = {
         languageName: '🇹🇷 Türkçe',
         // Lobby
         enterName: 'Kullanıcı Adınızı Girin',
-        // --- Dəyişiklik 1: 'oyun' butonu ---
-        startGame: '➕ Otaq Qur / Odaya Bağlan',
-        // --- Dəyişiklik 2: 'baslayin' butonu (join məntiqi) ---
-        joinGame: '➕ Otaq Qur / Odaya Bağlan',
-        // --- Dəyişiklik 3: Otaq Kodu placeholder ---
+        // --- Dəyişiklik 1: 'oyun' butonu (Oda Kur) ---
+        startGame: '✅ Otaq Qur ✅/ ➕ Odaya Bağlan ➕',
+        // --- Dəyişiklik 2: 'baslayin' butonu (Odaya Bağlan) ---
+        joinGame: '✅ Otaq Qur ✅ / ➕ Odaya Bağlan ➕',
+        // --- Dəyişiklik 3: Otaq Kodu placeholder (əvvəlki kimi) ---
         roomCode: 'Oda Kodu (Boş Bırakın=Yeni Oda)',
         // Game
         yourTurn: '✅ SIRADA SİZ!',
@@ -74,11 +74,11 @@ const languages = {
         languageName: '🇬🇧 English',
         // Lobby
         enterName: 'Enter Your Username',
-        // --- Dəyişiklik 1: 'oyun' butonu ---
-        startGame: '➕ Otaq Qur / Odaya Bağlan',
-        // --- Dəyişiklik 2: 'baslayin' butonu (join məntiqi) ---
-        joinGame: '➕ Otaq Qur / Odaya Bağlan',
-        // --- Dəyişiklik 3: Otaq Kodu placeholder ---
+        // --- Dəyişiklik 1: 'oyun' butonu (Create Room) ---
+        startGame: '✅ Otaq Qur ✅/ ➕ Odaya Bağlan ➕',
+        // --- Dəyişiklik 2: 'baslayin' butonu (Join Room) ---
+        joinGame: '✅ Otaq Qur ✅ / ➕ Odaya Bağlan ➕',
+        // --- Dəyişiklik 3: Otaq Kodu placeholder (əvvəlki kimi) ---
         roomCode: 'Room Code (Leave Blank=New Room)',
         // Game
         yourTurn: '✅ YOUR TURN!',
@@ -106,8 +106,6 @@ const languages = {
         roleGuest: '🎮 Role: GUEST (Opponent starts)'
     }
 };
-
-// ... (qalan kod dəyişdirilmədi)
 
 // Detect user's language based on IP or browser settings
 function detectLanguage() {
@@ -204,14 +202,15 @@ function updateUI() {
     // Update lobby text
     const nameInput = document.getElementById('username');
     const startBtn = document.getElementById('matchBtn');
-    // Qeyd: joinBtn sizin HTML-də yoxdur, amma bu JS-də var. Ona görə dəyişdirildi.
     const joinBtn = document.getElementById('joinBtn'); 
     const roomInput = document.getElementById('roomCodeInput');
     
+    // --- Bu hissə dəyişiklikləri tətbiq edir ---
     if (nameInput) nameInput.placeholder = t('enterName');
     if (startBtn) startBtn.textContent = t('startGame');
     if (joinBtn) joinBtn.textContent = t('joinGame');
     if (roomInput) roomInput.placeholder = t('roomCode');
+    // ----------------------------------------
     
     // Update game UI if in game
     updateGameUI();
