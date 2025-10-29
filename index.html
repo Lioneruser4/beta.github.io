@@ -2,11 +2,11 @@
 <html lang="tr">
 <head>
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1779293358827927"
-     crossorigin="anonymous"></script>
+      crossorigin="anonymous"></script>
     
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>💣 Emoji Bomb V4 - Eş Zamanlı + Sohbet</title>
+    <title>💣 Emoji Bomb V4 - Hafıza Oyunu</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -49,11 +49,8 @@
         .card-face.front { background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: white; border: 3px solid var(--card-bg); transform: rotateY(0deg); z-index: 2; }
         .card-face.back { background: var(--card-bg); color: var(--text-color); transform: rotateY(180deg); z-index: 1; }
 
-        .card-face.back.bg-red-200 { background-color: #fecaca; }
-        
-        @keyframes vibrate { 0% { transform: translate(1px, 1px) rotate(0deg); } 20% { transform: translate(-1px, -2px) rotate(-1deg); } 40% { transform: translate(-3px, 0px) rotate(1deg); } 60% { transform: translate(3px, 2px) rotate(0deg); } 80% { transform: translate(1px, -1px) rotate(-1deg); } 100% { transform: translate(-1px, 2px) rotate(1deg); } }
-        .vibrate { animation: vibrate 0.1s linear 5; }
-        /* CSS Bitişi */
+        .card-container.matched .card { pointer-events: none; opacity: 0.5; } /* Eşleşen kartları hafifçe soluklaştır */
+
     </style>
 </head>
 <body class="bg-gray-900 select-none">
@@ -66,7 +63,7 @@
         <h1 class="text-5xl font-black text-gray-900">💣 Emoji Bomb V4</h1>
         <p class="text-gray-700">Eş Zamanlı Hafıza Avı. Kullanıcı adınızı girin.</p>
         
-        <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adı">
+        <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adı" value="Oyuncu1">
         <input type="text" id="roomCodeInput" class="input-field uppercase" placeholder="Oda Numarası (Boş bırak=Oluştur)">
         
         <button id="matchBtn" class="btn btn-primary">🎮 Oda Oluştur / Odaya Gir</button>
@@ -80,16 +77,16 @@
             <button id="copyCodeBtn" class="btn bg-gray-600 text-white text-base py-2 max-w-xs">Kopyala</button>
         </div>
         <p id="waitStatus" class="text-lg text-gray-700"></p>
-        <button id="cancelBtn" class="btn bg-red-600 text-base py-3 max-w-xs" onclick="resetGame()">İptal Et</button>
+        <button id="cancelBtn" class="btn bg-red-600 text-base py-3 max-w-xs">İptal Et / Lobiye Dön</button>
     </div>
 
     <div id="gameScreen" class="screen space-y-6 container">
         <h1 class="text-5xl font-black text-gray-900">🕹️ Eş Zamanlı Av</h1>
         
         <div class="flex justify-between w-full text-gray-800 font-bold p-2 border-b border-gray-300">
-            <p><span id="myName" class="text-blue-600"></span>: <span id="myLives" class="text-green-600">❤️❤️</span></p>
+            <p><span id="myName" class="text-blue-600"></span></p>
             <p>vs</p>
-            <p><span id="opponentName" class="text-blue-600"></span>: <span id="opponentLives" class="text-green-600">❤️❤️</span></p>
+            <p><span id="opponentName" class="text-blue-600"></span></p>
         </div>
         <p id="roleStatus" class="text-gray-700 text-sm"></p>
 
@@ -117,14 +114,15 @@
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage, resetGame } from './game.js';
 
-        // RENDER URL'NİZ BURAYA OTOMATİK OLARAK AYARLANDI:
+        // ! ÖNEMLİ: Bu URL, sunucunuzun (server.js'in çalıştığı yer) URL'si olmalıdır.
+        // ! Eğer Render kullanıyorsanız, burayı kendi Render URL'nizle değiştirin.
         const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
         let socket;
         
         function validateInput() {
             const username = UIElements.usernameInput.value.trim();
             if (username.length < 2) {
-                UIElements.showGlobalMessage('Lütfen geçerli bir kullanıcı adı girin.', true);
+                UIElements.showGlobalMessage('Lütfen geçerli bir kullanıcı adı girin (min 2 karakter).', true);
                 return false;
             }
             return username;
@@ -132,7 +130,6 @@
 
         function connectToServer() {
             try {
-                // Render uyumluluğu için transports dizisi önceliklendirildi.
                 socket = io(LIVE_SERVER_URL, {
                     transports: ['websocket', 'polling'], 
                     reconnectionAttempts: 5, 
@@ -146,12 +143,14 @@
                 
                 socket.on('connect_error', (err) => {
                     console.error('Bağlantı Hatası:', err);
-                    UIElements.showGlobalMessage('HATA: Sunucuya erişilemiyor. Konsolu kontrol edin.', true);
+                    UIElements.showGlobalMessage('HATA: Sunucuya erişilemiyor. (Render URL doğru mu?)', true);
                     showScreen('lobby');
                 });
                 
                 socket.on('disconnect', () => {
-                    UIElements.showGlobalMessage('Bağlantı kesildi. Tekrar bağlanmaya çalışılıyor...', true);
+                    UIElements.showGlobalMessage('Bağlantı kesildi. Lobiye dönülüyor.', true);
+                    // Sayfa yenileme yerine lobiyi göster
+                    showScreen('lobby'); 
                 });
 
                 // --- Eşleşme Olayları ---
@@ -165,7 +164,7 @@
                 
                 socket.on('joinFailed', (message) => {
                     UIElements.showGlobalMessage(message, true);
-                    UIElements.resetGame();
+                    showScreen('lobby'); // Giriş başarısızsa lobiye dön
                 });
                 
                 // OYUN BAŞLANGIÇ SİNYALİ
@@ -173,9 +172,15 @@
                     const self = data.players.find(p => p.id === socket.id);
                     const opponent = data.players.find(p => p.id !== socket.id);
                     
+                    if (!opponent) {
+                        UIElements.showGlobalMessage('Rakip bilgisi eksik!', true);
+                        resetGame();
+                        return;
+                    }
+                    
                     setupSocketHandlers(
                         socket, 
-                        UIElements.roomCodeInput.value || data.code,
+                        data.code,
                         self.username,
                         opponent.username,
                         data
@@ -201,12 +206,19 @@
             const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
 
             if (roomCode === '') {
+                // Oda Oluştur
+                showScreen('wait');
+                document.getElementById('waitTitle').textContent = 'Oda Oluşturuluyor...';
+                document.getElementById('waitStatus').textContent = 'Sunucudan yanıt bekleniyor...';
+                document.getElementById('codeArea').classList.add('hidden');
                 socket.emit('createRoom', { username });
             } else {
+                // Odaya Katıl
                 if (roomCode.length !== 4) {
                     UIElements.showGlobalMessage('Oda kodu 4 haneli olmalıdır.', true);
                     return;
                 }
+                showScreen('wait');
                 document.getElementById('waitTitle').textContent = `Odaya Katılım: ${roomCode}`;
                 document.getElementById('waitStatus').textContent = 'Bağlanılıyor...';
                 document.getElementById('codeArea').classList.add('hidden');
