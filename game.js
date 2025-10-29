@@ -144,9 +144,9 @@ function updateStatusDisplay() {
     const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
 
     if (gameStage === 'SELECTION') {
-        if (selectedBombs.length < 3) {
-            turnStatusEl.textContent = `💣 BOMBA SEÇ: ${selectedBombs.length} / 3`;
-            actionMessageEl.textContent = "Rakibinizin başacağı 3 bombayı kartlar üzerine yerleştirin!";
+        if (selectedBombs.length < 2) {
+            turnStatusEl.textContent = `💣 BOMBA SEÇ: ${selectedBombs.length} / 2`;
+            actionMessageEl.textContent = "2 adet bomba seçin veya otomatik seçilmesini bekleyin (5sn)";
             turnStatusEl.classList.remove('text-red-600');
             turnStatusEl.classList.add('text-green-600');
         } else {
@@ -210,6 +210,8 @@ function stopVibration() {
 
 // --- HAREKET İŞLEYİCİLERİ ---
 
+let autoSelectTimeout = null;
+
 function handleCardClick(event) {
     // Tıklama olayını başlatan card-container'ı bul
     const cardContainer = event.currentTarget; 
@@ -224,12 +226,18 @@ function handleCardClick(event) {
     if (gameStage === 'SELECTION') {
         if (selectedBombs.includes(cardIndex)) {
             selectedBombs = selectedBombs.filter(i => i !== cardIndex);
-        } else if (selectedBombs.length < 3) {
+        } else if (selectedBombs.length < 2) {
             selectedBombs.push(cardIndex);
+            playSound(audioEmoji); // Seçim sesi
         }
         drawBoard(); 
         
-        if (selectedBombs.length === 3) {
+        if (selectedBombs.length === 2) {
+            // Otomatik seçim timer'ını iptal et
+            if (autoSelectTimeout) {
+                clearTimeout(autoSelectTimeout);
+                autoSelectTimeout = null;
+            }
             // Bombaları sunucuya gönder
             console.log(`💣 Bombalar gönderiliyor: ${isHost ? 'Host' : 'Guest'}`, selectedBombs);
             socket.emit('bombSelectionComplete', { roomCode: currentRoomCode, isHost: isHost, bombs: selectedBombs });
@@ -355,7 +363,33 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     initializeGame(LEVELS[level - 1]);
     drawBoard();
     showScreen('game');
-    showGlobalMessage(`🎮 Oyun ${opponentName} ile başladı! 💣 Önce bomba seçimi yapın.`, false);
+    showGlobalMessage(`🎮 Oyun ${opponentName} ile başladı! 💣 2 bomba seçin (5sn içinde otomatik).`, false);
+    
+    // Otomatik bomba seçimi (5 saniye sonra)
+    autoSelectTimeout = setTimeout(() => {
+        if (gameStage === 'SELECTION' && selectedBombs.length < 2) {
+            // Rastgele 2 bomba seç
+            const boardSize = LEVELS[level - 1];
+            const availableIndices = [];
+            for (let i = 0; i < boardSize; i++) {
+                if (!selectedBombs.includes(i)) {
+                    availableIndices.push(i);
+                }
+            }
+            
+            // Karıştır ve 2 tane seç
+            availableIndices.sort(() => Math.random() - 0.5);
+            selectedBombs = availableIndices.slice(0, 2);
+            
+            console.log(`⏰ Otomatik bomba seçimi: ${isHost ? 'Host' : 'Guest'}`, selectedBombs);
+            showGlobalMessage('⏰ Zaman doldu! Bombalar otomatik seçildi.', false);
+            
+            // Sunucuya gönder
+            socket.emit('bombSelectionComplete', { roomCode: currentRoomCode, isHost: isHost, bombs: selectedBombs });
+            drawBoard();
+            updateStatusDisplay();
+        }
+    }, 5000);
     
     // --- SOCKET.IO İŞLEYİCİLERİ ---
 
@@ -367,18 +401,27 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         } else {
             gameData.guestBombs = bombs;
         }
-        actionMessageEl.textContent = "Rakip bombasını seçti. Şimdi siz de 3 bomba seçin!";
+        playSound(audioEmoji); // Rakip seçti sesi
+        actionMessageEl.textContent = "Rakip bombasını seçti. Şimdi siz de 2 bomba seçin!";
         updateStatusDisplay();
     });
 
     // Her İki Oyuncu da Bombasını Seçti - Oyun Başlasın!
     socket.on('bothBombsSelected', ({ hostBombs, guestBombs }) => {
         console.log('🚀 HER İKİ BOMBA SETİ ALINDI! Oyun başlıyor...', { hostBombs, guestBombs });
+        
+        // Otomatik seçim timer'ını iptal et
+        if (autoSelectTimeout) {
+            clearTimeout(autoSelectTimeout);
+            autoSelectTimeout = null;
+        }
+        
         gameData.hostBombs = hostBombs;
         gameData.guestBombs = guestBombs;
         gameStage = 'PLAY';
         gameData.turn = 0; // Host başlar
         
+        playSound(audioEmoji); // Başlama sesi
         showGlobalMessage('🚀 Her iki oyuncu da hazır! Kart açma aşaması başlıyor!', false);
         drawBoard();
         updateStatusDisplay();
