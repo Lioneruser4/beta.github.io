@@ -45,7 +45,7 @@ function initializeRoomGameData(room, levelIndex = 0) {
         cardsLeft: boardSize,
         hostBombs: [], 
         guestBombs: [],
-        gameStage: 'SELECTION', // 'SELECTION' veya 'PLAY'
+        gameStage: 'SELECTION', // 'SELECTION', 'PLAY', 'ENDED'
         isHandlingMove: false // Hareket işleme kilidi
     };
 }
@@ -175,7 +175,7 @@ io.on('connection', (socket) => {
             newBoardState: gameData.board,
             turn: gameData.turn,
             hostLives: gameData.hostLives,
-            guestLives: gameData.hostLives, // Hata düzeltildi: gameData.guestLives olmalıydı
+            guestLives: gameData.guestLives, // Düzeltildi
             cardsLeft: gameData.cardsLeft,
             message: message,
             hitBomb: isHit,
@@ -210,7 +210,7 @@ io.on('connection', (socket) => {
                 
                 // Odayı Temizle/Yenile
                 if (room.hostId === socket.id) {
-                    delete rooms[code];
+                    delete rooms[code]; // Host ayrılırsa odayı tamamen sil
                 } else if (room.guestId === socket.id) {
                     room.playerCount = 1;
                     room.guestId = null;
