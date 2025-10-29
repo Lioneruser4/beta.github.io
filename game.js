@@ -85,7 +85,7 @@ function initializeGame(initialBoardSize) {
     selectedBombs = [];
     gameData.turn = 0;
     gameData.isGameOver = false;
-    gameStage = 'SELECTION'; 
+    gameStage = 'WAITING'; // Otomatik seçim bekleniyor
 }
 
 function drawBoard() {
@@ -143,18 +143,11 @@ function updateStatusDisplay() {
 
     const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
 
-    if (gameStage === 'SELECTION') {
-        if (selectedBombs.length < 2) {
-            turnStatusEl.textContent = `💣 BOMBA SEÇ: ${selectedBombs.length} / 2`;
-            actionMessageEl.textContent = "2 adet bomba seçin veya otomatik seçilmesini bekleyin (5sn)";
-            turnStatusEl.classList.remove('text-red-600');
-            turnStatusEl.classList.add('text-green-600');
-        } else {
-            turnStatusEl.textContent = `⏳ RAKIP SEÇİYOR...`;
-            actionMessageEl.textContent = "Seçiminiz tamamlandı! Rakibinizin bomba seçmesini bekleyin.";
-            turnStatusEl.classList.remove('text-green-600');
-            turnStatusEl.classList.add('text-red-600');
-        }
+    if (gameStage === 'WAITING') {
+        turnStatusEl.textContent = '⏳ OYUN HAZIRLANIYOR...';
+        actionMessageEl.textContent = "Bombalar otomatik yerleştiriliyor...";
+        turnStatusEl.classList.remove('text-red-600');
+        turnStatusEl.classList.add('text-yellow-600');
     } else if (gameStage === 'PLAY') {
         if (isMyTurn) {
             turnStatusEl.textContent = '✅ SIRA SENDE!';
@@ -210,8 +203,6 @@ function stopVibration() {
 
 // --- HAREKET İŞLEYİCİLERİ ---
 
-let autoSelectTimeout = null;
-
 function handleCardClick(event) {
     // Tıklama olayını başlatan card-container'ı bul
     const cardContainer = event.currentTarget; 
@@ -223,27 +214,7 @@ function handleCardClick(event) {
     
     const cardIndex = parseInt(cardElement.dataset.index);
 
-    if (gameStage === 'SELECTION') {
-        if (selectedBombs.includes(cardIndex)) {
-            selectedBombs = selectedBombs.filter(i => i !== cardIndex);
-        } else if (selectedBombs.length < 2) {
-            selectedBombs.push(cardIndex);
-            playSound(audioEmoji); // Seçim sesi
-        }
-        drawBoard(); 
-        
-        if (selectedBombs.length === 2) {
-            // Otomatik seçim timer'ını iptal et
-            if (autoSelectTimeout) {
-                clearTimeout(autoSelectTimeout);
-                autoSelectTimeout = null;
-            }
-            // Bombaları sunucuya gönder
-            console.log(`💣 Bombalar gönderiliyor: ${isHost ? 'Host' : 'Guest'}`, selectedBombs);
-            socket.emit('bombSelectionComplete', { roomCode: currentRoomCode, isHost: isHost, bombs: selectedBombs });
-            updateStatusDisplay();
-        }
-    } else if (gameStage === 'PLAY') {
+    if (gameStage === 'PLAY') {
         const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
         if (!isMyTurn || gameData.isGameOver) return; 
         
@@ -261,22 +232,18 @@ function sendMove(index) {
     }
 }
 
-async function applyMove(index) {
+async function applyMove(index, emoji, isBomb) {
     if (gameData.board[index].opened) return;
 
-    // Hamleyi yapan oyuncuya göre bombayı kontrol et
-    const currentPlayerIsHost = gameData.turn === 0;
-    const opponentBombs = currentPlayerIsHost ? gameData.guestBombs : gameData.hostBombs;
-    const hitBomb = opponentBombs.includes(index);
-    
     await triggerWaitAndVibrate();
 
     gameData.board[index].opened = true;
     gameData.cardsLeft -= 1;
     
-    if (hitBomb) {
+    if (isBomb) {
         gameData.board[index].content = '💣';
         // Hamle yapan oyuncu can kaybeder
+        const currentPlayerIsHost = gameData.turn === 0;
         if (currentPlayerIsHost) {
             gameData.hostLives--;
         } else { 
@@ -284,9 +251,9 @@ async function applyMove(index) {
         }
         
         playSound(audioBomb);
-        showGlobalMessage(`BOOM! ${currentPlayerIsHost ? 'Host' : 'Guest'} bombaya bastı!`, true);
+        showGlobalMessage(`BOOM! Bombaya bastınız!`, true);
     } else {
-        gameData.board[index].content = EMOTICONS[Math.floor(Math.random() * EMOTICONS.length)];
+        gameData.board[index].content = emoji; // Server'dan gelen emoji
         playSound(audioEmoji);
     }
     
@@ -363,58 +330,13 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     initializeGame(LEVELS[level - 1]);
     drawBoard();
     showScreen('game');
-    showGlobalMessage(`🎮 Oyun ${opponentName} ile başladı! 💣 2 bomba seçin (5sn içinde otomatik).`, false);
-    
-    // Otomatik bomba seçimi (5 saniye sonra)
-    autoSelectTimeout = setTimeout(() => {
-        if (gameStage === 'SELECTION' && selectedBombs.length < 2) {
-            // Rastgele 2 bomba seç
-            const boardSize = LEVELS[level - 1];
-            const availableIndices = [];
-            for (let i = 0; i < boardSize; i++) {
-                if (!selectedBombs.includes(i)) {
-                    availableIndices.push(i);
-                }
-            }
-            
-            // Karıştır ve 2 tane seç
-            availableIndices.sort(() => Math.random() - 0.5);
-            selectedBombs = availableIndices.slice(0, 2);
-            
-            console.log(`⏰ Otomatik bomba seçimi: ${isHost ? 'Host' : 'Guest'}`, selectedBombs);
-            showGlobalMessage('⏰ Zaman doldu! Bombalar otomatik seçildi.', false);
-            
-            // Sunucuya gönder
-            socket.emit('bombSelectionComplete', { roomCode: currentRoomCode, isHost: isHost, bombs: selectedBombs });
-            drawBoard();
-            updateStatusDisplay();
-        }
-    }, 5000);
+    showGlobalMessage(`🎮 Oyun ${opponentName} ile başladı! 🚀 Bombalar yerleştiriliyor...`, false);
     
     // --- SOCKET.IO İŞLEYİCİLERİ ---
 
-    // Bomb Seçimi Tamamlandı (Tek oyuncu seçti)
-    socket.on('bombSelectionComplete', ({ isHost: selectionHost, bombs }) => {
-        console.log(`Bomba seçimi alındı: ${selectionHost ? 'Host' : 'Guest'}`, bombs);
-        if (selectionHost) {
-            gameData.hostBombs = bombs;
-        } else {
-            gameData.guestBombs = bombs;
-        }
-        playSound(audioEmoji); // Rakip seçti sesi
-        actionMessageEl.textContent = "Rakip bombasını seçti. Şimdi siz de 2 bomba seçin!";
-        updateStatusDisplay();
-    });
-
-    // Her İki Oyuncu da Bombasını Seçti - Oyun Başlasın!
-    socket.on('bothBombsSelected', ({ hostBombs, guestBombs }) => {
-        console.log('🚀 HER İKİ BOMBA SETİ ALINDI! Oyun başlıyor...', { hostBombs, guestBombs });
-        
-        // Otomatik seçim timer'ını iptal et
-        if (autoSelectTimeout) {
-            clearTimeout(autoSelectTimeout);
-            autoSelectTimeout = null;
-        }
+    // Oyun Başlasın! (Bombalar otomatik seçildi)
+    socket.on('gameReady', ({ hostBombs, guestBombs }) => {
+        console.log('🚀 OYUN HAZIRLANDI! Bombalar yerleştirildi.', { hostBombs, guestBombs });
         
         gameData.hostBombs = hostBombs;
         gameData.guestBombs = guestBombs;
@@ -422,7 +344,7 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         gameData.turn = 0; // Host başlar
         
         playSound(audioEmoji); // Başlama sesi
-        showGlobalMessage('🚀 Her iki oyuncu da hazır! Kart açma aşaması başlıyor!', false);
+        showGlobalMessage('🚀 Oyun başlıyor! Kart açmayı başlatın!', false);
         drawBoard();
         updateStatusDisplay();
     });
@@ -432,8 +354,8 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         if (gameStage !== 'PLAY') return;
         
         if (data.type === 'MOVE') {
-            // Server tarafından onaylanmış hamleyi uygula
-            applyMove(data.cardIndex); 
+            // Server tarafından onaylanmış hamleyi uygula (emoji ve bomba bilgisi ile)
+            applyMove(data.cardIndex, data.emoji, data.isBomb); 
         }
     });
 
@@ -445,7 +367,7 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     // Seviye Atlama Sinyali
     socket.on('nextLevel', ({ newLevel }) => {
         level = newLevel;
-        showGlobalMessage(`🎆 Seviye ${level} - ${LEVELS[level-1]} Kart! Yeni bomba seçimi başlatılıyor...`, false);
+        showGlobalMessage(`🎆 Seviye ${level} - ${LEVELS[level-1]} Kart! Bombalar yerleştiriliyor...`, false);
         initializeGame(LEVELS[level - 1]);
         drawBoard();
         updateStatusDisplay();
