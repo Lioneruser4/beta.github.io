@@ -1,13 +1,12 @@
 // Dosya Adı: server.js (HATASIZ - HAFIZA OYUNU SUNUCU)
 const express = require('express');
-const http = require('http'); // require('http') düzeltildi
+const http = require('http'); 
 const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
 
-// Statik dosyaları sun (index.html ve game.js'in bulunduğu klasör)
-app.use(express.static('.')); // Kök dizini (server.js'in bulunduğu yer) işaret eder.
+app.use(express.static('.')); 
 
 const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] },
@@ -17,11 +16,11 @@ const io = new Server(server, {
 const rooms = {};
 
 // --- Sabitler ---
-const BOARD_SIZE = 20; // 5x4 Tahta için 20 kart
+const BOARD_SIZE = 20; 
 const EMOTICONS = ['🍉', '🍇', '🍒', '🍕', '🐱', '⭐', '🚀', '🔥', '🌈', '🎉'];
 const MATCH_DELAY = 1500; 
 
-// --- Yardımcı Fonksiyonlar ---
+// --- Yardımcı Fonksiyonlar (Aynı) ---
 function createShuffledContents(boardSize) {
     const pairs = boardSize / 2;
     let cardContents = [];
@@ -29,7 +28,6 @@ function createShuffledContents(boardSize) {
         const emoji = EMOTICONS[i % EMOTICONS.length];
         cardContents.push(emoji, emoji);
     }
-    // Fisher-Yates Karıştırma Algoritması
     for (let i = cardContents.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [cardContents[i], cardContents[j]] = [cardContents[j], cardContents[i]];
@@ -51,14 +49,13 @@ function initializeRoom(room) {
     room.gameActive = true;
     room.scoreHost = 0;
     room.scoreGuest = 0;
-    room.isHandlingMove = false; // Eş zamanlı hareketleri engellemek için kilit
+    room.isHandlingMove = false; 
 }
 
 
 // --- SOCKET.IO Olay Yönetimi ---
 io.on('connection', (socket) => {
     
-    // ODA OLUŞTUR
     socket.on('createRoom', ({ username }) => {
         const code = generateRoomCode();
         rooms[code] = { 
@@ -74,7 +71,6 @@ io.on('connection', (socket) => {
         socket.emit('roomCreated', code);
     });
 
-    // ODAYA KATIL
     socket.on('joinRoom', ({ username, roomCode }) => {
         const code = roomCode.toUpperCase();
         const room = rooms[code];
@@ -91,7 +87,6 @@ io.on('connection', (socket) => {
         initializeRoom(room);
         socket.join(code);
 
-        // Tüm odaya oyunu başlatma sinyali gönder
         io.to(code).emit('gameStart', {
             code,
             players: room.players,
@@ -110,14 +105,17 @@ io.on('connection', (socket) => {
 
         const { cardIndex } = data;
         
-        // Hata Kontrolleri
         if (socket.id !== room.turn) return; 
         if (room.matchedCards.has(cardIndex) || room.flippedCards.includes(cardIndex) || room.flippedCards.length >= 2) return; 
 
-        room.isHandlingMove = true; // Hareketi kilitle
+        // SADECE 2. KARTTA KİLİTLEME YAPILIRSA DAHA HIZLI BİR DENEYİM OLUR
+        if (room.flippedCards.length === 1) { 
+            room.isHandlingMove = true; 
+        }
+
         room.flippedCards.push(cardIndex);
 
-        // 1. Kart veya 2. Kartın çevrildiği bilgisini hemen gönder
+        // **KRİTİK DÜZELTME:** Her kart açıldığında tüm odaya anında gönderilir.
         io.to(data.roomCode).emit('gameStateUpdate', {
             cardIndex: cardIndex,
             flippedCards: room.flippedCards,
@@ -150,8 +148,10 @@ io.on('connection', (socket) => {
                     io.to(data.roomCode).emit('turnUpdate', { 
                         turn: room.turn, 
                         message: "Eşleşme! Sıra sizde kalıyor.",
-                        flippedCards: room.flippedCards, // Boş gönderilir
-                        matchedCards: Array.from(room.matchedCards) 
+                        flippedCards: room.flippedCards, 
+                        matchedCards: Array.from(room.matchedCards),
+                        scoreHost: room.scoreHost, // Skorları tekrar gönder
+                        scoreGuest: room.scoreGuest
                     });
                 }
 
@@ -167,8 +167,10 @@ io.on('connection', (socket) => {
                 io.to(data.roomCode).emit('turnUpdate', { 
                     turn: room.turn, 
                     message: "Eşleşmedi. Sıra rakibe geçti.",
-                    flippedCards: [], // Kartların kapandığını belirtmek için boş gönderilir
-                    matchedCards: Array.from(room.matchedCards) 
+                    flippedCards: [], // Kartları kapat
+                    matchedCards: Array.from(room.matchedCards),
+                    scoreHost: room.scoreHost, // Skorları tekrar gönder
+                    scoreGuest: room.scoreGuest
                 });
             }
         }
@@ -176,14 +178,12 @@ io.on('connection', (socket) => {
         room.isHandlingMove = false; // Kilidi kaldır
     });
 
-    // --- SOHBET VE BAĞLANTI KESME OLAYLARI ---
+    // ... (SOHBET VE BAĞLANTI KESME OLAYLARI aynı)
     socket.on('sendMessage', (data) => {
         const room = rooms[data.roomCode];
         if (!room) return;
-
         let senderName = (socket.id === room.hostId) ? room.hostUsername : room.guestUsername;
         if (!senderName) return;
-
         io.to(data.roomCode).emit('newMessage', { sender: senderName, text: data.message });
     });
 
@@ -191,18 +191,11 @@ io.on('connection', (socket) => {
         for (const code in rooms) {
             const room = rooms[code];
             if (room && (room.hostId === socket.id || room.guestId === socket.id)) {
-                
                 if (room.playerCount === 2) {
                     const opponentId = (room.hostId === socket.id) ? room.guestId : room.hostId;
-                    if (opponentId) { 
-                        io.to(opponentId).emit('opponentLeft', 'Rakibiniz bağlantıyı kesti. Lobiye dönülüyor.'); 
-                    }
+                    if (opponentId) { io.to(opponentId).emit('opponentLeft', 'Rakibiniz bağlantıyı kesti. Lobiye dönülüyor.'); }
                 }
-                
-                if (room.hostId === socket.id) { 
-                    delete rooms[code];
-                    console.log(`Oda ${code} silindi.`);
-                } 
+                if (room.hostId === socket.id) { delete rooms[code]; } 
                 else if (room.guestId === socket.id) {
                     room.playerCount = 1; 
                     room.guestId = null; 
@@ -210,7 +203,6 @@ io.on('connection', (socket) => {
                     room.players = room.players.filter(p => p.id === room.hostId);
                     if (room.gameActive) {
                         room.gameActive = false;
-                        // Host'a bekleme ekranına dönmesi için sinyal yolla
                         io.to(room.hostId).emit('roomCreated', code); 
                     }
                 }
@@ -222,7 +214,6 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
-    // Sunucunun dinlediği URL'yi konsola yazdır
     const host = process.env.RENDER_EXTERNAL_URL ? process.env.RENDER_EXTERNAL_URL : `http://localhost:${PORT}`;
     console.log(`🚀 Sunucu port ${PORT} üzerinde çalışıyor.`);
     console.log(`--------------------------------------------------------------------------------`);
