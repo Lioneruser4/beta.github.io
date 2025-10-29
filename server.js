@@ -98,14 +98,10 @@ io.on('connection', (socket) => {
             room.gameState.stage = 'PLAY';
             room.gameState.turn = 0; // Host başlar
             
-            // Her iki oyuncuya da seçimin tamamlandığını bildir
-            io.to(roomCode).emit('bombSelectionComplete', { 
-                isHost: true, 
-                bombs: room.gameState.hostBombs 
-            });
-            io.to(roomCode).emit('bombSelectionComplete', { 
-                isHost: false, 
-                bombs: room.gameState.guestBombs 
+            // Her iki oyuncuya da OYUN BAŞLASIN sinyali gönder
+            io.to(roomCode).emit('bothBombsSelected', { 
+                hostBombs: room.gameState.hostBombs,
+                guestBombs: room.gameState.guestBombs
             });
             
             console.log(`Her iki oyuncu da bomba seçti. Oyun başlıyor: ${roomCode}`);
