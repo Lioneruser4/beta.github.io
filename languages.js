@@ -5,9 +5,9 @@ const languages = {
         // Lobby
         enterName: 'İstifadəçi Adınızı Daxil Edin',
         // --- Dəyişiklik 1: 'oyun' butonu ---
-        startGame: '➕ Otaq Qur / Odaya Bağlan',
+        startGame: '✅ Otaq Qur ✅/ ➕ Odaya Bağlan ➕',
         // --- Dəyişiklik 2: 'baslayin' butonu (join məntiqi) ---
-        joinGame: '➕ Otaq Qur / Odaya Bağlan',
+        joinGame: '✅ Otaq Qur ✅ / ➕ Odaya Bağlan ➕',
         // --- Dəyişiklik 3: Otaq Kodu placeholder ---
         roomCode: 'Otaq Kodu (Boş buraxın=Yeni Otaq)',
         // Game
