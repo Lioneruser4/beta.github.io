@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>💣 Emoji Kart Bombası 1v1 </title>
+    <title>💣 Emoji Kart Bomb 1v1 </title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
     <script src="https://cdn.tailwindcss.com"></script>
@@ -386,7 +386,7 @@
         <input type="text" id="username" class="input-field" placeholder="İstifadəçi Adınızı Daxil Edin" maxlength="15">
         <input type="text" id="roomCodeInput" class="input-field uppercase" placeholder="Otaq Kodu (Boş buraxın=Yeni Otaq)" maxlength="6">
         
-        <button id="matchBtn" class="btn btn-primary">🎮 Oyuna Başla</button>
+        <button id="matchBtn" class="btn btn-primary">➕ Otaq Qur / Odaya Bağlan</button>
     </div>
     
     <div id="waitScreen" class="screen space-y-6 container">
@@ -535,6 +535,7 @@
         
         function validateInput() {
             const username = UIElements.usernameInput.value.trim();
+            // Dəyişdirilmədi: Lütfen geçerli bir kullanıcı adı girin. (Zəhmət olmasa etibarlı bir istifadəçi adı daxil edin.)
             if (username.length < 2) {
                 UIElements.showGlobalMessage('Zəhmət olmasa etibarlı bir istifadəçi adı daxil edin.', true);
                 return false;
@@ -551,25 +552,30 @@
                 });
 
                 socket.on('connect', () => {
+                    // Dəyişdirilmədi: Sunucuya bağlandı. Eşleşmeye hazırsınız. (Serverə qoşuldu. Eşləşməyə hazırsınız.)
                     UIElements.showGlobalMessage('Serverə qoşuldu. Eşləşməyə hazırsınız.', false);
                     showScreen('lobby');
                 });
                 
                 socket.on('connect_error', (err) => {
-                    console.error('Bağlantı Xətası:', err);
+                    console.error('Bağlantı Hatası:', err);
+                    // Dəyişdirilmədi: HATA: Sunucuya erişilemiyor. (XƏTA: Serverə daxil olmaq mümkün deyil.)
                     UIElements.showGlobalMessage('XƏTA: Serverə daxil olmaq mümkün deyil.', true);
                     showScreen('lobby');
                 });
                 
                 socket.on('disconnect', () => {
+                    // Dəyişdirilmədi: Bağlantı kesildi. Tekrar bağlanmaya çalışılıyor... (Bağlantı kəsildi. Yenidən qoşulmağa çalışılır...)
                     UIElements.showGlobalMessage('Bağlantı kəsildi. Yenidən qoşulmağa çalışılır...', true);
                 });
 
                 // --- Eşleşme Olayları (Eşləşmə Hadisələri) ---
                 socket.on('roomCreated', (code) => {
                     document.getElementById('roomCodeDisplay').textContent = code;
+                    // Dəyişdirilmədi: Odanız Kuruldu! (Otağınız Quruldu!)
                     document.getElementById('waitTitle').textContent = 'Otağınız Quruldu!';
                     document.getElementById('codeArea').classList.remove('hidden');
+                    // Dəyişdirilmədi: Oda kodunu arkadaşınıza gönderin ve bağlanmasını bekleyin. (Otaq kodunu dostunuza göndərin və qoşulmasını gözləyin.)
                     document.getElementById('waitStatus').textContent = 'Otaq kodunu dostunuza göndərin və qoşulmasını gözləyin.';
                 });
                 
@@ -588,6 +594,7 @@
 
             } catch (e) {
                 console.error('Socket.IO genel hatası:', e);
+                // Dəyişdirilmədi: Kritik bağlantı hatası oluştu. (Kritik qoşulma xətası baş verdi.)
                 UIElements.showGlobalMessage('Kritik qoşulma xətası baş verdi.', true);
             }
         }
@@ -601,12 +608,16 @@
             const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
 
             if (roomCode === '') {
+                // Dəyişdirilmədi: Oda Kuruluyor... (Otaq Qurulur...)
                 document.getElementById('waitTitle').textContent = 'Otaq Qurulur...';
+                // Dəyişdirilmədi: Lütfen bekleyin... (Zəhmət olmasa gözləyin...)
                 document.getElementById('waitStatus').textContent = 'Zəhmət olmasa gözləyin...';
                 document.getElementById('codeArea').classList.add('hidden');
                 socket.emit('createRoom', { username });
             } else {
+                // Dəyişdirilmədi: Odaya Katılım: (Otağa Qoşulma:)
                 document.getElementById('waitTitle').textContent = `Otağa Qoşulma: ${roomCode}`;
+                // Dəyişdirilmədi: Bağlanılıyor... (Qoşulunur...)
                 document.getElementById('waitStatus').textContent = 'Qoşulunur...';
                 document.getElementById('codeArea').classList.add('hidden');
                 socket.emit('joinRoom', { username, roomCode });
@@ -618,6 +629,8 @@
         
         document.getElementById('copyCodeBtn').addEventListener('click', () => {
             const textToCopy = document.getElementById('roomCodeDisplay').textContent;
+            // Dəyişdirilmədi: Oda Kodu Kopyalandı! (Otaq Kodu Kopyalandı!)
+            // Dəyişdirilmədi: Kopyalama başarısız. (Kopyalama uğursuz oldu.)
             navigator.clipboard.writeText(textToCopy)
                 .then(() => UIElements.showGlobalMessage('Otaq Kodu Kopyalandı!', false))
                 .catch(() => UIElements.showGlobalMessage('Kopyalama uğursuz oldu.', true));
