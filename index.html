@@ -386,10 +386,15 @@
             </ul>
         </div>
         
-        <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adınızı Girin" maxlength="15">
-        <input type="text" id="roomCodeInput" class="input-field uppercase" placeholder="Oda Kodu (Boş bırak=Yeni Oda)" maxlength="6">
+        <input type="text" id="username" class="input-field w-full" placeholder="Kullanıcı Adınızı Girin" maxlength="15">
+        <input type="text" id="roomCodeInput" class="input-field uppercase w-full" placeholder="Oda Kodu (Boş bırak=Yeni Oda)" maxlength="6">
         
-        <button id="matchBtn" class="btn btn-primary">🎮 Oyuna Başla</button>
+        <button id="createRoomBtn" class="btn btn-primary w-full">
+            🏠 Oda Kur
+        </button>
+        <button id="joinRoomBtn" class="btn bg-green-600 hover:bg-green-500 text-white w-full">
+            🚪 Odaya Gir
+        </button>
     </div>
     
     <div id="waitScreen" class="screen space-y-6 container">
@@ -444,6 +449,28 @@
         document.addEventListener('DOMContentLoaded', () => {
             // Initialize language after DOM is loaded
             window.languageManager.initLanguage();
+            
+            // Set up room creation and joining
+            const createRoomBtn = document.getElementById('createRoomBtn');
+            const joinRoomBtn = document.getElementById('joinRoomBtn');
+            const roomCodeInput = document.getElementById('roomCodeInput');
+            
+            if (createRoomBtn) {
+                createRoomBtn.addEventListener('click', () => {
+                    roomCodeInput.value = ''; // Clear room code for new room
+                    document.getElementById('matchBtn').click();
+                });
+            }
+            
+            if (joinRoomBtn && roomCodeInput) {
+                joinRoomBtn.addEventListener('click', () => {
+                    if (roomCodeInput.value.trim() === '') {
+                        showGlobalMessage('Lütfen oda kodunu girin', 'error');
+                        return;
+                    }
+                    document.getElementById('matchBtn').click();
+                });
+            }
             
             // Set up chat input to send on Enter key
             const chatInput = document.getElementById('chat-input');
