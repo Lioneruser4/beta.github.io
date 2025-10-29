@@ -333,11 +333,28 @@
             </ul>
         </div>
         
-        <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adınızı Girin" maxlength="15">
-        <div class="flex gap-3 w-full">
-            <button id="createBtn" class="btn btn-primary">➕ Oda Kur</button>
-            <input type="text" id="roomCodeInput" class="input-field uppercase" placeholder="Oda Kodu" maxlength="6" style="flex:1" />
-            <button id="joinBtn" class="btn btn-primary" style="width:auto; min-width: 140px">🔗 Bağlan</button>
+        <div class="w-full space-y-3">
+            <input type="text" id="username" class="input-field w-full" placeholder="Kullanıcı Adınızı Girin" maxlength="15">
+            
+            <button id="createBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-colors">
+                ➕ Yeni Oda Kur
+            </button>
+            
+            <div class="relative flex items-center">
+                <div class="absolute left-3 text-gray-500">#</div>
+                <input 
+                    type="text" 
+                    id="roomCodeInput" 
+                    class="input-field w-full pl-8 pr-4 py-3 text-center tracking-widest font-mono" 
+                    placeholder="ODA KODU" 
+                    maxlength="6" 
+                    style="letter-spacing: 0.2em;"
+                />
+            </div>
+            
+            <button id="joinBtn" class="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md transition-colors">
+                🔗 Odaya Katıl
+            </button>
         </div>
     </div>
     
