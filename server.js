@@ -18,6 +18,9 @@ const io = new Server(server, {
 
 const rooms = {}; 
 
+// Oyun için kullanılacak rastgele emojiler
+const EMOJIS = ['😀','😎','🦄','🐱','🍀','🍕','🌟','⚽','🎵','🚀','🎲','🥇'];
+
 function generateRoomCode() {
     let code = Math.random().toString(36).substring(2, 6).toUpperCase();
     while (rooms[code]) {
@@ -45,7 +48,8 @@ io.on('connection', (socket) => {
                 guestBombs: [],
                 hostBombsSelected: false,
                 guestBombsSelected: false,
-                level: 1
+                level: 1,
+                opened: [] // Açılan kart indeksleri
             }
         };
         socket.join(code);
@@ -74,7 +78,8 @@ io.on('connection', (socket) => {
             { id: room.hostId, username: room.hostUsername, isHost: true },
             { id: room.guestId, username: room.guestUsername, isHost: false }
         ];
-        io.to(code).emit('gameStart', players);
+        // Oda kodunu da ilet ki her iki taraf da hamle gönderirken doğru kodu kullansın
+        io.to(code).emit('gameStart', { players, roomCode: code });
         console.log(`${username} odaya katıldı: ${code}`);
         
         // Otomatik bomba seçimi yap (her oyuncu için rastgele 2 bomba)
@@ -120,29 +125,37 @@ io.on('connection', (socket) => {
         }
 
         if (data.type === 'MOVE') {
-            const cardIndex = data.cardIndex;
-            
-            // Bomba kontrolü - Hamle yapan oyuncuya göre
-            const opponentBombs = isHostTurn ? room.gameState.guestBombs : room.gameState.hostBombs;
-            const isBomb = opponentBombs.includes(cardIndex);
-            
-            // Rastgele emoji seç (bomba değilse)
-            const emojis = ['🙂', '😂', '😍', '😎', '🤩', '👍', '🎉', '🌟', '🍕', '🐱'];
-            const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-            
+            const idx = data.cardIndex;
+            // Aynı karta ikinci kez tıklamayı engelle
+            if (room.gameState.opened.includes(idx)) {
+                socket.emit('error', 'Bu kart zaten açıldı.');
+                return;
+            }
+
+            // Bombayı belirle: Host oynuyorsa Guest'in bombaları tehlikelidir, tersi de aynı
+            const isBomb = isHostTurn
+                ? room.gameState.guestBombs.includes(idx)
+                : room.gameState.hostBombs.includes(idx);
+
+            // Emoji seç (bomba değilse)
+            const emoji = isBomb ? '💣' : EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+
+            // Kartı açılmış olarak işaretle
+            room.gameState.opened.push(idx);
+
             // Sırayı değiştir
             room.gameState.turn = room.gameState.turn === 0 ? 1 : 0;
             
             // Hareketi her iki oyuncuya da gönder (emoji ve bomba bilgisi ile)
             io.to(code).emit('gameData', {
                 type: 'MOVE',
-                cardIndex: cardIndex,
+                cardIndex: idx,
                 emoji: emoji,
                 isBomb: isBomb,
                 roomCode: code
             });
             
-            console.log(`Hamle yapıldı - Oda: ${code}, Kart: ${cardIndex}, Bomba: ${isBomb}, Emoji: ${emoji}, Yeni sıra: ${room.gameState.turn}`);
+            console.log(`Hamle yapıldı - Oda: ${code}, Kart: ${idx}, Bomba: ${isBomb}, Emoji: ${emoji}, Yeni sıra: ${room.gameState.turn}`);
         }
     });
 
