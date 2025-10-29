@@ -386,15 +386,10 @@
             </ul>
         </div>
         
-        <input type="text" id="username" class="input-field w-full" placeholder="Kullanıcı Adınızı Girin" maxlength="15">
-        <input type="text" id="roomCodeInput" class="input-field uppercase w-full" placeholder="Oda Kodu (Boş bırak=Yeni Oda)" maxlength="6">
+        <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adınızı Girin" maxlength="15">
+        <input type="text" id="roomCodeInput" class="input-field uppercase" placeholder="Oda Kodu (Boş bırak=Yeni Oda)" maxlength="6">
         
-        <button id="createRoomBtn" class="btn btn-primary w-full">
-            🏠 Oda Kur
-        </button>
-        <button id="joinRoomBtn" class="btn bg-green-600 hover:bg-green-500 text-white w-full">
-            🚪 Odaya Gir
-        </button>
+        <button id="matchBtn" class="btn btn-primary">🎮 Oyuna Başla</button>
     </div>
     
     <div id="waitScreen" class="screen space-y-6 container">
@@ -446,67 +441,9 @@
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
         
         // Initialize language manager
-        // Store socket and room code globally
-        window.socket = null;
-        window.currentRoomCode = '';
-        
         document.addEventListener('DOMContentLoaded', () => {
             // Initialize language after DOM is loaded
             window.languageManager.initLanguage();
-            
-            // Set up room creation and joining
-            const createRoomBtn = document.getElementById('createRoomBtn');
-            const joinRoomBtn = document.getElementById('joinRoomBtn');
-            const roomCodeInput = document.getElementById('roomCodeInput');
-            
-            // Initialize socket connection
-            window.socket = io(LIVE_SERVER_URL);
-            
-            // Set up socket handlers from game.js
-            if (window.socket) {
-                setupSocketHandlers(window.socket, '', false, '');
-            }
-            
-            if (createRoomBtn) {
-                createRoomBtn.addEventListener('click', () => {
-                    const username = document.getElementById('username').value.trim();
-                    if (!username) {
-                        showGlobalMessage('Lütfen bir kullanıcı adı girin', 'error');
-                        return;
-                    }
-                    roomCodeInput.value = ''; // Clear room code for new room
-                    window.currentRoomCode = '';
-                    showScreen('wait');
-                    document.getElementById('waitTitle').textContent = 'Oda Kuruluyor...';
-                    
-                    // Emit create room event
-                    window.socket.emit('createRoom', { username });
-                });
-            }
-            
-            if (joinRoomBtn && roomCodeInput) {
-                joinRoomBtn.addEventListener('click', () => {
-                    const roomCode = roomCodeInput.value.trim().toUpperCase();
-                    const username = document.getElementById('username').value.trim();
-                    
-                    if (!username) {
-                        showGlobalMessage('Lütfen bir kullanıcı adı girin', 'error');
-                        return;
-                    }
-                    
-                    if (!roomCode) {
-                        showGlobalMessage('Lütfen oda kodunu girin', 'error');
-                        return;
-                    }
-                    
-                    window.currentRoomCode = roomCode;
-                    showScreen('wait');
-                    document.getElementById('waitTitle').textContent = 'Odaya Bağlanılıyor...';
-                    
-                    // Emit join room event
-                    window.socket.emit('joinRoom', { roomCode, username });
-                });
-            }
             
             // Set up chat input to send on Enter key
             const chatInput = document.getElementById('chat-input');
@@ -574,19 +511,18 @@
             const input = document.getElementById('chat-input');
             const message = input.value.trim();
             
-            if (message && window.socket) {
+            if (message && socket) {
                 // Emit chat message to server
-                window.socket.emit('chatMessage', {
-                    roomCode: window.currentRoomCode || 'default-room',
+                socket.emit('chatMessage', {
+                    roomCode: currentRoomCode,
                     message: message
                 });
                 
                 // Add to own chat
-                addChatMessage('Sen: ' + message, true);
+                addChatMessage(message, true);
                 
                 // Clear input
                 input.value = '';
-                input.focus();
             }
         }
         
