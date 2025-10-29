@@ -391,24 +391,48 @@
         }
         
         // --- Olay Dinleyicileri ---
-        UIElements.matchBtn.addEventListener('click', () => {
+        document.getElementById('createRoomBtn').addEventListener('click', () => {
             const username = validateInput();
             if (!username) return;
             
             showScreen('wait');
-            const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
-
-            if (roomCode === '') {
-                document.getElementById('waitTitle').textContent = 'Oda Kuruluyor...';
-                document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
-                document.getElementById('codeArea').classList.add('hidden');
-                socket.emit('createRoom', { username });
-            } else {
-                document.getElementById('waitTitle').textContent = `Odaya Katılım: ${roomCode}`;
-                document.getElementById('waitStatus').textContent = 'Bağlanılıyor...';
-                document.getElementById('codeArea').classList.add('hidden');
-                socket.emit('joinRoom', { username, roomCode });
-            }
+            document.getElementById('waitTitle').textContent = 'Oda Kuruluyor...';
+            document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
+            document.getElementById('codeArea').classList.add('hidden');
+            
+            console.log('Oda oluşturma isteği gönderiliyor...');
+            socket.emit('createRoom', { username }, (response) => {
+                console.log('Sunucu yanıtı:', response);
+                if (response && response.error) {
+                    console.error('Oda oluşturma hatası:', response.error);
+                    showGlobalMessage('Oda oluşturulurken bir hata oluştu: ' + response.error, true);
+                    showScreen('lobby');
+                }
+            });
+        });
+        
+        // Odaya katıl butonu için event listener
+        document.getElementById('showJoinRoomBtn').addEventListener('click', () => {
+            const username = validateInput();
+            if (!username) return;
+            
+            const roomCode = prompt('Oda kodunu girin:');
+            if (!roomCode) return;
+            
+            showScreen('wait');
+            document.getElementById('waitTitle').textContent = `Odaya Katılım: ${roomCode}`;
+            document.getElementById('waitStatus').textContent = 'Bağlanılıyor...';
+            document.getElementById('codeArea').classList.add('hidden');
+            
+            console.log('Odaya katılma isteği gönderiliyor:', roomCode);
+            socket.emit('joinRoom', { username, roomCode: roomCode.toUpperCase() }, (response) => {
+                console.log('Sunucu yanıtı:', response);
+                if (response && response.error) {
+                    console.error('Odaya katılma hatası:', response.error);
+                    showGlobalMessage('Odaya katılırken bir hata oluştu: ' + response.error, true);
+                    showScreen('lobby');
+                }
+            });
         });
 
         document.getElementById('cancelBtn').addEventListener('click', UIElements.resetGame);
