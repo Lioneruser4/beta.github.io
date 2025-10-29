@@ -39,29 +39,51 @@ function generateRoomCode() {
 io.on('connection', (socket) => {
     console.log(`Yeni bağlantı: ${socket.id}`);
     
-    socket.on('createRoom', ({ username }) => {
-        const code = generateRoomCode();
-        rooms[code] = {
-            code,
-            playerCount: 1,
-            hostId: socket.id,
-            hostUsername: username,
-            guestId: null,
-            guestUsername: null,
-            gameState: {
-                stage: 'WAITING', // WAITING, SELECTION, PLAY, ENDED
-                turn: 0, // 0 = Host, 1 = Guest
-                hostBombs: [],
-                guestBombs: [],
-                hostBombsSelected: false,
-                guestBombsSelected: false,
-                level: 1,
-                opened: [] // Açılan kart indeksleri
+    socket.on('createRoom', ({ username }, callback) => {
+        try {
+            if (!username || username.length < 2) {
+                console.error('Geçersiz kullanıcı adı:', username);
+                if (callback) callback({ error: 'Geçersiz kullanıcı adı. En az 2 karakter olmalıdır.' });
+                return;
             }
-        };
-        socket.join(code);
-        socket.emit('roomCreated', code);
-        console.log(`Oda oluşturuldu: ${code} - Host: ${username}`);
+
+            const code = generateRoomCode();
+            rooms[code] = {
+                code,
+                playerCount: 1,
+                hostId: socket.id,
+                hostUsername: username,
+                guestId: null,
+                guestUsername: null,
+                gameState: {
+                    stage: 'WAITING',
+                    turn: 0,
+                    hostBombs: [],
+                    guestBombs: [],
+                    hostBombsSelected: false,
+                    guestBombsSelected: false,
+                    level: 1,
+                    opened: []
+                },
+                createdAt: Date.now()
+            };
+
+            socket.join(code, (error) => {
+                if (error) {
+                    console.error('Odaya katılma hatası:', error);
+                    delete rooms[code];
+                    if (callback) callback({ error: 'Oda oluşturulurken bir hata oluştu.' });
+                    return;
+                }
+                
+                console.log(`Oda oluşturuldu: ${code} - Host: ${username} - Socket: ${socket.id}`);
+                socket.emit('roomCreated', code);
+                if (callback) callback({ success: true, roomCode: code });
+            });
+        } catch (error) {
+            console.error('Oda oluşturma hatası:', error);
+            if (callback) callback({ error: 'Beklenmeyen bir hata oluştu.' });
+        }
     });
 
     // Sohbet mesajı
