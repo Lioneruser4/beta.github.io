@@ -17,7 +17,7 @@ const rooms = {};
 
 // --- Sabitler ---
 const BOARD_SIZE = 20; 
-const EMOTICONS = ['🍉', '🍇', '🍒', '🍕', '🐱', '⭐', '🚀', '🔥', '🌈', '🎉', '💣']; // BOMBA EKLENDİ
+const EMOTICONS = ['🍉', '🍇', '🍒', '🍕', '🐱', '⭐', '🚀', '🔥', '🌈', '🎉', '💣']; 
 const BOMB_EMOJI = '💣';
 const MATCH_DELAY = 1500; 
 
@@ -28,12 +28,12 @@ function createShuffledContents(boardSize) {
     
     // Normal Eşleşen Kartlar
     for (let i = 0; i < pairs - 1; i++) { // 9 Çift (18 Kart)
-        const emoji = EMOTICONS[i % (EMOTICONS.length - 1)]; // BOMBA HARİÇ EMOJİLER
+        const emoji = EMOTICONS[i % (EMOTICONS.length - 1)]; 
         cardContents.push(emoji, emoji);
     }
     
     // 2 adet BOMBA Kartı Ekle
-    cardContents.push(BOMB_EMOJI, BOMB_EMOJI); // Toplam 20 kart
+    cardContents.push(BOMB_EMOJI, BOMB_EMOJI); 
 
     // Karıştır
     for (let i = cardContents.length - 1; i > 0; i--) {
@@ -66,8 +66,7 @@ function initializeRoom(room) {
 // --- SOCKET.IO Olay Yönetimi ---
 io.on('connection', (socket) => {
     
-    // ... (createRoom ve joinRoom olayları aynı kalır) ...
-
+    // ODA OLUŞTUR
     socket.on('createRoom', ({ username }) => {
         const code = generateRoomCode();
         rooms[code] = { 
@@ -83,6 +82,7 @@ io.on('connection', (socket) => {
         socket.emit('roomCreated', code);
     });
 
+    // ODAYA KATIL
     socket.on('joinRoom', ({ username, roomCode }) => {
         const code = roomCode.toUpperCase();
         const room = rooms[code];
@@ -117,11 +117,10 @@ io.on('connection', (socket) => {
 
         const { cardIndex } = data;
         
-        // KRİTİK: Sıra kontrolü
+        // Sıra kontrolü
         if (socket.id !== room.turn) return; 
         if (room.matchedCards.has(cardIndex) || room.flippedCards.includes(cardIndex) || room.flippedCards.length >= 2) return; 
 
-        // Eğer 2. kart çevriliyorsa işlemi kilitle
         if (room.flippedCards.length === 1) { 
             room.isHandlingMove = true; 
         }
@@ -131,12 +130,12 @@ io.on('connection', (socket) => {
 
         // 1. ADIM: Kart açma bilgisini anında tüm odaya gönder (Senkronizasyon Düzeltmesi)
         io.to(data.roomCode).emit('gameStateUpdate', {
-            flippedCardIndex: cardIndex, // Açılan kartın indeksi
+            flippedCardIndex: cardIndex, 
             flippedCards: room.flippedCards,
             matchedCards: Array.from(room.matchedCards), 
             scoreHost: room.scoreHost,
             scoreGuest: room.scoreGuest,
-            cardContent: cardContent // Açılan kartın içeriği (Bomba kontrolü için önemli)
+            cardContent: cardContent 
         });
 
 
@@ -147,20 +146,15 @@ io.on('connection', (socket) => {
             const content2 = room.cardContents[idx2];
             let message = '';
             let turnChange = true;
-            let playSound = null; // Ses olayını istemciye göndermek için
+            let playSound = null; 
 
-            // Bomba Kontrolü (Herhangi biri bomba ise)
+            // Bomba Kontrolü
             if (content1 === BOMB_EMOJI || content2 === BOMB_EMOJI) {
-                // BOMBA PATLADI
+                
                 message = "💣 BOMBA! Rakibe bir eşleşme hakkı kazandırdınız!";
                 playSound = 'BOMB_SOUND'; 
-
-                // Rakibin başarısız eşleşme sayısını 1 azalt veya 0'da tut (Veya ek skor verilebilir)
-                // Bu örnekte, basitçe sırayı rakibe verip bir mesaj gönderelim.
                 
-                room.flippedCards = []; // Kartları kapat
-                
-                // Sırayı Değiştir
+                room.flippedCards = []; 
                 room.turn = (room.turn === room.hostId) ? room.guestId : room.hostId;
                 turnChange = true;
 
@@ -176,7 +170,7 @@ io.on('connection', (socket) => {
                 if (room.turn === room.hostId) { room.scoreHost++; } else { room.scoreGuest++; }
                 
                 room.flippedCards = []; 
-                turnChange = false; // Sıra aynı oyuncuda kalır.
+                turnChange = false; 
 
             } else {
                 
@@ -184,10 +178,6 @@ io.on('connection', (socket) => {
                 message = "❌ Eşleşmedi. Sıra rakibe geçti.";
                 playSound = 'MISMATCH_SOUND';
                 
-                // Başarısız eşleşme sayısını artır (İleride 3 başarısızlıkta bomba patlatılabilir)
-                // if (room.turn === room.hostId) { room.hostFailedMatches++; } else { room.guestFailedMatches++; }
-
-                // Sırayı Değiştir
                 room.turn = (room.turn === room.hostId) ? room.guestId : room.hostId;
                 turnChange = true;
             }
@@ -197,9 +187,8 @@ io.on('connection', (socket) => {
             await new Promise(resolve => setTimeout(resolve, MATCH_DELAY));
             
             // Oyun Bitti mi Kontrolü
-            if (room.matchedCards.size === (BOARD_SIZE - 2) && room.gameActive) { // Bombalar hariç tüm kartlar eşleştiyse
+            if (room.matchedCards.size === (BOARD_SIZE - 2) && room.gameActive) { 
                 room.gameActive = false;
-                // Bombalar hala açık kalır
                 const winner = room.scoreHost === room.scoreGuest ? 'DRAW' : room.scoreHost > room.scoreGuest ? 'Host' : 'Guest';
                 io.to(data.roomCode).emit('gameEnd', { winner, scoreHost: room.scoreHost, scoreGuest: room.scoreGuest });
             }
@@ -209,7 +198,7 @@ io.on('connection', (socket) => {
             io.to(data.roomCode).emit('turnUpdate', { 
                 turn: room.turn, 
                 message: message,
-                flippedCards: room.flippedCards, // Eşleşmede boş, eşleşmeme/bombada boş
+                flippedCards: room.flippedCards, 
                 matchedCards: Array.from(room.matchedCards),
                 scoreHost: room.scoreHost,
                 scoreGuest: room.scoreGuest,
@@ -218,23 +207,59 @@ io.on('connection', (socket) => {
                 isBomb: (content1 === BOMB_EMOJI || content2 === BOMB_EMOJI) ? true : false,
                 bombIndexes: (content1 === BOMB_EMOJI && content2 === BOMB_EMOJI) ? [idx1, idx2] : 
                              (content1 === BOMB_EMOJI) ? [idx1] : 
-                             (content2 === BOMB_EMOJI) ? [idx2] : [] // Patlayan kartların indeksini gönder
+                             (content2 === BOMB_EMOJI) ? [idx2] : [] 
             });
 
         } else {
-            // Sadece 1 kart çevrildiyse, kilit açılmaz ve sıra değişmez
             room.isHandlingMove = false;
         }
 
-        room.isHandlingMove = false; // İşlem bitince kilidi kaldır (Sadece 2. kart çevrilirken kilitlemek daha temiz)
+        room.isHandlingMove = false; 
     });
 
-    // ... (disconnect ve sendMessage olayları aynı kalır) ...
+    // --- SOHBET VE BAĞLANTI KESME OLAYLARI (Aynı) ---
+    socket.on('sendMessage', (data) => {
+        const room = rooms[data.roomCode];
+        if (!room) return;
+        let senderName = (socket.id === room.hostId) ? room.hostUsername : room.guestUsername;
+        if (!senderName) return;
+        io.to(data.roomCode).emit('newMessage', { sender: senderName, text: data.message });
+    });
+
+    socket.on('disconnect', () => {
+        for (const code in rooms) {
+            const room = rooms[code];
+            if (room && (room.hostId === socket.id || room.guestId === socket.id)) {
+                if (room.playerCount === 2) {
+                    const opponentId = (room.hostId === socket.id) ? room.guestId : room.hostId;
+                    if (opponentId) { io.to(opponentId).emit('opponentLeft', 'Rakibiniz bağlantıyı kesti. Lobiye dönülüyor.'); }
+                }
+                if (room.hostId === socket.id) { 
+                    delete rooms[code]; 
+                    console.log(`Oda ${code} silindi.`);
+                } 
+                else if (room.guestId === socket.id) {
+                    room.playerCount = 1; 
+                    room.guestId = null; 
+                    room.guestUsername = null;
+                    room.players = room.players.filter(p => p.id === room.hostId);
+                    if (room.gameActive) {
+                        room.gameActive = false;
+                        io.to(room.hostId).emit('roomCreated', code); 
+                    }
+                }
+                break;
+            }
+        }
+    });
 });
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     const host = process.env.RENDER_EXTERNAL_URL ? process.env.RENDER_EXTERNAL_URL : `http://localhost:${PORT}`;
     console.log(`🚀 Sunucu port ${PORT} üzerinde çalışıyor.`);
+    console.log(`--------------------------------------------------------------------------------`);
     console.log(`🔥 Bağlantı Adresi: ${host}`);
+    console.log(`📢 index.html dosyasındaki LIVE_SERVER_URL değişkenini bu adresle EŞLEŞTİRMEYİ UNUTMAYIN.`);
+    console.log(`--------------------------------------------------------------------------------`);
 });
