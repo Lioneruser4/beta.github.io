@@ -97,18 +97,26 @@ function drawBoard() {
     gameData.board.forEach((cardState, index) => {
         const cardContainer = document.createElement('div');
         cardContainer.className = 'card-container aspect-square';
+        cardContainer.dataset.index = index; // Add index to container for easier access
 
         const card = document.createElement('div');
-        card.className = `card cursor-pointer`;
+        card.className = `card cursor-pointer transition-transform duration-300`;
         card.dataset.index = index;
 
         const front = document.createElement('div');
-        front.className = 'card-face front'; // Sizin stilinize göre front/back
+        front.className = 'card-face front absolute w-full h-full flex items-center justify-center text-2xl font-bold bg-white rounded-lg shadow-md';
         front.textContent = '?';
         
         const back = document.createElement('div');
-        back.className = 'card-face back';
-        back.textContent = cardState.content;
+        back.className = 'card-face back absolute w-full h-full flex items-center justify-center text-2xl font-bold bg-gray-100 rounded-lg';
+        back.textContent = cardState.content || '';
+
+        // Add transform styles for flipping
+        card.style.transformStyle = 'preserve-3d';
+        card.style.transition = 'transform 0.6s';
+        front.style.backfaceVisibility = 'hidden';
+        back.style.backfaceVisibility = 'hidden';
+        back.style.transform = 'rotateY(180deg)';
 
         card.appendChild(front);
         card.appendChild(back);
@@ -116,14 +124,19 @@ function drawBoard() {
         
         if (cardState.opened) {
             card.classList.add('flipped');
+            card.style.transform = 'rotateY(180deg)';
         } else {
             // SADECE SEÇEN KİŞİNİN GÖRMESİ İÇİN KIRMIZILIK
             if (gameStage === 'SELECTION' && selectedBombs.includes(index)) {
-                card.classList.add('bomb-selected'); 
+                card.classList.add('bomb-selected');
+                front.classList.add('bg-red-100');
             }
             
-            // KRİTİK DÜZELTME: TIKLAMA OLAYINI CARD-CONTAINER'A EKLE!
+            // Add click event to the container
             cardContainer.addEventListener('click', handleCardClick);
+            
+            // Also add pointer cursor to indicate it's clickable
+            cardContainer.style.cursor = 'pointer';
         }
         
         gameBoardEl.appendChild(cardContainer);
@@ -201,21 +214,43 @@ function stopVibration() {
 // --- HAREKET İŞLEYİCİLERİ ---
 
 function handleCardClick(event) {
-    // Tıklama olayını başlatan card-container'ı bul
-    const cardContainer = event.currentTarget; 
-    // İçindeki asıl .card elementini bul
+    // Prevent event bubbling to parent elements
+    event.stopPropagation();
+    
+    // Find the clicked card container and card element
+    const cardContainer = event.currentTarget;
     const cardElement = cardContainer.querySelector('.card');
     
-    // Eğer card elementi zaten açılmışsa veya bulunamazsa dur.
-    if (!cardElement || cardElement.classList.contains('flipped')) return; 
+    // If card is already flipped or not found, do nothing
+    if (!cardElement || cardElement.classList.contains('flipped')) return;
     
-    const cardIndex = parseInt(cardElement.dataset.index);
+    const cardIndex = parseInt(cardContainer.dataset.index || cardElement.dataset.index);
+    
+    // Debug log
+    console.log('Card clicked:', { 
+        index: cardIndex, 
+        gameStage, 
+        isHost, 
+        turn: gameData.turn,
+        isMyTurn: (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1)
+    });
 
     if (gameStage === 'PLAY') {
         const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
-        if (!isMyTurn || gameData.isGameOver) return; 
+        if (!isMyTurn) {
+            console.log('Not your turn!');
+            return;
+        }
         
+        if (gameData.isGameOver) {
+            console.log('Game is already over!');
+            return;
+        }
+        
+        console.log('Sending move for card:', cardIndex);
         sendMove(cardIndex);
+    } else {
+        console.log('Not in PLAY stage. Current stage:', gameStage);
     }
 }
 
@@ -230,27 +265,53 @@ function sendMove(index) {
 }
 
 async function applyMove(index, emoji, isBomb) {
-    if (gameData.board[index].opened) return;
+    console.log('Applying move:', { index, emoji, isBomb });
+    
+    if (index < 0 || index >= gameData.board.length) {
+        console.error('Invalid card index:', index);
+        return;
+    }
+    
+    if (gameData.board[index].opened) {
+        console.log('Card already opened:', index);
+        return;
+    }
 
     await triggerWaitAndVibrate();
 
+    // Update the board state
     gameData.board[index].opened = true;
-    gameData.cardsLeft -= 1;
+    gameData.board[index].content = isBomb ? '💣' : emoji;
+    gameData.cardsLeft--;
+    
+    // Update the UI
+    const cardContainer = document.querySelector(`.card-container[data-index="${index}"]`);
+    if (cardContainer) {
+        const card = cardContainer.querySelector('.card');
+        if (card) {
+            card.classList.add('flipped');
+            card.style.transform = 'rotateY(180deg)';
+            
+            // Update the back face content
+            const backFace = card.querySelector('.back');
+            if (backFace) {
+                backFace.textContent = gameData.board[index].content;
+            }
+        }
+    }
     
     if (isBomb) {
-        gameData.board[index].content = '💣';
-        // Hamle yapan oyuncu can kaybeder
+        // Current player loses a life
         const currentPlayerIsHost = gameData.turn === 0;
         if (currentPlayerIsHost) {
-            gameData.hostLives--;
+            gameData.hostLives = Math.max(0, gameData.hostLives - 1);
         } else { 
-            gameData.guestLives--;
+            gameData.guestLives = Math.max(0, gameData.guestLives - 1);
         }
         
         playSound(audioBomb);
         showGlobalMessage(`BOOM! Bombaya bastınız!`, true);
     } else {
-        gameData.board[index].content = emoji; // Server'dan gelen emoji
         playSound(audioEmoji);
     }
     
