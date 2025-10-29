@@ -6,29 +6,14 @@ const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
-const PORT = process.env.PORT || 10000;
 
-// CORS ve Socket.IO yapılandırması
+// CORS DÜZELTME: Tüm kaynaklardan gelen bağlantılara izin verir
 const io = new Server(server, {
     cors: {
-        origin: [
-            'https://beta-github-io.onrender.com',
-            'http://localhost:3000',
-            'http://127.0.0.1:5500',
-            'http://localhost:5500',
-            'https://xaliq2008.github.io'
-        ],
-        methods: ["GET", "POST"],
-        credentials: true
+        origin: "*", 
+        methods: ["GET", "POST"]
     },
-    transports: ['websocket', 'polling'],
-    path: '/socket.io/'
-});
-
-// Sunucuyu başlat
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Sunucu ${PORT} portunda çalışıyor`);
-    console.log(`🔌 Socket.IO yolu: ${io.path()}`);
+    transports: ['websocket', 'polling'] 
 });
 
 const rooms = {}; 
@@ -54,51 +39,29 @@ function generateRoomCode() {
 io.on('connection', (socket) => {
     console.log(`Yeni bağlantı: ${socket.id}`);
     
-    socket.on('createRoom', ({ username }, callback) => {
-        try {
-            if (!username || username.length < 2) {
-                console.error('Geçersiz kullanıcı adı:', username);
-                if (callback) callback({ error: 'Geçersiz kullanıcı adı. En az 2 karakter olmalıdır.' });
-                return;
+    socket.on('createRoom', ({ username }) => {
+        const code = generateRoomCode();
+        rooms[code] = {
+            code,
+            playerCount: 1,
+            hostId: socket.id,
+            hostUsername: username,
+            guestId: null,
+            guestUsername: null,
+            gameState: {
+                stage: 'WAITING', // WAITING, SELECTION, PLAY, ENDED
+                turn: 0, // 0 = Host, 1 = Guest
+                hostBombs: [],
+                guestBombs: [],
+                hostBombsSelected: false,
+                guestBombsSelected: false,
+                level: 1,
+                opened: [] // Açılan kart indeksleri
             }
-
-            const code = generateRoomCode();
-            rooms[code] = {
-                code,
-                playerCount: 1,
-                hostId: socket.id,
-                hostUsername: username,
-                guestId: null,
-                guestUsername: null,
-                gameState: {
-                    stage: 'WAITING',
-                    turn: 0,
-                    hostBombs: [],
-                    guestBombs: [],
-                    hostBombsSelected: false,
-                    guestBombsSelected: false,
-                    level: 1,
-                    opened: []
-                },
-                createdAt: Date.now()
-            };
-
-            socket.join(code, (error) => {
-                if (error) {
-                    console.error('Odaya katılma hatası:', error);
-                    delete rooms[code];
-                    if (callback) callback({ error: 'Oda oluşturulurken bir hata oluştu.' });
-                    return;
-                }
-                
-                console.log(`Oda oluşturuldu: ${code} - Host: ${username} - Socket: ${socket.id}`);
-                socket.emit('roomCreated', code);
-                if (callback) callback({ success: true, roomCode: code });
-            });
-        } catch (error) {
-            console.error('Oda oluşturma hatası:', error);
-            if (callback) callback({ error: 'Beklenmeyen bir hata oluştu.' });
-        }
+        };
+        socket.join(code);
+        socket.emit('roomCreated', code);
+        console.log(`Oda oluşturuldu: ${code} - Host: ${username}`);
     });
 
     // Sohbet mesajı
@@ -286,4 +249,7 @@ io.on('connection', (socket) => {
     });
 });
 
-// Sunucu zaten yukarıda başlatıldı
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Sunucu port ${PORT} üzerinde çalışıyor.`);
+});
