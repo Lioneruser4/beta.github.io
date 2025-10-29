@@ -55,8 +55,8 @@ let selectedBombs = []; // Kendi seçtiğimiz bombaların indexleri
 let gameData = {
     board: [], 
     turn: 0,   // 0 = Host, 1 = Guest
-    hostLives: 2,
-    guestLives: 2,
+    hostLives: 0,  // Server'dan gelen değerlerle güncellenecek
+    guestLives: 0, // Server'dan gelen değerlerle güncellenecek
     cardsLeft: 0,
     hostBombs: [], 
     guestBombs: [],
@@ -341,22 +341,32 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     // --- SOCKET.IO İŞLEYİCİLERİ ---
 
     // Oyun Başlasın! (Bombalar otomatik seçildi)
-    socket.on('gameReady', ({ hostBombs, guestBombs }) => {
-        console.log('🚀 gameReady EVENT ALINDI!', { hostBombs, guestBombs, gameStage, isHost });
+    socket.on('gameReady', (gameState) => {
+        console.log('🚀 gameReady EVENT ALINDI!', gameState);
         
-        gameData.hostBombs = hostBombs;
-        gameData.guestBombs = guestBombs;
+        // Oyun durumunu güncelle
+        gameData.hostBombs = gameState.hostBombs || [];
+        gameData.guestBombs = gameState.guestBombs || [];
+        gameData.hostLives = gameState.hostLives || 2;
+        gameData.guestLives = gameState.guestLives || 2;
+        gameData.turn = gameState.turn || 0;
+        
         gameStage = 'PLAY';
-        gameData.turn = 0; // Host başlar
         
-        console.log('✅ Oyun durumu PLAY olarak ayarlandı, board çiziliyor...');
+        console.log('✅ Oyun durumu güncellendi:', {
+            hostBombs: gameData.hostBombs,
+            guestBombs: gameData.guestBombs,
+            hostLives: gameData.hostLives,
+            guestLives: gameData.guestLives,
+            turn: gameData.turn
+        });
         
         playSound(audioEmoji); // Başlama sesi
         showGlobalMessage('🚀 Oyun başlıyor! Kart açmayı başlatın!', false);
+        
+        // Oyun tahtasını çiz ve durumu güncelle
         drawBoard();
         updateStatusDisplay();
-        
-        console.log('✅ Board çizildi ve durum güncellendi!');
     });
 
     // gameData Olayı (Hamle Geldi - Kendi veya Rakip)
