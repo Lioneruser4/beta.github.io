@@ -39,17 +39,23 @@ function initializeGame(boardSize) {
     gameData.isGameOver = false;
     
     // Seviyeye göre can ve bomba sayısını ayarla
-    const bombCount = level === 1 ? 2 : 3;
-    gameData.hostLives = bombCount;
-    gameData.guestLives = bombCount;
+    if (level === 1) {
+        // Level 1'de bomba yok, can yok
+        gameData.hostLives = 0;
+        gameData.guestLives = 0;
+    } else {
+        // Level 2 ve sonrası 3 can, 3 bomba
+        gameData.hostLives = 3;
+        gameData.guestLives = 3;
+    }
     
     gameStage = 'WAITING';
 }
 
 // --- OYUN DURUMU ---
 let level = 1; 
-// GÜNCELLENMİŞ KART SAYILARI: 12 (4x3), 16 (4x4), 20 (4x5)
-const LEVELS = [12, 16, 20]; 
+// Kart sayıları: Level 1'de 16, sonraki tüm levellerde 20 kart
+const LEVELS = [16, 20]; 
 let gameStage = 'SELECTION'; // 'SELECTION' veya 'PLAY'
 let selectedBombs = []; // Kendi seçtiğimiz bombaların indexleri
 
@@ -322,8 +328,8 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     // Oyun başlatılıyor
     level = 1; // Yeni oyuna başlarken seviyeyi 1'e sıfırla
     
-    // İlk seviye için board boyutunu ayarla (8 kart ile başla)
-    const boardSize = 8; //LEVELS[0]; // İlk seviye her zaman 12 kart
+    // İlk seviye için board boyutunu ayarla (16 kart ile başla)
+    const boardSize = 16; // İlk seviye 16 kart
     initializeGame(boardSize);
     
     // Can sayılarını server'dan gelen bilgiyle güncelle
@@ -389,9 +395,8 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     socket.on('nextLevel', ({ newLevel }) => {
         level = newLevel;
         
-        // Seviyeye göre board boyutunu hesapla (8, 12, 16, 20, 20, ...)
-            let boardSize = 8 + ((level - 1) * 4);
-            boardSize = Math.min(boardSize, 20); // Maksimum 20 kart
+        // Level 1'de 16, sonraki tüm levellerde 20 kart
+        let boardSize = level === 1 ? 16 : 20;
         
         showGlobalMessage(`🎆 Seviye ${level} - ${boardSize} Kart! Bombalar yerleştiriliyor...`, false);
         
