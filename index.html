@@ -116,7 +116,6 @@
             transform: rotateY(180deg);
         }
         .card-container.matched .card {
-            /* Eşleşen kartları hafifçe gölgelendir */
             box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
             border-color: green;
         }
@@ -228,8 +227,7 @@
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage, resetGame } from './game.js';
 
         // ! ÖNEMLİ: Sunucu adresini buraya kopyalayın. 
-        // ! server.js konsolunda çıkan "Bağlantı Adresi" olmalıdır.
-        const LIVE_SERVER_URL = 'http://localhost:10000'; // ÖRNEK ADRES - LÜTFEN KENDİ ADRESİNİZLE DEĞİŞTİRİN
+        const LIVE_SERVER_URL = 'http://localhost:10000'; // LÜTFEN KONTROL EDİN!
 
         let socket;
         
@@ -250,14 +248,14 @@
                 // Socket bağlantısını kur
                 socket = io(LIVE_SERVER_URL, { transports: ['websocket', 'polling'] });
                 
-                // Bağlantı başarılı olduğunda (CRITICAL)
+                // Bağlantı başarılı olduğunda
                 socket.on('connect', () => {
                     if (roomCode) {
                         UIElements.showGlobalMessage(`Oda (${roomCode}) aranıyor...`, false);
                         socket.emit('joinRoom', { username, roomCode });
                     } else {
                         UIElements.showGlobalMessage('Yeni oda oluşturuluyor...', false);
-                        socket.emit('createRoom', { username }); // Oda oluşturma isteği
+                        socket.emit('createRoom', { username }); 
                     }
                 });
 
