@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>💣 Emoji Bomb V4 - Hafıza Oyunu</title>
+    <title>💣 Emoji Bomb V5 - Profesyonel Hafıza Oyunu</title>
     
     <style>
-        /* ... (CSS STİLLERİ BURADA DEVAM EDİYOR) ... */
         body {
             font-family: sans-serif;
             margin: 0;
@@ -72,14 +71,14 @@
         /* OYUN TAHTASI VE KART STİLLERİ */
         .memory-board {
             display: grid;
-            grid-template-columns: repeat(5, 1fr); /* 5x4 tahta */
+            grid-template-columns: repeat(5, 1fr); 
             gap: 5px;
-            perspective: 1000px; /* 3D efekti için */
+            perspective: 1000px;
         }
         .card-container {
             position: relative;
             width: 100%;
-            padding-bottom: 100%; /* Kare yapmak için */
+            padding-bottom: 100%; 
             cursor: default;
         }
         .card-container.cursor-pointer {
@@ -121,36 +120,6 @@
             border-color: green;
         }
         
-        /* DURUM VE SOHBET STİLLERİ */
-        #gameInfo {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
-        }
-        #chatBox {
-            height: 200px;
-            overflow-y: auto;
-            border: 1px solid #ccc;
-            padding: 10px;
-            margin-top: 15px;
-            text-align: left;
-        }
-        #chatInputContainer {
-            display: flex;
-            margin-top: 10px;
-        }
-        #chatInput {
-            flex-grow: 1;
-        }
-        #sendChatBtn {
-            margin-left: 5px;
-            padding: 10px;
-            background-color: #3b82f6;
-        }
-        
         /* GLOBAL MESAJ */
         #globalMessage {
             position: fixed;
@@ -178,8 +147,8 @@
         </div>
 
         <div id="lobby" class="screen active">
-            <h1 class="text-5xl font-black text-gray-900">💣 Emoji Bomb V4</h1>
-            <p class="text-gray-700">Eş Zamanlı Hafıza Avı. Kullanıcı adınızı girin.</p>
+            <h1 class="text-5xl font-black text-gray-900">💣 Emoji Bomb V5</h1>
+            <p class="text-gray-700">Oyun için kullanıcı adınızı girin.</p>
             
             <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adı"> 
             <input type="text" id="roomCodeInput" class="input-field uppercase" placeholder="Oda Numarası (Boş bırak=Oluştur)">
@@ -189,32 +158,22 @@
 
         <div id="waitScreen" class="screen">
             <h1 class="text-5xl font-black text-gray-900">Bekleniyor...</h1>
-            <p class="text-gray-700">Rakibinizin bağlanması bekleniyor.</p>
-            <p class="text-sm">Oda Kodu: <span id="waitRoomCode" class="font-black text-green-600"></span></p>
+            <p class="text-gray-700">Oda Kodu: <span id="waitRoomCode" class="font-black text-green-600"></span></p>
         </div>
 
         <div id="gameScreen" class="screen">
-            <h2 id="turnStatus" class="font-black text-center text-green-600">SIRA SİZDE!</h2>
-            <p id="actionMessage" class="text-sm text-gray-700"></p>
+            <h2 id="turnStatus" class="font-black text-center">SIRA BEKLENİYOR</h2>
 
-            <div id="gameInfo">
+            <div id="gameInfo" style="display: flex; justify-content: space-between; padding: 10px 0;">
                 <span id="myName" class="font-black text-blue-700">Siz (Skor: 0)</span>
                 <span id="roleStatus" class="text-sm"></span>
                 <span id="opponentName" class="font-black text-red-600">Rakip (Skor: 0)</span>
             </div>
 
+            <p id="actionMessage" class="text-sm text-gray-700"></p>
+
             <div id="gameBoard" class="memory-board">
                 </div>
-            
-            <h3 class="text-center font-black">Sohbet</h3>
-            <div id="chatBox">
-                <div id="messages">
-                    </div>
-            </div>
-            <div id="chatInputContainer">
-                <input type="text" id="chatInput" class="input-field" placeholder="Mesajınızı yazın...">
-                <button id="sendChatBtn" class="btn">Gönder</button>
-            </div>
             
             <button onclick="UIElements.resetGame()" class="btn btn-primary" style="background-color: #9ca3af; margin-top: 20px;">Lobiye Dön</button>
         </div>
@@ -246,15 +205,17 @@
             }
 
             try {
-                // Bağlantı ayarları kaldırıldı, en basit haliyle bağlantı kurmayı deniyoruz
-                socket = io(LIVE_SERVER_URL); 
+                // Güvenilir bağlantı denemesi
+                socket = io(LIVE_SERVER_URL, { 
+                    transports: ['websocket', 'polling'], // Client tarafında da zorlama
+                    reconnectionAttempts: 3 
+                });
                 
                 socket.on('connect', () => {
+                    UIElements.showGlobalMessage(`Sunucuya bağlandı.`, false);
                     if (roomCode) {
-                        UIElements.showGlobalMessage(`Oda (${roomCode}) aranıyor...`, false);
                         socket.emit('joinRoom', { username, roomCode });
                     } else {
-                        UIElements.showGlobalMessage('Yeni oda oluşturuluyor...', false);
                         socket.emit('createRoom', { username }); 
                     }
                 });
@@ -262,15 +223,13 @@
                 socket.on('connect_error', (err) => {
                     UIElements.showGlobalMessage(`Bağlantı Hatası: Sunucuya ulaşılamıyor. URL: ${LIVE_SERVER_URL}`, true);
                     console.error("Socket bağlantı hatası:", err.message);
-                    showScreen('lobby');
                     socket.disconnect();
+                    showScreen('lobby');
                 });
                 
-                // Sunucu olayları
                 socket.on('roomCreated', (code) => {
                     UIElements.waitRoomCodeEl.textContent = code;
                     showScreen('wait');
-                    UIElements.showGlobalMessage(`Oda oluşturuldu: ${code}. Rakip bekleniyor.`, false);
                 });
 
                 socket.on('joinFailed', (message) => {
@@ -283,11 +242,10 @@
                     const selfUsername = initialData.players.find(p => p.id === socket.id).username;
                     const opponentUsername = initialData.players.find(p => p.id !== socket.id).username;
                     setupSocketHandlers(socket, initialData.code, selfUsername, opponentUsername, initialData);
-                    UIElements.showGlobalMessage("Oyun Başladı! İyi Eğlenceler!", false);
                 });
                 
             } catch (e) {
-                UIElements.showGlobalMessage('Socket.IO kütüphanesi yüklenemedi. Lütfen konsolu kontrol edin.', true);
+                UIElements.showGlobalMessage('Socket.IO yüklenemedi. Lütfen konsolu kontrol edin.', true);
                 console.error("Socket.IO yükleme hatası:", e);
             }
         }
