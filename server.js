@@ -57,6 +57,26 @@ io.on('connection', (socket) => {
         console.log(`Oda oluşturuldu: ${code} - Host: ${username}`);
     });
 
+    // Sohbet mesajı
+    socket.on('chatMessage', ({ roomCode, text }) => {
+        const code = (roomCode || '').toUpperCase();
+        const room = rooms[code];
+        if (!room || !text || typeof text !== 'string') return;
+
+        // Gönderenin adını belirle
+        let name = 'Oyuncu';
+        if (socket.id === room.hostId) name = room.hostUsername || 'Host';
+        else if (socket.id === room.guestId) name = room.guestUsername || 'Guest';
+
+        const payload = {
+            text: text.slice(0, 300), // uzunluğu sınırla
+            name,
+            ts: Date.now(),
+            senderId: socket.id
+        };
+        io.to(code).emit('chatMessage', payload);
+    });
+
     socket.on('joinRoom', ({ username, roomCode }) => {
         const code = roomCode.toUpperCase();
         const room = rooms[code];
