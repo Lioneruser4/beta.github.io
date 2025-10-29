@@ -7,7 +7,7 @@ let myName = '';
 const BOMB_EMOJI = '💣';
 const ANIMATION_DELAY = 1500; 
 
-// --- DOM Referansları (Aynı) ---
+// --- DOM Referansları ---
 const screens = { 
     lobby: document.getElementById('lobby'), 
     wait: document.getElementById('waitScreen'), 
@@ -18,13 +18,16 @@ const turnStatusEl = document.getElementById('turnStatus');
 const actionMessageEl = document.getElementById('actionMessage');
 const myNameEl = document.getElementById('myName'); 
 const opponentNameEl = document.getElementById('opponentName'); 
-// Sohbet aynı...
 
-// Yeni Ses Fonksiyonu (index.html'e <audio> etiketlerini eklemeniz gerekmektedir)
+// Sohbet Referansları
+const chatInputEl = document.getElementById('chatInput');
+const sendChatBtn = document.getElementById('sendChatBtn');
+const messagesEl = document.getElementById('messages');
+
 function playSound(soundKey) {
-    const audioEl = document.getElementById(soundKey); // Örneğin: <audio id="BOMB_SOUND" src="bomb.mp3"></audio>
+    const audioEl = document.getElementById(soundKey); 
     if (audioEl) {
-        audioEl.currentTime = 0; // Başa sar
+        audioEl.currentTime = 0; 
         audioEl.play().catch(e => console.error("Ses çalınamadı:", e));
     } else {
         console.log(`Ses kaydı bulunamadı: ${soundKey}`);
@@ -43,10 +46,43 @@ let gameData = {
 };
 
 // --- TEMEL UI FONKSİYONLARI (Aynı) ---
-export function showScreen(screenId) { /* ... */ }
-export function showGlobalMessage(message, isError = true) { /* ... */ }
-function appendMessage(sender, text, isMe) { /* ... */ }
-function handleSendMessage() { /* ... */ }
+export function showScreen(screenId) {
+    Object.values(screens).forEach(screen => screen && screen.classList.remove('active'));
+    if (screens[screenId]) { screens[screenId].classList.add('active'); }
+}
+
+export function showGlobalMessage(message, isError = true) {
+    const globalMessage = document.getElementById('globalMessage');
+    const globalMessageText = document.getElementById('globalMessageText');
+    if (!globalMessage || !globalMessageText) return;
+
+    globalMessageText.textContent = message;
+    globalMessage.classList.remove('bg-red-600', 'bg-green-600');
+    globalMessage.classList.add(isError ? 'bg-red-600' : 'bg-green-600');
+    globalMessage.classList.remove('hidden');
+    globalMessage.classList.add('show');
+    setTimeout(() => { globalMessage.classList.add('hidden'); globalMessage.classList.remove('show'); }, 4000);
+}
+
+function appendMessage(sender, text, isMe) {
+    const messageItem = document.createElement('p');
+    messageItem.className = `break-words ${isMe ? 'text-right text-blue-700' : 'text-left text-gray-800'}`;
+    messageItem.innerHTML = `<span class="font-bold">${sender}:</span> ${text}`;
+    messagesEl.appendChild(messageItem);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function handleSendMessage() {
+    const message = chatInputEl.value.trim();
+    if (message === "" || gameData.isGameOver || !socket || !socket.connected) return;
+
+    socket.emit('sendMessage', {
+        roomCode: currentRoomCode,
+        message: message
+    });
+    
+    chatInputEl.value = '';
+}
 
 
 // --- OYUN MANTIĞI VE ÇİZİM ---
@@ -104,7 +140,6 @@ function drawBoard() {
         card.className = `card`; 
         card.dataset.index = index;
 
-        // Kartın içeriği (Emoji)
         const front = document.createElement('div');
         front.className = 'card-face front';
         front.textContent = '?';
@@ -123,9 +158,13 @@ function drawBoard() {
         if (isMatched || isFlipped) {
             card.classList.add('flipped');
             if (isMatched) { cardContainer.classList.add('matched'); }
+            // Bomba seçildiyse bomb-chosen sınıfını ekle (Görsel geri bildirim için)
+            if (content === BOMB_EMOJI && isFlipped && !isMatched) {
+                 card.classList.add('bomb-chosen');
+            }
         }
         
-        // Sadece sırası gelen, eşleşmemiş ve açık olmayan kartlara tıklama ekle
+        // SADECE sırası gelen, eşleşmemiş ve açık olmayan kartlara tıklama ekle (KRİTİK)
         if (canClick && !isMatched && !isFlipped) {
             cardContainer.addEventListener('click', handleCardClick);
             cardContainer.classList.add('cursor-pointer');
@@ -154,13 +193,13 @@ function handleCardClick(event) {
     
     if (gameData.flippedCards.includes(cardIndex) || gameData.matchedCards.has(cardIndex)) return;
     
-    // Tıklamaları hemen engelle (2. kartı beklerken)
-    gameBoardEl.querySelectorAll('.card-container').forEach(el => el.removeEventListener('click', handleCardClick));
-    
     // 2. kart çevriliyorsa, animasyon kilidini aç
     if (gameData.flippedCards.length === 1) { 
         gameData.isAnimating = true; 
     }
+    
+    // Tıklamaları hemen engelle (2. kartı beklerken)
+    gameBoardEl.querySelectorAll('.card-container').forEach(el => el.removeEventListener('click', handleCardClick));
     
     sendMove(cardIndex);
 }
@@ -174,7 +213,7 @@ function sendMove(index) {
     }
 }
 
-// Sunucudan Kart Açma Bilgisi Geldiğinde (KRİTİK DÜZELTME)
+// Sunucudan Kart Açma Bilgisi Geldiğinde (Senkronizasyon Düzeltmesi)
 function handleGameStateUpdate(data) {
     const { flippedCardIndex, flippedCards, matchedCards, scoreHost, scoreGuest, cardContent } = data;
     
@@ -188,28 +227,20 @@ function handleGameStateUpdate(data) {
     if (cardElement && !cardElement.classList.contains('flipped')) {
         cardElement.classList.add('flipped'); 
         
-        // Eğer 2. kart çevrildiyse animasyon kilidini aç (turnUpdate gelene kadar)
         if (flippedCards.length === 2) {
             gameData.isAnimating = true;
         }
-        
-        // Bomba seçildi mi kontrol et (Hemen görsel geri bildirim için)
-        if (cardContent === BOMB_EMOJI) {
-             cardElement.classList.add('bomb-chosen');
-             // Sadece kendi sıramızdaki ilk bomba seçiminde ses çalmak için buraya özel bir kontrol eklenebilir.
-        }
     }
     
-    drawBoard(); // Tahtayı güncelleyerek (özellikle tıklama olaylarını doğru ayarla)
+    drawBoard(); 
 }
 
-// Sunucudan Sıra Değişikliği Bilgisi Geldiğinde (Bomba ve Skor Yönetimi)
+// Sunucudan Sıra Değişikliği Bilgisi Geldiğinde 
 function handleTurnUpdate(data) {
     gameData.currentTurnId = data.turn;
     
     // Kart Kapatma İşlemi
     if (data.flippedCards && data.flippedCards.length === 0) {
-        // Kartları kapat
         gameData.flippedCards.forEach(index => {
             const cardElement = document.querySelector(`.card[data-index="${index}"]`);
             if (cardElement) {
@@ -228,30 +259,24 @@ function handleTurnUpdate(data) {
     // Ses ve Animasyon
     if (data.playSound) {
         playSound(data.playSound); 
-        
-        if (data.isBomb) {
-            // Bomba Animasyonu (CSS ile patlama animasyonu tetiklenebilir)
-            data.bombIndexes.forEach(index => {
-                const cardContainer = document.querySelector(`.card-container > .card[data-index="${index}"]`);
-                if (cardContainer) {
-                    // cardContainer.classList.add('bomb-animation'); // CSS ile animasyonu tetikle
-                    setTimeout(() => { 
-                         cardContainer.classList.remove('bomb-chosen'); 
-                         // cardContainer.classList.remove('bomb-animation'); 
-                    }, 500);
-                }
-            });
-        }
     }
 
     showGlobalMessage(data.message, data.message.includes('Eşleşme') ? false : true);
     
     gameData.isAnimating = false;
-    drawBoard(); // Tahtayı yeniden çiz ve tıklama olaylarını doğru şekilde ekle
+    drawBoard(); 
 }
 
-// ... (handleGameEnd, setupSocketHandlers, resetGame ve UIElements aynı kalır) ...
-// setupSocketHandlers içinde 'gameStateUpdate' ve 'turnUpdate' dinleyicilerinin doğru atandığından emin olun.
+function handleGameEnd(data) {
+    gameData.isGameOver = true;
+    let winnerText = data.winner === 'DRAW' ? 'BERABERE' : (data.winner === (isHost ? 'Host' : 'Guest') ? 'SİZ KAZANDINIZ 🎉' : 'RAKİP KAZANDI 😢');
+    let endMessage = `OYUN BİTTİ! ${winnerText}. Skorlar - Siz: ${isHost ? data.scoreHost : data.scoreGuest}, Rakip: ${isHost ? data.scoreGuest : data.scoreHost}`;
+    showGlobalMessage(endMessage, data.winner === 'DRAW' ? false : data.winner === (isHost ? 'Host' : 'Guest') ? false : true);
+    updateStatusDisplay();
+}
+
+
+// --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
 export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername, initialData) {
     socket = s;
     currentRoomCode = roomCode;
@@ -267,11 +292,40 @@ export function setupSocketHandlers(s, roomCode, selfUsername, opponentUsername,
     
     document.getElementById('roleStatus').textContent = `Rolünüz: ${isHost ? 'Host' : 'Guest'}`;
     
-    // Bağlantı dinleyicilerini bir kere atadığınızdan emin olun
     socket.off('gameStateUpdate').on('gameStateUpdate', handleGameStateUpdate);
     socket.off('turnUpdate').on('turnUpdate', handleTurnUpdate); 
-    // ... (diğer dinleyiciler) ...
+    socket.off('gameEnd').on('gameEnd', handleGameEnd);
+    socket.off('opponentLeft').on('opponentLeft', (message) => {
+        showGlobalMessage(message || 'Rakibiniz ayrıldı. Lobiye dönülüyor.', true);
+        resetGame();
+    });
+    socket.off('newMessage').on('newMessage', (data) => {
+        const isMe = data.sender === myName;
+        appendMessage(data.sender, data.text, isMe);
+    });
+
+    sendChatBtn.onclick = handleSendMessage;
+    chatInputEl.onkeypress = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault(); 
+            handleSendMessage();
+        }
+    };
+
 }
 
-export function resetGame() { /* ... */ }
-export const UIElements = { /* ... */ };
+export function resetGame() { 
+    if (socket) {
+        socket.disconnect();
+    }
+    window.location.reload(); 
+}
+
+export const UIElements = {
+    matchBtn: document.getElementById('matchBtn'), 
+    roomCodeInput: document.getElementById('roomCodeInput'), 
+    usernameInput: document.getElementById('username'), 
+    waitRoomCodeEl: document.getElementById('waitRoomCode'),
+    showGlobalMessage, 
+    resetGame
+};
