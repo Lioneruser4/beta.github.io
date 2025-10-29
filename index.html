@@ -252,17 +252,12 @@
                     </button>
                     
                     <!-- Odaya Katılma Alanı -->
-                    <div id="joinRoomSection" class="space-y-3">
-                        <div class="relative">
-                            <input type="text" id="roomCodeInput" 
-                                class="w-full px-4 py-3 text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-                                placeholder="Oda Kodu (4 karakter)" maxlength="4" style="text-transform: uppercase">
-                        </div>
-                        <button id="joinRoomBtn" class="w-full flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200">
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                            </svg>
-                            Odaya Katıl
+                    <div class="flex gap-2">
+                        <input type="text" id="roomCodeInput" 
+                            class="flex-1 px-4 py-3 text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                            placeholder="Oda Kodu" maxlength="4" style="text-transform: uppercase">
+                        <button id="joinRoomBtn" class="px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                            Katıl
                         </button>
                     </div>
                 </div>
@@ -409,64 +404,29 @@
             });
         });
         
-        // Odaya katıl butonu için event listener
+        // Odaya katıl butonu için basit event listener
         document.getElementById('joinRoomBtn').addEventListener('click', () => {
-            try {
-                const username = validateInput();
-                if (!username) return;
-                
-                const roomCodeInput = document.getElementById('roomCodeInput');
-                const roomCode = roomCodeInput.value.trim().toUpperCase();
-                
-                if (roomCode.length !== 4) {
-                    showGlobalMessage('Lütfen geçerli bir oda kodu girin (4 karakter)', true);
-                    return;
-                }
-                
-                showScreen('wait');
-                document.getElementById('waitTitle').textContent = `Odaya Katılım: ${roomCode}`;
-                document.getElementById('waitStatus').textContent = 'Bağlanılıyor...';
-                document.getElementById('codeArea').classList.add('hidden');
-                
-                console.log('Odaya katılma isteği gönderiliyor:', roomCode);
-                
-                // Sunucuya odaya katılma isteği gönder
-                socket.emit('joinRoom', { 
-                    username: username,
-                    roomCode: roomCode
-                }, (response) => {
-                    console.log('Sunucu yanıtı (callback):', response);
-                    if (response && response.error) {
-                        console.error('Odaya katılma hatası (callback):', response.error);
-                        showGlobalMessage('Odaya katılırken bir hata oluştu: ' + response.error, true);
-                        showScreen('lobby');
-                    }
-                });
-                
-                // Oda oluşturulduğunda tetiklenen event
-                socket.on('roomCreated', (code) => {
-                    console.log('Oda oluşturuldu, oda kodu:', code);
-                    document.getElementById('roomCodeDisplay').textContent = code;
-                    document.getElementById('codeArea').classList.remove('hidden');
-                    document.getElementById('waitStatus').textContent = 'Oda kodunu arkadaşınıza gönderin...';
-                });
-                
-                // Odaya katılma başarılı olduğunda tetiklenen event
-                socket.on('joinSuccess', (data) => {
-                    console.log('Odaya başarıyla katıldı:', data);
-                });
-                
-                // Odaya katılma başarısız olduğunda tetiklenen event
-                socket.on('joinFailed', (message) => {
-                    console.error('Odaya katılamadı:', message);
-                    showGlobalMessage('Odaya katılamadı: ' + message, true);
-                    showScreen('lobby');
-                });
-                
-            } catch (error) {
-                console.error('Odaya katılırken beklenmeyen hata:', error);
-                showGlobalMessage('Bir hata oluştu: ' + error.message, true);
-                showScreen('lobby');
+            const username = validateInput();
+            if (!username) return;
+            
+            const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            if (!roomCode) {
+                showGlobalMessage('Lütfen bir oda kodu girin', true);
+                return;
+            }
+            
+            showScreen('wait');
+            document.getElementById('waitTitle').textContent = 'Odaya Bağlanılıyor...';
+            document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
+            
+            console.log('Odaya katılım denemesi:', roomCode);
+            socket.emit('joinRoom', { username, roomCode });
+        });
+        
+        // Oda kodu input'unda enter tuşu desteği
+        document.getElementById('roomCodeInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('joinRoomBtn').click();
             }
         });
         
