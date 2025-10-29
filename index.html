@@ -386,10 +386,21 @@
             </ul>
         </div>
         
-        <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adınızı Girin" maxlength="15">
-        <input type="text" id="roomCodeInput" class="input-field uppercase" placeholder="Oda Kodu (Boş bırak=Yeni Oda)" maxlength="6">
+        <input type="text" id="username" class="input-field w-full" placeholder="Kullanıcı Adınızı Girin" maxlength="15">
         
-        <button id="matchBtn" class="btn btn-primary">🎮 Oyuna Başla</button>
+        <div class="w-full space-y-3">
+            <button id="createRoomBtn" class="btn btn-primary w-full">
+                🏠 Oda Kur
+            </button>
+            <div class="relative flex items-center">
+                <div class="flex-grow">
+                    <input type="text" id="roomCodeInput" class="input-field uppercase w-full" placeholder="Oda Kodu" maxlength="6">
+                </div>
+                <button id="joinRoomBtn" class="btn bg-green-600 hover:bg-green-500 text-white ml-2 whitespace-nowrap">
+                    Odaya Gir
+                </button>
+            </div>
+        </div>
     </div>
     
     <div id="waitScreen" class="screen space-y-6 container">
@@ -452,6 +463,51 @@
                     if (e.key === 'Enter') {
                         sendChatMessage();
                     }
+                });
+            }
+            
+            // Set up create room and join room buttons
+            const createRoomBtn = document.getElementById('createRoomBtn');
+            const joinRoomBtn = document.getElementById('joinRoomBtn');
+            const roomCodeInput = document.getElementById('roomCodeInput');
+            
+            if (createRoomBtn) {
+                createRoomBtn.addEventListener('click', () => {
+                    roomCodeInput.value = ''; // Clear room code for new room
+                    document.getElementById('matchBtn').click();
+                });
+            }
+            
+            if (joinRoomBtn && roomCodeInput) {
+                joinRoomBtn.addEventListener('click', () => {
+                    if (roomCodeInput.value.trim() === '') {
+                        showGlobalMessage('Lütfen oda kodunu girin', 'error');
+                        return;
+                    }
+                    document.getElementById('matchBtn').click();
+                });
+            }
+            }
+            
+            // Set up create room and join room buttons
+            const createRoomBtn = document.getElementById('createRoomBtn');
+            const joinRoomBtn = document.getElementById('joinRoomBtn');
+            const roomCodeInput = document.getElementById('roomCodeInput');
+            
+            if (createRoomBtn) {
+                createRoomBtn.addEventListener('click', () => {
+                    if (roomCodeInput) roomCodeInput.value = ''; // Clear room code for new room
+                    document.getElementById('matchBtn')?.click();
+                });
+            }
+            
+            if (joinRoomBtn && roomCodeInput) {
+                joinRoomBtn.addEventListener('click', () => {
+                    if (roomCodeInput.value.trim() === '') {
+                        showGlobalMessage('Lütfen oda kodunu girin', 'error');
+                        return;
+                    }
+                    document.getElementById('matchBtn')?.click();
                 });
             }
         });
