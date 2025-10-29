@@ -109,97 +109,79 @@ io.on('connection', (socket) => {
         }
     });
     
-    // Odaya katılma işlemi
+    // Odaya katılma işlemi (basitleştirilmiş)
     socket.on('joinRoom', ({ username, roomCode }) => {
-        console.log('Odaya katılma isteği alındı:', { 
-            socketId: socket.id, 
-            username: username, 
-            roomCode: roomCode 
+        console.log('\n=== YENİ ODA KATILMA İSTEĞİ ===');
+        console.log('Kullanıcı:', username);
+        console.log('Oda Kodu:', roomCode);
+        console.log('Socket ID:', socket.id);
+        
+        // Basit validasyon
+        if (!username || !roomCode) {
+            console.log('HATA: Eksik bilgi');
+            socket.emit('joinFailed', 'Lütfen kullanıcı adı ve oda kodunu girin');
+            return;
+        }
+        
+        // Oda kodunu düzenle
+        roomCode = roomCode.toString().trim().toUpperCase();
+        console.log('İşlenmiş oda kodu:', roomCode);
+        
+        // Odayı bul
+        const room = rooms.get(roomCode);
+        
+        // Oda yoksa hata ver
+        if (!room) {
+            console.log('HATA: Oda bulunamadı');
+            socket.emit('joinFailed', 'Bu oda bulunamadı. Kodu kontrol edin.');
+            return;
+        }
+        
+        // Oda dolu mu kontrol et
+        if (room.players.length >= 2) {
+            console.log('HATA: Oda dolu');
+            socket.emit('joinFailed', 'Bu oda zaten dolu.');
+            return;
+        }
+        
+        // Yeni oyuncu bilgisi
+        const player = {
+            id: socket.id,
+            username: username,
+            isHost: false,
+            score: 0,
+            lives: 3
+        };
+        
+        // Oyuncuyu odaya ekle
+        room.players.push(player);
+        socket.join(roomCode);
+        
+        console.log('Odaya eklendi:', player.username);
+        console.log('Oda durumu:', {
+            kod: roomCode,
+            oyuncular: room.players.map(p => p.username)
         });
         
-        try {
-            // Eksik parametre kontrolü
-            if (!username || !roomCode) {
-                const errorMsg = 'Eksik bilgi: Kullanıcı adı veya oda kodu eksik';
-                console.error(errorMsg);
-                socket.emit('joinFailed', 'Lütfen geçerli bir oda kodu girin');
-                return;
-            }
+        // İkinci oyuncu geldi mi kontrol et
+        if (room.players.length === 2) {
+            console.log('İki oyuncu da hazır! Oyun başlıyor...');
             
-            // Oda kodunu temizle ve büyük harfe çevir
-            roomCode = roomCode.trim().toUpperCase();
-            console.log('Temizlenmiş oda kodu:', roomCode);
-            
-            // Odayı bul
-            const room = rooms.get(roomCode);
-            
-            // Oda yoksa hata gönder
-            if (!room) {
-                console.error('Oda bulunamadı:', roomCode);
-                socket.emit('joinFailed', 'Bu oda bulunamadı. Lütfen kodu kontrol edin.');
-                return;
-            }
-            
-            // Oda dolu mu kontrol et
-            if (room.players.length >= 2) {
-                console.error('Oda dolu:', roomCode);
-                socket.emit('joinFailed', 'Bu oda zaten dolu. Lütfen başka bir oda seçin.');
-                return;
-            }
-            
-            // Aynı kullanıcı adı kontrolü
-            const isUsernameTaken = room.players.some(p => p.username === username);
-            if (isUsernameTaken) {
-                console.error('Kullanıcı adı zaten alınmış:', username);
-                socket.emit('joinFailed', 'Bu kullanıcı adı zaten alınmış. Lütfen farklı bir isim seçin.');
-                return;
-            }
-            
-            // Yeni oyuncuyu oluştur
-            const player = {
-                id: socket.id,
-                username: username,
-                isHost: false,
-                score: 0,
-                lives: 3,
-                joinedAt: new Date()
-            };
-            
-            // Oyuncuyu odaya ekle
-            room.players.push(player);
-            socket.join(roomCode);
-            
-            console.log(`Kullanıcı odaya eklendi: ${player.username} (${roomCode})`);
-            console.log('Oda bilgisi:', {
-                odaKodu: roomCode,
-                oyuncuSayisi: room.players.length,
-                oyuncular: room.players.map(p => p.username)
+            // Oyunu başlat
+            room.status = 'playing';
+            io.to(roomCode).emit('gameStart', {
+                players: room.players,
+                roomCode: roomCode,
+                level: room.level || 1
             });
-            
-            // İkinci oyuncu geldiğinde oyunu başlat
-            if (room.players.length === 2) {
-                console.log('İki oyuncu da hazır, oyun başlıyor:', roomCode);
-                
-                // Oyun başlangıç zamanını ayarla
-                room.startedAt = new Date();
-                room.status = 'playing';
-                
-                // Tüm oyunculara oyunun başladığını bildir
-                io.to(roomCode).emit('gameStart', {
-                    players: room.players,
-                    roomCode: roomCode,
-                    level: room.level || 1
-                });
-                
-                console.log('Oyun başlatıldı:', roomCode);
-            } else {
-                // İlk oyuncuya başarılı katılım bilgisi gönder
-                socket.emit('joinSuccess', { 
-                    roomCode: roomCode,
-                    message: 'Odaya başarıyla katıldınız. İkinci oyuncu bekleniyor...'
-                });
-                console.log('İkinci oyuncu bekleniyor:', roomCode);
-            }
+        } else {
+            // İlk oyuncuya onay gönder
+            console.log('İkinci oyuncu bekleniyor...');
+            socket.emit('joinSuccess', { 
+                roomCode: roomCode,
+                message: 'Odaya başarıyla katıldınız. İkinci oyuncu bekleniyor...'
+            });
+        }
     });
     
     // Oyun verilerini işle
