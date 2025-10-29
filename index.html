@@ -245,10 +245,13 @@
             }
 
             try {
-                // Socket bağlantısını kur
-                socket = io(LIVE_SERVER_URL, { transports: ['websocket', 'polling'] });
+                // KRİTİK BAĞLANTI AYARI: Yeni bağlantı zorlama ve tüm transportları deneme
+                socket = io(LIVE_SERVER_URL, { 
+                    transports: ['websocket', 'polling'], 
+                    forceNew: true, 
+                    reconnectionAttempts: 3 
+                });
                 
-                // Bağlantı başarılı olduğunda
                 socket.on('connect', () => {
                     if (roomCode) {
                         UIElements.showGlobalMessage(`Oda (${roomCode}) aranıyor...`, false);
@@ -262,6 +265,7 @@
                 socket.on('connect_error', (err) => {
                     UIElements.showGlobalMessage(`Bağlantı Hatası: Sunucuya ulaşılamıyor. URL: ${LIVE_SERVER_URL}`, true);
                     console.error("Socket bağlantı hatası:", err.message);
+                    showScreen('lobby');
                     socket.disconnect();
                 });
                 
@@ -275,6 +279,7 @@
                 socket.on('joinFailed', (message) => {
                     UIElements.showGlobalMessage(message, true);
                     socket.disconnect();
+                    showScreen('lobby');
                 });
 
                 socket.on('gameStart', (initialData) => {
