@@ -177,24 +177,104 @@
         <p id="globalMessageText"></p>
     </div>
 
-    <div id="lobby" class="screen active space-y-6 container">
-        <h1 class="text-5xl font-black text-gray-900">💣 Emoji Bomb</h1>
-        <p class="text-gray-700 text-sm">Sunucuya bağlı. 1v1 Çok Oyunculu Bomba Oyunu</p>
-        
-        <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-3 rounded text-sm">
-            <p class="font-bold">📋 Oyun Kuralları:</p>
-            <ul class="list-disc list-inside mt-2 text-left">
-                <li>Bombalar otomatik yerleşir - direkt oyuna başlayın!</li>
-                <li>Sırayla kart açarsınız</li>
-                <li>Rakibinizin bombasına basarsanız can kaybedersiniz</li>
-                <li>2 can biter, oyunu kaybedersiniz!</li>
-            </ul>
+    <div id="lobby" class="screen active container max-w-md p-6">
+        <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-blue-600 to-purple-600 p-6 text-center">
+                <h1 class="text-4xl font-extrabold text-white mb-2">💣 Emoji Bomb</h1>
+                <p class="text-blue-100 text-sm">1v1 Çok Oyunculu Bomba Oyunu</p>
+            </div>
+            
+            <!-- Game Rules -->
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex items-center text-lg font-semibold text-gray-800 mb-3">
+                    <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Oyun Kuralları
+                </div>
+                <ul class="space-y-2 text-sm text-gray-600">
+                    <li class="flex items-start">
+                        <span class="text-green-500 mr-2">•</span>
+                        <span>Bombalar otomatik olarak yerleştirilir</span>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="text-green-500 mr-2">•</span>
+                        <span>Sırayla kart açarak ilerleyin</span>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="text-green-500 mr-2">•</span>
+                        <span>Bomba kartı açan can kaybeder</span>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="text-green-500 mr-2">•</span>
+                        <span>3 can hakkınız var</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <!-- User Input -->
+            <div class="p-6">
+                <!-- Username Input -->
+                <div class="mb-6">
+                    <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Kullanıcı Adı</label>
+                    <div class="relative rounded-md shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                        </div>
+                        <input type="text" id="username" class="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl" placeholder="Kullanıcı adınızı girin">
+                    </div>
+                </div>
+                
+                <!-- Room Code Input (Hidden by default) -->
+                <div id="roomCodeContainer" class="mb-6 hidden">
+                    <label for="roomCodeInput" class="block text-sm font-medium text-gray-700 mb-1">Oda Kodu</label>
+                    <div class="relative rounded-md shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                            </svg>
+                        </div>
+                        <input type="text" id="roomCodeInput" class="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl uppercase" placeholder="ODA KODU" maxlength="6" autocomplete="off">
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="space-y-3">
+                    <!-- Create Room Button -->
+                    <button id="createRoomBtn" class="w-full flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        Yeni Oda Kur
+                    </button>
+                    
+                    <!-- Show Join Room Button -->
+                    <button id="showJoinRoomBtn" class="w-full flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        Odaya Katıl
+                    </button>
+                    
+                    <!-- Join Room Button (Hidden by default) -->
+                    <button id="joinRoomBtn" class="w-full flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all duration-200 hidden">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Odaya Bağlan
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div class="bg-gray-50 px-6 py-4 text-center">
+                <p class="text-xs text-gray-500">Arkadaşlarınızla eğlenceli vakit geçirin!</p>
+            </div>
         </div>
-        
-        <input type="text" id="username" class="input-field" placeholder="Kullanıcı Adınızı Girin" maxlength="15">
-        <input type="text" id="roomCodeInput" class="input-field uppercase" placeholder="Oda Kodu (Boş bırak=Yeni Oda)" maxlength="6">
-        
-        <button id="matchBtn" class="btn btn-primary">🎮 Oyuna Başla</button>
     </div>
     
     <div id="waitScreen" class="screen space-y-6 container">
