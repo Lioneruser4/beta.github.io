@@ -109,70 +109,60 @@ io.on('connection', (socket) => {
         }
     });
     
-    // Odaya katılma işlemi
-    socket.on('joinRoom', ({ username, roomCode }) => {
-        console.log('Odaya katılma isteği alındı:', { username, roomCode });
+  // Odaya katılma
+  socket.on('joinRoom', ({ username, roomCode }) => {
+    try {
+      const room = rooms.get(roomCode);
+      
+      if (!room) {
+        console.log('Oda bulunamadı:', roomCode);
+        socket.emit('joinFailed', 'Böyle bir oda bulunamadı.');
+        return;
+      }
+      
+      if (room.players.length >= 2) {
+        console.log('Oda dolu:', roomCode);
+        socket.emit('joinFailed', 'Bu oda zaten dolu.');
+        return;
+      }
+      
+      // Yeni oyuncu bilgisi
+      const player = {
+        id: socket.id,
+        username: username || 'Oyuncu-' + socket.id.substring(0, 4),
+        isHost: false,
+        score: 0,
+        lives: 3
+      };
+      
+      // Oyuncuyu odaya ekle
+      room.players.push(player);
+      socket.join(roomCode);
+      
+      console.log(`Kullanıcı odaya eklendi: ${player.username} (${roomCode})`);
+      
+      // İkinci oyuncu geldiğinde oyunu başlat
+      if (room.players.length === 2) {
+        console.log('İki oyuncu da hazır, oyun başlıyor:', roomCode);
         
-        try {
-            // Odayı bul
-            const room = rooms.get(roomCode);
-            
-            // Oda yoksa hata gönder
-            if (!room) {
-                console.log('Oda bulunamadı:', roomCode);
-                socket.emit('joinFailed', 'Böyle bir oda bulunamadı.');
-                return;
-            }
-            
-            // Oda dolu mu kontrol et
-            if (room.players.length >= 2) {
-                console.log('Oda dolu:', roomCode);
-                socket.emit('joinFailed', 'Oda dolu.');
-                return;
-            }
-            
-            // Yeni oyuncu bilgisi
-            const player = {
-                id: socket.id,
-                username: username || 'Oyuncu-' + socket.id.substring(0, 4),
-                isHost: false,
-                score: 0,
-                lives: 3
-            };
-            
-            // Oyuncuyu odaya ekle
-            room.players.push(player);
-            socket.join(roomCode);
-            
-            console.log(`Kullanıcı odaya eklendi: ${player.username} (${roomCode})`);
-            
-            // İkinci oyuncu geldiğinde oyunu başlat
-            if (room.players.length === 2) {
-                console.log('İki oyuncu da hazır, oyun başlıyor:', roomCode);
-                
-                // Oyun başlangıç zamanını ayarla
-                room.status = 'playing';
-                
-                // Tüm oyunculara oyunun başladığını bildir
-                io.to(roomCode).emit('gameStart', {
-                    players: room.players,
-                    roomCode: roomCode,
-                    level: room.level || 1
-                });
-                
-                console.log('Oyun başlatıldı:', roomCode);
-            } else {
-                // İlk oyuncuya başarılı katılım bilgisi gönder
-                socket.emit('joinSuccess', { 
-                    roomCode: roomCode,
-                    message: 'Odaya başarıyla katıldınız. İkinci oyuncu bekleniyor...'
-                });
-                console.log('İkinci oyuncu bekleniyor:', roomCode);
-            }
-        } catch (error) {
-            console.error('Odaya katılma hatası:', error);
-            socket.emit('joinFailed', 'Odaya katılırken bir hata oluştu.');
-        }
+        // Oyun başlangıç zamanını ayarla
+        room.startedAt = new Date();
+        room.status = 'playing';
+        
+        // Tüm oyunculara oyunun başladığını bildir
+        io.to(roomCode).emit('gameStart', {
+          players: room.players,
+          roomCode: roomCode,
+          level: room.level || 1
+        });
+      } else {
+        // İlk oyuncuya başarılı katılım bilgisi gönder
+        socket.emit('joinSuccess', { roomCode });
+      }
+    } catch (error) {
+      console.error('Odaya katılma hatası:', error);
+      socket.emit('joinFailed', 'Odaya katılırken bir hata oluştu.');
+    }
     });
     
     // Oyun verilerini işle
