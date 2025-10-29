@@ -251,22 +251,20 @@
                         Yeni Oda Kur
                     </button>
                     
-                    <!-- Show Join Room Button -->
-                    <button id="showJoinRoomBtn" class="w-full flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        Odaya Katıl
-                    </button>
-                    
-                    <!-- Join Room Button (Hidden by default) -->
-                    <button id="joinRoomBtn" class="w-full flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all duration-200 hidden">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Odaya Bağlan
-                    </button>
+                    <!-- Odaya Katılma Alanı -->
+                    <div id="joinRoomSection" class="space-y-3">
+                        <div class="relative">
+                            <input type="text" id="roomCodeInput" 
+                                class="w-full px-4 py-3 text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                placeholder="Oda Kodu (4 karakter)" maxlength="4" style="text-transform: uppercase">
+                        </div>
+                        <button id="joinRoomBtn" class="w-full flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                            Odaya Katıl
+                        </button>
+                    </div>
                 </div>
             </div>
             
@@ -412,12 +410,17 @@
         });
         
         // Odaya katıl butonu için event listener
-        document.getElementById('showJoinRoomBtn').addEventListener('click', () => {
+        document.getElementById('joinRoomBtn').addEventListener('click', () => {
             const username = validateInput();
             if (!username) return;
             
-            const roomCode = prompt('Oda kodunu girin:');
-            if (!roomCode) return;
+            const roomCodeInput = document.getElementById('roomCodeInput');
+            const roomCode = roomCodeInput.value.trim().toUpperCase();
+            
+            if (roomCode.length !== 4) {
+                showGlobalMessage('Lütfen geçerli bir oda kodu girin (4 karakter)', true);
+                return;
+            }
             
             showScreen('wait');
             document.getElementById('waitTitle').textContent = `Odaya Katılım: ${roomCode}`;
@@ -425,7 +428,7 @@
             document.getElementById('codeArea').classList.add('hidden');
             
             console.log('Odaya katılma isteği gönderiliyor:', roomCode);
-            socket.emit('joinRoom', { username, roomCode: roomCode.toUpperCase() }, (response) => {
+            socket.emit('joinRoom', { username, roomCode }, (response) => {
                 console.log('Sunucu yanıtı:', response);
                 if (response && response.error) {
                     console.error('Odaya katılma hatası:', response.error);
@@ -433,6 +436,13 @@
                     showScreen('lobby');
                 }
             });
+        });
+        
+        // Oda kodu input'unda enter tuşuna basınca da katılma işlemi yap
+        document.getElementById('roomCodeInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('joinRoomBtn').click();
+            }
         });
 
         document.getElementById('cancelBtn').addEventListener('click', UIElements.resetGame);
