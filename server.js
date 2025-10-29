@@ -11,13 +11,30 @@ const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
         origin: "*",
-        methods: ["GET", "POST"],
+        methods: ["GET", "POST", "OPTIONS"],
+        allowedHeaders: ["my-custom-header"],
         credentials: true
     },
-    transports: ['websocket', 'polling'],
-    pingTimeout: 30000, // 30 saniye
-    pingInterval: 25000, // 25 saniyede bir ping
-    cookie: false
+    // Sadece WebSocket kullan
+    transports: ['websocket'],
+    // Zaman aşımı ayarları
+    pingTimeout: 60000, // 60 saniye
+    pingInterval: 30000, // 30 saniyede bir ping
+    cookie: false,
+    // Hata ayıklama modu
+    allowEIO3: true
+});
+
+// HTTP isteklerini dinle
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    next();
+});
+
+// Basit bir kök endpoint
+app.get('/', (req, res) => {
+    res.send('Sunucu çalışıyor!');
 });
 
 const rooms = {}; 
@@ -259,6 +276,18 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Sunucu port ${PORT} üzerinde çalışıyor.`);
+const HOST = process.env.HOST || '0.0.0.0';
+
+server.listen(PORT, HOST, () => {
+    console.log(`✅ Sunucu http://${HOST}:${PORT} adresinde çalışıyor`);
+    console.log(`🔄 Socket.io dinlemede`);
+});
+
+// İşlenmeyen hataları yakala
+process.on('uncaughtException', (err) => {
+    console.error('Yakalanmamış Hata:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('İşlenmemiş Reddedilme:', reason);
 });
