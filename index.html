@@ -290,8 +290,8 @@
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
 
-        // Render URL'niz: Lütfen bu kısmı KENDİ URL'nizle değiştirin!
-        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
+        // Local development server URL
+        const LIVE_SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : '';
         let socket;
         
         function validateInput() {
