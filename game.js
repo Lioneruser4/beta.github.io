@@ -335,16 +335,32 @@ function endGame(winnerRole) {
     
     setTimeout(() => {
         const nextLevel = level + 1;
-        showGlobalMessage(`🎮 Seviye ${nextLevel} Başlıyor!`, false);
+        const boardSize = nextLevel === 1 ? 16 : 20;
+        const bombCount = nextLevel === 1 ? 3 : 4; // İlk seviyede 3, sonra 4 bomba
         
-        // Sadece Host, yeni seviye sinyalini gönderir.
-        if (isHost) {
-            socket.emit('nextLevel', { roomCode: currentRoomCode, newLevel: nextLevel });
+        showGlobalMessage(`🎮 Seviye ${nextLevel} Başlıyor! ${bombCount} bomba ile oynanıyor.`, false);
+        
+        // Oyun durumunu sıfırla
+        gameData.isGameOver = false;
+        gameStage = 'PLAY';
+        gameData.hostLives = bombCount;
+        gameData.guestLives = bombCount;
+        
+        // Yeni seviyeyi başlat
+        initializeGame(boardSize);
+        updateStatusDisplay();
+        
+        // Rakibe de yeni seviyeyi bildir
+        if (socket && socket.connected) {
+            socket.emit('newLevel', { 
+                roomCode: currentRoomCode,
+                level: nextLevel,
+                boardSize: boardSize,
+                hostLives: bombCount,
+                guestLives: bombCount
+            });
         }
-        
-        // Oyun durumunu sıfırla (bombalar ve canlar server'dan gelecek)
-        // Bu kısım nextLevel event'i ile otomatik olarak yapılacak
-    }, 4000);
+    }, 2000); // 2 saniye bekle
 }
 
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
