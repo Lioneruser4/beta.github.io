@@ -404,22 +404,26 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     socket.on('newLevel', (data) => {
         console.log('🆕 Yeni seviye başlatılıyor:', data);
         
-        // Seviye bilgisini güncelle
-        level = data.level || 1;
+        // Seviye bilgisini güncelle (sayıya çevirerek)
+        level = parseInt(data.level) || 1;
+        
+        // Bomba sayısını hesapla
+        const bombCount = level === 1 ? 3 : 4;
         
         // Oyun durumunu güncelle
-        gameData.hostLives = data.hostLives || (level === 1 ? 3 : 4);
-        gameData.guestLives = data.guestLives || (level === 1 ? 3 : 4);
+        gameData.hostLives = bombCount;
+        gameData.guestLives = bombCount;
         gameData.turn = 0; // Host başlasın
         gameData.isGameOver = false;
+        gameData.board = []; // Tahtayı temizle
         gameStage = 'PLAY';
         
         // Yeni oyun tahtasını oluştur
-        const boardSize = data.boardSize || 20; // Varsayılan 20 kart
+        const boardSize = 20; // Her zaman 20 kart
         initializeGame(boardSize);
         
-        // Sunucudan yeni bombaları bekle
-        console.log('🔄 Yeni seviye için bombalar bekleniyor...');
+        console.log(`✅ Yeni seviye başlatıldı: ${level}, ${bombCount} bomba ile`);
+        showGlobalMessage(`🎮 Seviye ${level} başlıyor! ${bombCount} bomba ile oynanıyor.`, false);
     });
 
     // gameData Olayı (Hamle Geldi - Kendi veya Rakip)
@@ -440,22 +444,25 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     // Tüm kartlar açıldı mı kontrol et
     const checkLevelCompletion = () => {
         if (gameStage !== 'PLAY') return;
+        if (!gameData.board || gameData.board.length === 0) return;
         
         // Açılan kart sayısını kontrol et
-        const openedCards = gameData.board.filter(card => card.opened).length;
+        const openedCards = gameData.board.filter(card => card && card.opened).length;
         const totalCards = gameData.board.length;
+        
+        console.log(`🔍 Seviye tamamlama kontrolü: Açılan ${openedCards}/${totalCards} kart`);
         
         if (openedCards === totalCards) {
             const nextLevel = level + 1;
-            const bombCount = nextLevel === 1 ? 3 : 4; // İlk seviyede 3, sonra 4 bomba
-            const boardSize = 20; // Tüm seviyelerde 20 kart
+            const bombCount = nextLevel === 1 ? 3 : 4;
             
-            showGlobalMessage(`🎮 Tüm kartlar açıldı! Seviye ${nextLevel} başlıyor! ${bombCount} bomba ile oynanıyor.`, false);
+            console.log(`🎯 Tüm kartlar açıldı! Yeni seviye: ${nextLevel}, ${bombCount} bomba ile`);
+            showGlobalMessage(`🎉 Seviye ${level} tamamlandı! Yeni seviye yükleniyor...`, false);
             
             // Oyun durumunu güncelle
-            gameStage = 'WAITING'; // Yeni seviye başlayana kadar bekleme moduna geç
+            gameStage = 'WAITING';
             
-            // 1.5 saniye bekle ve yeni seviyeyi başlat
+            // 2 saniye bekle ve yeni seviyeyi başlat
             setTimeout(() => {
                 console.log(`🔄 Seviye ${nextLevel} başlatılıyor...`);
                 
@@ -468,12 +475,15 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
                     console.log(`📤 Sunucuya nextLevel isteği gönderildi: Seviye ${nextLevel}`);
                 } else {
                     console.error('❌ Sunucuya bağlı değil!');
+                    // Eğer sunucuya bağlı değilse, yine de yerel olarak devam et
+                    socket.emit('newLevel', { 
+                        level: nextLevel,
+                        boardSize: 20,
+                        hostLives: bombCount,
+                        guestLives: bombCount
+                    });
                 }
-                
-                // Yeni oyun tahtasını oluştur (sunucudan gelen bilgilerle güncellenecek)
-                initializeGame(boardSize);
-                updateStatusDisplay();
-            }, 1500);
+            }, 2000);
         }
     };
     
