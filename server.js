@@ -81,35 +81,44 @@ io.on('connection', (socket) => {
             { id: room.hostId, username: room.hostUsername, isHost: true },
             { id: room.guestId, username: room.guestUsername, isHost: false }
         ];
+        
         // Oda kodunu da ilet ki her iki taraf da hamle gönderirken doğru kodu kullansın
         io.to(code).emit('gameStart', { players, roomCode: code });
         console.log(`${username} odaya katıldı: ${code}`);
         
         // Oyun tahtası ayarları
         const boardSize = 20; // Tüm seviyelerde 20 kart
-        const bombCount = room.gameState.level === 1 ? 3 : 4; // İlk seviyede 3, sonra 4 bomba
+        const bombCount = 3; // İlk seviyede 3 bomba
         
         // Tüm olası kart indekslerini oluştur ve karıştır
         const allIndices = Array.from({ length: boardSize }, (_, i) => i);
         allIndices.sort(() => Math.random() - 0.5);
         
-        // Host ve Guest için bombaları ayarla
-        room.gameState.hostBombs = allIndices.slice(0, bombCount);
-        room.gameState.guestBombs = allIndices.slice(bombCount, bombCount * 2);
+        // Host ve Guest için bombaları ayarla (her oyuncu için ayrı bombalar)
+        room.gameState.hostBombs = [];
+        room.gameState.guestBombs = [];
         
-        // Can sayılarını güncelle
+        // Host için 3 bomba seç
+        for (let i = 0; i < bombCount; i++) {
+            room.gameState.hostBombs.push(allIndices[i]);
+        }
+        
+        // Guest için farklı 3 bomba seç
+        for (let i = bombCount; i < bombCount * 2; i++) {
+            room.gameState.guestBombs.push(allIndices[i]);
+        }
+        
+        // Can sayılarını ayarla
         room.gameState.hostLives = bombCount;
         room.gameState.guestLives = bombCount;
-        room.gameState.guestLives = bombCount;
         
+        // Oyun durumunu ayarla
         room.gameState.stage = 'PLAY';
-        room.gameState.turn = 0;
-        room.gameState.level = 1; // Seviyeyi 1 olarak ayarla
+        room.gameState.turn = 0; // Host başlar
+        room.gameState.level = 1;
+        room.gameState.opened = [];
         
         console.log(`🎲 Otomatik bombalar yerleştirildi - Host: ${room.gameState.hostBombs}, Guest: ${room.gameState.guestBombs}`);
-        
-        // Oyunu başlat
-        room.gameState.stage = 'PLAY';
         
         // Client'a güncel oyun durumunu gönder
         const gameState = {
@@ -117,7 +126,8 @@ io.on('connection', (socket) => {
             guestBombs: room.gameState.guestBombs,
             hostLives: room.gameState.hostLives,
             guestLives: room.gameState.guestLives,
-            turn: room.gameState.turn
+            turn: room.gameState.turn,
+            level: room.gameState.level
         };
         
         // Client'ın socket dinleyicilerini kurması için kısa bir gecikme
