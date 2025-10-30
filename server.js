@@ -199,7 +199,7 @@ io.on('connection', (socket) => {
             const allIndices = Array.from({ length: boardSize }, (_, i) => i);
             allIndices.sort(() => Math.random() - 0.5);
             
-            // Host ve Guest için bombaları ayarla
+            // Host ve Guest için benzersiz bombalar ayarla
             room.gameState.hostBombs = allIndices.slice(0, bombCount);
             room.gameState.guestBombs = allIndices.slice(bombCount, bombCount * 2);
             
@@ -213,7 +213,18 @@ io.on('connection', (socket) => {
             room.gameState.level = level;
             room.gameState.stage = 'PLAY';
             
-            console.log(`✅ Yeni seviye başlatıldı: ${level}, Host Bombaları: ${room.gameState.hostBombs}, Guest Bombaları: ${room.gameState.guestBombs}`);
+            console.log(`✅ Yeni seviye başlatıldı: ${level}, ${bombCount} bomba ile`);
+            console.log(`🔵 Host Bombaları: ${room.gameState.hostBombs}`);
+            console.log(`🔴 Guest Bombaları: ${room.gameState.guestBombs}`);
+            
+            // Oyun durumunu logla
+            console.log('Oyun Durumu:', {
+                level: room.gameState.level,
+                hostLives: room.gameState.hostLives,
+                guestLives: room.gameState.guestLives,
+                turn: room.gameState.turn,
+                stage: room.gameState.stage
+            });
             
             return { bombCount, boardSize, level };
         };
