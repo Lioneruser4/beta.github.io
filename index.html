@@ -118,115 +118,7 @@
         }
         
         /* Chat Interface (Çat İnterfeysi) */
-        .chat-container {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 280px;
-            max-height: 400px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-            display: flex;
-            flex-direction: column;
-            z-index: 90;
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-        
-        .chat-header {
-            background: #3498db;
-            color: white;
-            padding: 12px 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-        }
-        
-        .chat-messages {
-            flex: 1;
-            padding: 10px;
-            overflow-y: auto;
-            max-height: 300px;
-        }
-        
-        .message {
-            margin-bottom: 10px;
-            padding: 8px 12px;
-            border-radius: 15px;
-            max-width: 80%;
-            word-wrap: break-word;
-            font-size: 14px;
-            line-height: 1.4;
-        }
-        
-        .message.self {
-            background: #e3f2fd;
-            margin-left: auto;
-            border-bottom-right-radius: 5px;
-        }
-        
-        .message.opponent {
-            background: #f1f1f1;
-            margin-right: auto;
-            border-bottom-left-radius: 5px;
-        }
-        
-        .chat-input-container {
-            display: flex;
-            padding: 10px;
-            border-top: 1px solid #eee;
-            background: #f9f9f9;
-        }
-        
-        .chat-input {
-            flex: 1;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 20px;
-            outline: none;
-            font-size: 14px;
-        }
-        
-        .send-button {
-            background: #3498db;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            margin-left: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        
-        .send-button:hover {
-            background: #2980b9;
-        }
-        
-        .chat-notification {
-            position: fixed;
-            bottom: 80px;
-            right: 20px;
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 14px;
-            max-width: 250px;
-            display: none;
-            z-index: 100;
-            animation: slideIn 0.3s ease-out;
-        }
-        
-        @keyframes slideIn {
-            from { transform: translateY(20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
+        /* Çat CSS stilləri silindi */
         
         /* Utility */
         .btn { @apply w-full text-xl font-bold py-3 px-6 rounded-xl shadow-lg transition-all duration-200 ease-in-out; }
@@ -349,22 +241,6 @@
         </div>
     </div>
     
-    <div id="chat-notification" class="chat-notification"></div>
-    
-    <div id="chat-container" class="chat-container">
-        <div class="chat-header" onclick="toggleChat()">
-            <span>💬 Çat</span>
-            <i id="chat-toggle-icon" class="fas fa-chevron-down"></i>
-        </div>
-        <div id="chat-messages" class="chat-messages"></div>
-        <div class="chat-input-container">
-            <input type="text" id="chat-input" class="chat-input" placeholder="Mesaj yazın...">
-            <button id="send-message" class="send-button" onclick="sendChatMessage()">
-                <i class="fas fa-paper-plane"></i>
-            </button>
-        </div>
-    </div>
-
     <div id="globalMessage" class="hidden w-11/12 max-w-md p-4 bg-red-600 text-white rounded-lg shadow-lg">
         <p id="globalMessageText"></p>
     </div>
@@ -441,7 +317,8 @@
             // Initialize language after DOM is loaded
             window.languageManager.initLanguage();
             
-            // Set up chat input to send on Enter key
+            // Silinmiş hissə: Çat inputunu Enter ilə göndərmək funksiyası
+            /*
             const chatInput = document.getElementById('chat-input');
             if (chatInput) {
                 chatInput.addEventListener('keypress', (e) => {
@@ -450,9 +327,11 @@
                     }
                 });
             }
+            */
         });
         
-        // Chat functions
+        // Silinmiş hissə: Çat funksiyaları
+        /*
         function toggleChat() {
             const chatContainer = document.getElementById('chat-container');
             const chatMessages = document.getElementById('chat-messages');
@@ -521,11 +400,13 @@
                 input.value = '';
             }
         }
+        */
         
         // Make functions globally available
-        window.toggleChat = toggleChat;
-        window.sendChatMessage = sendChatMessage;
-        window.addChatMessage = addChatMessage;
+        // Silinmiş hissə: Çat funksiyalarını qlobal etmə
+        // window.toggleChat = toggleChat;
+        // window.sendChatMessage = sendChatMessage;
+        // window.addChatMessage = addChatMessage;
         window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
         window.setLanguage = languageManager.setLanguage;
 
@@ -591,6 +472,13 @@
                     // Server'dan gelen gerçek oda kodunu aktar (Serverdən gələn əsl otaq kodunu ötür)
                     setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
                 });
+                
+                // Silinmiş hissə: Serverdən gələn çat mesajlarını qəbul etmə (Artıq silinmiş 'addChatMessage' funksiyasına ehtiyac yoxdur)
+                /*
+                socket.on('chatMessage', ({ sender, message }) => {
+                    addChatMessage(`${sender}: ${message}`, false);
+                });
+                */
 
             } catch (e) {
                 console.error('Socket.IO genel hatası:', e);
