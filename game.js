@@ -268,8 +268,42 @@ async function applyMove(index, emoji, isBomb) {
         gameData.turn = gameData.turn === 0 ? 1 : 0;
         updateStatusDisplay();
         
-        // Oyun bitişini kontrol et
-        if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
+        // Tüm kartlar açıldı mı kontrol et
+        const allCardsRevealed = gameData.cardsLeft <= 0;
+        
+        if (allCardsRevealed) {
+            // Tüm kartlar açıldı, yeni seviyeye geç
+            level++;
+            const boardSize = level === 1 ? 16 : 20;
+            const bombCount = level === 1 ? 3 : 4; // İlk seviyede 3, sonra 4 bomba
+            
+            // Yeni seviye başlatılıyor
+            showGlobalMessage(`🎮 Seviye ${level} başlıyor! ${bombCount} bomba ile oynanıyor.`, false);
+            
+            // Oyun alanını temizle ve yeni seviyeyi başlat
+            setTimeout(() => {
+                // Canları sıfırlama, sadece bombaları güncelle
+                gameData.hostLives = bombCount;
+                gameData.guestLives = bombCount;
+                
+                // Yeni seviyeyi başlat
+                initializeGame(boardSize);
+                updateStatusDisplay();
+                
+                // Rakibe de yeni seviyeyi bildir
+                if (socket && socket.connected) {
+                    socket.emit('newLevel', { 
+                        roomCode: currentRoomCode,
+                        level: level,
+                        boardSize: boardSize,
+                        hostLives: bombCount,
+                        guestLives: bombCount
+                    });
+                }
+            }, 1500); // 1.5 saniye bekle
+        } 
+        // Oyun bitişini kontrol et (sadece canlar bittiyse)
+        else if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
             const winner = (gameData.hostLives <= 0 && gameData.guestLives <= 0) ? 'DRAW' : (gameData.hostLives <= 0 ? 'Guest' : 'Host');
             endGame(winner);
         }
@@ -391,26 +425,41 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         showGlobalMessage(message, true);
     });
 
-    // Seviye Atlama Sinyali
-    socket.on('nextLevel', ({ newLevel }) => {
+    // Tüm kartlar açıldı mı kontrol et
+    const allCardsRevealed = gameData.revealedCards.length === gameData.cards.length;
+    if (allCardsRevealed) {
+        // Tüm kartlar açıldı, yeni seviyeye geç
+        level++;
+        const boardSize = level === 1 ? 16 : 20;
+        
+        // Yeni seviye başlatılıyor
+        showGlobalMessage(`🎮 Seviye ${level} başlıyor!`, false);
+        
+        // Oyun alanını temizle ve yeni seviyeyi başlat
+        setTimeout(() => {
+            initializeGame(boardSize);
+            // Rakibe de yeni seviyeyi bildir
+            if (socket) {
+                socket.emit('startNewLevel', { level, boardSize });
+            }
+        }, 1500); // 1.5 saniye bekle
+    }
+
+    // Yeni seviye başlatma işlemi
+    socket.on('newLevel', ({ level: newLevel, boardSize, hostLives, guestLives }) => {
         level = newLevel;
+        gameData.hostLives = hostLives;
+        gameData.guestLives = guestLives;
         
-        // Level 1'de 16, sonraki tüm levellerde 20 kart
-        let boardSize = level === 1 ? 16 : 20;
+        showGlobalMessage(`🎮 Seviye ${level} başlıyor! ${hostLives} bomba ile oynanıyor.`, false);
         
-        showGlobalMessage(`🎆 Seviye ${level} - ${boardSize} Kart! Bombalar yerleştiriliyor...`, false);
-        
-        // Can sayılarını güncelle (server'dan gelen yeni bombalara göre)
-        socket.once('gameReady', ({ hostBombs, guestBombs }) => {
-            gameData.hostLives = hostBombs.length;
-            gameData.guestLives = guestBombs.length;
-            updateStatusDisplay();
-        });
-        
+        // Yeni oyun tahtasını başlat
         initializeGame(boardSize);
-        drawBoard();
         updateStatusDisplay();
     });
+    
+    // Eski nextLevel olayını kaldırmak için
+    socket.off('nextLevel');
     
     // Rakip Ayrıldı
     socket.on('opponentLeft', (message) => {
