@@ -46,12 +46,13 @@ io.on('connection', (socket) => {
                 turn: 0, // 0 = Host, 1 = Guest
                 hostBombs: [],
                 guestBombs: [],
-                hostLives: 2,  // İlk seviyede 2 can
-                guestLives: 2, // İlk seviyede 2 can
+                hostLives: 3,  // İlk seviyede 3 bomba
+                guestLives: 3, // İlk seviyede 3 bomba
                 hostBombsSelected: false,
                 guestBombsSelected: false,
                 level: 1,
-                opened: [] // Açılan kart indeksleri
+                opened: [], // Açılan kart indeksleri
+                boardSize: 20 // Tüm seviyelerde 20 kart
             }
         };
         socket.join(code);
@@ -84,9 +85,9 @@ io.on('connection', (socket) => {
         io.to(code).emit('gameStart', { players, roomCode: code });
         console.log(`${username} odaya katıldı: ${code}`);
         
-        // İlk seviye ayarları
-        const boardSize = 12; // İlk seviye 12 kart (4x3)
-        const bombCount = 2; // İlk seviyede 2'şer bomba
+        // Oyun tahtası ayarları
+        const boardSize = 20; // Tüm seviyelerde 20 kart
+        const bombCount = room.gameState.level === 1 ? 3 : 4; // İlk seviyede 3, sonra 4 bomba
         
         // Tüm olası kart indekslerini oluştur ve karıştır
         const allIndices = Array.from({ length: boardSize }, (_, i) => i);
@@ -96,8 +97,9 @@ io.on('connection', (socket) => {
         room.gameState.hostBombs = allIndices.slice(0, bombCount);
         room.gameState.guestBombs = allIndices.slice(bombCount, bombCount * 2);
         
-        // Can sayılarını bombalarla eşit yap
+        // Can sayılarını güncelle
         room.gameState.hostLives = bombCount;
+        room.gameState.guestLives = bombCount;
         room.gameState.guestLives = bombCount;
         
         room.gameState.stage = 'PLAY';
