@@ -432,26 +432,23 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
             // Oyun durumunu güncelle
             gameData.hostLives = bombCount;
             gameData.guestLives = bombCount;
+            gameData.isGameOver = false;
+            gameStage = 'PLAY';
             
             // 1.5 saniye bekle ve yeni seviyeyi başlat
             setTimeout(() => {
                 level = nextLevel;
-                gameStage = 'PLAY';
-                gameData.isGameOver = false;
                 
-                // Yeni oyun tahtasını oluştur
-                initializeGame(boardSize);
-                
-                // Sunucuya yeni seviyeyi bildir (bomba yerleşimleri için)
+                // Sunucuya yeni seviyeyi bildir
                 if (socket && socket.connected) {
-                    socket.emit('startNewLevel', { 
+                    socket.emit('nextLevel', { 
                         roomCode: currentRoomCode,
-                        level: nextLevel,
-                        boardSize: boardSize,
-                        bombCount: bombCount
+                        level: nextLevel
                     });
                 }
                 
+                // Yeni oyun tahtasını oluştur
+                initializeGame(boardSize);
                 updateStatusDisplay();
             }, 1500);
         }
