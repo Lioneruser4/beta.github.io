@@ -311,23 +311,20 @@
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
         
-        // Initialize language manager
+        // Dil funksiyaları languages.js faylından gəlir və qorunur
         document.addEventListener('DOMContentLoaded', () => {
-            // Initialize language after DOM is loaded
             window.languageManager.initLanguage();
         });
         
-        // Çat ilə əlaqəli bütün qlobal funksiyalar silindi
         window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
         window.setLanguage = languageManager.setLanguage;
 
-        // Render URL'niz: Lütfen bu kısmı KENDİ URL'nizle değiştirin! (Render URL'niz: Zəhmət olmasa bu hissəni ÖZ URL'nizlə əvəz edin!)
+        // Render URL'niz: Lütfen bu kısmı KENDİ URL'nizle değiştirin!
         const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
         let socket;
         
         function validateInput() {
             const username = UIElements.usernameInput.value.trim();
-            // Dəyişdirilmədi: Lütfen geçerli bir kullanıcı adı girin. (Zəhmət olmasa etibarlı bir istifadəçi adı daxil edin.)
             if (username.length < 2) {
                 UIElements.showGlobalMessage('Zəhmət olmasa etibarlı bir istifadəçi adı daxil edin.', true);
                 return false;
@@ -344,30 +341,25 @@
                 });
 
                 socket.on('connect', () => {
-                    // Dəyişdirilmədi: Sunucuya bağlandı. Eşleşmeye hazırsınız. (Serverə qoşuldu. Eşləşməyə hazırsınız.)
                     UIElements.showGlobalMessage('Serverə qoşuldu. Eşləşməyə hazırsınız.', false);
                     showScreen('lobby');
                 });
                 
                 socket.on('connect_error', (err) => {
                     console.error('Bağlantı Hatası:', err);
-                    // Dəyişdirilmədi: HATA: Sunucuya erişilemiyor. (XƏTA: Serverə daxil olmaq mümkün deyil.)
                     UIElements.showGlobalMessage('XƏTA: Serverə daxil olmaq mümkün deyil.', true);
                     showScreen('lobby');
                 });
                 
                 socket.on('disconnect', () => {
-                    // Dəyişdirilmədi: Bağlantı kesildi. Tekrar bağlanmaya çalışılıyor... (Bağlantı kəsildi. Yenidən qoşulmağa çalışılır...)
                     UIElements.showGlobalMessage('Bağlantı kəsildi. Yenidən qoşulmağa çalışılır...', true);
                 });
 
                 // --- Eşleşme Olayları (Eşləşmə Hadisələri) ---
                 socket.on('roomCreated', (code) => {
                     document.getElementById('roomCodeDisplay').textContent = code;
-                    // Dəyişdirilmədi: Odanız Kuruldu! (Otağınız Quruldu!)
                     document.getElementById('waitTitle').textContent = 'Otağınız Quruldu!';
                     document.getElementById('codeArea').classList.remove('hidden');
-                    // Dəyişdirilmədi: Oda kodunu arkadaşınıza gönderin ve bağlanmasını bekleyin. (Otaq kodunu dostunuza göndərin və qoşulmasını gözləyin.)
                     document.getElementById('waitStatus').textContent = 'Otaq kodunu dostunuza göndərin və qoşulmasını gözləyin.';
                 });
                 
@@ -380,15 +372,14 @@
                     const opponent = players.find(p => p.id !== socket.id);
                     const self = players.find(p => p.id === socket.id);
                     
-                    // Server'dan gelen gerçek oda kodunu aktar (Serverdən gələn əsl otaq kodunu ötür)
+                    // Oyunun başlaması üçün vacib olan funksiyaya toxunulmadı.
                     setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
                 });
-                
-                // Silinmiş hissə: Serverdən gələn 'chatMessage' qəbulu
+
+                // Qeyd: Serverdən gələn "chatMessage" qəbulu silinib.
 
             } catch (e) {
                 console.error('Socket.IO genel hatası:', e);
-                // Dəyişdirilmədi: Kritik bağlantı hatası oluştu. (Kritik qoşulma xətası baş verdi.)
                 UIElements.showGlobalMessage('Kritik qoşulma xətası baş verdi.', true);
             }
         }
@@ -402,16 +393,12 @@
             const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
 
             if (roomCode === '') {
-                // Dəyişdirilmədi: Oda Kuruluyor... (Otaq Qurulur...)
                 document.getElementById('waitTitle').textContent = 'Otaq Qurulur...';
-                // Dəyişdirilmədi: Lütfen bekleyin... (Zəhmət olmasa gözləyin...)
                 document.getElementById('waitStatus').textContent = 'Zəhmət olmasa gözləyin...';
                 document.getElementById('codeArea').classList.add('hidden');
                 socket.emit('createRoom', { username });
             } else {
-                // Dəyişdirilmədi: Odaya Katılım: (Otağa Qoşulma:)
                 document.getElementById('waitTitle').textContent = `Otağa Qoşulma: ${roomCode}`;
-                // Dəyişdirilmədi: Bağlanılıyor... (Qoşulunur...)
                 document.getElementById('waitStatus').textContent = 'Qoşulunur...';
                 document.getElementById('codeArea').classList.add('hidden');
                 socket.emit('joinRoom', { username, roomCode });
@@ -423,8 +410,6 @@
         
         document.getElementById('copyCodeBtn').addEventListener('click', () => {
             const textToCopy = document.getElementById('roomCodeDisplay').textContent;
-            // Dəyişdirilmədi: Oda Kodu Kopyalandı! (Otaq Kodu Kopyalandı!)
-            // Dəyişdirilmədi: Kopyalama başarısız. (Kopyalama uğursuz oldu.)
             navigator.clipboard.writeText(textToCopy)
                 .then(() => UIElements.showGlobalMessage('Otaq Kodu Kopyalandı!', false))
                 .catch(() => UIElements.showGlobalMessage('Kopyalama uğursuz oldu.', true));
