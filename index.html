@@ -117,9 +117,6 @@
             background: #f5f5f5;
         }
         
-        /* Chat Interface (Çat İnterfeysi) */
-        /* Çat CSS stilləri silindi */
-        
         /* Utility */
         .btn { @apply w-full text-xl font-bold py-3 px-6 rounded-xl shadow-lg transition-all duration-200 ease-in-out; }
         .btn-primary { @apply bg-blue-600 text-white hover:bg-blue-500 active:scale-95; }
@@ -316,97 +313,9 @@
         document.addEventListener('DOMContentLoaded', () => {
             // Initialize language after DOM is loaded
             window.languageManager.initLanguage();
-            
-            // Silinmiş hissə: Çat inputunu Enter ilə göndərmək funksiyası
-            /*
-            const chatInput = document.getElementById('chat-input');
-            if (chatInput) {
-                chatInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
-                        sendChatMessage();
-                    }
-                });
-            }
-            */
         });
         
-        // Silinmiş hissə: Çat funksiyaları
-        /*
-        function toggleChat() {
-            const chatContainer = document.getElementById('chat-container');
-            const chatMessages = document.getElementById('chat-messages');
-            const chatToggleIcon = document.getElementById('chat-toggle-icon');
-            
-            if (chatContainer.classList.contains('collapsed')) {
-                chatContainer.classList.remove('collapsed');
-                chatMessages.style.display = 'block';
-                chatToggleIcon.className = 'fas fa-chevron-down';
-            } else {
-                chatContainer.classList.add('collapsed');
-                chatMessages.style.display = 'none';
-                chatToggleIcon.className = 'fas fa-chevron-up';
-            }
-        }
-        
-        function showChatNotification(message) {
-            const notification = document.getElementById('chat-notification');
-            if (notification) {
-                notification.textContent = message;
-                notification.style.display = 'block';
-                
-                // Play notification sound
-                const notificationSound = new Audio('sound4.mp3');
-                notificationSound.play().catch(e => console.log('Could not play notification sound:', e));
-                
-                // Hide after 3 seconds
-                setTimeout(() => {
-                    notification.style.display = 'none';
-                }, 3000);
-            }
-        }
-        
-        function addChatMessage(message, isSelf = false) {
-            const chatMessages = document.getElementById('chat-messages');
-            if (chatMessages) {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = `message ${isSelf ? 'self' : 'opponent'}`;
-                messageDiv.textContent = message;
-                chatMessages.appendChild(messageDiv);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-                
-                // Show notification if chat is collapsed or not visible
-                const chatContainer = document.getElementById('chat-container');
-                if (chatContainer && chatContainer.classList.contains('collapsed')) {
-                    showChatNotification(message);
-                }
-            }
-        }
-        
-        function sendChatMessage() {
-            const input = document.getElementById('chat-input');
-            const message = input.value.trim();
-            
-            if (message && socket) {
-                // Emit chat message to server
-                socket.emit('chatMessage', {
-                    roomCode: currentRoomCode,
-                    message: message
-                });
-                
-                // Add to own chat
-                addChatMessage(message, true);
-                
-                // Clear input
-                input.value = '';
-            }
-        }
-        */
-        
-        // Make functions globally available
-        // Silinmiş hissə: Çat funksiyalarını qlobal etmə
-        // window.toggleChat = toggleChat;
-        // window.sendChatMessage = sendChatMessage;
-        // window.addChatMessage = addChatMessage;
+        // Çat ilə əlaqəli bütün qlobal funksiyalar silindi
         window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
         window.setLanguage = languageManager.setLanguage;
 
@@ -473,12 +382,7 @@
                     setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
                 });
                 
-                // Silinmiş hissə: Serverdən gələn çat mesajlarını qəbul etmə (Artıq silinmiş 'addChatMessage' funksiyasına ehtiyac yoxdur)
-                /*
-                socket.on('chatMessage', ({ sender, message }) => {
-                    addChatMessage(`${sender}: ${message}`, false);
-                });
-                */
+                // Silinmiş hissə: Serverdən gələn 'chatMessage' qəbulu
 
             } catch (e) {
                 console.error('Socket.IO genel hatası:', e);
