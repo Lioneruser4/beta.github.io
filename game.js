@@ -410,19 +410,29 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         // Bomba sayısını hesapla
         const bombCount = level === 1 ? 3 : 4;
         
-        // Oyun durumunu güncelle
-        gameData.hostLives = bombCount;
-        gameData.guestLives = bombCount;
-        gameData.turn = 0; // Host başlasın
-        gameData.isGameOver = false;
-        gameData.board = []; // Tahtayı temizle
+        // Oyun durumunu sıfırla
+        gameData = {
+            board: [],
+            turn: 0, // Host başlasın
+            hostLives: bombCount,
+            guestLives: bombCount,
+            cardsLeft: 20, // Her zaman 20 kart
+            hostBombs: [],
+            guestBombs: [],
+            isGameOver: false
+        };
+        
         gameStage = 'PLAY';
         
         // Yeni oyun tahtasını oluştur
-        const boardSize = 20; // Her zaman 20 kart
-        initializeGame(boardSize);
+        initializeGame(20); // Her zaman 20 kart
+        
+        // UI'ı güncelle
+        updateStatusDisplay();
         
         console.log(`✅ Yeni seviye başlatıldı: ${level}, ${bombCount} bomba ile`);
+        console.log(`🔵 Host Can: ${gameData.hostLives}, 🔴 Guest Can: ${gameData.guestLives}`);
+        
         showGlobalMessage(`🎮 Seviye ${level} başlıyor! ${bombCount} bomba ile oynanıyor.`, false);
     });
 
@@ -452,7 +462,7 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         
         console.log(`🔍 Seviye tamamlama kontrolü: Açılan ${openedCards}/${totalCards} kart`);
         
-        if (openedCards === totalCards) {
+        if (openedCards === totalCards && !gameData.isGameOver) {
             const nextLevel = level + 1;
             const bombCount = nextLevel === 1 ? 3 : 4;
             
@@ -461,10 +471,14 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
             
             // Oyun durumunu güncelle
             gameStage = 'WAITING';
+            gameData.isGameOver = true; // Oyunun bittiğini işaretle
             
-            // 2 saniye bekle ve yeni seviyeyi başlat
+            // 1.5 saniye bekle ve yeni seviyeyi başlat
             setTimeout(() => {
                 console.log(`🔄 Seviye ${nextLevel} başlatılıyor...`);
+                
+                // Önce mevcut tahtayı temizle
+                gameData.board = [];
                 
                 // Sunucuya yeni seviyeyi bildir
                 if (socket && socket.connected) {
@@ -483,7 +497,10 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
                         guestLives: bombCount
                     });
                 }
-            }, 2000);
+                
+                // Durum ekranını güncelle
+                updateStatusDisplay();
+            }, 1500);
         }
     };
     
