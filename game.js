@@ -473,6 +473,16 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
             gameStage = 'WAITING';
             gameData.isGameOver = true;
             
+            // Sunucuya seviye tamamlandı bilgisini gönder
+            if (socket && socket.connected) {
+                console.log(`📤 Sunucuya levelComplete gönderiliyor: Seviye ${level} tamamlandı`);
+                socket.emit('levelComplete', { 
+                    roomCode: currentRoomCode,
+                    level: level,
+                    nextLevel: nextLevel
+                });
+            }
+            
             // 1 saniye bekle ve yeni seviyeyi başlat
             setTimeout(() => {
                 console.log(`🔄 Seviye ${nextLevel} başlatılıyor...`);
@@ -494,6 +504,7 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
                 
                 // Sunucuya yeni seviyeyi bildir
                 if (socket && socket.connected) {
+                    console.log(`📤 Sunucuya nextLevel isteği gönderiliyor: Seviye ${nextLevel}`);
                     socket.emit('nextLevel', { 
                         roomCode: currentRoomCode,
                         level: nextLevel
