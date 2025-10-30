@@ -306,32 +306,51 @@ function endGame(winnerRole) {
         showGlobalMessage('😔 Bu turu kaybettiniz. Bir sonrakinde daha dikkatli olun!', true);
     }
     
+    // 2 saniye bekle ve yeni seviyeye geç
     setTimeout(() => {
         const nextLevel = level + 1;
-        const boardSize = nextLevel === 1 ? 16 : 20;
         const bombCount = nextLevel === 1 ? 3 : 4; // İlk seviyede 3, sonra 4 bomba
         
-        showGlobalMessage(`🎮 Seviye ${nextLevel} Başlıyor! ${bombCount} bomba ile oynanıyor.`, false);
+        console.log(`🔄 Yeni seviyeye geçiliyor: ${nextLevel}, ${bombCount} bomba ile`);
         
         // Oyun durumunu sıfırla
-        gameData.isGameOver = false;
-        gameStage = 'PLAY';
-        gameData.hostLives = bombCount;
-        gameData.guestLives = bombCount;
+        gameData = {
+            board: [],
+            turn: 0, // Host başlar
+            hostLives: bombCount,
+            guestLives: bombCount,
+            cardsLeft: 20, // Her zaman 20 kart
+            hostBombs: [],
+            guestBombs: [],
+            isGameOver: false
+        };
         
-        // Yeni seviyeyi başlat
-        initializeGame(boardSize);
+        // Seviyeyi güncelle
+        level = nextLevel;
+        gameStage = 'PLAY';
+        
+        // Yeni oyun tahtasını oluştur
+        initializeGame(20);
+        
+        // UI'ı güncelle
         updateStatusDisplay();
         
-        // Rakibe de yeni seviyeyi bildir
+        // Sunucuya yeni seviyeyi bildir
         if (socket && socket.connected) {
-            socket.emit('newLevel', { 
+            console.log(`📤 Sunucuya nextLevel isteği gönderiliyor: Seviye ${nextLevel}`);
+            socket.emit('nextLevel', { 
                 roomCode: currentRoomCode,
-                level: nextLevel,
-                boardSize: boardSize,
-                hostLives: bombCount,
-                guestLives: bombCount
+                level: nextLevel
             });
+            
+            // Ayrıca levelComplete olayını da gönder
+            socket.emit('levelComplete', {
+                roomCode: currentRoomCode,
+                level: level - 1,
+                nextLevel: nextLevel
+            });
+        } else {
+            console.error('❌ Sunucuya bağlı değil!');
         }
     }, 2000); // 2 saniye bekle
 }
