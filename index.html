@@ -163,15 +163,15 @@
         .code-display { 
             @apply text-5xl font-extrabold p-5 bg-gray-800 text-yellow-300 rounded-xl tracking-widest; 
             letter-spacing: 0.15em;
-            text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
             font-family: 'Chakra Petch', monospace;
         }
         
-        /* Global Mesaj */
+        /* Global Mesajin Yuxaridan Gəlmə Stili */
         #globalMessage.show { 
             display: block; 
             position: fixed; 
-            top: env(safe-area-inset-top, 20px); 
+            top: env(safe-area-inset-top, 20px); /* ⬅️ Mesajın Yuxarı Pozisiyası */
             left: 50%; 
             transform: translateX(-50%); 
             z-index: 50; 
@@ -180,10 +180,10 @@
             max-width: 400px;
             padding: 1rem;
             border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
         }
         @keyframes fadeInDown {
-            from { opacity: 0; transform: translate(-50%, -20px); }
+            from { opacity: 0; transform: translate(-50%, -20px); } /* ⬅️ Yuxarıdan gəlmə effekti */
             to { opacity: 1; transform: translate(-50%, 0); }
         }
         
@@ -365,7 +365,9 @@
             const globalMsgText = UIElements.globalMessageText;
             
             globalMsgText.textContent = message;
+            // Əvvəlki rəngləri təmizləyin
             globalMsg.classList.remove('bg-red-600', 'bg-green-600', 'hidden');
+            // Yeni rəngi əlavə edin və göstərin
             globalMsg.classList.add(isError ? 'bg-red-600' : 'bg-green-600', 'show');
             
             // Gizlətmək üçün taymer
@@ -406,7 +408,7 @@
 
              // Tərcüməni yenilə (əgər languageManager mövcuddursa)
              if (window.languageManager && window.languageManager.updateUI) {
-                window.languageManager.updateUI();
+                 window.languageManager.updateUI();
              }
         }
         
@@ -450,19 +452,30 @@
                     timeout: 20000 
                 });
 
+                // ⭐ SERVERƏ QOŞULMA MESAJI BURADA ÇIXIR (Yuxarıdan gəlməsi üçün CSS yuxarıdadır)
                 socket.on('connect', () => {
-                    UIElements.showGlobalMessage('Serverə qoşuldu. Eşləşməyə hazırsınız.', false);
+                    const message = (window.languageManager && window.languageManager.t) 
+                        ? window.languageManager.t('serverConnected') // language.js faylında bu açar olmalıdır
+                        : 'Serverə qoşuldu. Eşləşməyə hazırsınız.'; 
+
+                    UIElements.showGlobalMessage(message, false);
                     showScreen('lobby');
                 });
                 
                 socket.on('connect_error', (err) => {
                     console.error('Bağlantı Hatası:', err);
-                    UIElements.showGlobalMessage('XƏTA: Serverə daxil olmaq mümkün deyil.', true);
+                    const message = (window.languageManager && window.languageManager.t) 
+                        ? window.languageManager.t('connectError') 
+                        : 'XƏTA: Serverə daxil olmaq mümkün deyil.'; 
+                    UIElements.showGlobalMessage(message, true);
                     showScreen('lobby');
                 });
                 
                 socket.on('disconnect', () => {
-                    UIElements.showGlobalMessage('Bağlantı kəsildi. Yenidən qoşulmağa çalışılır...', true);
+                    const message = (window.languageManager && window.languageManager.t) 
+                        ? window.languageManager.t('disconnected') 
+                        : 'Bağlantı kəsildi. Yenidən qoşulmağa çalışılır...'; 
+                    UIElements.showGlobalMessage(message, true);
                 });
 
                 // --- Otaq Qurulması Olayı (HOST ÜÇÜN) ---
@@ -504,7 +517,11 @@
                         window.languageManager.updateGameUI();
                     }
                     
-                    UIElements.showGlobalMessage(`Oyun başladı! Otaq: ${data.roomCode}`, false);
+                    const gameStartMsg = (window.languageManager && window.languageManager.t) 
+                        ? window.languageManager.t('gameStarted', { roomCode: data.roomCode })
+                        : `Oyun başladı! Otaq: ${data.roomCode}`; 
+
+                    UIElements.showGlobalMessage(gameStartMsg, false);
                 });
 
             } catch (e) {
