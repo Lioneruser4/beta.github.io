@@ -1,38 +1,10 @@
 // Dosya Adı: game.js
-
-// 🚨 KRİTİK DÜZELTME: Socket.IO bağlantısı ve olay yöneticileri bu dosyanın en üstüne eklendi.
-// Lütfen bu adresin Render'daki canlı adresiniz olduğundan emin olun:
-const RENDER_SERVER_URL = "https://beta-github-io.onrender.com"; 
-
-const socket = io(RENDER_SERVER_URL, {
-    transports: ['websocket', 'polling']
-});
-
-let currentUsername = '';
+let socket;
 let currentRoomCode = '';
 let isHost = false;
 let opponentName = '';
-let level = 1; 
-let gameStage = 'SELECTION'; // 'SELECTION', 'PLAY', 'WAITING' veya 'ENDED'
 
-// Level'a göre bomba sayısını belirleyen yardımcı fonksiyon
-const getBombCount = (level) => level === 1 ? 3 : 4;
-// Level'a göre kart sayısını belirleyen yardımcı fonksiyon
-const getBoardSize = (level) => level === 1 ? 16 : 20;
-
-let gameData = {
-    board: [], 
-    turn: 0,  // 0 = Host, 1 = Guest
-    hostLives: getBombCount(1),  
-    guestLives: getBombCount(1), 
-    cardsLeft: getBoardSize(1),
-    hostBombs: [], 
-    guestBombs: [],
-    isGameOver: false
-};
-
-
-// --- DOM Referansları (Erişilebilir olması için tüm fonksiyonların dışında) ---
+// --- DOM Referansları ---
 const screens = { 
     lobby: document.getElementById('lobby'), 
     wait: document.getElementById('waitScreen'), 
@@ -45,13 +17,6 @@ const myLivesEl = document.getElementById('myLives');
 const opponentLivesEl = document.getElementById('opponentLives');
 const opponentNameEl = document.getElementById('opponentName');
 const roleStatusEl = document.getElementById('roleStatus');
-
-// Lobi Butonları
-const createRoomBtn = document.getElementById('createRoomBtn');
-const joinRoomBtn = document.getElementById('joinRoomBtn');
-const roomCodeInput = document.getElementById('roomCodeInput');
-const usernameInput = document.getElementById('username');
-const matchBtn = document.getElementById('matchBtn'); // Placeholder olarak kalabilir
 
 // SESLER
 const audioBomb = new Audio('sound1.mp3'); 
@@ -73,27 +38,48 @@ function initializeGame(boardSize) {
     gameData.turn = 0; // Host başlar
     gameData.isGameOver = false;
     
-    const bombCount = getBombCount(level);
+    // Seviyeye göre can ve bomba sayısını ayarla
+    if (level === 1) {
+        // Level 1'de bomba yok, can yok
+        gameData.hostLives = 0;
+        gameData.guestLives = 0;
+    } else {
+        // Level 2 ve sonrası 3 can, 3 bomba
+        gameData.hostLives = 3;
+        gameData.guestLives = 3;
+    }
     
-    gameData.hostLives = bombCount;
-    gameData.guestLives = bombCount;
-    
-    gameStage = 'WAITING'; 
-    
-    updateStatusDisplay();
-    drawBoard(); 
+    gameStage = 'WAITING';
 }
+
+// --- OYUN DURUMU ---
+let level = 1; 
+// Kart sayıları: Level 1'de 16, sonraki tüm levellerde 20 kart
+const LEVELS = [16, 20]; 
+let gameStage = 'SELECTION'; // 'SELECTION' veya 'PLAY'
+let selectedBombs = []; // Kendi seçtiğimiz bombaların indexleri
+
+let gameData = {
+    board: [], 
+    turn: 0,   // 0 = Host, 1 = Guest
+    hostLives: 0,  // Server'dan gelen değerlerle güncellenecek
+    guestLives: 0, // Server'dan gelen değerlerle güncellenecek
+    cardsLeft: 0,
+    hostBombs: [], 
+    guestBombs: [],
+    isGameOver: false
+};
 
 const EMOTICONS = ['🙂', '😂', '😍', '😎', '🤩', '👍', '🎉', '🌟', '🍕', '🐱'];
 
 // --- TEMEL UI FONKSİYONLARI ---
 
-function showScreen(screenId) {
-    Object.values(screens).forEach(screen => screen.classList.remove('active'));
+export function showScreen(screenId) {
+     Object.values(screens).forEach(screen => screen.classList.remove('active'));
     screens[screenId].classList.add('active');
 }
 
-function showGlobalMessage(message, isError = true) {
+export function showGlobalMessage(message, isError = true) {
     const globalMessage = document.getElementById('globalMessage');
     const globalMessageText = document.getElementById('globalMessageText');
     globalMessageText.textContent = message;
@@ -107,24 +93,24 @@ function showGlobalMessage(message, isError = true) {
 // --- OYUN MANTIĞI VE ÇİZİM ---
 
 function drawBoard() {
-    const boardSize = getBoardSize(level);
+    const boardSize = LEVELS[level - 1];
     
+    // Grid düzenini sadece 4 sütun (4 aşağı inme) olarak ayarla
     gameBoardEl.className = 'grid w-full max-w-sm mx-auto memory-board'; 
-    gameBoardEl.style.gridTemplateColumns = 'repeat(4, 1fr)'; 
+    gameBoardEl.style.gridTemplateColumns = 'repeat(4, 1fr)'; // 4 sütun (4x3, 4x4, 4x5 için)
     
     gameBoardEl.innerHTML = '';
     
     gameData.board.forEach((cardState, index) => {
         const cardContainer = document.createElement('div');
-        const rowCount = boardSize / 4;
-        cardContainer.className = `card-container aspect-square card-rows-${rowCount}`;
+        cardContainer.className = 'card-container aspect-square';
 
         const card = document.createElement('div');
         card.className = `card cursor-pointer`;
         card.dataset.index = index;
 
         const front = document.createElement('div');
-        front.className = 'card-face front'; 
+        front.className = 'card-face front'; // Sizin stilinize göre front/back
         front.textContent = '?';
         
         const back = document.createElement('div');
@@ -138,6 +124,12 @@ function drawBoard() {
         if (cardState.opened) {
             card.classList.add('flipped');
         } else {
+            // SADECE SEÇEN KİŞİNİN GÖRMESİ İÇİN KIRMIZILIK
+            if (gameStage === 'SELECTION' && selectedBombs.includes(index)) {
+                card.classList.add('bomb-selected'); 
+            }
+            
+            // KRİTİK DÜZELTME: TIKLAMA OLAYINI CARD-CONTAINER'A EKLE!
             cardContainer.addEventListener('click', handleCardClick);
         }
         
@@ -152,26 +144,24 @@ function updateStatusDisplay() {
     
     myLivesEl.textContent = '❤️'.repeat(Math.max(0, myLives));
     opponentLivesEl.textContent = '❤️'.repeat(Math.max(0, opponentLives));
-    opponentNameEl.textContent = opponentName;
-    roleStatusEl.textContent = isHost ? "🎮 Rol: HOST" : "🎮 Rol: GUEST";
 
     const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
 
     if (gameStage === 'WAITING') {
         turnStatusEl.textContent = '⏳ OYUN HAZIRLANIYOR...';
-        actionMessageEl.textContent = `Seviye ${level} için bombalar yerleştiriliyor...`;
-        turnStatusEl.classList.remove('text-red-600', 'text-green-600');
+        actionMessageEl.textContent = "Bombalar otomatik yerleştiriliyor...";
+        turnStatusEl.classList.remove('text-red-600');
         turnStatusEl.classList.add('text-yellow-600');
     } else if (gameStage === 'PLAY') {
         if (isMyTurn) {
             turnStatusEl.textContent = '✅ SIRA SENDE!';
-            actionMessageEl.textContent = `Seviye ${level}: Bir kart aç! Rakibinizin ${getBombCount(level)} bombasından kaçının.`;
-            turnStatusEl.classList.remove('text-red-600', 'text-yellow-600');
+            actionMessageEl.textContent = "Bir kart aç! Rakibinizin bombalarından kaçınmaya çalışın.";
+            turnStatusEl.classList.remove('text-red-600');
             turnStatusEl.classList.add('text-green-600');
         } else {
             turnStatusEl.textContent = '⏳ RAKİBİN SIRASI';
             actionMessageEl.textContent = "Rakibinizin hamlesini bekleyin...";
-            turnStatusEl.classList.remove('text-green-600', 'text-yellow-600');
+            turnStatusEl.classList.remove('text-green-600');
             turnStatusEl.classList.add('text-red-600');
         }
     }
@@ -182,22 +172,55 @@ function updateStatusDisplay() {
     }
 }
 
+// --- ANIMASYON VE SES ---
+
+async function triggerWaitAndVibrate() {
+     if (gameData.cardsLeft < 8 && gameStage === 'PLAY') { 
+        startVibration();
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        stopVibration();
+    }
+}
+function startVibration() {
+    const cardContainers = gameBoardEl.querySelectorAll('.card-container');
+    cardContainers.forEach(container => {
+        const card = container.querySelector('.card');
+        if (card && !card.classList.contains('flipped')) {
+            card.classList.add('vibrate');
+        }
+    });
+    playSound(audioWait);
+}
+
+function stopVibration() {
+    const cardContainers = gameBoardEl.querySelectorAll('.card-container');
+    cardContainers.forEach(container => {
+        const card = container.querySelector('.card');
+        if (card) {
+            card.classList.remove('vibrate');
+        }
+    });
+    audioWait.pause();
+    audioWait.currentTime = 0;
+}
+
+
 // --- HAREKET İŞLEYİCİLERİ ---
 
-async function handleCardClick(event) {
+function handleCardClick(event) {
+    // Tıklama olayını başlatan card-container'ı bul
     const cardContainer = event.currentTarget; 
+    // İçindeki asıl .card elementini bul
     const cardElement = cardContainer.querySelector('.card');
     
+    // Eğer card elementi zaten açılmışsa veya bulunamazsa dur.
     if (!cardElement || cardElement.classList.contains('flipped')) return; 
     
     const cardIndex = parseInt(cardElement.dataset.index);
 
     if (gameStage === 'PLAY') {
         const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
-        if (!isMyTurn || gameData.isGameOver) {
-            showGlobalMessage('Sıra sende değil!', true);
-            return;
-        } 
+        if (!isMyTurn || gameData.isGameOver) return; 
         
         sendMove(cardIndex);
     }
@@ -213,255 +236,346 @@ function sendMove(index) {
     }
 }
 
-async function applyMove(index, emoji, isBomb, newHostLives, newGuestLives, newTurn) {
+async function applyMove(index, emoji, isBomb) {
     if (gameData.board[index].opened) return;
 
-    // Vibration ve ses mantığı buraya eklenebilir
+    await triggerWaitAndVibrate();
 
     gameData.board[index].opened = true;
     gameData.cardsLeft -= 1;
     
-    gameData.hostLives = newHostLives;
-    gameData.guestLives = newGuestLives;
-    gameData.turn = newTurn; 
-
     if (isBomb) {
         gameData.board[index].content = '💣';
+        // Hamle yapan oyuncu can kaybeder
+        const currentPlayerIsHost = gameData.turn === 0;
+        if (currentPlayerIsHost) {
+            gameData.hostLives--;
+        } else { 
+            gameData.guestLives--;
+        }
+        
         playSound(audioBomb);
         showGlobalMessage(`BOOM! Bombaya bastınız!`, true);
     } else {
-        gameData.board[index].content = emoji;
+        gameData.board[index].content = emoji; // Server'dan gelen emoji
         playSound(audioEmoji);
     }
     
+    drawBoard(); 
+    
+    // Oyun tahtasını güncelle
     drawBoard();
     
     setTimeout(() => {
+        // Sırayı değiştir
+        gameData.turn = gameData.turn === 0 ? 1 : 0;
         updateStatusDisplay();
         
+        // Oyunun bitip bitmediğini kontrol et
         if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
-            endGame(); 
+            const winner = (gameData.hostLives <= 0 && gameData.guestLives <= 0) ? 'DRAW' : 
+                         (gameData.hostLives <= 0 ? 'Guest' : 'Host');
+            endGame(winner);
         } else {
+            // Tüm kartların açılıp açılmadığını kontrol et
             checkLevelCompletion();
         }
+        
     }, 1000);
 }
 
-function endGame() {
+function endGame(winnerRole) {
     gameData.isGameOver = true;
     gameStage = 'ENDED';
     
-    const hostDied = gameData.hostLives <= 0;
-    const guestDied = gameData.guestLives <= 0;
-    
-    let winnerRole = 'DRAW';
-    if (!hostDied && guestDied) winnerRole = 'Host';
-    else if (hostDied && !guestDied) winnerRole = 'Guest';
-
     const myRole = isHost ? 'Host' : 'Guest';
     const iWon = (winnerRole === myRole);
     const isDraw = (winnerRole === 'DRAW');
     
     if (isDraw) {
-        showGlobalMessage('🤝 Beraberlik! Yeniden dene.', false);
+        turnStatusEl.textContent = `🤝 BERABERLİK!`;
+        actionMessageEl.textContent = `Her iki oyuncu da tüm canlarını kaybetti!`;
+        showGlobalMessage('🤝 Beraberlik! Her ikiniz de harika oynadınız!', false);
     } else if (iWon) {
-        showGlobalMessage('🎉 Kazandın! Yeni seviyeye geçiliyor...', false);
+        turnStatusEl.textContent = `🎉 KAZANDIN!`;
+        actionMessageEl.textContent = `Tebrikler! Rakibinizi yendiniz!`;
+        showGlobalMessage('🎉 Tebrikler! Bu turu kazandınız!', false);
     } else {
-        showGlobalMessage('😔 Kaybettin. Yeni seviyeye geçiliyor...', true);
+        turnStatusEl.textContent = `😔 KAYBETTİN`;
+        actionMessageEl.textContent = `Rakibiniz bu turu kazandı.`;
+        showGlobalMessage('😔 Bu turu kaybettiniz. Bir sonrakinde daha dikkatli olun!', true);
     }
     
-    triggerNextLevel(level + 1); 
-}
-
-function checkLevelCompletion() {
-    if (gameStage !== 'PLAY' || gameData.isGameOver) return;
-    
-    const openedCards = gameData.board.filter(card => card && card.opened).length;
-    const totalCards = gameData.board.length;
-    
-    if (openedCards === totalCards) {
-        showGlobalMessage(`🎉 Seviye ${level} tamamlandı! Yeni seviye yükleniyor...`, false);
-        triggerNextLevel(level + 1);
-    }
-};
-
-function triggerNextLevel(nextLevel) {
-    if (gameStage === 'ENDED' || gameStage === 'WAITING') return;
-    
-    gameStage = 'WAITING';
-    gameData.isGameOver = true;
-    updateStatusDisplay();
-
+    // 2 saniye bekle ve yeni seviyeye geç
     setTimeout(() => {
+        const nextLevel = level + 1;
+        const bombCount = nextLevel === 1 ? 3 : 4; // İlk seviyede 3, sonra 4 bomba
+        
+        console.log(`🔄 Yeni seviyeye geçiliyor: ${nextLevel}, ${bombCount} bomba ile`);
+        
+        // Oyun durumunu sıfırla
+        gameData = {
+            board: [],
+            turn: 0, // Host başlar
+            hostLives: bombCount,
+            guestLives: bombCount,
+            cardsLeft: 20, // Her zaman 20 kart
+            hostBombs: [],
+            guestBombs: [],
+            isGameOver: false
+        };
+        
+        // Seviyeyi güncelle
+        level = nextLevel;
+        gameStage = 'PLAY';
+        
+        // Yeni oyun tahtasını oluştur
+        initializeGame(20);
+        
+        // UI'ı güncelle
+        updateStatusDisplay();
+        
+        // Sunucuya yeni seviyeyi bildir
         if (socket && socket.connected) {
-            socket.emit('levelComplete', { 
+            console.log(`📤 Sunucuya nextLevel isteği gönderiliyor: Seviye ${nextLevel}`);
+            socket.emit('nextLevel', { 
                 roomCode: currentRoomCode,
-                level: level,
+                level: nextLevel
+            });
+            
+            // Ayrıca levelComplete olayını da gönder
+            socket.emit('levelComplete', {
+                roomCode: currentRoomCode,
+                level: level - 1,
                 nextLevel: nextLevel
             });
+        } else {
+            console.error('❌ Sunucuya bağlı değil!');
         }
-    }, 2000);
+    }, 2000); // 2 saniye bekle
 }
 
-function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
+// --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
+export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
+    console.log('🎯 setupSocketHandlers ÇAĞRILDI!', { roomCode, isHost: host, opponent: opponentNameFromIndex });
+    
+    socket = s;
     currentRoomCode = roomCode;
     isHost = host;
     opponentName = opponentNameFromIndex;
     
-    level = 1; 
-    const initialBoardSize = getBoardSize(level);
-    initializeGame(initialBoardSize);
+    opponentNameEl.textContent = opponentName;
+    roleStatusEl.textContent = isHost ? "🎮 Rol: HOST (Sen başla)" : "🎮 Rol: GUEST (Rakip başlar)";
+
+    // Oyun başlatılıyor
+    level = 1; // Yeni oyuna başlarken seviyeyi 1'e sıfırla
+    
+    // İlk seviye için board boyutunu ayarla (16 kart ile başla)
+    const boardSize = 16; // İlk seviye 16 kart
+    initializeGame(boardSize);
+    
+    // Can sayılarını server'dan gelen bilgiyle güncelle
+    socket.once('gameReady', ({ hostBombs, guestBombs }) => {
+        gameData.hostLives = hostBombs.length;
+        gameData.guestLives = guestBombs.length;
+        updateStatusDisplay();
+    });
+    
+    drawBoard();
+    showScreen('game');
+    showGlobalMessage(`🎮 Oyun ${opponentName} ile başladı! 🚀 Bombalar yerleştiriliyor...`, false);
+    
+    console.log('📡 Socket dinleyicileri kuruluyor...');
+    
+    // --- SOCKET.IO İŞLEYİCİLERİ ---
+
+    // Oyun Başlasın! (Bombalar otomatik seçildi)
+    socket.on('gameReady', (gameState) => {
+        console.log('🚀 gameReady EVENT ALINDI!', gameState);
+        
+        // Oyun durumunu güncelle
+        gameData.hostBombs = gameState.hostBombs || [];
+        gameData.guestBombs = gameState.guestBombs || [];
+        gameData.hostLives = gameState.hostLives || (level === 1 ? 3 : 4);
+        gameData.guestLives = gameState.guestLives || (level === 1 ? 3 : 4);
+        gameData.turn = gameState.turn || 0;
+        
+        gameStage = 'PLAY';
+        
+        console.log('✅ Oyun durumu güncellendi:', {
+            level: level,
+            hostBombs: gameData.hostBombs,
+            guestBombs: gameData.guestBombs,
+            hostLives: gameData.hostLives,
+            guestLives: gameData.guestLives,
+            turn: gameData.turn
+        });
+        
+        playSound(audioEmoji); // Başlama sesi
+        showGlobalMessage(`🚀 Seviye ${level} başlıyor! ${level === 1 ? '3' : '4'} bomba ile oynanıyor.`, false);
+        
+        // Oyun tahtasını çiz ve durumu güncelle
+        drawBoard();
+        updateStatusDisplay();
+    });
+    
+    // Yeni seviye başlatma
+    socket.on('newLevel', (data) => {
+        console.log('🆕 Yeni seviye başlatılıyor:', data);
+        
+        // Seviye bilgisini güncelle (sayıya çevirerek)
+        level = parseInt(data.level) || 1;
+        
+        // Bomba sayısını hesapla
+        const bombCount = level === 1 ? 3 : 4;
+        
+        // Oyun durumunu sıfırla
+        gameData = {
+            board: [],
+            turn: 0, // Host başlasın
+            hostLives: bombCount,
+            guestLives: bombCount,
+            cardsLeft: 20, // Her zaman 20 kart
+            hostBombs: [],
+            guestBombs: [],
+            isGameOver: false
+        };
+        
+        gameStage = 'PLAY';
+        
+        // Yeni oyun tahtasını oluştur
+        initializeGame(20); // Her zaman 20 kart
+        
+        // UI'ı güncelle
+        updateStatusDisplay();
+        
+        console.log(`✅ Yeni seviye başlatıldı: ${level}, ${bombCount} bomba ile`);
+        console.log(`🔵 Host Can: ${gameData.hostLives}, 🔴 Guest Can: ${gameData.guestLives}`);
+        
+        showGlobalMessage(`🎮 Seviye ${level} başlıyor! ${bombCount} bomba ile oynanıyor.`, false);
+    });
+
+    // gameData Olayı (Hamle Geldi - Kendi veya Rakip)
+    socket.on('gameData', (data) => {
+        if (gameStage !== 'PLAY') return;
+        
+        if (data.type === 'MOVE') {
+            // Server tarafından onaylanmış hamleyi uygula (emoji ve bomba bilgisi ile)
+            applyMove(data.cardIndex, data.emoji, data.isBomb); 
+        }
+    });
+
+    // Hata mesajları için dinleyici
+    socket.on('error', (message) => {
+        showGlobalMessage(message, true);
+    });
+
+    // Tüm kartlar açıldı mı kontrol et
+    const checkLevelCompletion = () => {
+        if (gameStage !== 'PLAY' || gameData.isGameOver) return;
+        if (!gameData.board || gameData.board.length === 0) return;
+        
+        // Açılan kart sayısını kontrol et
+        const openedCards = gameData.board.filter(card => card && card.opened).length;
+        const totalCards = gameData.board.length;
+        
+        console.log(`🔍 Seviye tamamlama kontrolü: Açılan ${openedCards}/${totalCards} kart`);
+        
+        if (openedCards === totalCards) {
+            const nextLevel = level + 1;
+            const bombCount = nextLevel === 1 ? 3 : 4;
+            
+            console.log(`🎯 Tüm kartlar açıldı! Yeni seviye: ${nextLevel}, ${bombCount} bomba ile`);
+            showGlobalMessage(`🎉 Seviye ${level} tamamlandı! Yeni seviye yükleniyor...`, false);
+            
+            // Oyun durumunu güncelle
+            gameStage = 'WAITING';
+            gameData.isGameOver = true;
+            
+            // Sunucuya seviye tamamlandı bilgisini gönder
+            if (socket && socket.connected) {
+                console.log(`📤 Sunucuya levelComplete gönderiliyor: Seviye ${level} tamamlandı`);
+                socket.emit('levelComplete', { 
+                    roomCode: currentRoomCode,
+                    level: level,
+                    nextLevel: nextLevel
+                });
+            } else {
+                console.error('❌ Sunucuya bağlı değil!');
+            }
+            
+            // 1 saniye bekle ve yeni seviyeyi başlat
+            setTimeout(() => {
+                console.log(`🔄 Seviye ${nextLevel} başlatılıyor...`);
+                
+                // Yeni seviyeyi başlat
+                level = nextLevel;
+                gameStage = 'PLAY';
+                
+                // Sunucudan yeni seviyeyi bekle
+                if (socket && socket.connected) {
+                    console.log(`📤 Sunucuya nextLevel isteği gönderiliyor: Seviye ${nextLevel}`);
+                    socket.emit('nextLevel', { 
+                        roomCode: currentRoomCode,
+                        level: nextLevel
+                    });
+                } else {
+                    // Eğer sunucuya bağlı değilse, yerel olarak devam et
+                    console.log('🔌 Sunucuya bağlı değil, yerel olarak devam ediliyor...');
+                    gameData = {
+                        board: [],
+                        turn: 0,
+                        hostLives: bombCount,
+                        guestLives: bombCount,
+                        cardsLeft: 20,
+                        hostBombs: [],
+                        guestBombs: [],
+                        isGameOver: false
+                    };
+                    initializeGame(20);
+                    updateStatusDisplay();
+                    showGlobalMessage(`🎮 Seviye ${level} başlıyor! ${bombCount} bomba ile oynanıyor.`, false);
+                }
+            }, 1000);
+        }
+    };
+    
+    // Oyun başlangıcında ve her hamle sonrası kontrol et
+    checkLevelCompletion();
+
+    // Yeni seviye başlatma işlemi
+    socket.on('newLevel', ({ level: newLevel, boardSize, hostLives, guestLives }) => {
+        level = newLevel;
+        gameData.hostLives = hostLives;
+        gameData.guestLives = guestLives;
+        
+        showGlobalMessage(`🎮 Seviye ${level} başlıyor! ${hostLives} bomba ile oynanıyor.`, false);
+        
+        // Yeni oyun tahtasını başlat
+        initializeGame(boardSize);
+        updateStatusDisplay();
+    });
+    
+    // Eski nextLevel olayını kaldırmak için
+    socket.off('nextLevel');
+    
+    // Rakip Ayrıldı
+    socket.on('opponentLeft', (message) => {
+        showGlobalMessage(message || 'Rakibiniz ayrıldı. Lobiye dönülüyor.', true);
+        resetGame();
+    });
 }
 
-function resetGame() {
+export function resetGame() {
+    // Tüm oyun ayarlarını sıfırlar ve lobiye döner (En güvenli yol: Sayfayı yenilemek)
     window.location.reload(); 
 }
 
-// --- SOCKET.IO İŞLEYİCİLERİ ---
-
-// 1. BAĞLANTI VE HATA YÖNETİMİ
-socket.on('connect', () => {
-    console.log(`[SOCKET] Sunucuya başarıyla bağlandı. ID: ${socket.id}`);
-    showGlobalMessage('Sunucuya bağlandı. Oda kurabilir veya katılabilirsiniz.', false);
-    if (createRoomBtn && joinRoomBtn) {
-        createRoomBtn.disabled = false;
-        joinRoomBtn.disabled = false;
-    }
-});
-
-socket.on('connect_error', (err) => {
-    console.error(`[SOCKET HATA] Bağlantı hatası: ${err.message}`);
-    showGlobalMessage('Sunucuya bağlanılamadı. Lütfen Render URL\'nizi kontrol edin.', true);
-});
-
-// 2. ODA KURMA
-createRoomBtn.addEventListener('click', () => {
-    currentUsername = usernameInput.value.trim();
-    if (!currentUsername) {
-        showGlobalMessage('Lütfen kullanıcı adınızı girin.', true);
-        return;
-    }
-    socket.emit('createRoom', { username: currentUsername });
-});
-
-socket.on('roomCreated', (roomCode) => {
-    console.log(`[EVENT] Oda başarıyla kuruldu: ${roomCode}`);
-    showScreen('wait');
-    document.getElementById('roomCodeDisplay').textContent = roomCode;
-    setupSocketHandlers(socket, roomCode, true, 'Rakip bekleniyor...');
-});
-
-// 3. ODAYA KATILMA
-joinRoomBtn.addEventListener('click', () => {
-    currentUsername = usernameInput.value.trim();
-    const roomCode = roomCodeInput.value.trim();
-    
-    if (!currentUsername || !roomCode) {
-        showGlobalMessage('Lütfen hem kullanıcı adınızı hem de oda kodunu girin.', true);
-        return;
-    }
-    socket.emit('joinRoom', { username: currentUsername, roomCode: roomCode });
-});
-
-socket.on('roomJoined', (roomCode) => {
-    console.log(`[EVENT] Odaya başarıyla katıldı: ${roomCode}`);
-});
-
-socket.on('joinFailed', (message) => {
-    console.log(`[EVENT] Odaya katılamadı: ${message}`);
-    showGlobalMessage(message, true);
-});
-
-// 4. OYUN BAŞLATMA
-socket.on('gameStart', (data) => {
-    console.log(`[EVENT] Oyun başlıyor: Oda ${data.roomCode}`);
-    const myId = socket.id;
-    
-    const hostPlayer = data.players.find(p => p.isHost);
-    const guestPlayer = data.players.find(p => !p.isHost);
-
-    const isHostNow = myId === hostPlayer.id;
-    const opponent = isHostNow ? guestPlayer : hostPlayer;
-    
-    setupSocketHandlers(socket, data.roomCode, isHostNow, opponent.username);
-    showScreen('game');
-    showGlobalMessage(`🎮 Oyun ${opponent.username} ile başladı!`, false);
-});
-
-// 5. OYUN DÖNGÜSÜ
-socket.on('gameReady', (gameState) => {
-    console.log('🚀 gameReady EVENT ALINDI!', gameState);
-    
-    gameData.hostBombs = gameState.hostBombs || [];
-    gameData.guestBombs = gameState.guestBombs || [];
-    gameData.hostLives = gameState.hostLives || getBombCount(level);
-    gameData.guestLives = gameState.guestLives || getBombCount(level);
-    gameData.turn = gameState.turn || 0;
-    
-    gameStage = 'PLAY';
-    gameData.isGameOver = false;
-
-    level = gameState.level || 1;
-    const boardSize = gameState.boardSize || getBoardSize(level);
-    gameData.cardsLeft = boardSize;
-    gameData.board = Array.from({ length: boardSize }, () => ({ opened: false, content: '' }));
-    
-    playSound(audioEmoji);
-    showGlobalMessage(`🚀 Seviye ${level} başlıyor!`, false);
-    
-    drawBoard();
-    updateStatusDisplay();
-});
-
-socket.on('gameData', (data) => {
-    if (gameStage !== 'PLAY' || gameData.isGameOver) return;
-    
-    if (data.type === 'MOVE') {
-        applyMove(
-            data.cardIndex, 
-            data.emoji, 
-            data.isBomb, 
-            data.hostLives, 
-            data.guestLives, 
-            data.turn
-        ); 
-    }
-});
-
-socket.on('newLevel', (data) => {
-    console.log('🆕 Yeni seviye başlatılıyor:', data);
-    
-    level = parseInt(data.level) || 1;
-    const bombCount = getBombCount(level);
-    const boardSize = getBoardSize(level);
-    
-    gameData = {
-        board: Array.from({ length: boardSize }, () => ({ opened: false, content: '' })),
-        turn: 0,
-        hostLives: data.hostLives || bombCount,
-        guestLives: data.guestLives || bombCount,
-        cardsLeft: boardSize, 
-        hostBombs: [],
-        guestBombs: [],
-        isGameOver: false
-    };
-    
-    gameStage = 'WAITING';
-    drawBoard();
-    updateStatusDisplay();
-    showGlobalMessage(`🎮 Seviye ${level} yükleniyor!`, false);
-});
-
-socket.on('error', (message) => {
-    showGlobalMessage(message, true);
-});
-
-socket.on('opponentLeft', (message) => {
-    showGlobalMessage(message || 'Rakibiniz ayrıldı. Lobiye dönülüyor.', true);
-    resetGame();
-});
-
-// ******************************************************************************
-// * NOT: Bu dosya artık tüm bağlantı ve oyun mantığını içerdiği için,           *
-// * index.html dosyanızda sadece bu dosyayı yüklemeniz yeterlidir.             *
-// ******************************************************************************
+// Lobi Butonlarını dışarıdan erişilebilir yapıyoruz (index.html'in kullanması için)
+export const UIElements = {
+    matchBtn: document.getElementById('matchBtn'), 
+    roomCodeInput: document.getElementById('roomCodeInput'), 
+    usernameInput: document.getElementById('username'), 
+    showGlobalMessage, 
+    resetGame
+};
