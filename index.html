@@ -6,6 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a202c">
+    <meta name="format-detection" content="telephone=no">
     <title>💣 Emoji Kart Bomb 1v1</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -14,20 +15,72 @@
         // iOS ve Telegram WebView için touch event desteği
         document.addEventListener('DOMContentLoaded', function() {
             // iOS için touch event'leri etkinleştir
-            document.body.addEventListener('touchstart', function() {}, { passive: true });
+            const enableTouchEvents = () => {
+                document.body.addEventListener('touchstart', function() {}, { passive: true });
+                document.body.addEventListener('touchend', function() {}, { passive: true });
+            };
             
             // Telegram WebView tespiti
             const isTelegram = window.navigator.userAgent.includes('Telegram');
             if (isTelegram) {
                 document.documentElement.classList.add('telegram-webview');
+                // Telegram WebView'ı tam ekran yap
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.expand();
+                    window.Telegram.WebApp.enableClosingConfirmation();
+                }
             }
             
             // iOS tespiti
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
             if (isIOS) {
                 document.documentElement.classList.add('ios-device');
+                // iOS için viewport düzeltmesi
+                const viewport = document.querySelector('meta[name="viewport"]');
+                if (viewport) {
+                    viewport.content = viewport.content + ', maximum-scale=1';
+                }
             }
+
+            // Touch event'lerini etkinleştir
+            enableTouchEvents();
+            
+            // Audio context'i başlat
+            initializeAudioContext();
         });
+
+        // Audio context'i başlatma fonksiyonu
+        function initializeAudioContext() {
+            // AudioContext'i oluştur
+            window.AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!window.audioContext) {
+                window.audioContext = new AudioContext();
+                
+                // iOS için sessiz bir ses çalarak audio context'i aktif hale getir
+                const silentBuffer = window.audioContext.createBuffer(1, 1, 22050);
+                const source = window.audioContext.createBufferSource();
+                source.buffer = silentBuffer;
+                source.connect(window.audioContext.destination);
+                source.start(0);
+                
+                // Kullanıcı etkileşimi için event listener'lar
+                const events = ['touchstart', 'touchend', 'click', 'keydown', 'mousedown'];
+                const unlockAudio = () => {
+                    if (window.audioContext.state === 'suspended') {
+                        window.audioContext.resume();
+                    }
+                    // Event listener'ları kaldır
+                    events.forEach(event => {
+                        document.removeEventListener(event, unlockAudio, true);
+                    });
+                };
+                
+                // Event listener'ları ekle
+                events.forEach(event => {
+                    document.addEventListener(event, unlockAudio, true, { passive: true });
+                });
+            }
+        }
     </script>
     
     <style>
@@ -737,9 +790,49 @@
         });
     </script>
     
-    <!-- iOS için ek script -->
+    <!-- iOS ve Telegram WebView için ek script -->
     <script>
-        // iOS için viewport düzeltmesi
+        // iOS için viewport ve touch event düzeltmeleri
+        document.addEventListener('DOMContentLoaded', function() {
+            // iOS'ta scroll sorunlarını önleme
+            const preventDefaultScroll = function(e) {
+                // Sadece div ve button elementlerinde scroll'u engelle
+                if (e.target.tagName === 'DIV' || e.target.tagName === 'BUTTON') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                }
+            };
+            
+            // Touch event'lerini engelleme
+            document.body.addEventListener('touchmove', preventDefaultScroll, { passive: false });
+            
+            // iOS'ta input odaklandığında sayfanın kaymasını engelle
+            const inputs = document.querySelectorAll('input, textarea, select');
+            inputs.forEach(input => {
+                input.addEventListener('focus', function() {
+                    window.scrollTo(0, 0);
+                    document.body.scrollTop = 0;
+                });
+            });
+            
+            // iOS'ta sayfa yüklendiğinde scroll'u sıfırla
+            window.addEventListener('load', function() {
+                setTimeout(function() {
+                    window.scrollTo(0, 0);
+                }, 0);
+                
+                // iOS'ta sayfa boyutunu ayarla
+                const setViewportHeight = () => {
+                    let vh = window.innerHeight * 0.01;
+                    document.documentElement.style.setProperty('--vh', `${vh}px`);
+                };
+                
+                setViewportHeight();
+                window.addEventListener('resize', setViewportHeight);
+                window.addEventListener('orientationchange', setViewportHeight);
+            });
+        });
         document.addEventListener('DOMContentLoaded', function() {
             // iOS için viewport düzeltmesi
             if (/(iPad|iPhone|iPod)/g.test(navigator.userAgent)) {
@@ -766,5 +859,51 @@
             }
         });
     </script>
+    
+    <!-- iOS ve Telegram WebView için ek stil düzeltmeleri -->
+    <style>
+        /* iOS ve Telegram WebView için ek stil düzeltmeleri */
+        :root {
+            --vh: 1vh;
+        }
+        
+        /* iOS input zoom'u engelleme */
+        @supports (-webkit-touch-callout: none) {
+            input, textarea, select {
+                font-size: 16px !important;
+            }
+        }
+        
+        /* iOS Safari'de butonların mavi rengini kaldırma */
+        input, textarea, button, select, a, div {
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* iOS'ta hızlı tıklamaları işleme */
+        * {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        
+        /* iOS'ta scroll davranışını iyileştirme */
+        .screen {
+            -webkit-overflow-scrolling: touch;
+            overflow-y: auto;
+            height: 100vh;
+            height: calc(var(--vh, 1vh) * 100);
+        }
+        
+        /* iOS'ta input alanları için düzeltme */
+        input, textarea, select {
+            -webkit-appearance: none;
+            -webkit-border-radius: 0;
+            border-radius: 0;
+        }
+    </style>
 </body>
 </html>
