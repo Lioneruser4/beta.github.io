@@ -1,252 +1,235 @@
-// Dosya Adı: language.js
+// Language strings for the game
 const languages = {
-    az: {
-        languageName: '🇦🇿 Azərbaycanca',
-        // Başlıq və Qaydalar
-        title: '💣 Emoji Bombası',
-        rulesTitle: '📋 Oyun Qaydaları (YENİ):',
-        rule1: 'Bütün səviyyələr 20 kartdan ibarətdir.',
-        rule2: 'Level 1: Hər oyunçunun 3 bombası (3 canı) var.',
-        rule3: 'Level 2+: Hər oyunçunun 4 bombası (4 canı) var.',
-        rule4: 'Bütün təhlükəsiz kartlar açıldıqda növbəti səviyyəyə keçirsiniz.',
-        // Lobi
-        enterName: 'İstifadəçi Adınızı Daxil Edin',
-        roomCode: 'Otaq Kodu (Boş buraxın=Yeni Otaq)',
-        joinGame: '➕ Otaq Qur / Odaya Bağlan',
-        // Gözləmə
-        creatingRoom: 'Otaq Qurulur...',
-        roomCreated: 'Otağınız Quruldu!',
-        roomCodeTitle: 'Otaq Kodunuz:',
-        copyCode: 'Kopyala',
-        waitingForPlayer: 'Rəqib gözlənilir...',
-        pleaseWait: 'Zəhmət olmasa gözləyin...',
-        joiningRoom: 'Otağa Qoşulma:',
-        joining: 'Qoşulunur...',
-        cancel: 'Ləğv Et',
-        // Oyun Ekranı
-        you: 'SƏN',
-        levelTitle: 'SƏVİYYƏ',
-        waiting: 'Rəqib gözlənilir...',
-        roleHost: 'Rol: HOST',
-        roleGuest: 'Rol: QONAQ',
-        yourTurn: '✅ SƏNİN NÖVBƏN!',
-        opponentTurn: '⏳ RƏQİBİN NÖVBƏSİ',
-        exitGame: '🚪 Oyundan Çıx',
-        // Chat
-        typeMessage: 'Mesaj yazın...',
-        send: 'Göndər',
-        // Xəbərdarlıqlar və Mesajlar
-        connected: 'Serverə qoşuldu.',
-        disconnected: 'Bağlantı kəsildi. Yenidən qoşulunur...',
-        errorConnect: 'XƏTA: Serverə daxil olmaq mümkün deyil.',
-        errorUsername: 'Zəhmət olmasa etibarlı bir istifadəçi adı daxil edin.',
-        copied: 'Otaq Kodu Kopyalandı!',
-        copyFailed: 'Kopyalama uğursuz oldu.',
-        bombExploded: 'BOOM! Bombaya basdınız!',
-        gameOver: 'Oyun Bitdi!',
-        youWon: '🎉 QAZANDIN!',
-        youLost: '😔 MƏĞLUB OLDUN.',
-        draw: '🤝 BƏRABƏRƏ!',
-        levelComplete: 'Səviyyə {level} tamamlandı! Növbəti səviyyə...',
-        levelStarting: 'Səviyyə {level} başlayır ({lives} can).',
-        cardOpened: 'Bu kart artıq açılıb.',
-    },
-    tr: {
-        languageName: '🇹🇷 Türkçe',
-        // Başlıq ve Kurallar
-        title: '💣 Emoji Bombası',
-        rulesTitle: '📋 Oyun Kuralları (YENİ):',
-        rule1: 'Tüm seviyeler 20 karttan oluşur.',
-        rule2: 'Level 1: Her oyuncunun 3 bombası (3 canı) var.',
-        rule3: 'Level 2+: Her oyuncunun 4 bombası (4 canı) var.',
-        rule4: 'Tüm güvenli kartlar açıldığında sonraki seviyeye geçilir.',
-        // Lobi
-        enterName: 'Kullanıcı Adınızı Girin',
-        roomCode: 'Oda Kodu (Boş Bırakın=Yeni Oda)',
-        joinGame: '➕ Oda Kur / Odaya Katıl',
-        // Bekleme
-        creatingRoom: 'Oda Kuruluyor...',
-        roomCreated: 'Odanız Kuruldu!',
-        roomCodeTitle: 'Oda Kodunuz:',
-        copyCode: 'Kopyala',
-        waitingForPlayer: 'Rakip bekleniyor...',
-        pleaseWait: 'Lütfen bekleyin...',
-        joiningRoom: 'Odaya Katılma:',
-        joining: 'Katılınılıyor...',
-        cancel: 'İptal Et',
-        // Oyun Ekranı
-        you: 'SEN',
-        levelTitle: 'SEVİYE',
-        waiting: 'Rakip bekleniyor...',
-        roleHost: 'Rol: EV SAHİBİ',
-        roleGuest: 'Rol: MİSAFİR',
-        yourTurn: '✅ SIRA SENDE!',
-        opponentTurn: '⏳ RAKİBİN SIRASI',
-        exitGame: '🚪 Oyundan Çık',
-        // Chat
-        typeMessage: 'Mesaj yazın...',
-        send: 'Gönder',
-        // Uyarılar ve Mesajlar
-        connected: 'Sunucuya bağlandı.',
-        disconnected: 'Bağlantı kesildi. Yeniden bağlanılıyor...',
-        errorConnect: 'HATA: Sunucuya erişilemiyor.',
-        errorUsername: 'Lütfen geçerli bir kullanıcı adı girin.',
-        copied: 'Oda Kodu Kopyalandı!',
-        copyFailed: 'Kopyalama başarısız.',
-        bombExploded: 'BOOM! Bombaya bastınız!',
-        gameOver: 'Oyun Bitti!',
-        youWon: '🎉 KAZANDIN!',
-        youLost: '😔 KAYBETTİN.',
-        draw: '🤝 BERABERE!',
-        levelComplete: 'Seviye {level} tamamlandı! Sonraki seviye...',
-        levelStarting: 'Seviye {level} başlıyor ({lives} can).',
-        cardOpened: 'Bu kart zaten açık.',
-    },
-    en: {
-        languageName: '🇬🇧 English',
-        // Title and Rules
-        title: '💣 Emoji Bomb',
-        rulesTitle: '📋 Game Rules (NEW):',
-        rule1: 'All levels consist of 20 cards.',
-        rule2: 'Level 1: Each player has 3 bombs (3 lives).',
-        rule3: 'Level 2+: Each player has 4 bombs (4 lives).',
-        rule4: 'When all safe cards are opened, you advance to the next level.',
-        // Lobby
-        enterName: 'Enter Your Username',
-        roomCode: 'Room Code (Leave Blank=New Room)',
-        joinGame: '➕ Create / Join Room',
-        // Waiting
-        creatingRoom: 'Creating Room...',
-        roomCreated: 'Your Room is Ready!',
-        roomCodeTitle: 'Your Room Code:',
-        copyCode: 'Copy',
-        waitingForPlayer: 'Waiting for opponent...',
-        pleaseWait: 'Please wait...',
-        joiningRoom: 'Joining Room:',
-        joining: 'Joining...',
-        cancel: 'Cancel',
-        // Game Screen
-        you: 'YOU',
-        levelTitle: 'LEVEL',
-        waiting: 'Waiting for opponent...',
-        roleHost: 'Role: HOST',
-        roleGuest: 'Role: GUEST',
-        yourTurn: '✅ YOUR TURN!',
-        opponentTurn: '⏳ OPPONENT\'S TURN',
-        exitGame: '🚪 Exit Game',
-        // Chat
-        typeMessage: 'Type a message...',
-        send: 'Send',
-        // Alerts and Messages
-        connected: 'Connected to server.',
-        disconnected: 'Disconnected. Reconnecting...',
-        errorConnect: 'ERROR: Cannot connect to server.',
-        errorUsername: 'Please enter a valid username.',
-        copied: 'Room Code Copied!',
-        copyFailed: 'Copy failed.',
-        bombExploded: 'BOOM! You hit a bomb!',
-        gameOver: 'Game Over!',
-        youWon: '🎉 YOU WON!',
-        youLost: '😔 YOU LOST.',
-        draw: '🤝 IT\'S A DRAW!',
-        levelComplete: 'Level {level} complete! Next level...',
-        levelStarting: 'Level {level} starting ({lives} lives).',
-        cardOpened: 'This card is already open.',
-    }
+    az: {
+        languageName: '🇦🇿 Azərbaycanca',
+        // Lobby
+        enterName: 'İstifadəçi Adınızı Daxil Edin',
+        // --- Dəyişiklik 1: 'oyun' butonu (Otaq Qur) ---
+        startGame: '✅ Otaq Qur / ➕ Otağa Bağlan ➕',
+        // --- Dəyişiklik 2: 'baslayin' butonu (Odaya Bağlan) ---
+        joinGame: '✅ Otaq Qur / ➕ Otağa Bağlan ➕',
+        // --- Dəyişiklik 3: Otaq Kodu placeholder (əvvəlki kimi) ---
+        roomCode: 'Otaq Kodu (Boş buraxın=Yeni Otaq)',
+        // Game
+        yourTurn: '✅ SİZİN NÖVBƏNİZ!',
+        opponentTurn: '⏳ Rəqibin növbəsi',
+        gameStarting: '🎮 Oyun başlayır!',
+        selectCards: '📌 Kart seçin',
+        gameOver: '🎮 Oyun bitdi!',
+        youWon: '🎉 QAZANDIN!',
+        youLost: '😔 Məğlub oldun',
+        draw: '🤝 Bərabərə',
+        nextLevel: 'Növbəti səviyyə',
+        // Chat
+        send: 'Göndər',
+        typeMessage: 'Mesaj yazın...',
+        // Messages
+        playerLeft: 'Oyuncu ayrıldı',
+        waitingForPlayer: 'Oyunçu gözlənilir...',
+        bombExploded: 'BOMBA! Partladın!',
+        levelStarting: 'Səviyyə başlayır...',
+        // UI
+        lives: 'Can: {lives}',
+        level: 'Səviyyə: {level}',
+        opponent: 'Rəqib: {name}',
+        roleHost: '🎮 Rol: HOST (Sən başla)',
+        roleGuest: '🎮 Rol: QONAQ (Rəqib başlayır)'
+    },
+    tr: {
+        languageName: '🇹🇷 Türkçe',
+        // Lobby
+        enterName: 'Kullanıcı Adınızı Girin',
+        // --- Dəyişiklik 1: 'oyun' butonu (Oda Kur) ---
+        startGame: '✅ Otaq Qur / ➕ Odaya Bağlan ➕',
+        // --- Dəyişiklik 2: 'baslayin' butonu (Odaya Bağlan) ---
+        joinGame: '✅ Otaq Qur / ➕ Odaya Bağlan ➕',
+        // --- Dəyişiklik 3: Otaq Kodu placeholder (əvvəlki kimi) ---
+        roomCode: 'Oda Kodu (Boş Bırakın=Yeni Oda)',
+        // Game
+        yourTurn: '✅ SIRADA SİZ!',
+        opponentTurn: '⏳ RAKİBİN SIRASI',
+        gameStarting: '🎮 Oyun Başlıyor!',
+        selectCards: '📌 Kart seçin',
+        gameOver: '🎮 Oyun Bitti!',
+        youWon: '🎉 KAZANDIN!',
+        youLost: '😔 KAYBETTİN',
+        draw: '🤝 BERABERE',
+        nextLevel: 'Sonraki Seviye',
+        // Chat
+        send: 'Gönder',
+        typeMessage: 'Mesaj yazın...',
+        // Messages
+        playerLeft: 'Oyuncu ayrıldı',
+        waitingForPlayer: 'Oyuncu bekleniyor...',
+        bombExploded: 'BOMBA! Patladın!',
+        levelStarting: 'Seviye başlıyor...',
+        // UI
+        lives: 'Can: {lives}',
+        level: 'Seviye: {level}',
+        opponent: 'Rakip: {name}',
+        roleHost: '🎮 Rol: EV SAHİBİ (Sen başla)',
+        roleGuest: '🎮 Rol: MİSAFİR (Rakip başlar)'
+    },
+    en: {
+        languageName: '🇬🇧 English',
+        // Lobby
+        enterName: 'Enter Your Username',
+        // --- Dəyişiklik 1: 'oyun' butonu (Create Room) ---
+        startGame: '✅ Otaq Qur / ➕ Odaya Bağlan ➕',
+        // --- Dəyişiklik 2: 'baslayin' butonu (Join Room) ---
+        joinGame: '✅ Otaq Qur / ➕ Odaya Bağlan ➕',
+        // --- Dəyişiklik 3: Otaq Kodu placeholder (əvvəlki kimi) ---
+        roomCode: 'Room Code (Leave Blank=New Room)',
+        // Game
+        yourTurn: '✅ YOUR TURN!',
+        opponentTurn: '⏳ OPPONENT\'S TURN',
+        gameStarting: '🎮 Game Starting!',
+        selectCards: '📌 Select cards',
+        gameOver: '🎮 Game Over!',
+        youWon: '🎉 YOU WON!',
+        youLost: '😔 YOU LOST',
+        draw: '🤝 DRAW',
+        nextLevel: 'Next Level',
+        // Chat
+        send: 'Send',
+        typeMessage: 'Type a message...',
+        // Messages
+        playerLeft: 'Player left',
+        waitingForPlayer: 'Waiting for player...',
+        bombExploded: 'BOOM! You hit a bomb!',
+        levelStarting: 'Level starting...',
+        // UI
+        lives: 'Lives: {lives}',
+        level: 'Level: {level}',
+        opponent: 'Opponent: {name}',
+        roleHost: '🎮 Role: HOST (You start)',
+        roleGuest: '🎮 Role: GUEST (Opponent starts)'
+    }
 };
 
-// --- Dil Meneceri (Dəyişməyib) ---
+// Detect user's language based on IP or browser settings
+function detectLanguage() {
+    // Default to Azerbaijani
+    let lang = 'az';
+    
+    // Try to get from URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const langParam = urlParams.get('lang');
+    
+    if (langParam && languages[langParam]) {
+        return langParam;
+    }
+    
+    // Try to get from browser settings
+    const browserLang = navigator.language || navigator.userLanguage;
+    if (browserLang) {
+        if (browserLang.startsWith('tr')) {
+            lang = 'tr';
+        } else if (browserLang.startsWith('en')) {
+            lang = 'en';
+        }
+    }
+    
+    return lang;
+}
+
+// Set language and update UI
+let currentLanguage = detectLanguage();
+
+export function setLanguage(lang) {
+    if (languages[lang]) {
+        currentLanguage = lang;
+        // Update URL without reloading the page
+        const url = new URL(window.location);
+        url.searchParams.set('lang', lang);
+        window.history.pushState({}, '', url);
+        
+        // Save to localStorage for persistence
+        localStorage.setItem('preferredLanguage', lang);
+        
+        // Update UI elements
+        updateUI();
+    }
+}
 
 // Get a translated string
-function t(key, params = {}) {
-    let lang = window.languageManager.currentLanguage;
-    if (!languages[lang] || !languages[lang][key]) {
-        // Fallback to English if key not found
-        lang = 'en';
-    }
-    let str = languages[lang][key] || key;
-    
-    Object.keys(params).forEach(param => {
-        str = str.replace(`{${param}}`, params[param]);
-    });
-    return str;
+export function t(key, params = {}) {
+    let str = languages[currentLanguage][key] || key;
+    
+    // Replace placeholders with actual values
+    Object.keys(params).forEach(param => {
+        str = str.replace(`{${param}}`, params[param]);
+    });
+    
+    return str;
 }
 
-function detectLanguage() {
-    const savedLang = localStorage.getItem('preferredLanguage');
-    if (savedLang && languages[savedLang]) return savedLang;
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const langParam = urlParams.get('lang');
-    if (langParam && languages[langParam]) return langParam;
-
-    const browserLang = navigator.language || navigator.userLanguage;
-    if (browserLang) {
-        if (browserLang.startsWith('tr')) return 'tr';
-        if (browserLang.startsWith('en')) return 'en';
-    }
-    return 'az'; // Default
-}
-
-function setLanguage(lang) {
-    if (languages[lang]) {
-        window.languageManager.currentLanguage = lang;
-        localStorage.setItem('preferredLanguage', lang);
-        updateUI();
-    }
-}
-
-function updateUI() {
-    const lang = window.languageManager.currentLanguage;
-    
-    // Update language button
-    const langButtonFlag = document.getElementById('current-language-flag');
-    if (langButtonFlag) {
-        langButtonFlag.textContent = languages[lang].languageName.split(' ')[0];
-    }
-    
-    // Update all elements with data-lang-key
-    document.querySelectorAll('[data-lang-key]').forEach(el => {
-        const key = el.getAttribute('data-lang-key');
-        const translation = t(key);
-        
-        // Check if element is an input placeholder
-        if (el.tagName === 'INPUT' && el.hasAttribute('placeholder')) {
-            el.placeholder = translation;
-        } else {
-            el.textContent = translation;
-        }
-    });
-}
-
-function toggleLanguageSelector() {
-    const selector = document.getElementById('language-selector');
-    if (selector) {
-        selector.style.display = selector.style.display === 'block' ? 'none' : 'block';
-    }
+// Toggle language selector
+export function toggleLanguageSelector() {
+    const selector = document.getElementById('language-selector');
+    if (selector) {
+        selector.style.display = selector.style.display === 'block' ? 'none' : 'block';
+    }
 }
 
 // Close language selector when clicking outside
 document.addEventListener('click', (e) => {
-    const selector = document.getElementById('language-selector');
-    const button = document.getElementById('language-button');
-    if (selector && button && !selector.contains(e.target) && !button.contains(e.target)) {
-        selector.style.display = 'none';
-    }
+    const selector = document.getElementById('language-selector');
+    const button = document.getElementById('language-button');
+    
+    if (selector && button && !selector.contains(e.target) && !button.contains(e.target)) {
+        selector.style.display = 'none';
+    }
 });
 
-// Initialize
-function initLanguage() {
-    window.languageManager.currentLanguage = detectLanguage();
-    updateUI();
+// Initialize language from localStorage if available
+export function initLanguage() {
+    const savedLang = localStorage.getItem('preferredLanguage');
+    if (savedLang && languages[savedLang]) {
+        currentLanguage = savedLang;
+    }
+    updateUI();
 }
 
-// Export functions to global scope
+// Update all UI elements with translations
+function updateUI() {
+    // Update language button
+    const currentLangEl = document.getElementById('current-language');
+    if (currentLangEl) {
+        currentLangEl.textContent = languages[currentLanguage].languageName.substring(0, 5); // Sadece bayrak ve kısa kodu göster
+    }
+
+    // Update lobby text
+    const nameInput = document.getElementById('username');
+    const startBtn = document.getElementById('matchBtn');
+    const roomInput = document.getElementById('roomCodeInput');
+    
+    // --- Bu hissə dəyişiklikləri tətbiq edir ---
+    if (nameInput) nameInput.placeholder = t('enterName');
+    if (startBtn) startBtn.textContent = t('startGame');
+    if (roomInput) roomInput.placeholder = t('roomCode');
+    // ----------------------------------------
+    
+    // Update game UI if in game
+    updateGameUI();
+}
+
+// Update game-specific UI elements (game.js'den gelen global değişkenleri kullanır)
+export function updateGameUI() {
+    // Bu kısım oyun durumu bilgilerine erişemediği için (game.js'deki global değişkenler)
+    // Yalnızca dil metinlerini güncelleyebilir.
+    
+    // TurnStatus ve ActionMessage güncellemeleri game.js'nin sorumluluğundadır.
+    
+    // Eğer isterseniz, game.js'den gelen verilere göre burada güncellemeleri yapabiliriz.
+}
+
+// Export functions
 window.languageManager = {
-    t,
-    setLanguage,
-    currentLanguage: detectLanguage(),
-    initLanguage,
-    toggleLanguageSelector,
-    updateUI
+    t,
+    setLanguage,
+    currentLanguage: () => currentLanguage,
+    initLanguage,
+    toggleLanguageSelector,
+    updateGameUI
 };
