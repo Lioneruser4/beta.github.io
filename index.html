@@ -1,189 +1,17 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="az">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, height=device-height">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#1a202c">
-    <meta name="format-detection" content="telephone=no">
     <title>💣 Emoji Kart Bomb 1v1</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <script>
-        // iOS ve Telegram WebView için touch event desteği
-        document.addEventListener('DOMContentLoaded', function() {
-            // iOS için touch event'leri etkinleştir
-            const enableTouchEvents = () => {
-                document.body.addEventListener('touchstart', function() {}, { passive: true });
-                document.body.addEventListener('touchend', function() {}, { passive: true });
-            };
-            
-            // Telegram WebView tespiti
-            const isTelegram = window.navigator.userAgent.includes('Telegram');
-            if (isTelegram) {
-                document.documentElement.classList.add('telegram-webview');
-                // Telegram WebView'ı tam ekran yap
-                if (window.Telegram && window.Telegram.WebApp) {
-                    window.Telegram.WebApp.expand();
-                    window.Telegram.WebApp.enableClosingConfirmation();
-                }
-            }
-            
-            // iOS tespiti
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-            if (isIOS) {
-                document.documentElement.classList.add('ios-device');
-                // iOS için viewport düzeltmesi
-                const viewport = document.querySelector('meta[name="viewport"]');
-                if (viewport) {
-                    viewport.content = viewport.content + ', maximum-scale=1';
-                }
-            }
-
-            // Touch event'lerini etkinleştir
-            enableTouchEvents();
-            
-            // Audio context'i başlat
-            initializeAudioContext();
-        });
-
-        // Audio context'i başlatma fonksiyonu
-        function initializeAudioContext() {
-            // AudioContext'i oluştur
-            window.AudioContext = window.AudioContext || window.webkitAudioContext;
-            if (!window.audioContext) {
-                window.audioContext = new AudioContext();
-                
-                // iOS için sessiz bir ses çalarak audio context'i aktif hale getir
-                const silentBuffer = window.audioContext.createBuffer(1, 1, 22050);
-                const source = window.audioContext.createBufferSource();
-                source.buffer = silentBuffer;
-                source.connect(window.audioContext.destination);
-                source.start(0);
-                
-                // Kullanıcı etkileşimi için event listener'lar
-                const events = ['touchstart', 'touchend', 'click', 'keydown', 'mousedown'];
-                const unlockAudio = () => {
-                    if (window.audioContext.state === 'suspended') {
-                        window.audioContext.resume();
-                    }
-                    // Event listener'ları kaldır
-                    events.forEach(event => {
-                        document.removeEventListener(event, unlockAudio, true);
-                    });
-                };
-                
-                // Event listener'ları ekle
-                events.forEach(event => {
-                    document.addEventListener(event, unlockAudio, true, { passive: true });
-                });
-            }
-        }
-    </script>
     
     <style>
-        /* === Tüm Cihazlar İçin Düzeltmeler === */
-        html {
-            -webkit-text-size-adjust: 100%;
-            -webkit-tap-highlight-color: transparent;
-            height: 100%;
-            overflow-x: hidden;
-            touch-action: manipulation;
-        }
+        /* === KENDİ OYUNUNUZDAN ALINAN CSS STİLLERİ VE MOBİL UYUM === */
         
-        /* iOS için özel stiller */
-        html.ios-device {
-            position: fixed;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-        }
-        
-        /* Android için özel stiller */
-        html.android-device {
-            -webkit-overflow-scrolling: touch;
-        }
-        
-        /* Telegram WebView için özel stiller */
-        html.telegram-webview {
-            --tg-viewport-height: 100vh;
-            height: 100%;
-        }
-        
-        /* Mobil cihazlar için genel stiller */
-        html.mobile-device {
-            --vh: 1vh;
-        }
-        
-        /* Viewport yüksekliği sorunlarını çöz */
-        @supports (-webkit-touch-callout: none) {
-            html {
-                height: -webkit-fill-available;
-            }
-        }
-            -webkit-overflow-scrolling: touch;
-            height: 100%;
-            overflow: hidden;
-        }
-        
-        body {
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-            touch-action: manipulation;
-            height: 100%;
-            position: fixed;
-            width: 100%;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-        
-        /* iOS ve Telegram için özel stiller */
-        .ios-device .screen,
-        .telegram-webview .screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-        
-        /* Input alanları için iOS düzeltmesi */
-        input, select, textarea {
-            font-size: 16px !important;
-        }
-        
-        /* Butonlar için dokunmatik geri bildirim */
-        button, .btn, [role="button"] {
-            -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
-            touch-action: manipulation;
-            transition: transform 0.1s ease, opacity 0.1s ease;
-        }
-        
-        button:active, .btn:active, [role="button"]:active,
-        button.active, .btn.active, [role="button"].active {
-            transform: scale(0.95);
-            opacity: 0.8;
-        }
-        
-        /* iOS'ta :active durumu için */
-        .ios-device button, .ios-device .btn, .ios-device [role="button"] {
-            -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
-        }
-        
-        /* Oyun tahtası için kaydırma düzeltmesi */
-        .game-board {
-            -webkit-overflow-scrolling: touch;
-            overflow-y: auto;
-        }
-        
-        /* === OYUN STİLLERİ === */
         :root {
             --primary-color: #3498db;
             --secondary-color: #2980b9;
@@ -673,260 +501,19 @@
 
     <script src="languages.js"></script>
     
-    <script>
-        // Butonlara tıklama olaylarını ekle
-        document.addEventListener('DOMContentLoaded', function() {
-            // Oda oluştur butonu
-            document.getElementById('createRoomBtn').addEventListener('click', function() {
-                console.log('Oda oluştur butonuna tıklandı');
-                const username = document.getElementById('username').value.trim();
-                if (!username) {
-                    alert('Lütfen bir kullanıcı adı girin');
-                    return;
-                }
-                connectToServer();
-            });
-
-            // Odaya katıl butonu
-            document.getElementById('joinRoomBtn').addEventListener('click', function() {
-                console.log('Odaya katıl butonuna tıklandı');
-                const username = document.getElementById('username').value.trim();
-                const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-                
-                if (!username) {
-                    alert('Lütfen bir kullanıcı adı girin');
-                    return;
-                }
-                
-                if (!roomCode) {
-                    alert('Lütfen bir oda kodu girin');
-                    return;
-                }
-                
-                connectToServer(roomCode);
-            });
-
-            // Kodu kopyala butonu
-            document.getElementById('copyCodeBtn').addEventListener('click', function() {
-                const roomCode = document.getElementById('roomCodeDisplay').textContent;
-                if (roomCode && roomCode !== 'Yükleniyor...') {
-                    navigator.clipboard.writeText(roomCode).then(function() {
-                        alert('Oda kodu panoya kopyalandı: ' + roomCode);
-                    }).catch(function() {
-                        // Tarayıcı desteklemiyorsa
-                        const tempInput = document.createElement('input');
-                        document.body.appendChild(tempInput);
-                        tempInput.value = roomCode;
-                        tempInput.select();
-                        document.execCommand('copy');
-                        document.body.removeChild(tempInput);
-                        alert('Oda kodu kopyalandı: ' + roomCode);
-                    });
-                }
-            });
-
-            // İptal butonu
-            document.getElementById('cancelBtn').addEventListener('click', function() {
-                if (socket && socket.connected) {
-                    socket.disconnect();
-                }
-                showScreen('lobby');
-            });
-
-            // Oyunu bitir butonu
-            document.getElementById('endGameBtn').addEventListener('click', function() {
-                if (confirm('Oyundan çıkmak istediğinize emin misiniz?')) {
-                    if (socket && socket.connected) {
-                        socket.disconnect();
-                    }
-                    showScreen('lobby');
-                }
-            });
-
-            // Kullanıcı adı alanına enter tuşu ile submit özelliği ekle
-            document.getElementById('username').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    const roomCode = document.getElementById('roomCodeInput').value.trim();
-                    if (roomCode) {
-                        document.getElementById('joinRoomBtn').click();
-                    } else {
-                        document.getElementById('createRoomBtn').click();
-                    }
-                }
-            });
-
-            // Oda kodu alanına enter tuşu ile submit özelliği ekle
-            document.getElementById('roomCodeInput').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    document.getElementById('joinRoomBtn').click();
-                }
-            });
-        });
-    </script>
-    
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
         
-        // Global socket değişkeni
-        let socket;
-        
-        // Hata ayıklama için konsol çıktıları
-        console.log('Script yüklendi, socket.io versiyonu:', io?.version);
-        
-        // Global showScreen fonksiyonu
-        window.showScreen = showScreen;
-        
-        // Platform kontrolü
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        const isAndroid = /Android/.test(navigator.userAgent);
-        const isTelegram = window.navigator.userAgent.includes('Telegram');
-        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-        const isMobile = isIOS || isAndroid || /Mobi|Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        console.log('Platform bilgisi:', { isIOS, isAndroid, isTelegram, isSafari, isMobile });
-        
-        // Platforma özel sınıflar ekle
-        if (isIOS) document.documentElement.classList.add('ios-device');
-        if (isAndroid) document.documentElement.classList.add('android-device');
-        if (isTelegram) document.documentElement.classList.add('telegram-webview');
-        if (isMobile) document.documentElement.classList.add('mobile-device');
-        
-        // Dil yöneticisini başlat
         document.addEventListener('DOMContentLoaded', () => {
             window.languageManager.initLanguage();
-            initializeApp();
         });
         
         window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
         window.setLanguage = languageManager.setLanguage;
 
-        // Sunucu URL'si - WebSocket protokolü ile başlamalı
-        const LIVE_SERVER_URL = 'wss://beta-github-io.onrender.com';
+        // Render URL'niz: Lütfen bu kısmı KENDİ URL'nizle değiştirin!
+        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
         let socket;
-        let reconnectAttempts = 0;
-        const MAX_RECONNECT_ATTEMPTS = 5;
-        
-        // Socket bağlantı seçenekleri
-        const socketOptions = {
-            reconnection: true,
-            reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
-            reconnectionDelay: 1000,
-            reconnectionDelayMax: 5000,
-            timeout: 10000,
-            transports: isMobile ? ['websocket'] : ['websocket', 'polling'],
-            upgrade: !isMobile,
-            forceNew: true,
-            withCredentials: true,
-            secure: true,
-            rejectUnauthorized: false,
-            extraHeaders: {
-                'X-Platform': isIOS ? 'ios' : isAndroid ? 'android' : isTelegram ? 'telegram' : 'web',
-                'X-User-Agent': navigator.userAgent
-            },
-            // iOS ve Android için özel ayarlar
-            ...(isMobile && {
-                pingInterval: 25000,
-                pingTimeout: 60000,
-                autoConnect: true
-            })
-        };
-        
-        console.log('Socket bağlantı ayarları:', socketOptions);
-        
-        // Uygulama başlangıç ayarları
-        function initializeApp() {
-            // iOS ve Android için viewport ayarları
-            if (isMobile) {
-                const viewport = document.querySelector('meta[name="viewport"]');
-                if (viewport) {
-                    viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
-                }
-                
-                // iOS için input alanlarını optimize et
-                if (isIOS) {
-                    document.querySelectorAll('input, textarea, select').forEach(el => {
-                        el.setAttribute('autocorrect', 'off');
-                        el.setAttribute('autocapitalize', 'none');
-                        el.setAttribute('spellcheck', 'false');
-                    });
-                }
-            }
-            
-            // Telegram WebView ayarları
-            if (isTelegram && window.Telegram?.WebApp) {
-                try {
-                    window.Telegram.WebApp.expand();
-                    window.Telegram.WebApp.enableClosingConfirmation();
-                    window.Telegram.WebApp.setHeaderColor('#1a202c');
-                    window.Telegram.WebApp.setBackgroundColor('#1a202c');
-                } catch (e) {
-                    console.error('Telegram WebApp API hatası:', e);
-                }
-            }
-            
-            // Dokunmatik etkileşimleri iyileştir
-            setupTouchInteractions();
-        }
-        
-        // Dokunmatik etkileşimleri ayarla
-        function setupTouchInteractions() {
-            // Tüm butonlar için dokunmatik geri bildirim
-            document.querySelectorAll('button, .btn, [role="button"]').forEach(button => {
-                button.addEventListener('touchstart', function() {
-                    this.classList.add('active');
-                }, { passive: true });
-                
-                button.addEventListener('touchend', function() {
-                    this.classList.remove('active');
-                }, { passive: true });
-                
-                button.addEventListener('touchcancel', function() {
-                    this.classList.remove('active');
-                }, { passive: true });
-                
-                // iOS'ta :active durumu için
-                button.style.cursor = 'pointer';
-            });
-            
-            // iOS'ta scroll sorunlarını önle
-            document.body.addEventListener('touchmove', preventDefaultScroll, { passive: false });
-            
-            // Giriş alanları için optimize et
-            document.querySelectorAll('input, textarea').forEach(input => {
-                input.addEventListener('focus', handleInputFocus);
-                input.addEventListener('blur', handleInputBlur);
-            });
-        }
-        
-        // Dokunmatik scroll engelleme
-        function preventDefaultScroll(e) {
-            // Sadece dokunmatik cihazlarda ve gerekli durumlarda engelle
-            if (isMobile && !e.target.closest('.scrollable')) {
-                e.preventDefault();
-                e.stopPropagation();
-                return false;
-            }
-        }
-        
-        // Giriş alanı odaklandığında
-        function handleInputFocus(e) {
-            if (isMobile) {
-                // iOS'ta klavye açıldığında sayfayı yukarı kaydır
-                setTimeout(() => {
-                    e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 300);
-            }
-        }
-        
-        // Giriş alanı odak dışı olduğunda
-        function handleInputBlur() {
-            if (isMobile) {
-                // Klavye kapandığında sayfayı eski haline getir
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-        }
         
         function validateInput() {
             const username = UIElements.usernameInput.value.trim();
@@ -937,96 +524,7 @@
             return username;
         }
 
-        // Sunucuya bağlanma fonksiyonu
-    async function connectToServer(roomCode = '') {
-        const username = document.getElementById('username').value.trim();
-        if (!username) {
-            showGlobalMessage('Lütfen bir kullanıcı adı girin', true);
-            return;
-        }
-        
-        console.log('Sunucuya bağlanılıyor...', LIVE_SERVER_URL);
-        
-        // Bağlantı durumu göster
-        showScreen('wait');
-        document.getElementById('waitTitle').textContent = 'Sunucuya bağlanılıyor...';
-        document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
-        
-        try {
-            // Socket bağlantısını oluştur
-            socket = io(LIVE_SERVER_URL, socketOptions);
-            
-            // Bağlantı başarılı olduğunda
-            socket.on('connect', () => {
-                console.log('Sunucuya bağlandı. Socket ID:', socket.id);
-                
-                // Odaya katıl veya oluştur
-                if (roomCode) {
-                    // Odaya katıl
-                    socket.emit('joinRoom', { 
-                        username: username,
-                        roomCode: roomCode 
-                    });
-                    console.log('Odaya katılım isteği gönderildi:', roomCode);
-                } else {
-                    // Yeni oda oluştur
-                    socket.emit('createRoom', { 
-                        username: username 
-                    });
-                    console.log('Yeni oda oluşturuluyor...');
-                }
-            });
-            
-            // Oda oluşturulduğunda
-            socket.on('roomCreated', (code) => {
-                console.log('Oda oluşturuldu:', code);
-                document.getElementById('roomCodeDisplay').textContent = code;
-                document.getElementById('waitTitle').textContent = 'Otağınız Kuruldu! 🎉';
-                document.getElementById('codeArea').classList.remove('hidden');
-                document.getElementById('waitStatus').textContent = 'Oda kodunu dostunuza gönderin ve katılmasını bekleyin.';
-            });
-            
-            // Odaya katılım başarısız olduğunda
-            socket.on('joinFailed', (message) => {
-                console.error('Odaya katılamadı:', message);
-                showGlobalMessage(message, true);
-                showScreen('lobby');
-            });
-            
-            // Oyun başladığında
-            socket.on('gameStart', (data) => {
-                console.log('Oyun başladı:', data);
-                setupSocketHandlers(socket, data.roomCode, data.isHost, data.opponentName);
-                showScreen('game');
-            });
-            
-            // Hata durumunda
-            socket.on('error', (error) => {
-                console.error('Socket hatası:', error);
-                showGlobalMessage('Bir hata oluştu: ' + (error.message || 'Bilinmeyen hata'), true);
-            });
-            
-            // Bağlantı koptuğunda
-            socket.on('disconnect', (reason) => {
-                console.log('Bağlantı kesildi:', reason);
-                if (reason === 'io server disconnect') {
-                    // Sunucu tarafından bağlantı kesildi
-                    showGlobalMessage('Sunucu bağlantısı kesildi. Tekrar bağlanılıyor...', true);
-                    socket.connect();
-                }
-            });
-            
-        } catch (error) {
-            console.error('Bağlantı hatası:', error);
-            showGlobalMessage('Bağlantı hatası oluştu: ' + (error.message || 'Bilinmeyen hata'), true);
-            showScreen('lobby');
-            
-            // Hata durumunda 3 saniye sonra tekrar dene
-            setTimeout(() => {
-                console.log('Hata sonrası tekrar bağlanılıyor...');
-                connectToServer(roomCode);
-            }, 3000);
-        }
+        function connectToServer() {
             try {
                 socket = io(LIVE_SERVER_URL, {
                     transports: ['websocket', 'polling'], 
@@ -1062,206 +560,65 @@
                     showScreen('lobby');
                 });
                 
-                socket.on('gameStart', (data) => {
-                    console.log('Oyun başladı:', data);
-                    setupSocketHandlers(socket, data.roomCode, data.isHost, data.opponentName);
-                    showScreen('game');
-                });
-                
-                // Genel hata yönetimi
-                socket.on('error', (error) => {
-                    console.error('Socket hatası:', error);
-                    showGlobalMessage('Bir hata oluştu: ' + (error.message || 'Bilinmeyen hata'), true);
-                });
-                
-                // Bağlantı koptuğunda
-                socket.on('disconnect', (reason) => {
-                    console.log('Bağlantı kesildi:', reason);
-                    if (reason === 'io server disconnect') {
-                        // Sunucu tarafından bağlantı kesildi
-                        showGlobalMessage('Sunucu bağlantısı kesildi. Tekrar bağlanılıyor...', true);
-                        socket.connect();
-                    }
-                });
-                
-            } catch (error) {
-                console.error('Bağlantı hatası:', error);
-                showGlobalMessage('Bağlantı hatası oluştu: ' + (error.message || 'Bilinmeyen hata'), true);
-                showScreen('lobby');
-                
-                // Hata durumunda 3 saniye sonra tekrar dene
-                setTimeout(() => {
-                    console.log('Hata sonrası tekrar bağlanılıyor...');
-                    connectToServer();
-                }, 3000);
-            }            
-                        // iOS için sessiz bir ses çal
-                        if (audioContext.state === 'suspended') {
-                            audioContext.resume();
-                        }
-                        
-<!-- ... -->
-                        document.removeEventListener('touchstart', unlockAudio);
-                        document.removeEventListener('touchend', unlockAudio);
-                        document.removeEventListener('click', unlockAudio);
-                    };
+                socket.on('gameStart', ({ players, roomCode }) => {
+                    const opponent = players.find(p => p.id !== socket.id);
+                    const self = players.find(p => p.id === socket.id);
                     
-                    // Kullanıcı etkileşimi için event listener'lar ekle
-                    document.addEventListener('touchstart', unlockAudio, { once: true });
-                    document.addEventListener('touchend', unlockAudio, { once: true });
-                    document.addEventListener('click', unlockAudio, { once: true });
-                    
-                    // Telegram WebView için ekstra kontrol
-                    if (window.Telegram && window.Telegram.WebApp) {
-                        window.Telegram.WebApp.expand();
-                        window.Telegram.WebApp.enableClosingConfirmation();
-                    }
-                }
-            };
-            
-            // Sayfa yüklendiğinde ses başlatmayı dene
-            initAudioContext();
-            
-            // Oyun başlatma işlemi
-            connectToServer();
-        });
-    </script>
-    
-    <!-- iOS ve Telegram WebView için ek script -->
-    <script>
-        // iOS için viewport ve touch event düzeltmeleri
-        document.addEventListener('DOMContentLoaded', function() {
-            // iOS'ta scroll sorunlarını önleme
-            const preventDefaultScroll = function(e) {
-                // Sadece div ve button elementlerinde scroll'u engelle
-                if (e.target.tagName === 'DIV' || e.target.tagName === 'BUTTON') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    return false;
-                }
-            };
-            
-            // Touch event'lerini engelleme
-            document.body.addEventListener('touchmove', preventDefaultScroll, { passive: false });
-            
-            // iOS'ta input odaklandığında sayfanın kaymasını engelle
-            const inputs = document.querySelectorAll('input, textarea, select');
-            inputs.forEach(input => {
-                input.addEventListener('focus', function() {
-                    window.scrollTo(0, 0);
-                    document.body.scrollTop = 0;
+                    setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
                 });
-            });
+
+            } catch (e) {
+                console.error('Socket.IO genel hatası:', e);
+                UIElements.showGlobalMessage('Kritik qoşulma xətası baş verdi.', true);
+            }
+        }
+        
+        // --- Olay Dinleyicileri ---
+        document.getElementById('createRoomBtn').addEventListener('click', () => {
+            const username = validateInput();
+            if (!username) return;
             
-            // iOS'ta sayfa yüklendiğinde scroll'u sıfırla
-            window.addEventListener('load', function() {
-                setTimeout(function() {
-                    window.scrollTo(0, 0);
-                }, 0);
-                
-                // iOS'ta sayfa boyutunu ayarla
-                const setViewportHeight = () => {
-                    let vh = window.innerHeight * 0.01;
-                    document.documentElement.style.setProperty('--vh', `${vh}px`);
-                };
-                
-                setViewportHeight();
-                window.addEventListener('resize', setViewportHeight);
-                window.addEventListener('orientationchange', setViewportHeight);
-            });
+            showScreen('wait');
+            document.getElementById('waitTitle').textContent = 'Otaq Qurulur...';
+            document.getElementById('waitStatus').textContent = 'Zəhmət olmasa gözləyin...';
+            document.getElementById('codeArea').classList.add('hidden');
+            socket.emit('createRoom', { username });
         });
-        document.addEventListener('DOMContentLoaded', function() {
-            // iOS için viewport düzeltmesi
-            if (/(iPad|iPhone|iPod)/g.test(navigator.userAgent)) {
-                const viewport = document.querySelector('meta[name=viewport]');
-                if (viewport) {
-                    viewport.content = viewport.content + ', maximum-scale=1.0';
-                }
-                
-                // iOS için touch event'leri
-                document.body.style.cursor = 'pointer';
-                
-                // iOS için scroll düzeltmesi
-                document.body.addEventListener('touchmove', function(e) {
-                    if (e.target.tagName === 'DIV' || e.target.tagName === 'BUTTON') {
-                        e.preventDefault();
-                    }
-                }, { passive: false });
+        
+        document.getElementById('joinRoomBtn').addEventListener('click', () => {
+            const username = validateInput();
+            if (!username) return;
+            
+            const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            if (!roomCode) {
+                UIElements.showGlobalMessage('Xahiş olunur otaq kodunu daxil edin', true);
+                return;
             }
             
-            // Telegram WebView için ekstra düzenleme
-            if (window.navigator.userAgent.includes('Telegram')) {
-                document.documentElement.style.overflow = 'auto';
-                document.body.style.overflow = 'auto';
-            }
+            showScreen('wait');
+            document.getElementById('waitTitle').textContent = `Otağa Qoşulma: ${roomCode}`;
+            document.getElementById('waitStatus').textContent = 'Qoşulunur...';
+            document.getElementById('codeArea').classList.add('hidden');
+            socket.emit('joinRoom', { username, roomCode });
         });
+
+        document.getElementById('cancelBtn').addEventListener('click', () => {
+            if (socket && socket.connected) {
+                socket.emit('leaveRoom', { roomCode: document.getElementById('roomCodeDisplay').textContent });
+            }
+            UIElements.resetGame();
+        });
+        
+        document.getElementById('endGameBtn').addEventListener('click', UIElements.resetGame);
+        
+        document.getElementById('copyCodeBtn').addEventListener('click', () => {
+            const textToCopy = document.getElementById('roomCodeDisplay').textContent;
+            navigator.clipboard.writeText(textToCopy)
+                .then(() => UIElements.showGlobalMessage('Otaq Kodu Kopyalandı!', false))
+                .catch(() => UIElements.showGlobalMessage('Kopyalama uğursuz oldu.', true));
+        });
+
+        document.addEventListener('DOMContentLoaded', connectToServer);
     </script>
-    
-    <!-- iOS ve Telegram WebView için ek stil düzeltmeleri -->
-    <style>
-        /* iOS ve Telegram WebView için ek stil düzeltmeleri */
-        :root {
-            --vh: 1vh;
-        }
-        
-        /* iOS input zoom'u engelleme */
-        @supports (-webkit-touch-callout: none) {
-            input, textarea, select {
-                font-size: 16px !important;
-            }
-        }
-        
-        /* iOS Safari'de butonların mavi rengini kaldırma */
-        input, textarea, button, select, a, div {
-            -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
-            -webkit-tap-highlight-color: transparent;
-        }
-        
-        /* iOS'ta hızlı tıklamaları işleme */
-        * {
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            -khtml-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-        }
-        
-        /* iOS'ta scroll davranışını iyileştirme */
-        .screen {
-            -webkit-overflow-scrolling: touch;
-            overflow-y: auto;
-            height: 100vh;
-            height: calc(var(--vh, 1vh) * 100);
-        }
-        
-        /* iOS'ta input alanları için düzeltme */
-        input, textarea, select {
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
-            border-radius: 0;
-            -webkit-border-radius: 0;
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-            -webkit-user-select: text;
-            -webkit-overflow-scrolling: touch;
-        }
-        
-        /* iOS'ta input alanlarını düzelt */
-        .ios-device input, 
-        .ios-device textarea, 
-        .ios-device select {
-            font-size: 16px !important; /* iOS zoom'u önler */
-            transform: translateZ(0); /* Donanım hızlandırma */
-        }
-        
-        /* iOS'ta input odaklandığında büyüme sorununu çöz */
-        @supports (-webkit-touch-callout: none) {
-            input, textarea {
-                font-size: 16px !important;
-            }
-        }
-    </style>
 </body>
 </html>
