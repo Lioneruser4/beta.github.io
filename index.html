@@ -83,19 +83,20 @@
             z-index: 100;
         }
         .language-button {
-            background: rgba(255, 255, 255, 0.2); /* Hafif şeffaf */
-            border: 2px solid #63b3ed; /* Daha belirgin kenarlık */
-            border-radius: 25px; /* Daha yuvarlak */
-            padding: 8px 18px; /* Daha geniş padding */
-            cursor: pointer;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid #63b3ed;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
             display: flex;
             align-items: center;
-            gap: 10px;
-            font-weight: bold;
+            justify-content: center;
+            cursor: pointer;
             color: #e2e8f0;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             transition: all 0.2s;
-            backdrop-filter: blur(5px); /* Arka plan bulanıklığı */
+            backdrop-filter: blur(5px);
+            padding: 0;
         }
         .language-button:hover {
             background: rgba(255, 255, 255, 0.3);
@@ -103,24 +104,27 @@
         .language-options {
             display: none;
             position: absolute;
-            top: 100%;
+            top: calc(100% + 5px);
             right: 0;
-            background: #2d3748; /* Koyu arka plan */
+            background: #2d3748;
             border: 1px solid #4a5568;
             border-radius: 12px;
-            margin-top: 8px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.4);
             overflow: hidden;
             z-index: 101;
-            min-width: 180px;
+            min-width: 150px;
             color: #e2e8f0;
         }
         .language-option {
-            padding: 10px 20px;
+            padding: 10px 15px;
             cursor: pointer;
             display: flex;
             align-items: center;
             gap: 10px;
+            transition: background-color 0.2s;
+        }
+        .language-option:hover {
+            background-color: #4a5568;
         }
         .language-option:hover {
             background: #4a5568;
@@ -384,8 +388,7 @@
 <body class="bg-gray-900 select-none">
     <div class="language-selector">
         <button id="language-button" class="language-button" onclick="toggleLanguageSelector()">
-            <span id="current-language">🇦🇿 AZ</span>
-            <i class="fas fa-chevron-down"></i>
+            <span id="current-language">🇦🇿</span>
         </button>
         <div id="language-selector" class="language-options">
             <div class="language-option" onclick="setLanguage('az')">🇦🇿 Azərbaycanca</div>
