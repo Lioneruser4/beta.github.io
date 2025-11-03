@@ -171,15 +171,21 @@
             font-family: 'Chakra Petch', monospace;
         }
         
-        /* Global Mesajin Yuxaridan Gəlmə Stili */
+        /* ⭐ GLOBAL MESAJ: Yuxarıda qalması və Animasiya */
+        #globalMessage {
+            position: fixed;
+            top: env(safe-area-inset-top, 20px);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 50;
+            opacity: 0;
+            display: none; /* Başlanğıcda gizlət */
+            transition: none; /* 'hidden' klassı istifadə olunmur, opacity ilə idarə olunur */
+        }
+        
         #globalMessage.show { 
             display: block; 
-            position: fixed; 
-            top: env(safe-area-inset-top, 20px); 
-            left: 50%; 
-            transform: translateX(-50%); 
-            z-index: 50; 
-            animation: fadeInDown 0.3s ease-out; 
+            animation: fadeInDown 0.3s ease-out forwards; 
             width: 90%;
             max-width: 400px;
             padding: 1rem;
@@ -243,7 +249,7 @@
         </div>
     </div>
     
-    <div id="globalMessage" class="hidden w-11/12 max-w-md p-4 bg-red-600 text-white rounded-lg shadow-lg">
+    <div id="globalMessage" class="w-11/12 max-w-md p-4 text-white rounded-lg shadow-lg">
         <p id="globalMessageText"></p>
     </div>
 
@@ -345,7 +351,6 @@
         const UIElements = {
             usernameInput: document.getElementById('username'),
             roomCodeInput: document.getElementById('roomCodeInput'),
-            // DÜYMƏLƏR YENİLƏNDİ
             createRoomBtn: document.getElementById('createRoomBtn'),
             joinRoomBtn: document.getElementById('joinRoomBtn'),
             
@@ -360,12 +365,14 @@
             opponentLives: document.getElementById('opponentLives'),
             turnStatus: document.getElementById('turnStatus'),
             actionMessage: document.getElementById('actionMessage'),
-            // Bütün ekranları əldə edin
             screens: document.querySelectorAll('.screen')
         };
+
+        // Global zamanlayıcını saxlamaq üçün dəyişən
+        window.globalMessageTimeout = null;
         
         /**
-         * Gloal mesajı göstərir
+         * Gloal mesajı göstərir (2 saniyəlik limit ilə)
          * @param {string} message 
          * @param {boolean} isError 
          */
@@ -373,14 +380,21 @@
             const globalMsg = UIElements.globalMessage;
             const globalMsgText = UIElements.globalMessageText;
             
+            // Əvvəlki zamanlayıcını təmizləyin
+            if (window.globalMessageTimeout) {
+                clearTimeout(window.globalMessageTimeout);
+            }
+            
             globalMsgText.textContent = message;
             // Əvvəlki rəngləri təmizləyin
-            globalMsg.classList.remove('bg-red-600', 'bg-green-600', 'hidden');
+            globalMsg.classList.remove('bg-red-600', 'bg-green-600');
             // Yeni rəngi əlavə edin və göstərin
             globalMsg.classList.add(isError ? 'bg-red-600' : 'bg-green-600', 'show');
             
-            // Gizlətmək üçün taymer
-            setTimeout(() => globalMsg.classList.remove('show'), 3000);
+            // ⭐ 2 SANİYƏ SONRA GİZLƏT MƏNTİQİ
+            window.globalMessageTimeout = setTimeout(() => {
+                globalMsg.classList.remove('show');
+            }, 2000); // 2000ms = 2 saniyə
         };
 
         /**
@@ -388,16 +402,13 @@
          * @param {string} screenId - (lobby, waitScreen, gameScreen)
          */
         function showScreen(screenId) {
-             // Bütün ekranları gizlət
             UIElements.screens.forEach(screen => {
                 screen.classList.remove('active');
             });
 
-            // Yalnız istənilən ekranı aktiv et
             const screen = document.getElementById(screenId);
             if (screen) {
                  screen.classList.add('active');
-                 // Həmçinin Scroll-u yuxarıya qaldır
                  screen.scrollTop = 0; 
             } else {
                  console.error(`XƏTA: '${screenId}' ID-li ekran tapılmadı.`);
@@ -411,11 +422,10 @@
              showScreen('lobby');
              UIElements.roomCodeDisplay.textContent = '';
              UIElements.roomCodeInput.value = '';
-             // Tərcüməni yenilə (əgər languageManager mövcuddursa)
+             
              if (window.languageManager && window.languageManager.updateUI) {
                  window.languageManager.updateUI();
              } else {
-                 // Dil meneceri yoxdusa, əl ilə sıfırlayın
                  UIElements.waitTitle.textContent = 'Otaq Hazırlanır...';
                  UIElements.waitStatus.textContent = 'Rəqib qoşulmasını gözləyirsiniz...';
              }
@@ -439,7 +449,6 @@
 
         // --- SOCKET MƏNTİQİ ---
 
-        // Server URL-i:
         const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com';
         let socket;
         
@@ -462,7 +471,7 @@
                     timeout: 20000 
                 });
 
-                // ⭐ 1. SERVERƏ QOŞULMA MESAJI (Yuxarıdan gəlir)
+                // SERVERƏ QOŞULMA MESAJI
                 socket.on('connect', () => {
                     const message = (window.languageManager && window.languageManager.t) 
                         ? window.languageManager.t('serverConnected')
@@ -488,14 +497,13 @@
                     UIElements.showGlobalMessage(message, true);
                 });
 
-                // ⭐ 2. OTAQ QURULDU MESAJI (Yuxarıdan gəlir)
+                // OTAQ QURULDU MESAJI (Bildiriş yuxarıdan gəlir)
                 socket.on('roomCreated', (code) => {
                     UIElements.roomCodeDisplay.textContent = code;
                     
                     const title = (window.languageManager && window.languageManager.t) 
                         ? window.languageManager.t('roomCreatedTitle') 
                         : 'Otağınız Quruldu! 🎉';
-                    
                     const status = (window.languageManager && window.languageManager.t) 
                         ? window.languageManager.t('roomCreatedStatus') 
                         : 'Otaq kodunu dostunuza göndərin və qoşulmasını gözləyin.';
@@ -504,7 +512,6 @@
                     UIElements.codeArea.classList.remove('hidden');
                     UIElements.waitStatus.textContent = status;
                     
-                    // Bildirişin yuxarıdan gəlməsi
                     const successMsg = (window.languageManager && window.languageManager.t) 
                         ? window.languageManager.t('roomCreatedSuccess', { code: code }) 
                         : `Otaq ${code} kodu ilə uğurla quruldu. Rəqib gözlənilir.`;
@@ -517,33 +524,28 @@
                     UIElements.resetGame();
                 });
                 
-                // 3. OYUN BAŞLANMASI MESAJI (Yuxarıdan gəlir)
+                // OYUN BAŞLANMASI MƏNTİQİ (Bildiriş yuxarıdan gəlir)
                 socket.on('gameStart', (data) => {
                     console.log("Oyun Başladı! Data:", data);
                     
-                    // Rəqibi tapın
                     const opponent = data.players.find(p => p.id !== socket.id);
                     
-                    // UI-ı yeniləyin
                     UIElements.opponentName.textContent = opponent ? opponent.username : "Rəqib";
                     UIElements.myLives.textContent = '❤️❤️❤️';
                     UIElements.opponentLives.textContent = '❤️❤️❤️';
                     
-                    // Növbə statusunu qurun
                     if (data.currentTurn === socket.id) {
                          UIElements.turnStatus.textContent = 'SİZİN növbənizdir! Kart seçin.';
                     } else {
                          UIElements.turnStatus.textContent = `${UIElements.opponentName.textContent} növbəsidir...`;
                     }
 
-                    // Ekranı Oyuna Keçirin
                     showScreen('gameScreen'); 
                     
                     if (window.languageManager && window.languageManager.updateGameUI) {
                         window.languageManager.updateGameUI();
                     }
                     
-                    // Oyun başladı bildirişi
                     const gameStartMsg = (window.languageManager && window.languageManager.t) 
                         ? window.languageManager.t('gameStarted', { roomCode: data.roomCode })
                         : `Oyun başladı! Otaq: ${data.roomCode}`; 
@@ -557,9 +559,9 @@
             }
         }
         
-        // --- Olay Dinleyicileri Yeniləndi ---
+        // --- Olay Dinleyicileri ---
         
-        // YENİ DÜYMƏ: Otaq Qur
+        // DÜYMƏ: Otaq Qur
         UIElements.createRoomBtn.addEventListener('click', () => {
             const username = validateInput();
             if (!username) return;
@@ -570,11 +572,10 @@
             UIElements.waitStatus.textContent = 'Zəhmət olmasa gözləyin...';
             UIElements.codeArea.classList.add('hidden');
             
-            // Otaq kodu sahəsini boş saxlayaraq yeni otaq istəyirik
             socket.emit('createRoom', { username });
         });
 
-        // YENİ DÜYMƏ: Otağa Qoşul
+        // DÜYMƏ: Otağa Qoşul
         UIElements.joinRoomBtn.addEventListener('click', () => {
             const username = validateInput();
             if (!username) return;
@@ -592,14 +593,12 @@
             UIElements.waitStatus.textContent = 'Qoşulunur...';
             UIElements.codeArea.classList.add('hidden');
             
-            // Daxil edilmiş kodla otağa qoşulmaq istəyirik
             socket.emit('joinRoom', { username, roomCode });
         });
 
 
         document.getElementById('cancelBtn').addEventListener('click', () => {
             if (socket && socket.connected && UIElements.roomCodeDisplay.textContent) {
-                // Serverə otaqdan çıxmaq siqnalını göndər
                 socket.emit('leaveRoom', { roomCode: UIElements.roomCodeDisplay.textContent });
             }
             UIElements.resetGame();
@@ -615,11 +614,9 @@
         });
 
         document.addEventListener('DOMContentLoaded', () => {
-             // Dilin ilkin yüklənməsi
              if (window.languageManager && window.languageManager.initLanguage) {
                  window.languageManager.initLanguage();
              }
-             // Serverə qoşulun
              connectToServer();
         });
     </script>
