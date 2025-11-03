@@ -41,8 +41,8 @@ function initializeGame(boardSize) {
     // Seviyeye göre can ve bomba sayısını ayarla
     if (level === 1) {
         // Level 1'de bomba yok, can yok
-        gameData.hostLives = 0;
-        gameData.guestLives = 0;
+        gameData.hostLives = 0; // Bu değer gameReady'den güncellenecek
+        gameData.guestLives = 0; // Bu değer gameReady'den güncellenecek
     } else {
         // Level 2 ve sonrası 3 can, 3 bomba
         gameData.hostLives = 3;
@@ -61,7 +61,7 @@ let selectedBombs = []; // Kendi seçtiğimiz bombaların indexleri
 
 let gameData = {
     board: [], 
-    turn: 0,   // 0 = Host, 1 = Guest
+    turn: 0,  // 0 = Host, 1 = Guest
     hostLives: 0,  // Server'dan gelen değerlerle güncellenecek
     guestLives: 0, // Server'dan gelen değerlerle güncellenecek
     cardsLeft: 0,
@@ -75,7 +75,7 @@ const EMOTICONS = ['🙂', '😂', '😍', '😎', '🤩', '👍', '🎉', '🌟
 // --- TEMEL UI FONKSİYONLARI ---
 
 export function showScreen(screenId) {
-     Object.values(screens).forEach(screen => screen.classList.remove('active'));
+    Object.values(screens).forEach(screen => screen.classList.remove('active'));
     screens[screenId].classList.add('active');
 }
 
@@ -93,7 +93,7 @@ export function showGlobalMessage(message, isError = true) {
 // --- OYUN MANTIĞI VE ÇİZİM ---
 
 function drawBoard() {
-    const boardSize = LEVELS[level - 1];
+    const boardSize = LEVELS[level - 1] || 20; // Default 20
     
     // Grid düzenini sadece 4 sütun (4 aşağı inme) olarak ayarla
     gameBoardEl.className = 'grid w-full max-w-sm mx-auto memory-board'; 
@@ -147,7 +147,7 @@ function updateStatusDisplay() {
 
     const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
 
-    if (gameStage === 'WAITING') {
+    if (gameStage === 'WAITING' || gameStage === 'SELECTION') {
         turnStatusEl.textContent = '⏳ OYUN HAZIRLANIYOR...';
         actionMessageEl.textContent = "Bombalar otomatik yerleştiriliyor...";
         turnStatusEl.classList.remove('text-red-600');
@@ -166,7 +166,7 @@ function updateStatusDisplay() {
         }
     }
     
-    if (gameData.isGameOver) {
+    if (gameData.isGameOver && gameStage === 'ENDED') {
         turnStatusEl.textContent = "✅ OYUN BİTTİ!";
         actionMessageEl.textContent = "Sonuçlar hesaplanıyor...";
     }
@@ -175,7 +175,7 @@ function updateStatusDisplay() {
 // --- ANIMASYON VE SES ---
 
 async function triggerWaitAndVibrate() {
-     if (gameData.cardsLeft < 8 && gameStage === 'PLAY') { 
+    if (gameData.cardsLeft < 8 && gameStage === 'PLAY') { 
         startVibration();
         await new Promise(resolve => setTimeout(resolve, 2000));
         stopVibration();
@@ -278,7 +278,7 @@ async function applyMove(index, emoji, isBomb) {
             endGame(winner);
         } else {
             // Tüm kartların açılıp açılmadığını kontrol et
-            checkLevelCompletion();
+            checkLevelCompletion(); // ✅ GLOBAL FONKSİYONU ÇAĞIR!
         }
         
     }, 1000);
@@ -306,54 +306,69 @@ function endGame(winnerRole) {
         showGlobalMessage('😔 Bu turu kaybettiniz. Bir sonrakinde daha dikkatli olun!', true);
     }
     
-    // 2 saniye bekle ve yeni seviyeye geç
+    // 2 saniye bekle ve sunucuya oyun bitti bilgisini gönder
+    // Sunucu yeni seviyeyi başlatma işini yapacaktır.
     setTimeout(() => {
         const nextLevel = level + 1;
-        const bombCount = nextLevel === 1 ? 3 : 4; // İlk seviyede 3, sonra 4 bomba
         
-        console.log(`🔄 Yeni seviyeye geçiliyor: ${nextLevel}, ${bombCount} bomba ile`);
+        console.log(`🔄 Oyun bitti, sunucudan yeni seviye bekleniyor: ${nextLevel}`);
         
-        // Oyun durumunu sıfırla
-        gameData = {
-            board: [],
-            turn: 0, // Host başlar
-            hostLives: bombCount,
-            guestLives: bombCount,
-            cardsLeft: 20, // Her zaman 20 kart
-            hostBombs: [],
-            guestBombs: [],
-            isGameOver: false
-        };
-        
-        // Seviyeyi güncelle
-        level = nextLevel;
-        gameStage = 'PLAY';
-        
-        // Yeni oyun tahtasını oluştur
-        initializeGame(20);
-        
-        // UI'ı güncelle
-        updateStatusDisplay();
-        
-        // Sunucuya yeni seviyeyi bildir
+        // Sunucuya levelComplete olayını gönder (Bu, yeni seviyenin başlamasına yol açar)
         if (socket && socket.connected) {
-            console.log(`📤 Sunucuya nextLevel isteği gönderiliyor: Seviye ${nextLevel}`);
-            socket.emit('nextLevel', { 
-                roomCode: currentRoomCode,
-                level: nextLevel
-            });
-            
-            // Ayrıca levelComplete olayını da gönder
+            console.log(`📤 Sunucuya levelComplete gönderiliyor (endGame): Seviye ${level} tamamlandı`);
             socket.emit('levelComplete', {
                 roomCode: currentRoomCode,
-                level: level - 1,
+                level: level,
+                nextLevel: nextLevel
+            });
+        } else {
+            console.error('❌ Sunucuya bağlı değil, yeni seviyeye geçilemiyor!');
+        }
+    }, 2000); // 2 saniye bekle
+}
+
+// --- SEVİYE TAMAMLAMA KONTROLÜ (GLOBAL ALAN) ---
+// Bu fonksiyonu global alana taşıyarak, applyMove içerisinden erişilebilir kıldık.
+function checkLevelCompletion() {
+    if (gameStage !== 'PLAY' || gameData.isGameOver) return;
+    if (!gameData.board || gameData.board.length === 0) return;
+    
+    // Açılan kart sayısını kontrol et
+    const openedCards = gameData.board.filter(card => card && card.opened).length;
+    const totalCards = gameData.board.length;
+    
+    console.log(`🔍 Seviye tamamlama kontrolü: Açılan ${openedCards}/${totalCards} kart`);
+    
+    if (openedCards === totalCards) {
+        const nextLevel = level + 1;
+        
+        console.log(`🎯 Tüm kartlar açıldı! Yeni seviye: ${nextLevel}`);
+        showGlobalMessage(`🎉 Seviye ${level} tamamlandı! Yeni seviye yükleniyor...`, false);
+        
+        // Oyun durumunu güncelle (geçiş anında hamle yapılmasın)
+        gameStage = 'WAITING';
+        gameData.isGameOver = true;
+        
+        // Sunucuya seviye tamamlandı bilgisini gönder
+        if (socket && socket.connected) {
+            console.log(`📤 Sunucuya levelComplete gönderiliyor: Seviye ${level} tamamlandı`);
+            socket.emit('levelComplete', { 
+                roomCode: currentRoomCode,
+                level: level,
                 nextLevel: nextLevel
             });
         } else {
             console.error('❌ Sunucuya bağlı değil!');
         }
-    }, 2000); // 2 saniye bekle
+        
+        // 1 saniye bekle, bu arada sunucudan 'newLevel' olayının gelmesini bekle.
+        setTimeout(() => {
+            console.log(`🔄 Sunucudan Seviye ${nextLevel} bilgisini bekle...`);
+        }, 1000);
+    }
 }
+// --- SON ---
+
 
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
 export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
@@ -371,7 +386,7 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     level = 1; // Yeni oyuna başlarken seviyeyi 1'e sıfırla
     
     // İlk seviye için board boyutunu ayarla (16 kart ile başla)
-    const boardSize = 16; // İlk seviye 16 kart
+    const boardSize = LEVELS[level - 1]; // İlk seviye 16 kart
     initializeGame(boardSize);
     
     // Can sayılarını server'dan gelen bilgiyle güncelle
@@ -396,47 +411,36 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         // Oyun durumunu güncelle
         gameData.hostBombs = gameState.hostBombs || [];
         gameData.guestBombs = gameState.guestBombs || [];
-        gameData.hostLives = gameState.hostLives || (level === 1 ? 3 : 4);
-        gameData.guestLives = gameState.guestLives || (level === 1 ? 3 : 4);
+        // Server'dan gelen can değerlerini kullan (Canlar 0 gelirse default 3 yap, ama level 1'in 3 bomba olma ihtimali var)
+        gameData.hostLives = gameState.hostLives === undefined ? (level === 1 ? 3 : 4) : gameState.hostLives;
+        gameData.guestLives = gameState.guestLives === undefined ? (level === 1 ? 3 : 4) : gameState.guestLives;
         gameData.turn = gameState.turn || 0;
         
         gameStage = 'PLAY';
         
-        console.log('✅ Oyun durumu güncellendi:', {
-            level: level,
-            hostBombs: gameData.hostBombs,
-            guestBombs: gameData.guestBombs,
-            hostLives: gameData.hostLives,
-            guestLives: gameData.guestLives,
-            turn: gameData.turn
-        });
-        
-        playSound(audioEmoji); // Başlama sesi
-        showGlobalMessage(`🚀 Seviye ${level} başlıyor! ${level === 1 ? '3' : '4'} bomba ile oynanıyor.`, false);
-        
         // Oyun tahtasını çiz ve durumu güncelle
         drawBoard();
         updateStatusDisplay();
+        
+        playSound(audioEmoji); // Başlama sesi
+        showGlobalMessage(`🚀 Seviye ${level} başlıyor! ${gameData.hostLives} bomba ile oynanıyor.`, false);
     });
     
     // Yeni seviye başlatma
     socket.on('newLevel', (data) => {
         console.log('🆕 Yeni seviye başlatılıyor:', data);
         
-        // Seviye bilgisini güncelle (sayıya çevirerek)
+        // Seviye bilgisini güncelle
         level = parseInt(data.level) || 1;
         
-        // Bomba sayısını hesapla
-        const bombCount = level === 1 ? 3 : 4;
-        
-        // Oyun durumunu sıfırla
+        // Oyun durumunu sıfırla ve yeni canları ayarla
         gameData = {
             board: [],
-            turn: 0, // Host başlasın
-            hostLives: bombCount,
-            guestLives: bombCount,
-            cardsLeft: 20, // Her zaman 20 kart
-            hostBombs: [],
+            turn: 0, // Host başlar
+            hostLives: data.hostLives,
+            guestLives: data.guestLives,
+            cardsLeft: data.boardSize, // Server'dan gelen kart sayısını kullan
+            hostBombs: [], 
             guestBombs: [],
             isGameOver: false
         };
@@ -444,15 +448,12 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         gameStage = 'PLAY';
         
         // Yeni oyun tahtasını oluştur
-        initializeGame(20); // Her zaman 20 kart
+        initializeGame(data.boardSize);
         
         // UI'ı güncelle
         updateStatusDisplay();
         
-        console.log(`✅ Yeni seviye başlatıldı: ${level}, ${bombCount} bomba ile`);
-        console.log(`🔵 Host Can: ${gameData.hostLives}, 🔴 Guest Can: ${gameData.guestLives}`);
-        
-        showGlobalMessage(`🎮 Seviye ${level} başlıyor! ${bombCount} bomba ile oynanıyor.`, false);
+        showGlobalMessage(`🎮 Seviye ${level} başladı! ${data.hostLives} can ile oynanıyor.`, false);
     });
 
     // gameData Olayı (Hamle Geldi - Kendi veya Rakip)
@@ -469,95 +470,6 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     socket.on('error', (message) => {
         showGlobalMessage(message, true);
     });
-
-    // Tüm kartlar açıldı mı kontrol et
-    const checkLevelCompletion = () => {
-        if (gameStage !== 'PLAY' || gameData.isGameOver) return;
-        if (!gameData.board || gameData.board.length === 0) return;
-        
-        // Açılan kart sayısını kontrol et
-        const openedCards = gameData.board.filter(card => card && card.opened).length;
-        const totalCards = gameData.board.length;
-        
-        console.log(`🔍 Seviye tamamlama kontrolü: Açılan ${openedCards}/${totalCards} kart`);
-        
-        if (openedCards === totalCards) {
-            const nextLevel = level + 1;
-            const bombCount = nextLevel === 1 ? 3 : 4;
-            
-            console.log(`🎯 Tüm kartlar açıldı! Yeni seviye: ${nextLevel}, ${bombCount} bomba ile`);
-            showGlobalMessage(`🎉 Seviye ${level} tamamlandı! Yeni seviye yükleniyor...`, false);
-            
-            // Oyun durumunu güncelle
-            gameStage = 'WAITING';
-            gameData.isGameOver = true;
-            
-            // Sunucuya seviye tamamlandı bilgisini gönder
-            if (socket && socket.connected) {
-                console.log(`📤 Sunucuya levelComplete gönderiliyor: Seviye ${level} tamamlandı`);
-                socket.emit('levelComplete', { 
-                    roomCode: currentRoomCode,
-                    level: level,
-                    nextLevel: nextLevel
-                });
-            } else {
-                console.error('❌ Sunucuya bağlı değil!');
-            }
-            
-            // 1 saniye bekle ve yeni seviyeyi başlat
-            setTimeout(() => {
-                console.log(`🔄 Seviye ${nextLevel} başlatılıyor...`);
-                
-                // Yeni seviyeyi başlat
-                level = nextLevel;
-                gameStage = 'PLAY';
-                
-                // Sunucudan yeni seviyeyi bekle
-                if (socket && socket.connected) {
-                    console.log(`📤 Sunucuya nextLevel isteği gönderiliyor: Seviye ${nextLevel}`);
-                    socket.emit('nextLevel', { 
-                        roomCode: currentRoomCode,
-                        level: nextLevel
-                    });
-                } else {
-                    // Eğer sunucuya bağlı değilse, yerel olarak devam et
-                    console.log('🔌 Sunucuya bağlı değil, yerel olarak devam ediliyor...');
-                    gameData = {
-                        board: [],
-                        turn: 0,
-                        hostLives: bombCount,
-                        guestLives: bombCount,
-                        cardsLeft: 20,
-                        hostBombs: [],
-                        guestBombs: [],
-                        isGameOver: false
-                    };
-                    initializeGame(20);
-                    updateStatusDisplay();
-                    showGlobalMessage(`🎮 Seviye ${level} başlıyor! ${bombCount} bomba ile oynanıyor.`, false);
-                }
-            }, 1000);
-        }
-    };
-    
-    // Oyun başlangıcında ve her hamle sonrası kontrol et
-    checkLevelCompletion();
-
-    // Yeni seviye başlatma işlemi
-    socket.on('newLevel', ({ level: newLevel, boardSize, hostLives, guestLives }) => {
-        level = newLevel;
-        gameData.hostLives = hostLives;
-        gameData.guestLives = guestLives;
-        
-        showGlobalMessage(`🎮 Seviye ${level} başlıyor! ${hostLives} bomba ile oynanıyor.`, false);
-        
-        // Yeni oyun tahtasını başlat
-        initializeGame(boardSize);
-        updateStatusDisplay();
-    });
-    
-    // Eski nextLevel olayını kaldırmak için
-    socket.off('nextLevel');
     
     // Rakip Ayrıldı
     socket.on('opponentLeft', (message) => {
