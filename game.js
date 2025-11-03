@@ -45,8 +45,8 @@ function initializeGame(boardSize) {
         gameData.guestLives = 0; // Bu değer gameReady'den güncellenecek
     } else {
         // Level 2 ve sonrası 3 can, 3 bomba
-        gameData.hostLives = 4;
-        gameData.guestLives = 4;
+        gameData.hostLives = 6;
+        gameData.guestLives = 6;
     }
     
     gameStage = 'WAITING';
