@@ -50,20 +50,19 @@
         /* Ana Ekran Düzeni */
         .screen { 
             width: 100%; 
-            height: 100vh; /* Viewport yüksekliği */
+            height: 100vh;
             max-width: none;
             max-height: none;
             display: none; 
             flex-direction: column; 
             align-items: center; 
-            justify-content: flex-start; /* Üstten hizalı */
-            padding: 0.5rem; 
+            justify-content: flex-start;
+            padding: 0.25rem; 
             box-sizing: border-box; 
             text-align: center; 
             background-color: #2d3748;
             border-radius: 0;
             box-shadow: none;
-            transition: background-color 0.3s;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
             position: fixed;
@@ -128,9 +127,12 @@
         }
         
         /* Utility */
-        .btn { 
-            @apply w-full text-xl font-bold py-4 px-6 rounded-2xl shadow-xl transition-all duration-200 ease-in-out; 
-            letter-spacing: 0.05em; /* Harf aralığı */
+        .btn {
+            @apply px-8 py-4 rounded-xl font-bold text-xl transition-all duration-300 flex items-center justify-center;
+            min-width: 250px;
+            margin: 0.5rem 0;
+            height: auto;
+            min-height: 60px;
         }
         .btn-primary { 
             @apply bg-blue-600 text-white hover:bg-blue-500 active:scale-98; 
@@ -140,22 +142,16 @@
         .btn-primary:hover {
             box-shadow: 0 8px 20px rgba(66, 153, 225, 0.6);
         }
-        .input-field { 
-            @apply w-full text-lg bg-gray-700 text-white border-2 border-gray-600 rounded-xl p-4 text-center placeholder-gray-400 focus:outline-none focus:border-blue-500; 
-            box-shadow: inset 0 2px 5px rgba(0,0,0,0.2); /* İç gölge */
-            transition: border-color 0.2s, box-shadow 0.2s;
+        .input-field {
+            @apply w-full p-5 text-xl rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+            height: 60px;
+            font-size: 1.1rem;
         }
         .input-field:focus {
             box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5), inset 0 2px 5px rgba(0,0,0,0.2);
         }
 
-        .code-display { 
-            @apply text-5xl font-extrabold p-5 bg-gray-800 text-yellow-300 rounded-xl tracking-widest; 
-            letter-spacing: 0.15em;
-            text-shadow: 0 2px 5px rgba(0,0,0,0.5);
-            font-family: 'Chakra Petch', monospace; /* Daha teknolojik bir font */
-        }
-        
         /* Global Mesaj */
         #globalMessage.show { 
             display: block; 
@@ -241,12 +237,12 @@
         .game-board {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 5px;
-            margin: 10px auto;
+            gap: 3px;
+            margin: 5px auto;
             max-width: 100%;
             width: 100%;
             perspective: 1000px;
-            padding: 0 10px;
+            padding: 0 5px;
             box-sizing: border-box;
             flex: 1;
         }
@@ -258,16 +254,17 @@
         .card {
             aspect-ratio: 1/1;
             background: #4a5568;
-            border-radius: 8px;
+            border-radius: 6px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             cursor: pointer;
             transform-style: preserve-3d;
-            transition: transform 0.5s, background-color 0.3s;
+            transition: transform 0.4s, background-color 0.2s;
             position: relative;
-            min-width: 0; /* Prevents flexbox overflow */
+            min-width: 0;
+            border: 1px solid #2d3748;
         }
         .card.flipped {
             transform: rotateY(180deg);
@@ -414,7 +411,7 @@
             <p class="font-bold text-xl mb-3 text-white">📋 Oyun Qaydaları:</p>
             <ul class="list-disc list-inside mt-2 text-left space-y-2 text-lg">
                 <li>Kartları açaraq rəqibinizin bombalarından qaçın.</li>
-                <li>Hər kəsin ❤️ Canı var. Bombaya bassanız can itirirsiniz.</li>
+                <li>Hər kəsin **3 canı** var. Bombaya bassanız can itirirsiniz.</li>
                 <li>Canı bitən oyunu uduzur!</li>
                 <li>Bütün kartlar açılarsa, yeni səviyyəyə keçirsiniz.</li>
             </ul>
@@ -422,16 +419,16 @@
         
         <div class="w-full animated-lobby-item input-username-container max-w-md">
             <p class="text-left text-base font-semibold mb-2 text-gray-300">
-                👤 1. İstifadəçi Adınızı Daxil Edin:
+                👤 **1. İstifadəçi Adınızı Daxil Edin:**
             </p>
             <input type="text" id="username" class="input-field shadow-lg text-black" placeholder="Oyuncu Adı (min 2 herf)" maxlength="15" style="color: #000000 !important;">
         </div>
         
         <div class="w-full animated-lobby-item input-roomcode-container max-w-md">
             <p class="text-left text-base font-semibold mb-2 text-gray-300">
-                🚪 2. Otaq Kodu:
+                🚪 **2. Otaq Kodu:**
                 <span class="font-normal block text-sm mt-1">
-                    * Yeni otaq qurmaq üçün bu sahəni BOŞ buraxın.
+                    * Yeni otaq qurmaq üçün bu sahəni **BOŞ** buraxın.
                 </span>
                 <span class="font-normal block text-sm">
                     * Mövcud otağa qoşulmaq üçün dostunuzun verdiyi kodu buraya daxil edin.
