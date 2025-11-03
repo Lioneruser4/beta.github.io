@@ -12,11 +12,16 @@
     <script src="language.js"></script> 
     
     <style>
-        /* === KENDİ OYUNUNUZDAN ALINAN CSS STİLLERİ VƏ MOBİL UYUM === */
-        
+        /* CSS stillləri olduğu kimi qalir */
         :root {
             --primary-color: #3498db;
             --secondary-color: #2980b9;
+            --success-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --text-color: #2c3e50;
+            --bg-color: #ecf0f1;
+            --card-bg: white;
+            --shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         }
         
         * {
@@ -67,7 +72,7 @@
             display: flex; 
         }
         
-        /* Language Selector (Stilleri olduğu kimi qaldı) */
+        /* Language Selector (Dəyişmədi) */
         .language-selector {
             position: fixed;
             top: env(safe-area-inset-top, 15px);
@@ -128,24 +133,16 @@
         .btn-primary:hover {
             box-shadow: 0 8px 20px rgba(66, 153, 225, 0.6);
         }
-        
-        .btn-secondary {
-            @apply bg-green-600 text-white hover:bg-green-500 active:scale-98; 
-            background: linear-gradient(135deg, #48bb78, #68d391);
-            border: none;
-        }
-        .btn-secondary:hover {
-             box-shadow: 0 8px 20px rgba(72, 187, 120, 0.6);
-        }
-
-
         .input-field { 
             @apply w-full text-lg bg-white text-gray-900 border-2 border-gray-600 rounded-xl p-4 text-center placeholder-gray-400 focus:outline-none focus:border-blue-500; 
             box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
             transition: border-color 0.2s, box-shadow 0.2s;
             color: #1f2937 !important; 
         }
-
+        .input-field::placeholder {
+            color: #6b7280;
+            opacity: 1;
+        }
         .code-display { 
             @apply text-5xl font-extrabold p-5 bg-gray-800 text-yellow-300 rounded-xl tracking-widest; 
             letter-spacing: 0.15em;
@@ -153,7 +150,7 @@
             font-family: 'Chakra Petch', monospace;
         }
         
-        /* GLOBAL MESAJ */
+        /* Global Mesaj */
         #globalMessage {
             position: fixed;
             top: env(safe-area-inset-top, 20px);
@@ -263,22 +260,20 @@
         
         <div class="w-full animated-lobby-item input-roomcode-container max-w-md">
             <p class="text-left text-base font-semibold mb-2 text-gray-300">
-                🚪 **2. Otaq Kodu (Qoşulmaq üçün):**
+                🚪 **2. Otaq Kodu:**
                 <span class="font-normal block text-sm mt-1">
-                    * Yeni otaq qurmaq üçün kodu **BOŞ** buraxın.
+                    * Yeni otaq qurmaq üçün bu sahəni **BOŞ** buraxın.
+                </span>
+                <span class="font-normal block text-sm">
+                    * Mövcud otağa qoşulmaq üçün dostunuzun verdiyi kodu buraya daxil edin.
                 </span>
             </p>
-            <input type="text" id="roomCodeInput" class="input-field uppercase shadow-lg" placeholder="Otaq Kodu (Dostunun Kodu)" maxlength="6">
+            <input type="text" id="roomCodeInput" class="input-field uppercase shadow-lg" placeholder="Otaq Kodu (Boş: Yeni Otaq)" maxlength="6">
         </div>
         
-        <div class="w-full max-w-md space-y-4">
-            <button id="createRoomBtn" class="btn btn-primary animated-lobby-item shadow-xl">
-                <i class="fas fa-plus-circle mr-2"></i> Yeni Otaq Qur
-            </button>
-            <button id="joinRoomBtn" class="btn btn-secondary animated-lobby-item shadow-xl">
-                <i class="fas fa-sign-in-alt mr-2"></i> Otağa Qoşul
-            </button>
-        </div>
+        <button id="matchBtn" class="btn btn-primary animated-lobby-item shadow-xl max-w-md">
+            <i class="fas fa-handshake mr-2"></i> Otaq Qur / Odaya Qoşul
+        </button>
     </div>
     
     <div id="waitScreen" class="screen space-y-8">
@@ -333,8 +328,7 @@
         const UIElements = {
             usernameInput: document.getElementById('username'),
             roomCodeInput: document.getElementById('roomCodeInput'),
-            createRoomBtn: document.getElementById('createRoomBtn'),
-            joinRoomBtn: document.getElementById('joinRoomBtn'),
+            matchBtn: document.getElementById('matchBtn'),
             
             globalMessage: document.getElementById('globalMessage'),
             globalMessageText: document.getElementById('globalMessageText'),
@@ -351,11 +345,9 @@
         };
 
         window.globalMessageTimeout = null;
-        // ⭐ YENİ DƏYİŞƏN: Bu oyunçu hostdurmu?
-        let isHost = false; 
         
         /**
-         * Gloal mesajı göstərir (2 saniyəlik limit ilə və mobil uyumlu fade-out)
+         * Gloal mesajı göstərir (2 saniyəlik limit ilə)
          * @param {string} message 
          * @param {boolean} isError 
          */
@@ -368,7 +360,7 @@
             }
             
             globalMsgText.textContent = message;
-            globalMsg.classList.remove('bg-red-600', 'bg-green-600');
+            globalMsg.classList.remove('bg-red-600', 'bg-green-600', 'hidden');
             globalMsg.classList.add(isError ? 'bg-red-600' : 'bg-green-600');
             
             globalMsg.style.display = 'block';
@@ -404,7 +396,6 @@
              showScreen('lobby');
              UIElements.roomCodeDisplay.textContent = '';
              UIElements.roomCodeInput.value = '';
-             isHost = false; // Statusu sıfırla
              
              if (window.languageManager && window.languageManager.updateUI) {
                  window.languageManager.updateUI();
@@ -462,18 +453,31 @@
                     showScreen('lobby');
                 });
                 
-                // ... (connect_error və disconnect hadisələri olduğu kimi qalır) ...
+                socket.on('connect_error', (err) => {
+                    console.error('Bağlantı Hatası:', err);
+                    UIElements.showGlobalMessage('XƏTA: Serverə daxil olmaq mümkün deyil.', true);
+                    showScreen('lobby');
+                });
+                
+                socket.on('disconnect', () => {
+                    UIElements.showGlobalMessage('Bağlantı kəsildi. Yenidən qoşulmağa çalışılır...', true);
+                });
 
-                // OTAQ QURULDU MESAJI (HOST)
+                // --- Otaq Qurulması Olayı (HOST ÜÇÜN) ---
                 socket.on('roomCreated', (code) => {
-                    isHost = true; // ⭐ HOST OLDUĞUMUZU QEYD EDİRİK
                     UIElements.roomCodeDisplay.textContent = code;
                     
                     const title = (window.languageManager && window.languageManager.t) 
                         ? window.languageManager.t('roomCreatedTitle') 
                         : 'Otağınız Quruldu! 🎉';
-                    // ... (qalan UI yenilənmələri) ...
+                    const status = (window.languageManager && window.languageManager.t) 
+                        ? window.languageManager.t('roomCreatedStatus') 
+                        : 'Otaq kodunu dostunuza göndərin və qoşulmasını gözləyin.';
                     
+                    UIElements.waitTitle.textContent = title;
+                    UIElements.codeArea.classList.remove('hidden'); // Kodu görünür et
+                    UIElements.waitStatus.textContent = status;
+
                     const successMsg = (window.languageManager && window.languageManager.t) 
                         ? window.languageManager.t('roomCreatedSuccess', { code: code }) 
                         : `Otaq ${code} kodu ilə uğurla quruldu. Rəqib gözlənilir.`;
@@ -486,7 +490,7 @@
                     UIElements.resetGame();
                 });
                 
-                // ⭐ ƏSAS DÜZƏLİŞ: OYUN BAŞLANMASI MƏNTİQİ
+                // ⭐ ƏVVƏLKİ SADƏ MƏNTİQİNİZƏ QAYITDIQ (Serverin düzgün işlədiyini fərz edirik)
                 socket.on('gameStart', (data) => {
                     console.log("Oyun Başladı! Data:", data);
                     
@@ -498,38 +502,17 @@
                     
                     let turnMessage;
                     
-                    // Serverdən gələn məlumatı yoxla
+                    // Serverdən gələn data.currentTurn-a etibar edirik
                     if (data.currentTurn === socket.id) {
-                         // 1. Server məni seçdi.
                          turnMessage = (window.languageManager && window.languageManager.t) 
                              ? window.languageManager.t('yourTurn') 
                              : 'SİZİN növbənizdir! Kart seçin.';
                          
-                    } else if (opponent && data.currentTurn === opponent.id) {
-                        // 2. Server rəqibi seçdi.
+                    } else { // data.currentTurn ya rəqibin ID-si olmalıdır, ya da server xətasıdır, amma əvvəlki kimi sadə məntiqə qayıdırıq.
+                        const opponentName = opponent ? opponent.username : "Rəqib";
                          turnMessage = (window.languageManager && window.languageManager.t) 
-                             ? window.languageManager.t('opponentTurn', { name: opponent.username }) 
-                             : `${opponent.username} növbəsidir...`;
-                         
-                    } else {
-                        // 3. ⭐ YENİ MƏNTİQ: Server düzgün ID göndərməyibsə (Məntiq Xətası verəndə bu işləyəcək)
-                        console.warn("Server ilkin növbəni düzgün təyin etmədi. Host başlatma məntiqi tətbiq olunur.");
-                        
-                        if (isHost) {
-                            // Mən Hostam, Mən başlayıram (İstifadəçinin İstəyi)
-                             turnMessage = (window.languageManager && window.languageManager.t) 
-                                 ? window.languageManager.t('yourTurn') 
-                                 : 'SİZİN növbənizdir! Kart seçin. (Host Məntiqi)';
-                             
-                             // Serverə ilkin növbəni dəqiqləşdirmək üçün siqnal göndərmək lazımdır (SERVER KODU YOXSA BU TƏKÇƏ GÖRÜNÜŞDƏ DÜZƏLİŞ EDİR)
-                             // socket.emit('fixTurn', { currentTurn: socket.id }); // Əgər server tərəfdən dəyişmək mümkündürsə.
-                            
-                        } else {
-                            // Mən Host deyiləm, rəqib Host olmalıdır, onun başlamasını gözləyirəm
-                             turnMessage = (window.languageManager && window.languageManager.t) 
-                                 ? window.languageManager.t('opponentTurn', { name: opponent.username || "Rəqib" }) 
-                                 : `${opponent.username || "Rəqib"} növbəsidir... (Hostun başlaması gözlənilir)`;
-                        }
+                             ? window.languageManager.t('opponentTurn', { name: opponentName }) 
+                             : `${opponentName} növbəsidir...`;
                     }
 
                     UIElements.turnStatus.textContent = turnMessage;
@@ -552,43 +535,30 @@
             }
         }
         
-        // --- Olay Dinleyicileri (Dəyişmədi) ---
+        // --- Olay Dinleyicileri ---
         
-        UIElements.createRoomBtn.addEventListener('click', () => {
+        UIElements.matchBtn.addEventListener('click', () => {
             const username = validateInput();
             if (!username) return;
             
             showScreen('waitScreen'); 
             
-            UIElements.waitTitle.textContent = 'Otaq Qurulur...';
-            UIElements.waitStatus.textContent = 'Zəhmət olmasa gözləyin...';
-            UIElements.codeArea.classList.add('hidden');
-            
-            socket.emit('createRoom', { username });
-        });
-
-        UIElements.joinRoomBtn.addEventListener('click', () => {
-            const username = validateInput();
-            if (!username) return;
-
             const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
-            
-            if (roomCode.length < 4 || roomCode.length > 6) {
-                UIElements.showGlobalMessage('Qoşulmaq üçün etibarlı Otaq Kodu daxil edin.', true);
-                return;
-            }
-            
-            showScreen('waitScreen'); 
-            
-            UIElements.waitTitle.textContent = `Otağa Qoşulma: ${roomCode}`;
-            UIElements.waitStatus.textContent = 'Qoşulunur...';
-            UIElements.codeArea.classList.add('hidden');
-            
-            // Qoşulan zaman Host olmadığımızı qəbul edirik
-            isHost = false; 
-            socket.emit('joinRoom', { username, roomCode });
-        });
 
+            if (roomCode === '') {
+                // Otaq Qur
+                UIElements.waitTitle.textContent = 'Otaq Qurulur...';
+                UIElements.waitStatus.textContent = 'Zəhmət olmasa gözləyin...';
+                UIElements.codeArea.classList.add('hidden');
+                socket.emit('createRoom', { username });
+            } else {
+                // Otağa Qoşul
+                UIElements.waitTitle.textContent = `Otağa Qoşulma: ${roomCode}`;
+                UIElements.waitStatus.textContent = 'Qoşulunur...';
+                UIElements.codeArea.classList.add('hidden');
+                socket.emit('joinRoom', { username, roomCode });
+            }
+        });
 
         document.getElementById('cancelBtn').addEventListener('click', () => {
             if (socket && socket.connected && UIElements.roomCodeDisplay.textContent) {
@@ -600,10 +570,19 @@
         document.getElementById('endGameBtn').addEventListener('click', UIElements.resetGame);
         
         document.getElementById('copyCodeBtn').addEventListener('click', () => {
-            const textToCopy = UIElements.roomCodeDisplay.textContent;
+            const textToCopy = UIElements.roomCodeDisplay.textContent.trim();
+            
+            if (!textToCopy) {
+                UIElements.showGlobalMessage('Kopyalanacaq kod yoxdur.', true);
+                return;
+            }
+
             navigator.clipboard.writeText(textToCopy)
                 .then(() => UIElements.showGlobalMessage('Otaq Kodu Kopyalandı!', false))
-                .catch(() => UIElements.showGlobalMessage('Kopyalama uğursuz oldu.', true));
+                .catch(err => {
+                    console.error('Kopyalama xətası:', err);
+                    UIElements.showGlobalMessage('Kopyalama uğursuz oldu.', true);
+                });
         });
 
         document.addEventListener('DOMContentLoaded', () => {
