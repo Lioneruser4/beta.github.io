@@ -1,285 +1,322 @@
-// Dosya Adı: game.js (Memory/Bomb Oyunu Mantığı)
-
-// main.js dosyasından gerekli global fonksiyonları içe aktar
-import { showScreen, showGlobalMessage, t } from './main.js'; 
-
-// --- Global Değişkenler ve Durum Yönetimi ---
-
+// Dosya Adı: game.js
 let socket;
-export let currentRoomCode = ''; 
-export let isHost = false; 
-export let opponentName = ''; 
+let currentRoomCode = '';
+let isHost = false;
+let opponentName = '';
 
-// Oyun Durumu
-let gameData = {
-    turn: 0, // 0 = Host, 1 = Guest
-    hostBombs: [],
-    guestBombs: [],
-    hostLives: 3,
-    guestLives: 3,
-    level: 1,
-    opened: [],
-    boardSize: 20
+// --- DOM Referansları ---
+const screens = { 
+    lobby: document.getElementById('lobby'), 
+    wait: document.getElementById('waitScreen'), 
+    game: document.getElementById('gameScreen') 
 };
-
-// Emojiler (server.js'teki ile aynı olmalıdır)
-const EMOJIS = ['😀', '😎', '🦄', '🐱', '🍀', '🍕', '🌟', '⚽', '🎵', '🚀', '🎲', '🥇'];
-
-// --- DOM Referansları (Memory Oyunu Özel) ---
-const board = document.getElementById('gameBoard');
+const gameBoardEl = document.getElementById('gameBoard');
 const turnStatusEl = document.getElementById('turnStatus');
+const levelDisplayEl = document.getElementById('levelDisplay');
 const myLivesEl = document.getElementById('myLives');
 const opponentLivesEl = document.getElementById('opponentLives');
 const opponentNameEl = document.getElementById('opponentName');
-const roleStatusEl = document.getElementById('roleStatus');
+const myRoleEl = document.getElementById('myRole');
+const opponentRoleEl = document.getElementById('opponentRole');
 
+// Chat Elementləri
+const chatMessagesEl = document.getElementById('chatMessages');
+const chatInputEl = document.getElementById('chatInput');
+const chatSendBtnEl = document.getElementById('chatSendBtn');
 
-// --- Yardımcı Fonksiyonlar ---
+// Oyun Vəziyyəti (Serverdən gələn məlumatla dolacaq)
+let gameData = {
+    level: 1,
+    boardSize: 20,
+    turn: 0, 
+    hostLives: 0, 
+    guestLives: 0,
+    hostBombs: [], 
+    guestBombs: [],
+    opened: [] // Açılmış kartların indeksləri
+};
 
-function updateLivesDisplay() {
+// --- TEMEL UI FONKSİYONLARI (Export edilir) ---
+
+export function showScreen(screenId) {
+    Object.values(screens).forEach(screen => screen.classList.remove('active'));
+    screens[screenId].classList.add('active');
+}
+
+export function showGlobalMessage(message, isError = true) {
+    const globalMessage = document.getElementById('globalMessage');
+    const globalMessageText = document.getElementById('globalMessageText');
+    
+    globalMessageText.textContent = message;
+    globalMessage.classList.remove('bg-red-600', 'bg-green-600', 'hidden');
+    globalMessage.classList.add(isError ? 'bg-red-600' : 'bg-green-600');
+    globalMessage.classList.add('show');
+    
+    setTimeout(() => { 
+        globalMessage.classList.remove('show');
+        globalMessage.classList.add('hidden');
+    }, 4000);
+}
+
+// Oyunu sıfırla (Ən təhlükəsiz yol: Səhifəni yenilə)
+export function resetGame() {
+    window.location.reload(); 
+}
+
+// --- OYUN MƏNTİQİ VƏ ÇƏKİM ---
+
+// Oyun taxtasını çəkir
+function drawBoard() {
+    gameBoardEl.innerHTML = '';
+    gameBoardEl.style.gridTemplateColumns = 'repeat(4, 1fr)'; // 4x5 = 20 Kart
+    
+    for (let i = 0; i < gameData.boardSize; i++) {
+        const cardContainer = document.createElement('div');
+        cardContainer.className = 'card-container';
+
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.index = i;
+
+        const front = document.createElement('div');
+        front.className = 'card-face front';
+        front.textContent = '?';
+        
+        const back = document.createElement('div');
+        back.className = 'card-face back';
+        // Məzmunu serverdən gələn məlumata görə təyin edəcəyik
+
+        card.appendChild(front);
+        card.appendChild(back);
+        cardContainer.appendChild(card);
+        
+        // Klikləmə hadisəsi
+        cardContainer.addEventListener('click', handleCardClick);
+        gameBoardEl.appendChild(cardContainer);
+    }
+}
+
+// UI-da Can, Səviyyə və Növbəni yeniləyir
+function updateStatusDisplay() {
+    // Canlar
+    myLivesEl.textContent = '❤️'.repeat(Math.max(0, isHost ? gameData.hostLives : gameData.guestLives));
+    opponentLivesEl.textContent = '❤️'.repeat(Math.max(0, isHost ? gameData.guestLives : gameData.hostLives));
+    
+    // Səviyyə
+    levelDisplayEl.textContent = gameData.level;
+    
+    // Rollar
+    myRoleEl.textContent = t(isHost ? 'roleHost' : 'roleGuest');
+    opponentRoleEl.textContent = t(isHost ? 'roleGuest' : 'roleHost');
+    opponentNameEl.textContent = opponentName.toUpperCase();
+
+    // Növbə
+    const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
+    
+    if (isMyTurn) {
+        turnStatusEl.textContent = t('yourTurn');
+        turnStatusEl.classList.remove('text-red-600', 'animate-pulse');
+        turnStatusEl.classList.add('text-green-600');
+    } else {
+        turnStatusEl.textContent = t('opponentTurn');
+        turnStatusEl.classList.remove('text-green-600');
+        turnStatusEl.classList.add('text-red-600', 'animate-pulse');
+    }
+}
+
+// Kartı çevir (Serverdən gələn məlumata görə)
+function flipCard(index, emoji, isBomb, newTurn) {
+    const card = gameBoardEl.querySelector(`.card[data-index="${index}"]`);
+    if (!card || card.classList.contains('flipped')) return;
+
+    card.classList.add('flipped');
+    card.querySelector('.back').textContent = emoji;
+    gameData.opened.push(index); // Açılanlara əlavə et
+    
+    // Növbəni yenilə
+    gameData.turn = newTurn;
+
+    if (isBomb) {
+        // Hərəkəti edən oyunçu can itirir
+        const playerWhoMovedWasHost = (newTurn === 1); // Növbə qonağa keçdisə, host oynamışdı
+        
+        if (playerWhoMovedWasHost) {
+            gameData.hostLives--;
+        } else {
+            gameData.guestLives--;
+        }
+        
+        card.classList.add('vibrate'); // Titrəmə effekti
+        showGlobalMessage(t('bombExploded'), true);
+        
+        // Oyun bitdimi yoxla (Can itkisi ilə)
+        if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
+            endGame();
+        }
+
+    } else {
+        // Kart bomba deyilsə, səviyyə bitdimi yoxla
+        checkLevelCompletion();
+    }
+    
+    // UI-ı yenilə
+    updateStatusDisplay();
+}
+
+// Oyun sonu
+function endGame() {
+    gameData.stage = 'ENDED'; // Yeni hərəkətlərin qarşısını al
+    
     const myLives = isHost ? gameData.hostLives : gameData.guestLives;
     const opponentLives = isHost ? gameData.guestLives : gameData.hostLives;
 
-    // Canları göstermek için emoji barı
-    const myLivesText = t('lives', { lives: '❤️'.repeat(myLives) });
-    const opponentLivesText = t('lives', { lives: '❤️'.repeat(opponentLives) });
+    let msgKey;
+    if (myLives > opponentLives) msgKey = 'youWon';
+    else if (myLives < opponentLives) msgKey = 'youLost';
+    else msgKey = 'draw'; // Adətən canlar bərabər bitmir, amma ehtimaldır
 
-    // Seviye bilgisini de ekle
-    const levelText = t('level', { level: gameData.level });
-    
-    // Benim tarafım (Can + Seviye)
-    myLivesEl.innerHTML = `
-        ${myLivesText}
-        <span class="text-sm font-light text-gray-400 block mt-1">${levelText}</span>
-    `;
-    
-    // Rakip tarafı (Sadece Can)
-    opponentLivesEl.textContent = opponentLivesText;
-    
-    roleStatusEl.textContent = isHost ? t('roleHost') : t('roleGuest');
-    opponentNameEl.textContent = t('opponent', { name: opponentName });
+    turnStatusEl.textContent = t(msgKey);
+    showGlobalMessage(t('gameOver') + " " + t(msgKey), myLives <= 0);
+
+    // 4 saniyə sonra lobiyə (səhifə yenilənməsi)
+    setTimeout(() => {
+        resetGame();
+    }, 4000);
 }
 
-function updateTurnStatus() {
-    const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
-    
-    turnStatusEl.textContent = isMyTurn ? t('yourTurn') : t('opponentTurn');
-    turnStatusEl.classList.toggle('text-yellow-400', isMyTurn);
-    turnStatusEl.classList.toggle('text-gray-400', !isMyTurn);
-}
-
+// Səviyyə tamamlanmasını yoxla
 function checkLevelCompletion() {
-    const totalCards = gameData.boardSize;
-    const openedCount = gameData.opened.length;
-    const bombCount = gameData.hostBombs.length; 
-    
-    const winnableCards = totalCards - (bombCount * 2);
+    if (gameData.stage === 'ENDED') return;
 
-    if (openedCount >= winnableCards) {
-        
-        if (gameData.hostLives > 0 && gameData.guestLives > 0) {
-            // Seviye atlama
-            showGlobalMessage(`🏆 Seviye ${gameData.level} Başarıyla Tamamlandı!`, false);
-            
-            if (isHost) {
-                 socket.emit('levelComplete', { 
-                    roomCode: currentRoomCode, 
-                    level: gameData.level,
-                    nextLevel: gameData.level + 1
+    const totalBombs = gameData.hostBombs.length + gameData.guestBombs.length;
+    const totalNonBombs = gameData.boardSize - totalBombs;
+
+    if (gameData.opened.length === totalNonBombs) {
+        // Bütün təhlükəsiz kartlar açıldı!
+        gameData.stage = 'LEVEL_UP';
+        showGlobalMessage(t('levelComplete', { level: gameData.level }), false);
+
+        // Yalnız Host növbəti səviyyə üçün serverə müraciət edir
+        if (isHost) {
+            setTimeout(() => {
+                socket.emit('levelComplete', {
+                    roomCode: currentRoomCode,
+                    level: gameData.level
                 });
-            }
-
-        } else {
-            // Oyun Sonu (Canlar bitmiş olmalı)
-            endGame();
+            }, 2000); // 2 saniyə gözlə
         }
     }
 }
 
-function endGame() {
-    let messageKey;
-    const myLives = isHost ? gameData.hostLives : gameData.guestLives;
-    const opponentLives = isHost ? gameData.guestLives : gameData.hostLives;
+// --- HƏRƏKƏT İŞLƏYİCİLƏRİ (Event Handlers) ---
 
-    if (myLives > opponentLives) {
-        messageKey = 'youWon';
-    } else if (myLives < opponentLives) {
-        messageKey = 'youLost';
-    } else {
-        messageKey = 'draw';
-    }
-
-    showGlobalMessage(t('gameOver') + ' ' + t(messageKey), myLives <= opponentLives);
+function handleCardClick(event) {
+    // Tıklanan elementin `.card`-ın özü olduğundan əmin ol
+    const card = event.currentTarget.querySelector('.card');
+    if (!card) return;
     
-    setTimeout(() => {
-        resetGame(); 
-        showScreen('menu');
-    }, 4000);
-}
+    const cardIndex = parseInt(card.dataset.index);
 
-// --- Oyun Tahtası Mantığı ---
-
-function createBoard(size) {
-    board.innerHTML = '';
-    board.style.gridTemplateColumns = `repeat(4, 1fr)`; 
+    // Oyun vəziyyətini yoxla
+    if (gameData.stage !== 'PLAY') return;
     
-    for (let i = 0; i < size; i++) {
-        const cardContainer = document.createElement('div');
-        cardContainer.className = 'p-1 card-container';
-        
-        const card = document.createElement('div');
-        // Kart boyutu ayarlaması için h-20 kaldırıldı, css ile ayarlanacak
-        card.className = 'card aspect-square w-full h-auto'; 
-        card.dataset.index = i;
-        
-        const frontFace = document.createElement('div');
-        frontFace.className = 'card-face front';
-        frontFace.textContent = '?'; 
-
-        const backFace = document.createElement('div');
-        backFace.className = 'card-face back';
-        backFace.textContent = ''; 
-
-        card.appendChild(frontFace);
-        card.appendChild(backFace);
-        cardContainer.appendChild(card);
-        board.appendChild(cardContainer);
-
-        card.addEventListener('click', handleCardClick);
-    }
-}
-
-function handleCardClick(e) {
-    const card = e.currentTarget;
-    const idx = parseInt(card.dataset.index);
-    
+    // Növbəni yoxla
     const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
     if (!isMyTurn) {
         showGlobalMessage(t('opponentTurn'), true);
         return;
     }
-    if (card.classList.contains('flipped') || gameData.opened.includes(idx)) {
-        showGlobalMessage('Bu kart zaten açıldı.', true);
+    
+    // Kartın artıq açılıb-açılmadığını yoxla
+    if (gameData.opened.includes(cardIndex)) {
+        showGlobalMessage(t('cardOpened'), true);
         return;
     }
-    
-    // Hamleyi Server'a gönder
+
+    // Hərəkəti serverə göndər
     socket.emit('gameData', {
+        roomCode: currentRoomCode,
         type: 'MOVE',
-        cardIndex: idx,
-        roomCode: currentRoomCode
+        cardIndex: cardIndex,
     });
 }
 
-function processMove(index, emoji, isBomb) {
-    const card = board.querySelector(`.card[data-index="${index}"]`);
-    if (!card || card.classList.contains('flipped')) return;
-
-    card.classList.add('flipped');
-    const backFace = card.querySelector('.back');
-    backFace.textContent = emoji;
-
-    // Durumu güncelle
-    gameData.opened.push(index);
-
-    if (isBomb) {
-        // Can Kaybı: Hamleyi yapanın rakibinin bombası açıldığı için, hamleyi yapan can kaybeder.
-        // Hamleyi yapan oyuncu, sırası değişmeden önceki oyuncudur.
-        const playerWhoMovedIsHost = gameData.turn === 0;
-        
-        if (playerWhoMovedIsHost) {
-             gameData.hostLives = Math.max(0, gameData.hostLives - 1); // Host can kaybeder
-        } else {
-             gameData.guestLives = Math.max(0, gameData.guestLives - 1); // Guest can kaybeder
-        }
-        
-        card.classList.add('vibrate'); 
-        showGlobalMessage(t('bombExploded'), true);
-
-        // Can sıfırlandıysa oyun biter
-        if (gameData.hostLives === 0 || gameData.guestLives === 0) {
-            endGame();
-        }
-        
-    } else {
-        card.classList.remove('vibrate');
+// Chat mesajı göndərmə
+function handleSendMessage() {
+    const message = chatInputEl.value.trim();
+    if (message && socket) {
+        socket.emit('chatMessage', { roomCode: currentRoomCode, message });
+        chatInputEl.value = '';
     }
-    
-    // Sırayı değiştir
-    gameData.turn = gameData.turn === 0 ? 1 : 0; 
-    
-    updateLivesDisplay();
-    updateTurnStatus();
-    checkLevelCompletion();
 }
 
-export function resetGame() {
-    // Hafıza oyununun tüm lokal durumunu sıfırlar
-    gameData = {
-        turn: 0, 
-        hostBombs: [],
-        guestBombs: [],
-        hostLives: 3,
-        guestLives: 3,
-        level: 1,
-        opened: [],
-        boardSize: 20
-    };
-    currentRoomCode = '';
-    isHost = false;
-    opponentName = '';
-    board.innerHTML = '';
+// Gələn chat mesajını göstər
+function displayChatMessage(username, message) {
+    const msgDiv = document.createElement('div');
+    msgDiv.innerHTML = `<strong class="text-blue-600">${username}:</strong> ${message}`;
+    chatMessagesEl.appendChild(msgDiv);
+    // Avtomatik aşağı çək
+    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
 }
 
-// --- Socket.IO İşleyicileri ---
-
-export function setupMemorySocketHandlers(s, roomCode, host, opponentNameFromIndex) {
+// --- SOCKET.IO ÜÇÜN ƏSAS FUNKSİYA (Export edilir) ---
+export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     socket = s;
     currentRoomCode = roomCode;
     isHost = host;
     opponentName = opponentNameFromIndex;
     
-    showScreen('game');
+    showScreen('game'); // Oyun ekranına keçid
     
-    // --- GENEL DURUM GÜNCELLEMESİ (gameReady) ---
-    socket.off('gameReady'); // Birden fazla kez dinlenmemesi için
-    socket.on('gameReady', (state) => {
-        gameData.hostBombs = state.hostBombs;
-        gameData.guestBombs = state.guestBombs;
-        gameData.hostLives = state.hostLives;
-        gameData.guestLives = state.guestLives;
-        gameData.turn = state.turn;
-        gameData.level = state.level;
-        gameData.opened = []; 
+    // Chat düymələrini aktivləşdir
+    chatSendBtnEl.onclick = handleSendMessage;
+    chatInputEl.onkeypress = (e) => {
+        if (e.key === 'Enter') handleSendMessage();
+    };
 
-        createBoard(gameData.boardSize);
-        updateLivesDisplay();
-        updateTurnStatus();
-        document.getElementById('actionMessage').textContent = t('selectCards');
-        showGlobalMessage(t('gameStarting'), false);
+    // --- Socket Dinləyiciləri (Oyun üçün) ---
+
+    // Oyun hazır (Level 1 və ya növbəti səviyyə)
+    socket.on('gameReady', (gameState) => {
+        gameData = { ...gameState, opened: [] }; // Vəziyyəti tamamilə yenilə
+        gameData.stage = 'PLAY';
+        
+        drawBoard(); // Taxtanı çək
+        updateStatusDisplay(); // UI-ı yenilə
+        
+        showGlobalMessage(t('levelStarting', { level: gameData.level, lives: gameData.hostLives }), false);
     });
 
-    // --- HAREKET ALINDI (gameData: MOVE) ---
-    socket.off('gameData');
+    // Hərəkət gəldi (Kart çevrildi)
     socket.on('gameData', (data) => {
         if (data.type === 'MOVE') {
-            processMove(data.cardIndex, data.emoji, data.isBomb);
+            flipCard(data.cardIndex, data.emoji, data.isBomb, data.turn);
         }
     });
 
-    // --- YENİ SEVİYE BİLGİSİ ---
-    socket.off('newLevel');
-    socket.on('newLevel', ({ level: newLevel, boardSize, hostLives, guestLives }) => {
-        gameData.level = newLevel;
-        gameData.hostLives = hostLives;
-        gameData.guestLives = guestLives;
-        gameData.boardSize = boardSize; 
-
-        showGlobalMessage(t('levelStarting', { level: newLevel, lives: hostLives }), false);
-        
-        createBoard(boardSize);
-        updateLivesDisplay();
+    // Chat mesajı gəldi
+    socket.on('chatMessage', ({ username, message }) => {
+        displayChatMessage(username, message);
     });
-    
-    // Rakip ayrılma ve genel hata işleyicisi main.js'te tanımlı.
+
+    // Rəqib ayrıldı
+    socket.on('opponentLeft', (message) => {
+        showGlobalMessage(message || 'Rəqibiniz ayrıldı.', true);
+        setTimeout(resetGame, 3000);
+    });
+
+    // Server xətası
+    socket.on('error', (message) => {
+        showGlobalMessage(message, true);
+    });
 }
+
+
+// Lobi elementlərini index.html-dəki <script type="module"> üçün export et
+export const UIElements = {
+    matchBtn: document.getElementById('matchBtn'), 
+    roomCodeInput: document.getElementById('roomCodeInput'), 
+    usernameInput: document.getElementById('username'), 
+    showGlobalMessage, 
+    resetGame
+};
