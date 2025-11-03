@@ -1,187 +1,324 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="az">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2 OYUN 1 FİYATINA - Online Multiplayer</title>
+    <title>💣 Emoji Kart Bomb 1v1 </title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
     <script src="https://cdn.tailwindcss.com"></script>
+    
     <script src="/socket.io/socket.io.js"></script>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center p-4 relative">
-
-    <div id="globalMessage" class="fixed top-0 left-1/2 transform -translate-x-1/2 mt-4 p-3 rounded-lg shadow-xl text-center z-50 transition-all duration-300 hidden show">
-        <span id="globalMessageText" class="font-semibold"></span>
-    </div>
-
-    <div class="absolute top-4 right-4 z-40">
-        <button id="language-button" onclick="window.languageManager.toggleLanguageSelector()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition duration-300">
-            🇹🇷 Türkçe
-        </button>
-        <div id="language-selector" class="absolute right-0 mt-2 w-40 bg-gray-700 rounded-lg shadow-xl z-50 hidden">
-            <a href="#" onclick="window.languageManager.setLanguage('az'); return false;" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600">🇦🇿 Azərbaycanca</a>
-            <a href="#" onclick="window.languageManager.setLanguage('tr'); return false;" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600">🇹🇷 Türkçe</a>
-            <a href="#" onclick="window.languageManager.setLanguage('en'); return false;" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600">🇬🇧 English</a>
-        </div>
-    </div>
-
-    <div class="w-full max-w-md">
-
-        <div id="menu" class="screen active text-center p-6 bg-gray-800 rounded-xl shadow-2xl transition-all duration-500">
-            <h1 class="text-3xl font-extrabold mb-8 text-yellow-400" data-lang-key="gameTitle">2 OYUN 1 FİYATINA</h1>
-            <p class="text-lg mb-6" data-lang-key="selectGame">Oyun Seçin</p>
-            <div class="space-y-4">
-                <button id="selectMemory" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 shadow-md" data-game-type="MEMORY" data-lang-key="memoryGame">
-                    💣 BOMBA KARTLARI (Hafıza)
-                </button>
-                <button id="selectPong" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 shadow-md" data-game-type="PONG" data-lang-key="pongGame">
-                    🏓 PİNG PONG (Hızlı Raket)
-                </button>
-            </div>
-        </div>
-
-        <div id="lobby" class="screen hidden text-center p-6 bg-gray-800 rounded-xl shadow-2xl transition-all duration-500">
-            <h2 class="text-2xl font-bold mb-6 text-blue-400" id="lobbyTitle">Lobi</h2>
-            <input type="text" id="username" placeholder="Kullanıcı Adınızı Girin" class="w-full p-3 mb-4 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500">
-            <input type="text" id="roomCodeInput" placeholder="Oda Kodu (Boş Bırakın=Yeni Oda)" class="w-full p-3 mb-6 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500">
-            
-            <button id="matchBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 mb-3" data-lang-key="startGame">
-                ✅ Oda Kur
-            </button>
-            <button id="joinBtn" class="w-full bg-yellow-600 hover:bg-yellow-700 text-gray-900 font-bold py-3 px-6 rounded-lg transition duration-300" data-lang-key="joinGame">
-                ➕ Odaya Bağlan
-            </button>
-        </div>
-
-        <div id="waitScreen" class="screen hidden text-center p-6 bg-gray-800 rounded-xl shadow-2xl transition-all duration-500">
-            <h2 class="text-3xl font-bold mb-4 text-orange-400" id="waitCode">Oda Kodu: XXXX</h2>
-            <p class="text-lg mb-8 text-gray-300" data-lang-key="waitingForPlayer">Oyuncu bekleniyor...</p>
-            <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-600 h-16 w-16 mx-auto mb-6"></div>
-            <button onclick="window.location.reload()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
-                Lobiye Dön
-            </button>
-        </div>
-
-        <div id="gameScreen" class="screen hidden p-4 bg-gray-800 rounded-xl shadow-2xl transition-all duration-500">
-            <div class="flex justify-between items-center mb-4">
-                <div class="text-left">
-                    <p class="text-lg font-semibold" id="myLives">❤️❤️❤️</p>
-                    <p class="text-sm text-gray-400" id="roleStatus">🎮 Rol: </p>
-                </div>
-                <div class="text-center">
-                    <h3 class="text-2xl font-bold text-yellow-400" id="turnStatus">⏳ OYUN HAZIRLANIYOR...</h3>
-                    <p class="text-sm text-gray-300" id="actionMessage"></p>
-                </div>
-                <div class="text-right">
-                    <p class="text-lg font-semibold text-red-400" id="opponentLives">❤️❤️❤️</p>
-                    <p class="text-sm text-gray-400" id="opponentName">Rakip:</p>
-                </div>
-            </div>
-            
-            <div id="gameBoard" class="grid w-full max-w-sm mx-auto my-6" style="grid-template-columns: repeat(4, 1fr);">
-                </div>
-
-            <div class="mt-6 bg-gray-700 p-3 rounded-lg">
-                <div id="chat-messages" class="h-24 overflow-y-auto mb-2 text-sm">
-                    </div>
-                <div class="flex">
-                    <input type="text" id="chat-input" placeholder="Mesaj yazın..." class="flex-grow p-2 bg-gray-600 border border-gray-500 rounded-l-lg text-white">
-                    <button id="send-message" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-r-lg" data-lang-key="send">Gönder</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="pongGame" class="screen hidden p-4 bg-gray-800 rounded-xl shadow-2xl transition-all duration-500 text-center">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-2xl font-bold text-yellow-400" id="pongScore">0 - 0</h3>
-            </div>
-            <p class="text-sm text-gray-300 mb-4" id="pongStatus">🏓 Ping Pong Oyunu</p>
-
-            <div class="w-full mx-auto bg-black rounded-lg shadow-lg overflow-hidden border-2 border-white" style="width: 600px; height: 400px;">
-                <canvas id="pongCanvas" width="600" height="400" class="w-full h-full"></canvas>
-            </div>
-
-            <p class="text-sm text-gray-500 mt-4">Kontroller: W (Yukarı), S (Aşağı)</p>
-        </div>
-
-    </div>
-
-    <script src="language.js"></script> <script type="module" src="main.js"></script>
-    <script type="module" src="game.js"></script>
-    <script type="module" src="pong.js"></script>
-
+    
     <style>
-        .screen {
-            display: none;
+        /* CSS Stilleri (Kart çevrilməsi, vibrasiya və s.) */
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2980b9;
+            --bg-color: #ecf0f1;
+            --card-bg: white;
+            --shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        * { -webkit-tap-highlight-color: transparent; }
+        
+        body { 
+            font-family: sans-serif; 
+            background-color: var(--bg-color); 
+            color: #2c3e50;
+            min-height: 100vh; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            overflow-x: hidden; 
+            padding: 10px;
+        }
+        
+        .container {
             width: 100%;
+            max-width: 500px;
+            margin: auto;
         }
-        .screen.active {
-            display: block;
+        
+        .screen { 
+            width: 100%; 
+            display: none; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 1.5rem; 
+            box-sizing: border-box; 
+            text-align: center; 
+            background-color: var(--card-bg); 
+            border-radius: 12px; 
+            box-shadow: var(--shadow); 
         }
-        /* Loader CSS */
-        .loader {
-            border-top-color: #3498db;
-            animation: spin 1s linear infinite;
+        .screen.active { display: flex; }
+        
+        /* Dil Seçici */
+        .language-selector { position: fixed; top: 15px; right: 15px; z-index: 100; }
+        .language-button { background: rgba(255, 255, 255, 0.9); border: 2px solid #3498db; border-radius: 20px; padding: 5px 15px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: bold; }
+        .language-options { display: none; position: absolute; top: 100%; right: 0; background: white; border: 1px solid #ddd; border-radius: 8px; margin-top: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden; z-index: 101; min-width: 150px; }
+        .language-option { padding: 8px 15px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+        .language-option:hover { background: #f5f5f5; }
+
+        /* Utility */
+        .btn { @apply w-full text-xl font-bold py-3 px-6 rounded-xl shadow-lg transition-all duration-200 ease-in-out; }
+        .btn-primary { @apply bg-blue-600 text-white hover:bg-blue-500 active:scale-95; }
+        .input-field { @apply w-full text-lg bg-gray-200 text-gray-900 border-2 border-gray-400 rounded-lg p-3 text-center placeholder-gray-500 focus:outline-none focus:border-blue-500; }
+        
+        /* Qlobal Mesaj */
+        #globalMessage { 
+            display: none; 
+            position: fixed; 
+            top: 20px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            z-index: 50; 
+            width: 90%;
+            max-width: 400px;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        #globalMessage.show { display: block; }
+        
+        /* Oyun Taxtası */
+        .memory-board {
+            display: grid;
+            gap: 8px; 
+            padding: 5px 0;
+            grid-template-columns: repeat(4, 1fr); /* 4x5 = 20 Kart */
         }
-        /* Card CSS for Memory Game */
+        
+        /* Kart Stilleri */
         .card-container {
-            padding: 4px;
+            perspective: 1000px; 
+            aspect-ratio: 1; /* Kartları kvadrat edir */
         }
         .card {
-            width: 100%;
-            height: 100%;
-            position: relative;
-            transform-style: preserve-3d;
-            transition: transform 0.6s;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            width: 100%; height: 100%; border-radius: 10px; cursor: pointer; position: relative;
+            transform-style: preserve-3d; 
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         }
-        .card.flipped {
-            transform: rotateY(180deg);
-            cursor: default;
-        }
+        .card.flipped { transform: rotateY(180deg); }
         .card-face {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            backface-visibility: hidden;
-            border-radius: 8px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 2.5rem;
-            font-weight: bold;
-            border: 2px solid #4a5568;
-            transition: border 0.3s;
+            position: absolute; width: 100%; height: 100%;
+            backface-visibility: hidden; 
+            display: flex; justify-content: center; align-items: center;
+            border-radius: 10px; font-size: 1.8rem; font-weight: bold;
         }
-        .front {
-            background-color: #4a5568;
-            color: #fff;
+        .card-face.front {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white; border: 3px solid var(--card-bg);
+            transform: rotateY(0deg); z-index: 2;
         }
-        .back {
-            background-color: #2b6cb0; 
-            color: #fff;
-            transform: rotateY(180deg);
+        .card-face.back {
+            background: var(--card-bg); color: var(--text-color);
+            transform: rotateY(180deg); z-index: 1;
         }
-        .card:not(.flipped):hover {
-             transform: scale(1.05); 
-        }
-        .card.vibrate {
-            animation: vibrate 0.1s infinite;
-        }
+        /* Vibrasiya */
         @keyframes vibrate {
-            0% { transform: translate(1px, 1px) rotate(0deg); }
-            25% { transform: translate(-1px, -2px) rotate(-1deg); }
-            50% { transform: translate(-3px, 0px) rotate(1deg); }
-            75% { transform: translate(1px, 2px) rotate(0deg); }
-            100% { transform: translate(1px, -1px) rotate(-1deg); }
+            0% { transform: translate(1px, 1px); } 20% { transform: translate(-1px, -2px); }
+            40% { transform: translate(-3px, 0px); } 60% { transform: translate(3px, 2px); }
+            80% { transform: translate(1px, -1px); } 100% { transform: translate(-1px, 2px); }
         }
+        .vibrate { animation: vibrate 0.2s linear 3; }
     </style>
+</head>
+<body class="bg-gray-900 select-none">
+    
+    <div class="language-selector">
+        <button id="language-button" class="language-button" onclick="window.languageManager.toggleLanguageSelector()">
+            <span id="current-language-flag">🇦🇿</span>
+            <i class="fas fa-chevron-down text-xs"></i>
+        </button>
+        <div id="language-selector" class="language-options">
+            <div class="language-option" onclick="window.languageManager.setLanguage('az')">🇦🇿 Azərbaycanca</div>
+            <div class="language-option" onclick="window.languageManager.setLanguage('tr')">🇹🇷 Türkçe</div>
+            <div class="language-option" onclick="window.languageManager.setLanguage('en')">🇬🇧 English</div>
+        </div>
+    </div>
+    
+    <div id="globalMessage" class="hidden w-11/12 max-w-md p-4 text-white rounded-lg shadow-lg">
+        <p id="globalMessageText"></p>
+    </div>
+
+    <div id="lobby" class="screen active space-y-6 container">
+        <h1 class="text-5xl font-black text-gray-900" data-lang-key="title">💣 Emoji Bombası</h1>
+        
+        <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-3 rounded text-sm">
+            <p class="font-bold" data-lang-key="rulesTitle">📋 Oyun Qaydaları (YENİ):</p>
+            <ul class="list-disc list-inside mt-2 text-left space-y-1">
+                <li data-lang-key="rule1">Bütün səviyyələr 20 kartdan ibarətdir.</li>
+                <li data-lang-key="rule2">Level 1: Hər oyunçunun 3 bombası (3 canı) var.</li>
+                <li data-lang-key="rule3">Level 2+: Hər oyunçunun 4 bombası (4 canı) var.</li>
+                <li data-lang-key="rule4">Bütün təhlükəsiz kartlar açıldıqda növbəti səviyyəyə keçirsiniz.</li>
+            </ul>
+        </div>
+        
+        <input type="text" id="username" class="input-field" placeholder="İstifadəçi Adınızı Daxil Edin" maxlength="15" data-lang-key="enterName">
+        <input type="text" id="roomCodeInput" class="input-field uppercase" placeholder="Otaq Kodu (Boş buraxın=Yeni Otaq)" maxlength="6" data-lang-key="roomCode">
+        
+        <button id="matchBtn" class="btn btn-primary" data-lang-key="joinGame">➕ Otaq Qur / Odaya Bağlan</button>
+    </div>
+    
+    <div id="waitScreen" class="screen space-y-6 container">
+        <h2 id="waitTitle" class="text-3xl font-bold text-gray-900" data-lang-key="creatingRoom">Otaq Qurulur...</h2>
+        <div id="codeArea" class="space-y-3 hidden">
+            <p class="text-lg text-gray-700" data-lang-key="roomCodeTitle">Otaq Kodunuz:</p>
+            <div id="roomCodeDisplay" class="text-4xl font-extrabold p-4 bg-gray-800 text-yellow-300 rounded-lg tracking-widest"></div>
+            <button id="copyCodeBtn" class="btn bg-gray-600 text-white text-base py-2 max-w-xs" data-lang-key="copyCode">Kopyala</button>
+        </div>
+        <p id="waitStatus" class="text-lg text-gray-700" data-lang-key="waitingForPlayer">Rəqib gözlənilir...</p>
+        <button id="cancelBtn" class="btn bg-red-600 text-base py-3 max-w-xs" data-lang-key="cancel">Ləğv Et</button>
+    </div>
+
+    <div id="gameScreen" class="screen space-y-4 container">
+        
+        <div class="flex justify-between w-full text-gray-800 font-bold p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border-2 border-gray-300">
+            <div class="text-center w-1/3">
+                <p class="text-xs text-gray-600" data-lang-key="you">SƏN</p>
+                <p id="myLives" class="text-2xl text-green-600">❤️❤️❤️</p>
+                <p id="myRole" class="text-xs text-blue-600" data-lang-key="roleHost">Rol: HOST</p>
+            </div>
+            <div class="text-center w-1/3 border-x-2 border-gray-300 px-2">
+                <p class="text-xs text-gray-600" data-lang-key="levelTitle">SƏVİYYƏ</P>
+                <p id="levelDisplay" class="text-2xl font-black text-gray-900">1</p>
+                <p id="turnStatus" class="text-xs font-bold text-red-600 animate-pulse" data-lang-key="waiting">Rəqib gözlənilir...</p>
+            </div>
+            <div class="text-center w-1/3">
+                <p id="opponentName" class="text-xs text-gray-600">RƏQİB</p>
+                <p id="opponentLives" class="text-2xl text-red-500">❤️❤️❤️</p>
+                <p id="opponentRole" class="text-xs text-gray-500" data-lang-key="roleGuest">Rol: QONAQ</p>
+            </div>
+        </div>
+
+        <div id="gameContent" class="p-4 bg-gray-200 rounded-lg w-full space-y-3">
+            <div id="gameBoard" class="grid w-full max-w-sm mx-auto memory-board">
+                </div>
+        </div>
+        
+        <div class="w-full bg-gray-100 p-3 rounded-lg shadow-inner">
+            <div id="chatMessages" class="h-24 overflow-y-auto mb-2 p-2 bg-white rounded border border-gray-300 text-sm space-y-1">
+                </div>
+            <div class="flex">
+                <input type="text" id="chatInput" class="input-field text-sm py-2 px-3 flex-grow rounded-r-none" placeholder="Mesaj yazın..." data-lang-key="typeMessage">
+                <button id="chatSendBtn" class="btn btn-primary text-sm py-2 px-4 rounded-l-none w-auto" data-lang-key="send">Göndər</button>
+            </div>
+        </div>
+        
+        <button id="endGameBtn" class="btn bg-red-600 hover:bg-red-500 text-white text-sm py-2 max-w-xs" data-lang-key="exitGame">🚪 Oyundan Çıx</button>
+    </div>
+
+    <script src="language.js"></script>
+    
+    <script type="module">
+        // game.js faylından lazımi funksiyaları import et
+        import { setupSocketHandlers, showScreen, UIElements } from './game.js';
+        
+        let socket;
+        // Render URL'niz: (QEYD: Bu dəyişəni artıq main.js-də istifadə etmirik, io() avtomatik bağlanır)
+        // const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            // Dil menecerini başlat
+            window.languageManager.initLanguage();
+
+            // Socket.IO bağlantısını başlat
+            connectToServer();
+        });
+
+        function validateInput() {
+            const username = UIElements.usernameInput.value.trim();
+            if (username.length < 2) {
+                UIElements.showGlobalMessage(window.languageManager.t('errorUsername'), true);
+                return false;
+            }
+            return username;
+        }
+
+        function connectToServer() {
+            try {
+                // Render-da host edildikdə, io() avtomatik olaraq eyni ünvana bağlanır
+                socket = io(window.location.origin, {
+                    transports: ['websocket', 'polling'], 
+                    reconnectionAttempts: 5, 
+                    timeout: 20000 
+                });
+
+                socket.on('connect', () => {
+                    UIElements.showGlobalMessage(window.languageManager.t('connected'), false);
+                    showScreen('lobby'); 
+                });
+                
+                socket.on('connect_error', (err) => {
+                    console.error('Bağlantı Hatası:', err);
+                    UIElements.showGlobalMessage(window.languageManager.t('errorConnect'), true);
+                    showScreen('lobby');
+                });
+                
+                socket.on('disconnect', () => {
+                    UIElements.showGlobalMessage(window.languageManager.t('disconnected'), true);
+                });
+
+                // --- Otaq Hadisələri ---
+                socket.on('roomCreated', (code) => {
+                    document.getElementById('roomCodeDisplay').textContent = code;
+                    document.getElementById('waitTitle').textContent = window.languageManager.t('roomCreated');
+                    document.getElementById('codeArea').classList.remove('hidden');
+                    document.getElementById('waitStatus').textContent = window.languageManager.t('waitingForPlayer');
+                });
+                
+                socket.on('joinFailed', (message) => {
+                    UIElements.showGlobalMessage(message, true);
+                    UIElements.resetGame(); // Lobi-yə qaytarır
+                });
+                
+                socket.on('gameStart', ({ players, roomCode }) => {
+                    const opponent = players.find(p => p.id !== socket.id);
+                    const self = players.find(p => p.id === socket.id);
+                    
+                    // Oyun məntiqini (game.js) socket ilə birləşdir
+                    setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
+                });
+
+            } catch (e) {
+                console.error('Socket.IO genel hatası:', e);
+                UIElements.showGlobalMessage('Kritik qoşulma xətası baş verdi.', true);
+            }
+        }
+        
+        // --- Klik Hadisələri (Event Listeners) ---
+        UIElements.matchBtn.addEventListener('click', () => {
+            const username = validateInput();
+            if (!username) return;
+            
+            showScreen('wait');
+            const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
+
+            if (roomCode === '') {
+                // Yeni Otaq Qur
+                document.getElementById('waitTitle').textContent = window.languageManager.t('creatingRoom');
+                document.getElementById('waitStatus').textContent = window.languageManager.t('pleaseWait');
+                document.getElementById('codeArea').classList.add('hidden');
+                socket.emit('createRoom', { username });
+            } else {
+                // Otağa Qoşul
+                document.getElementById('waitTitle').textContent = `${window.languageManager.t('joiningRoom')} ${roomCode}`;
+                document.getElementById('waitStatus').textContent = window.languageManager.t('joining');
+                document.getElementById('codeArea').classList.add('hidden');
+                socket.emit('joinRoom', { username, roomCode });
+            }
+        });
+
+        document.getElementById('cancelBtn').addEventListener('click', UIElements.resetGame);
+        document.getElementById('endGameBtn').addEventListener('click', UIElements.resetGame);
+        
+        document.getElementById('copyCodeBtn').addEventListener('click', () => {
+            const textToCopy = document.getElementById('roomCodeDisplay').textContent;
+            navigator.clipboard.writeText(textToCopy)
+                .then(() => UIElements.showGlobalMessage(window.languageManager.t('copied'), false))
+                .catch(() => UIElements.showGlobalMessage(window.languageManager.t('copyFailed'), true));
+        });
+
+    </script>
 </body>
 </html>
