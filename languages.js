@@ -1,172 +1,224 @@
 // Dosya Adı: language.js
-// Language strings for the game
 const languages = {
     az: {
         languageName: '🇦🇿 Azərbaycanca',
-        // Menu
-        gameTitle: '2 OYUN 1 UCUZ',
-        selectGame: 'Oyun Seçin',
-        memoryGame: '💣 BOMBA KARTLARI (Hafıza)',
-        pongGame: '🏓 PİNG PONG (Sürətli Çubuğ)',
-        // Lobby
+        // Başlıq və Qaydalar
+        title: '💣 Emoji Bombası',
+        rulesTitle: '📋 Oyun Qaydaları (YENİ):',
+        rule1: 'Bütün səviyyələr 20 kartdan ibarətdir.',
+        rule2: 'Level 1: Hər oyunçunun 3 bombası (3 canı) var.',
+        rule3: 'Level 2+: Hər oyunçunun 4 bombası (4 canı) var.',
+        rule4: 'Bütün təhlükəsiz kartlar açıldıqda növbəti səviyyəyə keçirsiniz.',
+        // Lobi
         enterName: 'İstifadəçi Adınızı Daxil Edin',
-        startGame: '✅ Otaq Qur',
-        joinGame: '➕ Otağa Bağlan',
         roomCode: 'Otaq Kodu (Boş buraxın=Yeni Otaq)',
-        // Game (Memory)
-        yourTurn: '✅ SİZİN NÖVBƏNİZ!',
-        opponentTurn: '⏳ Rəqibin növbəsi',
-        gameStarting: '🎮 Oyun başlayır!',
-        selectCards: '📌 Kart seçin',
-        gameOver: '🎮 Oyun bitdi!',
-        youWon: '🎉 QAZANDIN!',
-        youLost: '😔 Məğlub oldun',
-        draw: '🤝 Bərabərə',
-        nextLevel: 'Növbəti səviyyə',
-        // Pong 
-        pongGameStatus: 'Rəqib: {name}', 
+        joinGame: '➕ Otaq Qur / Odaya Bağlan',
+        // Gözləmə
+        creatingRoom: 'Otaq Qurulur...',
+        roomCreated: 'Otağınız Quruldu!',
+        roomCodeTitle: 'Otaq Kodunuz:',
+        copyCode: 'Kopyala',
+        waitingForPlayer: 'Rəqib gözlənilir...',
+        pleaseWait: 'Zəhmət olmasa gözləyin...',
+        joiningRoom: 'Otağa Qoşulma:',
+        joining: 'Qoşulunur...',
+        cancel: 'Ləğv Et',
+        // Oyun Ekranı
+        you: 'SƏN',
+        levelTitle: 'SƏVİYYƏ',
+        waiting: 'Rəqib gözlənilir...',
+        roleHost: 'Rol: HOST',
+        roleGuest: 'Rol: QONAQ',
+        yourTurn: '✅ SƏNİN NÖVBƏN!',
+        opponentTurn: '⏳ RƏQİBİN NÖVBƏSİ',
+        exitGame: '🚪 Oyundan Çıx',
         // Chat
-        send: 'Göndər',
         typeMessage: 'Mesaj yazın...',
-        // Messages
-        playerLeft: 'Oyuncu ayrıldı. Menüye dönülür...',
-        waitingForPlayer: 'Oyunçu gözlənilir...',
-        bombExploded: 'BOMBA! Partladın!',
-        levelStarting: 'Səviyyə {level} başlayır, {lives} can ilə...',
-        // UI
-        lives: '{lives}',
-        level: 'Səviyyə: {level}',
-        opponent: 'Rəqib: {name}',
-        roleHost: '🎮 Rol: HOST (Sən başla)',
-        roleGuest: '🎮 Rol: QONAQ (Rəqib başlayır)'
+        send: 'Göndər',
+        // Xəbərdarlıqlar və Mesajlar
+        connected: 'Serverə qoşuldu.',
+        disconnected: 'Bağlantı kəsildi. Yenidən qoşulunur...',
+        errorConnect: 'XƏTA: Serverə daxil olmaq mümkün deyil.',
+        errorUsername: 'Zəhmət olmasa etibarlı bir istifadəçi adı daxil edin.',
+        copied: 'Otaq Kodu Kopyalandı!',
+        copyFailed: 'Kopyalama uğursuz oldu.',
+        bombExploded: 'BOOM! Bombaya basdınız!',
+        gameOver: 'Oyun Bitdi!',
+        youWon: '🎉 QAZANDIN!',
+        youLost: '😔 MƏĞLUB OLDUN.',
+        draw: '🤝 BƏRABƏRƏ!',
+        levelComplete: 'Səviyyə {level} tamamlandı! Növbəti səviyyə...',
+        levelStarting: 'Səviyyə {level} başlayır ({lives} can).',
+        cardOpened: 'Bu kart artıq açılıb.',
     },
     tr: {
         languageName: '🇹🇷 Türkçe',
-        // Menu
-        gameTitle: '2 OYUN 1 FİYATINA',
-        selectGame: 'Oyun Seçin',
-        memoryGame: '💣 BOMBA KARTLARI (Hafıza)',
-        pongGame: '🏓 PİNG PONG (Hızlı Raket)',
-        // Lobby
+        // Başlıq ve Kurallar
+        title: '💣 Emoji Bombası',
+        rulesTitle: '📋 Oyun Kuralları (YENİ):',
+        rule1: 'Tüm seviyeler 20 karttan oluşur.',
+        rule2: 'Level 1: Her oyuncunun 3 bombası (3 canı) var.',
+        rule3: 'Level 2+: Her oyuncunun 4 bombası (4 canı) var.',
+        rule4: 'Tüm güvenli kartlar açıldığında sonraki seviyeye geçilir.',
+        // Lobi
         enterName: 'Kullanıcı Adınızı Girin',
-        startGame: '✅ Oda Kur',
-        joinGame: '➕ Odaya Bağlan',
         roomCode: 'Oda Kodu (Boş Bırakın=Yeni Oda)',
-        // Game (Memory)
-        yourTurn: '✅ SIRADA SİZ!',
+        joinGame: '➕ Oda Kur / Odaya Katıl',
+        // Bekleme
+        creatingRoom: 'Oda Kuruluyor...',
+        roomCreated: 'Odanız Kuruldu!',
+        roomCodeTitle: 'Oda Kodunuz:',
+        copyCode: 'Kopyala',
+        waitingForPlayer: 'Rakip bekleniyor...',
+        pleaseWait: 'Lütfen bekleyin...',
+        joiningRoom: 'Odaya Katılma:',
+        joining: 'Katılınılıyor...',
+        cancel: 'İptal Et',
+        // Oyun Ekranı
+        you: 'SEN',
+        levelTitle: 'SEVİYE',
+        waiting: 'Rakip bekleniyor...',
+        roleHost: 'Rol: EV SAHİBİ',
+        roleGuest: 'Rol: MİSAFİR',
+        yourTurn: '✅ SIRA SENDE!',
         opponentTurn: '⏳ RAKİBİN SIRASI',
-        gameStarting: '🎮 Oyun Başlıyor!',
-        selectCards: '📌 Kart seçin',
-        gameOver: '🎮 Oyun Bitti!',
-        youWon: '🎉 KAZANDIN!',
-        youLost: '😔 KAYBETTİN',
-        draw: '🤝 BERABERE',
-        nextLevel: 'Sonraki Seviye',
-        // Pong
-        pongGameStatus: 'Rakip: {name}', 
+        exitGame: '🚪 Oyundan Çık',
         // Chat
-        send: 'Gönder',
         typeMessage: 'Mesaj yazın...',
-        // Messages
-        playerLeft: 'Oyuncu ayrıldı. Menüye dönülüyor...',
-        waitingForPlayer: 'Oyuncu bekleniyor...',
-        bombExploded: 'BOMBA! Patladın!',
-        levelStarting: 'Seviye {level} başlıyor, {lives} can ile...',
-        // UI
-        lives: '{lives}',
-        level: 'Seviye: {level}',
-        opponent: 'Rakip: {name}',
-        roleHost: '🎮 Rol: EV SAHİBİ (Sen başla)',
-        roleGuest: '🎮 Rol: MİSAFİR (Rakip başlar)'
+        send: 'Gönder',
+        // Uyarılar ve Mesajlar
+        connected: 'Sunucuya bağlandı.',
+        disconnected: 'Bağlantı kesildi. Yeniden bağlanılıyor...',
+        errorConnect: 'HATA: Sunucuya erişilemiyor.',
+        errorUsername: 'Lütfen geçerli bir kullanıcı adı girin.',
+        copied: 'Oda Kodu Kopyalandı!',
+        copyFailed: 'Kopyalama başarısız.',
+        bombExploded: 'BOOM! Bombaya bastınız!',
+        gameOver: 'Oyun Bitti!',
+        youWon: '🎉 KAZANDIN!',
+        youLost: '😔 KAYBETTİN.',
+        draw: '🤝 BERABERE!',
+        levelComplete: 'Seviye {level} tamamlandı! Sonraki seviye...',
+        levelStarting: 'Seviye {level} başlıyor ({lives} can).',
+        cardOpened: 'Bu kart zaten açık.',
     },
     en: {
         languageName: '🇬🇧 English',
-        // Menu
-        gameTitle: '2 GAMES FOR 1',
-        selectGame: 'Select Game',
-        memoryGame: '💣 BOMB CARDS (Memory)',
-        pongGame: '🏓 PING PONG (Fast Paddle)',
+        // Title and Rules
+        title: '💣 Emoji Bomb',
+        rulesTitle: '📋 Game Rules (NEW):',
+        rule1: 'All levels consist of 20 cards.',
+        rule2: 'Level 1: Each player has 3 bombs (3 lives).',
+        rule3: 'Level 2+: Each player has 4 bombs (4 lives).',
+        rule4: 'When all safe cards are opened, you advance to the next level.',
         // Lobby
         enterName: 'Enter Your Username',
-        startGame: '✅ Create Room',
-        joinGame: '➕ Join Room',
         roomCode: 'Room Code (Leave Blank=New Room)',
-        // Game (Memory)
+        joinGame: '➕ Create / Join Room',
+        // Waiting
+        creatingRoom: 'Creating Room...',
+        roomCreated: 'Your Room is Ready!',
+        roomCodeTitle: 'Your Room Code:',
+        copyCode: 'Copy',
+        waitingForPlayer: 'Waiting for opponent...',
+        pleaseWait: 'Please wait...',
+        joiningRoom: 'Joining Room:',
+        joining: 'Joining...',
+        cancel: 'Cancel',
+        // Game Screen
+        you: 'YOU',
+        levelTitle: 'LEVEL',
+        waiting: 'Waiting for opponent...',
+        roleHost: 'Role: HOST',
+        roleGuest: 'Role: GUEST',
         yourTurn: '✅ YOUR TURN!',
         opponentTurn: '⏳ OPPONENT\'S TURN',
-        gameStarting: '🎮 Game Starting!',
-        selectCards: '📌 Select cards',
-        gameOver: '🎮 Game Over!',
-        youWon: '🎉 YOU WON!',
-        youLost: '😔 YOU LOST',
-        draw: '🤝 DRAW',
-        nextLevel: 'Next Level',
-        // Pong
-        pongGameStatus: 'Opponent: {name}', 
+        exitGame: '🚪 Exit Game',
         // Chat
-        send: 'Send',
         typeMessage: 'Type a message...',
-        // Messages
-        playerLeft: 'Player left. Returning to menu...',
-        waitingForPlayer: 'Waiting for player...',
+        send: 'Send',
+        // Alerts and Messages
+        connected: 'Connected to server.',
+        disconnected: 'Disconnected. Reconnecting...',
+        errorConnect: 'ERROR: Cannot connect to server.',
+        errorUsername: 'Please enter a valid username.',
+        copied: 'Room Code Copied!',
+        copyFailed: 'Copy failed.',
         bombExploded: 'BOOM! You hit a bomb!',
-        levelStarting: 'Level {level} starting with {lives} lives...',
-        // UI
-        lives: '{lives}',
-        level: 'Level: {level}',
-        opponent: 'Opponent: {name}',
-        roleHost: '🎮 Role: HOST (You start)',
-        roleGuest: '🎮 Role: GUEST (Opponent starts)'
+        gameOver: 'Game Over!',
+        youWon: '🎉 YOU WON!',
+        youLost: '😔 YOU LOST.',
+        draw: '🤝 IT\'S A DRAW!',
+        levelComplete: 'Level {level} complete! Next level...',
+        levelStarting: 'Level {level} starting ({lives} lives).',
+        cardOpened: 'This card is already open.',
     }
 };
 
-// Detect user's language based on IP or browser settings
-function detectLanguage() {
-    let lang = 'az';
-    const urlParams = new URLSearchParams(window.location.search);
-    const langParam = urlParams.get('lang');
-    
-    if (langParam && languages[langParam]) {
-        return langParam;
+// --- Dil Meneceri (Dəyişməyib) ---
+
+// Get a translated string
+function t(key, params = {}) {
+    let lang = window.languageManager.currentLanguage;
+    if (!languages[lang] || !languages[lang][key]) {
+        // Fallback to English if key not found
+        lang = 'en';
     }
+    let str = languages[lang][key] || key;
     
-    const browserLang = navigator.language || navigator.userLanguage;
-    if (browserLang) {
-        if (browserLang.startsWith('tr')) {
-            lang = 'tr';
-        } else if (browserLang.startsWith('en')) {
-            lang = 'en';
-        }
-    }
-    return lang;
+    Object.keys(params).forEach(param => {
+        str = str.replace(`{${param}}`, params[param]);
+    });
+    return str;
 }
 
-// Set language and update UI
-let currentLanguage = detectLanguage();
+function detectLanguage() {
+    const savedLang = localStorage.getItem('preferredLanguage');
+    if (savedLang && languages[savedLang]) return savedLang;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const langParam = urlParams.get('lang');
+    if (langParam && languages[langParam]) return langParam;
+
+    const browserLang = navigator.language || navigator.userLanguage;
+    if (browserLang) {
+        if (browserLang.startsWith('tr')) return 'tr';
+        if (browserLang.startsWith('en')) return 'en';
+    }
+    return 'az'; // Default
+}
 
 function setLanguage(lang) {
     if (languages[lang]) {
-        currentLanguage = lang;
-        const url = new URL(window.location);
-        url.searchParams.set('lang', lang);
-        window.history.pushState({}, '', url);
+        window.languageManager.currentLanguage = lang;
         localStorage.setItem('preferredLanguage', lang);
         updateUI();
     }
 }
 
-// Get a translated string
-function t(key, params = {}) {
-    let str = languages[currentLanguage][key] || key;
+function updateUI() {
+    const lang = window.languageManager.currentLanguage;
     
-    Object.keys(params).forEach(param => {
-        str = str.replace(`{${param}}`, params[param]);
+    // Update language button
+    const langButtonFlag = document.getElementById('current-language-flag');
+    if (langButtonFlag) {
+        langButtonFlag.textContent = languages[lang].languageName.split(' ')[0];
+    }
+    
+    // Update all elements with data-lang-key
+    document.querySelectorAll('[data-lang-key]').forEach(el => {
+        const key = el.getAttribute('data-lang-key');
+        const translation = t(key);
+        
+        // Check if element is an input placeholder
+        if (el.tagName === 'INPUT' && el.hasAttribute('placeholder')) {
+            el.placeholder = translation;
+        } else {
+            el.textContent = translation;
+        }
     });
-    
-    return str;
 }
 
-// Toggle language selector
 function toggleLanguageSelector() {
     const selector = document.getElementById('language-selector');
     if (selector) {
@@ -178,53 +230,22 @@ function toggleLanguageSelector() {
 document.addEventListener('click', (e) => {
     const selector = document.getElementById('language-selector');
     const button = document.getElementById('language-button');
-    
     if (selector && button && !selector.contains(e.target) && !button.contains(e.target)) {
         selector.style.display = 'none';
     }
 });
 
-// Initialize language from localStorage if available
+// Initialize
 function initLanguage() {
-    const savedLang = localStorage.getItem('preferredLanguage');
-    if (savedLang && languages[savedLang]) {
-        currentLanguage = savedLang;
-    }
+    window.languageManager.currentLanguage = detectLanguage();
     updateUI();
-}
-
-// Update all UI elements with translations
-function updateUI() {
-    // Update language button
-    const langButton = document.getElementById('language-button');
-    if (langButton) {
-        langButton.textContent = languages[currentLanguage].languageName;
-    }
-    
-    // Update data-lang-key elements
-    document.querySelectorAll('[data-lang-key]').forEach(el => {
-        const key = el.getAttribute('data-lang-key');
-        if (languages[currentLanguage][key]) {
-            el.textContent = languages[currentLanguage][key];
-        }
-    });
-
-    // Update lobby text (placeholders)
-    const nameInput = document.getElementById('username');
-    const roomInput = document.getElementById('roomCodeInput');
-    if (nameInput) nameInput.placeholder = t('enterName');
-    if (roomInput) roomInput.placeholder = t('roomCode');
-    
-    // Update chat UI
-    const messageInput = document.getElementById('chat-input');
-    if (messageInput) messageInput.placeholder = t('typeMessage');
 }
 
 // Export functions to global scope
 window.languageManager = {
     t,
     setLanguage,
-    currentLanguage: () => currentLanguage,
+    currentLanguage: detectLanguage(),
     initLanguage,
     toggleLanguageSelector,
     updateUI
