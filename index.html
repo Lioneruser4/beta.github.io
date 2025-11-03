@@ -51,8 +51,8 @@
         .screen { 
             width: 100%; 
             height: 100vh;
-            max-width: none;
-            max-height: none;
+            max-width: 100%;
+            max-height: 100%;
             display: none; 
             flex-direction: column; 
             align-items: center; 
@@ -63,7 +63,7 @@
             background-color: #2d3748;
             border-radius: 0;
             box-shadow: none;
-            overflow-y: auto;
+            overflow: hidden;
             -webkit-overflow-scrolling: touch;
             position: fixed;
             top: 0;
@@ -142,14 +142,9 @@
         .btn-primary:hover {
             box-shadow: 0 8px 20px rgba(66, 153, 225, 0.6);
         }
-        .input-field {
-            @apply w-full p-5 text-xl rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200;
-            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
-            height: 60px;
-            font-size: 1.1rem;
-        }
-        .input-field:focus {
-            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5), inset 0 2px 5px rgba(0,0,0,0.2);
+        .btn:active {
+            transform: translateY(0) scale(0.98);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
 
         /* Global Mesaj */
@@ -237,14 +232,15 @@
         .game-board {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 3px;
-            margin: 5px auto;
+            gap: 0.25rem;
+            margin: 0 auto;
             max-width: 100%;
             width: 100%;
             perspective: 1000px;
-            padding: 0 5px;
+            padding: 0.25rem;
             box-sizing: border-box;
             flex: 1;
+            overflow: hidden;
         }
         .card-container {
             perspective: 1000px; 
@@ -252,19 +248,21 @@
             width: 100%; /* Esneklik */
         }
         .card {
-            aspect-ratio: 1/1;
+            aspect-ratio: 1;
             background: #4a5568;
-            border-radius: 6px;
+            border-radius: 0.5rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.2rem;
+            font-size: 1.25rem;
             cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
             transform-style: preserve-3d;
-            transition: transform 0.4s, background-color 0.2s;
             position: relative;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
             min-width: 0;
-            border: 1px solid #2d3748;
+            min-height: 0;
         }
         .card.flipped {
             transform: rotateY(180deg);
@@ -323,12 +321,13 @@
             margin-bottom: 1rem;
         }
         #gameScreen .status-panel {
-            background: linear-gradient(135deg, #3182ce, #667eea); /* Güzel bir gradient */
-            color: #f7fafc;
-            border-radius: 15px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            background: rgba(45, 55, 72, 0.9);
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            margin: 0.25rem 0;
+            width: 100%;
+            max-width: 100%;
+            font-size: 0.9rem;
         }
         #turnStatus {
             font-size: 1.8rem;
@@ -462,28 +461,32 @@
         <button id="cancelBtn" class="btn bg-red-600 text-base py-3 max-w-xs">Ləğv Et / Lobiye Qayıt <i class="fas fa-times-circle ml-2"></i></button>
     </div>
 
-    <div id="gameScreen" class="screen space-y-4">
-        <h1 class="text-4xl font-black">🕹️ Emoji Bombası</h1>
+    <div id="gameScreen" class="screen">
+        <div class="w-full flex justify-between items-center p-1">
+            <div class="text-left pl-2">
+                <div id="myLives" class="text-xl">❤️❤️❤️</div>
+                <div class="text-xs text-blue-300">SEN</div>
+            </div>
+            
+            <div class="text-center">
+                <h1 class="text-xl font-bold m-0 p-0">💣</h1>
+                <div id="levelInfo" class="text-xs">Seviye: 1</div>
+            </div>
+            
+            <div class="text-right pr-2">
+                <div id="opponentLives" class="text-xl">❤️❤️❤️</div>
+                <div id="opponentName" class="text-xs text-blue-300">Rakip</div>
+            </div>
+        </div>
         
-        <div class="flex justify-between items-center w-full text-gray-100 font-bold p-3 status-panel max-w-md">
-            <div class="text-center">
-                <p class="text-sm text-blue-200">SƏN</p>
-                <p id="myLives" class="text-3xl text-red-400">❤️❤️❤️</p>
-            </div>
-            <div class="text-center">
-                <p class="text-sm text-blue-200">VS</p>
-                <p id="opponentName" class="text-xl text-blue-100 font-bold"></p>
-            </div>
-            <div class="text-center">
-                <p class="text-sm text-blue-200">RƏQİB</p>
-                <p id="opponentLives" class="text-3xl text-red-400">❤️❤️❤️</p>
-            </div>
+        <div class="w-full text-center p-1">
+            <div id="turnStatus" class="text-sm font-bold text-yellow-400">SIRA SENDE</div>
+            <div id="actionMessage" class="text-xs text-gray-300">Bir kart seç</div>
         </div>
         <p id="roleStatus" class="text-gray-300 text-xs bg-gray-700 p-2 rounded-lg"></p>
 
         <div id="gameContent" class="bg-gray-800 rounded-xl w-full space-y-4 p-4 shadow-xl">
             <h3 id="turnStatus" class="text-2xl font-bold text-red-400 animate-pulse">Rəqib gözlənilir...</h3>
-            <p id="actionMessage" class="text-base text-blue-300 font-semibold"></p>
             
             <div id="gameBoard" class="grid w-full mx-auto">
             </div>
