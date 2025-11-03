@@ -1,5 +1,7 @@
 // Dosya Adı: pong.js
-// İki Oyunlu Yapı için Yeni Ping Pong İstemci Mantığı
+// Ping Pong İstemci Mantığı
+
+import { showScreen, showGlobalMessage, t } from './main.js'; 
 
 let pongSocket;
 let pongCurrentRoomCode = '';
@@ -11,7 +13,7 @@ const canvas = document.getElementById('pongCanvas');
 const ctx = canvas.getContext('2d');
 let animationFrameId;
 
-// Oyun Alanı Boyutları (CSS tarafından ayarlanacak, burada oranları kullanıyoruz)
+// Oyun Alanı Boyutları (index.html'den sabitlenmiş)
 const CANVAS_WIDTH = 600;
 const CANVAS_HEIGHT = 400;
 
@@ -27,9 +29,11 @@ let guestPaddleY = CANVAS_HEIGHT / 2 - PADDLE_HEIGHT / 2;
 const BALL_SIZE = 8;
 let ballX = CANVAS_WIDTH / 2;
 let ballY = CANVAS_HEIGHT / 2;
-let ballSpeedX = 4; // Başlangıç X hızı
-let ballSpeedY = 4; // Başlangıç Y hızı
-const MAX_SPEED = 12; // Maksimum Top Hızı
+let ballSpeedX = 0; // Başlangıçta sıfır, Host başlatır
+let ballSpeedY = 0; 
+const INITIAL_SPEED = 4;
+const MAX_SPEED = 12; 
+const MAX_SCORE = 10; // Oyun bitiş skoru
 
 // Skor
 let hostScore = 0;
@@ -42,8 +46,9 @@ const keys = {};
 const pongScoreEl = document.getElementById('pongScore');
 const pongStatusEl = document.getElementById('pongStatus');
 
-// --- SESLER (Yeni) ---
-const audioPaddle = new Audio('paddle_hit.mp3');
+// --- SESLER ---
+// Ses dosyalarının root dizinde olduğu varsayılır.
+const audioPaddle = new Audio('paddle_hit.mp3'); 
 const audioWall = new Audio('wall_hit.mp3');
 const audioScore = new Audio('score.mp3');
 
@@ -86,27 +91,36 @@ function draw() {
     drawCircle(ballX, ballY, BALL_SIZE, 'white');
 }
 
-// --- GÜNCELLEME VE ÇARPIŞMA MANTIĞI ---
+// --- GÜNCELLEME VE ÇARPIŞMA MANTIĞI (Sadece Host'ta Çalışır) ---
 
 function updateLocalPaddle() {
     const isUp = keys['w'] || keys['W'] || keys['ArrowUp'];
     const isDown = keys['s'] || keys['S'] || keys['ArrowDown'];
 
+    let currentY;
     if (pongIsHost) {
-        if (isUp) hostPaddleY -= PADDLE_SPEED;
-        if (isDown) hostPaddleY += PADDLE_SPEED;
-        hostPaddleY = Math.max(0, Math.min(CANVAS_HEIGHT - PADDLE_HEIGHT, hostPaddleY));
-        pongSocket.emit('pongMove', { roomCode: pongCurrentRoomCode, y: hostPaddleY, isHost: true });
+        currentY = hostPaddleY;
     } else {
-        if (isUp) guestPaddleY -= PADDLE_SPEED;
-        if (isDown) guestPaddleY += PADDLE_SPEED;
-        guestPaddleY = Math.max(0, Math.min(CANVAS_HEIGHT - PADDLE_HEIGHT, guestPaddleY));
-        pongSocket.emit('pongMove', { roomCode: pongCurrentRoomCode, y: guestPaddleY, isHost: false });
+        currentY = guestPaddleY;
     }
+
+    if (isUp) currentY -= PADDLE_SPEED;
+    if (isDown) currentY += PADDLE_SPEED;
+    currentY = Math.max(0, Math.min(CANVAS_HEIGHT - PADDLE_HEIGHT, currentY));
+    
+    // Y Sınırlama ve Güncelleme
+    if (pongIsHost) {
+        hostPaddleY = currentY;
+    } else {
+        guestPaddleY = currentY;
+    }
+
+    // Hareketi Server'a gönder
+    pongSocket.emit('pongMove', { roomCode: pongCurrentRoomCode, y: currentY, isHost: pongIsHost });
 }
 
 function updateBall() {
-    if (pongIsHost) { // Topun hareket mantığı sadece Host'ta çalışır (Server'a daha az yük)
+    if (pongIsHost) { // Topun hareket ve çarpışma mantığı sadece Host'ta çalışır
         ballX += ballSpeedX;
         ballY += ballSpeedY;
 
@@ -117,40 +131,31 @@ function updateBall() {
             ballY = Math.max(BALL_SIZE, Math.min(CANVAS_HEIGHT - BALL_SIZE, ballY));
         }
 
-        // Host Çubuk Çarpışması (Sol taraf)
-        if (ballX - BALL_SIZE < PADDLE_WIDTH && ballX - BALL_SIZE > 0) {
-            if (ballY > hostPaddleY && ballY < hostPaddleY + PADDLE_HEIGHT) {
-                playPongSound(audioPaddle);
-                // X Hızını artır ve yönü tersine çevir
-                ballSpeedX = Math.min(MAX_SPEED, -ballSpeedX + 0.5); 
-                // Y Hızını çubuğun neresine çarptığına göre ayarla
-                let relativeIntersectY = (hostPaddleY + (PADDLE_HEIGHT / 2)) - ballY;
-                let normalizedRelativeIntersectionY = (relativeIntersectY / (PADDLE_HEIGHT / 2));
-                ballSpeedY = normalizedRelativeIntersectionY * (-ballSpeedX) * 0.5; // Açıyı dinamikleştir
+        // Çubuk Çarpışması Kontrolü
+        const isHostHitting = ballSpeedX < 0 && ballX - BALL_SIZE < PADDLE_WIDTH;
+        const isGuestHitting = ballSpeedX > 0 && ballX + BALL_SIZE > CANVAS_WIDTH - PADDLE_WIDTH;
 
-                // Server'a güncel top durumunu gönder
-                pongSocket.emit('pongBallUpdate', { 
-                    roomCode: pongCurrentRoomCode, 
-                    x: ballX, 
-                    y: ballY, 
-                    speedX: ballSpeedX, 
-                    speedY: ballSpeedY 
-                });
-            }
-        }
-        
-        // Guest Çubuk Çarpışması (Sağ taraf)
-        if (ballX + BALL_SIZE > CANVAS_WIDTH - PADDLE_WIDTH && ballX + BALL_SIZE < CANVAS_WIDTH) {
-            if (ballY > guestPaddleY && ballY < guestPaddleY + PADDLE_HEIGHT) {
+        if (isHostHitting || isGuestHitting) {
+            const paddleY = isHostHitting ? hostPaddleY : guestPaddleY;
+            
+            if (ballY > paddleY && ballY < paddleY + PADDLE_HEIGHT) {
                 playPongSound(audioPaddle);
-                // X Hızını artır ve yönü tersine çevir
-                ballSpeedX = Math.min(MAX_SPEED, -ballSpeedX - 0.5);
-                // Y Hızını ayarla
-                let relativeIntersectY = (guestPaddleY + (PADDLE_HEIGHT / 2)) - ballY;
+                
+                // Dinamik Hız Artışı ve Yön Değiştirme
+                const currentSpeed = Math.abs(ballSpeedX);
+                let newSpeed = Math.min(MAX_SPEED, currentSpeed + 0.5);
+                
+                // Yönü tersine çevir ve yeni hızı ata
+                ballSpeedX = isHostHitting ? newSpeed : -newSpeed;
+                
+                // Y Hızı (Açı) Ayarı
+                let relativeIntersectY = (paddleY + (PADDLE_HEIGHT / 2)) - ballY;
                 let normalizedRelativeIntersectionY = (relativeIntersectY / (PADDLE_HEIGHT / 2));
-                ballSpeedY = normalizedRelativeIntersectionY * (ballSpeedX) * 0.5; // Açıyı dinamikleştir
+                
+                // Yeni Y hızını X hızının bir oranına ayarla (açı ne kadar dikse, Y hızı o kadar büyük olur)
+                ballSpeedY = normalizedRelativeIntersectionY * newSpeed * 0.75; 
 
-                // Server'a güncel top durumunu gönder
+                // Rakibe güncel top durumunu gönder
                 pongSocket.emit('pongBallUpdate', { 
                     roomCode: pongCurrentRoomCode, 
                     x: ballX, 
@@ -163,17 +168,15 @@ function updateBall() {
 
         // Skor Alma (Sınırları Geçme)
         if (ballX < 0) {
-            // Guest puan aldı
             guestScore++;
             playPongSound(audioScore);
             pongSocket.emit('pongScore', { roomCode: pongCurrentRoomCode, score: guestScore, scorerIsHost: false });
-            resetBall(pongIsHost ? 1 : -1);
+            resetBall(1); // Guest'in sahasına düştü, Host başlatsın
         } else if (ballX > CANVAS_WIDTH) {
-            // Host puan aldı
             hostScore++;
             playPongSound(audioScore);
             pongSocket.emit('pongScore', { roomCode: pongCurrentRoomCode, score: hostScore, scorerIsHost: true });
-            resetBall(pongIsHost ? 1 : -1);
+            resetBall(-1); // Host'un sahasına düştü, Guest başlatsın
         }
     }
 }
@@ -182,26 +185,26 @@ function resetBall(direction) {
     ballX = CANVAS_WIDTH / 2;
     ballY = CANVAS_HEIGHT / 2;
     
-    // Yönü rastgele ayarla, hızı sıfırla
-    ballSpeedX = 4 * direction;
-    ballSpeedY = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 3 + 1);
-
-    // Host değilse ve Host'tan yeni top bilgisi bekleniyorsa
-    if (!pongIsHost) {
+    // Topu Host başlatır (+1 yön), Guest başlatır (-1 yön)
+    if (pongIsHost) {
+        ballSpeedX = INITIAL_SPEED * direction;
+        ballSpeedY = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 3 + 1);
+    } else {
+        // Guest sadece koordinatları alır, hızı sıfır tutar.
         ballSpeedX = 0;
         ballSpeedY = 0;
     }
-    
+
     updatePongScoreDisplay();
     
-    if (hostScore >= 10 || guestScore >= 10) {
+    if (hostScore >= MAX_SCORE || guestScore >= MAX_SCORE) {
         endPongGame();
     }
 }
 
 function gameLoop() {
     updateLocalPaddle();
-    updateBall();
+    updateBall(); // Sadece Host topu günceller
     draw();
     animationFrameId = requestAnimationFrame(gameLoop);
 }
@@ -211,7 +214,6 @@ function gameLoop() {
 function updatePongScoreDisplay() {
     const myScore = pongIsHost ? hostScore : guestScore;
     const opponentScore = pongIsHost ? guestScore : hostScore;
-    const opponentText = pongOpponentName || 'Rakip';
     
     pongScoreEl.innerHTML = `
         <span class="text-xl font-bold text-blue-400">${myScore}</span> 
@@ -219,34 +221,33 @@ function updatePongScoreDisplay() {
         <span class="text-xl font-bold text-red-400">${opponentScore}</span>
     `;
     
-    pongStatusEl.textContent = `🚀 ${t('pongGame', { name: opponentText })}`;
+    pongStatusEl.textContent = t('pongGameStatus', { name: pongOpponentName });
 }
 
 function endPongGame() {
     cancelAnimationFrame(animationFrameId);
     
-    const winner = hostScore > guestScore ? 'HOST' : 'GUEST';
-    const myRole = pongIsHost ? 'HOST' : 'GUEST';
+    const myScore = pongIsHost ? hostScore : guestScore;
+    const opponentScore = pongIsHost ? guestScore : hostScore;
     
-    let messageKey = 'draw';
-    if (winner === myRole) {
+    let messageKey;
+    if (myScore > opponentScore) {
         messageKey = 'youWon';
-    } else if (winner !== 'HOST' && winner !== 'GUEST') {
-        messageKey = 'draw'; // Should not happen with score limit
-    } else {
+    } else if (myScore < opponentScore) {
         messageKey = 'youLost';
+    } else {
+        messageKey = 'draw';
     }
     
-    showGlobalMessage(t(messageKey, { name: pongOpponentName }), winner === myRole);
+    showGlobalMessage(t('gameOver') + ' ' + t(messageKey), myScore <= opponentScore);
     
-    // Geri dönme
     setTimeout(() => {
-        showScreen('menu');
         resetPongGame();
+        showScreen('menu');
     }, 4000);
 }
 
-function resetPongGame() {
+export function resetPongGame() {
     cancelAnimationFrame(animationFrameId);
     hostScore = 0;
     guestScore = 0;
@@ -257,12 +258,19 @@ function resetPongGame() {
     updatePongScoreDisplay();
     pongCurrentRoomCode = '';
     pongOpponentName = '';
+    
+    document.removeEventListener('keydown', handleKeyDown);
+    document.removeEventListener('keyup', handleKeyUp);
 }
 
 
 // --- GİRİŞ İŞLEYİCİLERİ ---
 
 function handleKeyDown(e) {
+    // W ve S tuşlarını engelle
+    if (e.key === 'w' || e.key === 'W' || e.key === 's' || e.key === 'S') {
+        e.preventDefault(); 
+    }
     keys[e.key] = true;
 }
 
@@ -273,19 +281,16 @@ function handleKeyUp(e) {
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
 
 export function setupPongSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
-    console.log('🎯 setupPongSocketHandlers ÇAĞRILDI!');
-    
     pongSocket = s;
     pongCurrentRoomCode = roomCode;
     pongIsHost = host;
     pongOpponentName = opponentNameFromIndex;
     
-    // Canvas boyutunu ayarla (CSS'de ayarlanmış olmalı, burası sadece fallback)
     canvas.width = CANVAS_WIDTH;
     canvas.height = CANVAS_HEIGHT;
     
     showScreen('pongGame');
-    showGlobalMessage(`🏓 Ping Pong Oyunu ${pongOpponentName} ile başladı!`, false);
+    showGlobalMessage(`🏓 Ping Pong Oyunu ${opponentNameFromIndex} ile başladı!`, false);
     
     // Oyun durumunu sıfırla ve başlat
     hostScore = 0;
@@ -305,9 +310,7 @@ export function setupPongSocketHandlers(s, roomCode, host, opponentNameFromIndex
     gameLoop();
     
     // --- SOCKET.IO İŞLEYİCİLERİ ---
-
-    // Rakip çubuk hareketini al
-    pongSocket.on('pongMove', ({ y, isHost: movedByHost }) => {
+    pongSocket.off('pongMove').on('pongMove', ({ y, isHost: movedByHost }) => {
         if (movedByHost) {
             hostPaddleY = y;
         } else {
@@ -316,7 +319,7 @@ export function setupPongSocketHandlers(s, roomCode, host, opponentNameFromIndex
     });
 
     // Topun durumunu al (Sadece Host'tan)
-    pongSocket.on('pongBallUpdate', ({ x, y, speedX, speedY }) => {
+    pongSocket.off('pongBallUpdate').on('pongBallUpdate', ({ x, y, speedX, speedY }) => {
         if (!pongIsHost) {
             ballX = x;
             ballY = y;
@@ -326,7 +329,7 @@ export function setupPongSocketHandlers(s, roomCode, host, opponentNameFromIndex
     });
     
     // Skor güncellemesi
-    pongSocket.on('pongScore', ({ score, scorerIsHost }) => {
+    pongSocket.off('pongScore').on('pongScore', ({ score, scorerIsHost }) => {
         if (scorerIsHost) {
             hostScore = score;
         } else {
@@ -334,18 +337,12 @@ export function setupPongSocketHandlers(s, roomCode, host, opponentNameFromIndex
         }
         updatePongScoreDisplay();
         
-        if (hostScore >= 10 || guestScore >= 10) {
+        if (hostScore >= MAX_SCORE || guestScore >= MAX_SCORE) {
             endPongGame();
         } else {
-            // Skordan sonra topu sıfırla
             resetBall(pongIsHost ? 1 : -1); 
         }
     });
-
-    // Rakip Ayrıldı
-    pongSocket.on('opponentLeft', (message) => {
-        showGlobalMessage(message || t('playerLeft'), true);
-        resetPongGame();
-        showScreen('menu');
-    });
+    
+    // Rakip ayrılma işleyicisi main.js'te tanımlı.
 }
