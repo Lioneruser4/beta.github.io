@@ -137,14 +137,28 @@
         .btn-primary:hover {
             box-shadow: 0 8px 20px rgba(66, 153, 225, 0.6);
         }
+        
+        /* ⭐ DEYİŞİKLİK BURADA: Input sahələrinin dizaynı və ŞRİFT RƏNGİ */
         .input-field { 
-            @apply w-full text-lg bg-gray-700 text-white border-2 border-gray-600 rounded-xl p-4 text-center placeholder-gray-400 focus:outline-none focus:border-blue-500; 
+            /* Əvvəl: bg-gray-700 text-white */
+            @apply w-full text-lg bg-white text-gray-900 border-2 border-gray-600 rounded-xl p-4 text-center placeholder-gray-400 focus:outline-none focus:border-blue-500; 
             box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
             transition: border-color 0.2s, box-shadow 0.2s;
         }
         .input-field:focus {
             box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5), inset 0 2px 5px rgba(0,0,0,0.2);
         }
+        /* placeholder qara rəngdə olması üçün xüsusi stil (bu Tailwindi əvəz edir) */
+        .input-field::placeholder {
+            color: #6b7280; /* Boz rəng, qara fonda görünməsi üçün bir az daha açıq */
+            opacity: 1; 
+        }
+        /* Yuxarıdakı qara şrift məntiqi işləməzsə, bu CSS işləyəcək: */
+        .input-field {
+            color: #1f2937 !important; /* Məcburi qara şrift */
+        }
+        /* ---------------------------------------------------- */
+
 
         .code-display { 
             @apply text-5xl font-extrabold p-5 bg-gray-800 text-yellow-300 rounded-xl tracking-widest; 
@@ -193,8 +207,7 @@
             to { transform: rotate(360deg); }
         }
         
-        /* ... (Digər stillər qorunur) ... */
-
+        /* OYUN İÇİ STILLƏRİN QALAN HİSSƏSİ QORUNUR */
         #gameScreen {
             padding-top: env(safe-area-inset-top, 20px);
             padding-bottom: env(safe-area-inset-bottom, 20px);
@@ -209,7 +222,6 @@
             max-width: 100%;
             width: 100%;
         }
-        /* OYUN İÇİ STILLƏRİN QALAN HİSSƏSİ QORUNUR */
         
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@700&family=Chakra+Petch:wght@700&display=swap" rel="stylesheet">
@@ -335,6 +347,10 @@
             codeArea: document.getElementById('codeArea'),
             waitStatus: document.getElementById('waitStatus'),
             opponentName: document.getElementById('opponentName'),
+            myLives: document.getElementById('myLives'),
+            opponentLives: document.getElementById('opponentLives'),
+            turnStatus: document.getElementById('turnStatus'),
+            actionMessage: document.getElementById('actionMessage'),
             // Bütün ekranları əldə edin
             screens: document.querySelectorAll('.screen')
         };
@@ -449,13 +465,12 @@
                     UIElements.showGlobalMessage('Bağlantı kəsildi. Yenidən qoşulmağa çalışılır...', true);
                 });
 
-                // --- Otaq Qurulması Olayı ---
+                // --- Otaq Qurulması Olayı (HOST ÜÇÜN) ---
                 socket.on('roomCreated', (code) => {
                     UIElements.roomCodeDisplay.textContent = code;
                     UIElements.waitTitle.textContent = 'Otağınız Quruldu! 🎉';
                     UIElements.codeArea.classList.remove('hidden');
                     UIElements.waitStatus.textContent = 'Otaq kodunu dostunuza göndərin və qoşulmasını gözləyin.';
-                    // showScreen('waitScreen'); // Təkrar çağırışa ehtiyac yoxdur.
                 });
                 
                 socket.on('joinFailed', (message) => {
@@ -463,15 +478,33 @@
                     UIElements.resetGame();
                 });
                 
-                socket.on('gameStart', ({ players, roomCode }) => {
-                    const opponent = players.find(p => p.id !== socket.id);
+                // --- OYUN BAŞLANMASI MƏNTİQİ (HƏR İKİ OYUNÇU ÜÇÜN) ---
+                socket.on('gameStart', (data) => {
+                    console.log("Oyun Başladı! Data:", data);
                     
-                    UIElements.opponentName.textContent = opponent.username;
-                    showScreen('gameScreen'); // Oyuna başlama ekranına keçid
+                    // Rəqibi tapın
+                    const opponent = data.players.find(p => p.id !== socket.id);
+                    
+                    // UI-ı yeniləyin
+                    UIElements.opponentName.textContent = opponent ? opponent.username : "Rəqib";
+                    UIElements.myLives.textContent = '❤️❤️❤️';
+                    UIElements.opponentLives.textContent = '❤️❤️❤️';
+                    
+                    // Növbə statusunu qurun
+                    if (data.currentTurn === socket.id) {
+                         UIElements.turnStatus.textContent = 'SİZİN növbənizdir! Kart seçin.';
+                    } else {
+                         UIElements.turnStatus.textContent = `${UIElements.opponentName.textContent} növbəsidir...`;
+                    }
+
+                    // Ekranı Oyuna Keçirin
+                    showScreen('gameScreen'); 
                     
                     if (window.languageManager && window.languageManager.updateGameUI) {
                         window.languageManager.updateGameUI();
                     }
+                    
+                    UIElements.showGlobalMessage(`Oyun başladı! Otaq: ${data.roomCode}`, false);
                 });
 
             } catch (e) {
@@ -485,7 +518,7 @@
             const username = validateInput();
             if (!username) return;
             
-            // DİQQƏT: Buradakı showScreen('waitScreen') boş ekran problemini həll edir.
+            // Otaq Qur/Qoşul əməliyyatından əvvəl gözləmə ekranına keçid
             showScreen('waitScreen'); 
             
             const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
@@ -507,6 +540,7 @@
 
         document.getElementById('cancelBtn').addEventListener('click', () => {
             if (socket && socket.connected && UIElements.roomCodeDisplay.textContent) {
+                // Serverə otaqdan çıxmaq siqnalını göndər
                 socket.emit('leaveRoom', { roomCode: UIElements.roomCodeDisplay.textContent });
             }
             UIElements.resetGame();
