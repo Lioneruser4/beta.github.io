@@ -2,7 +2,7 @@
 <html lang="az">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, height=device-height">
     <title>💣 Emoji Kart Bomb 1v1</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
@@ -50,22 +50,27 @@
         /* Ana Ekran Düzeni */
         .screen { 
             width: 100%; 
-            height: 100%; /* Tam ekran yüksekliği */
-            max-width: none; /* Max genişliği kaldır */
-            max-height: none; /* Max yüksekliği kaldır */
+            height: 100vh; /* Viewport yüksekliği */
+            max-width: none;
+            max-height: none;
             display: none; 
             flex-direction: column; 
             align-items: center; 
-            justify-content: center; /* İçeriği dikeyde ortala */
-            padding: 1.5rem; 
+            justify-content: flex-start; /* Üstten hizalı */
+            padding: 0.5rem; 
             box-sizing: border-box; 
             text-align: center; 
-            background-color: #2d3748; /* Ekranların arka planı */
-            border-radius: 0; /* Köşeleri sıfırla */
-            box-shadow: none; /* Gölgeyi kaldır (tam ekranda gerek yok) */
-            transition: background-color 0.3s; 
-            overflow-y: auto; /* İçerik taşarsa kaydırılabilir olsun */
-            -webkit-overflow-scrolling: touch; /* iOS'ta yumuşak kaydırma */
+            background-color: #2d3748;
+            border-radius: 0;
+            box-shadow: none;
+            transition: background-color 0.3s;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
         }
         .screen.active { 
             display: flex; 
@@ -233,14 +238,17 @@
             width: 100%;
         }
 
-        .memory-board {
+        .game-board {
             display: grid;
-            gap: 10px; /* Daha fazla boşluk */
-            padding: 10px 0;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            margin: 10px auto;
+            max-width: 100%;
             width: 100%;
-            flex-grow: 1; /* Board'ın dikeyde büyümesini sağlar */
-            max-width: 400px; /* Max genişlik sınırlaması */
-            margin: 0 auto;
+            perspective: 1000px;
+            padding: 0 10px;
+            box-sizing: border-box;
+            flex: 1;
         }
         .card-container {
             perspective: 1000px; 
@@ -248,14 +256,18 @@
             width: 100%; /* Esneklik */
         }
         .card {
-            width: 100%;
-            height: 100%;
-            border-radius: 12px; /* Daha yuvarlak kartlar */
+            aspect-ratio: 1/1;
+            background: #4a5568;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
             cursor: pointer;
-            position: relative;
             transform-style: preserve-3d;
-            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2); /* Daha belirgin gölge */
+            transition: transform 0.5s, background-color 0.3s;
+            position: relative;
+            min-width: 0; /* Prevents flexbox overflow */
         }
         .card.flipped {
             transform: rotateY(180deg);
@@ -402,7 +414,7 @@
             <p class="font-bold text-xl mb-3 text-white">📋 Oyun Qaydaları:</p>
             <ul class="list-disc list-inside mt-2 text-left space-y-2 text-lg">
                 <li>Kartları açaraq rəqibinizin bombalarından qaçın.</li>
-                <li>Hər kəsin **3 canı** var. Bombaya bassanız can itirirsiniz.</li>
+                <li>Hər kəsin ❤️ Canı var. Bombaya bassanız can itirirsiniz.</li>
                 <li>Canı bitən oyunu uduzur!</li>
                 <li>Bütün kartlar açılarsa, yeni səviyyəyə keçirsiniz.</li>
             </ul>
@@ -410,16 +422,16 @@
         
         <div class="w-full animated-lobby-item input-username-container max-w-md">
             <p class="text-left text-base font-semibold mb-2 text-gray-300">
-                👤 **1. İstifadəçi Adınızı Daxil Edin:**
+                👤 1. İstifadəçi Adınızı Daxil Edin:
             </p>
             <input type="text" id="username" class="input-field shadow-lg text-black" placeholder="Oyuncu Adı (min 2 herf)" maxlength="15" style="color: #000000 !important;">
         </div>
         
         <div class="w-full animated-lobby-item input-roomcode-container max-w-md">
             <p class="text-left text-base font-semibold mb-2 text-gray-300">
-                🚪 **2. Otaq Kodu:**
+                🚪 2. Otaq Kodu:
                 <span class="font-normal block text-sm mt-1">
-                    * Yeni otaq qurmaq üçün bu sahəni **BOŞ** buraxın.
+                    * Yeni otaq qurmaq üçün bu sahəni BOŞ buraxın.
                 </span>
                 <span class="font-normal block text-sm">
                     * Mövcud otağa qoşulmaq üçün dostunuzun verdiyi kodu buraya daxil edin.
