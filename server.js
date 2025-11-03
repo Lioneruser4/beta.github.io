@@ -53,6 +53,13 @@ function initializeNextLevel(room, newLevel) {
     // Host: İlk 'bombCount' kadar
     room.gameState.hostBombs = allIndices.slice(0, bombCount);
     // Guest: Sonraki 'bombCount' kadar
+    // Bombaların çakışmaması için 2 * bombCount kullanıyoruz. 
+    // Örn: Level 2 için 4 bomba. Host 0-3 alır. Guest 4-7 alır. Toplam 8 kart bombalanır. (20 kartın 12'si emoji olur)
+    room.isHostBombPlacement = room.gameState.hostBombs; 
+    room.isGuestBombPlacement = allIndices.slice(bombCount, bombCount * 2);
+
+    // Kodu daha temiz hale getirelim ve room.gameState içindeki değişkenleri güncelleyelim
+    room.gameState.hostBombs = allIndices.slice(0, bombCount);
     room.gameState.guestBombs = allIndices.slice(bombCount, bombCount * 2);
     
     // Can sayılarını güncelle
@@ -73,6 +80,7 @@ function initializeNextLevel(room, newLevel) {
 io.on('connection', (socket) => {
     console.log(`Yeni bağlantı: ${socket.id}`);
     
+    // *** ODA KURMA KISMI ***
     socket.on('createRoom', ({ username }) => {
         const code = generateRoomCode();
         rooms[code] = {
@@ -83,29 +91,32 @@ io.on('connection', (socket) => {
             guestId: null,
             guestUsername: null,
             gameState: {
-                stage: 'WAITING', // WAITING, PLAY, ENDED
-                turn: 0, // 0 = Host, 1 = Guest
+                stage: 'WAITING', 
+                turn: 0, 
                 hostBombs: [],
                 guestBombs: [],
                 hostLives: getBombCount(1), 
                 guestLives: getBombCount(1), 
                 level: 1,
-                opened: [], // Açılan kart indeksleri
-                boardSize: getBoardSize(1) // Level 1: 16 kart
+                opened: [], 
+                boardSize: getBoardSize(1)
             }
         };
         socket.join(code);
-        socket.emit('roomCreated', code);
+        // Bu kısım istemciye oda kodunu başarıyla kurduğunu bildirir.
+        socket.emit('roomCreated', code); 
         console.log(`Oda oluşturuldu: ${code} - Host: ${username}`);
     });
 
+    // *** ODAYA KATILMA KISMI ***
     socket.on('joinRoom', ({ username, roomCode }) => {
         const code = roomCode.toUpperCase();
         const room = rooms[code];
         const initialLevel = 1;
         
         if (!room || room.playerCount >= 2) {
-            socket.emit('joinFailed', 'Oda bulunamadı veya dolu.');
+            // Eğer bu bildirim gelmiyorsa, sunucuya bağlanılamamış demektir.
+            socket.emit('joinFailed', 'Oda bulunamadı veya dolu.'); 
             return;
         }
 
@@ -115,6 +126,7 @@ io.on('connection', (socket) => {
         
         socket.join(code);
         
+        // Bu kısım istemciye odaya başarıyla katıldığını bildirir.
         socket.emit('roomJoined', code); 
 
         const players = [
@@ -126,8 +138,6 @@ io.on('connection', (socket) => {
         console.log(`${username} odaya katıldı: ${code}`);
         
         // --- OYUN BAŞLANGICI VE BOMBA YERLEŞİMİ (LEVEL 1) ---
-        
-        // Yeni seviye başlatma fonksiyonu ile Level 1'i ayarla
         initializeNextLevel(room, initialLevel);
 
         const gameState = {
@@ -140,9 +150,9 @@ io.on('connection', (socket) => {
             boardSize: room.gameState.boardSize
         };
         
-        // Client'ın socket dinleyicilerini kurması için kısa bir gecikme
         setTimeout(() => {
-            io.to(code).emit('gameReady', gameState);
+            // İstemcinin oyunu başlatması için gerekli kritik sinyal.
+            io.to(code).emit('gameReady', gameState); 
             console.log(`🚀 gameReady sinyali gönderildi (Level ${initialLevel}):`, gameState);
         }, 500);
     });
@@ -195,15 +205,14 @@ io.on('connection', (socket) => {
             // Sırayı değiştir
             room.gameState.turn = room.gameState.turn === 0 ? 1 : 0;
             
-            // Hareketi her iki oyuncuya da gönder (emoji ve bomba bilgisi ile)
+            // Hareketi her iki oyuncuya da gönder
             io.to(code).emit('gameData', {
                 type: 'MOVE',
                 cardIndex: idx,
                 emoji: emoji,
                 isBomb: isBomb,
-                // Yeni canlı bilgilerini istemciye gönder
-                hostLives: room.gameState.hostLives,
-                guestLives: room.gameState.guestLives,
+                hostLives: room.gameState.hostLives, // Güncel canları gönder
+                guestLives: room.gameState.guestLives, // Güncel canları gönder
                 turn: room.gameState.turn
             });
             
@@ -219,7 +228,7 @@ io.on('connection', (socket) => {
         const currentLevel = room.gameState.level;
         const newLevel = parseInt(nextLevel) || (currentLevel + 1);
 
-        console.log(`🏆 Seviye ${currentLevel} tamamlandı (İstemci tarafından bildirildi). Yeni seviye: ${newLevel}`);
+        console.log(`🏆 Seviye ${currentLevel} tamamlandı. Yeni seviye: ${newLevel}`);
 
         // Sunucunun yeni seviye hazırlığını yap
         initializeNextLevel(room, newLevel);
@@ -245,25 +254,6 @@ io.on('connection', (socket) => {
         }, 500);
     });
 
-    // Chat mesajlarını işle
-    socket.on('chatMessage', ({ roomCode, message }) => {
-        const room = rooms[roomCode];
-        if (!room) return;
-        
-        const player = [
-            { id: room.hostId, username: room.hostUsername },
-            { id: room.guestId, username: room.guestUsername }
-        ].find(p => p.id === socket.id);
-        if (!player) return;
-        
-        io.to(roomCode).emit('chatMessage', {
-            senderId: socket.id,
-            username: player.username,
-            message: message,
-            timestamp: new Date().toISOString()
-        });
-    });
-
     // Bağlantı kesildiğinde
     socket.on('disconnect', () => {
         console.log(`Bağlantı kesildi: ${socket.id}`);
@@ -276,12 +266,10 @@ io.on('connection', (socket) => {
                     io.to(opponentId).emit('opponentLeft', 'Rakibiniz bağlantıyı kesti. Lobiye dönülüyor.');
                 }
                 
-                // Oda tamamen temizlenir (host ayrıldığında)
                 if (room.hostId === socket.id) {
                     delete rooms[code];
                     console.log(`Oda silindi (Host ayrıldı): ${code}`);
                 } else if (room.guestId === socket.id) {
-                    // Guest ayrılırsa, oda kalır ve host beklemeye alınır
                     room.playerCount = 1;
                     room.guestId = null;
                     room.guestUsername = null;
