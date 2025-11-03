@@ -60,6 +60,8 @@
             box-shadow: var(--shadow); 
             transition: background-color 0.3s; 
         }
+        
+        /* HATA DÜZELTME: Bu sınıf başlangıç ekranını gösterir */
         .screen.active { 
             display: flex; 
         }
@@ -116,8 +118,6 @@
         .language-option:hover {
             background: #f5f5f5;
         }
-        
-        /* Çat İnterfeysinə aid bütün CSS stilləri silindi. */
         
         /* Utility */
         .btn { @apply w-full text-xl font-bold py-3 px-6 rounded-xl shadow-lg transition-all duration-200 ease-in-out; }
@@ -204,7 +204,7 @@
         }
 
         /* 💣 SADECE SEÇENİN GÖRDÜĞÜ KIRMIZILIK (💣 YALNIZ SEÇƏNİN GÖRDÜYÜ QIZARITI) */
-        .card.bomb-selected .card-face.front {
+        .card-container.bomb-selected .card-face.front {
             background: linear-gradient(135deg, #f39c12, #e74c3c); /* Hafif turuncu-kırmızı geçiş (Yüngül narıncı-qırmızı keçid) */
             animation: pulse-red 0.5s infinite alternate;
         }
@@ -244,7 +244,7 @@
         <p id="globalMessageText"></p>
     </div>
 
-    <div id="lobby" class="screen active space-y-6 container">
+        <div id="lobby" class="screen active space-y-6 container">
         <h1 class="text-5xl font-black text-gray-900">💣 Emoji Bombası</h1>
         <p class="text-gray-700 text-sm">Serverə bağlıdır. 1v1 Çox Oyunçulu Bomba Oyunu</p>
         
@@ -298,7 +298,7 @@
             <h3 id="turnStatus" class="text-xl font-bold text-red-600 animate-pulse">Rəqib gözlənilir...</h3>
             <p id="actionMessage" class="text-sm text-purple-600 font-semibold"></p>
             
-            <div id="gameBoard" class="grid w-full max-w-sm mx-auto">
+            <div id="gameBoard" class="memory-board w-full max-w-sm mx-auto">
                 </div>
             
         </div>
@@ -319,8 +319,9 @@
         window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
         window.setLanguage = languageManager.setLanguage;
 
-        // Render URL'niz: Lütfen bu kısmı KENDİ URL'nizle değiştirin!
+        // !!! DİKKAT: Bu kısmı kendi CANLI Render URL'nizle DEĞİŞTİRMELİSİNİZ!
         const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
+        // ORNEK: const LIVE_SERVER_URL = 'https://sizin-oyun-sunucunuz.onrender.com';
         let socket;
         
         function validateInput() {
@@ -341,13 +342,14 @@
                 });
 
                 socket.on('connect', () => {
-                    UIElements.showGlobalMessage('Serverə qoşuldu. Eşləşməyə hazırsınız.', false);
+                    UIElements.showGlobalMessage('Serverə qoşuldu. Eşleşmeye hazırsınız.', false);
+                    // Bağlantı kurulduğunda lobiyi göster
                     showScreen('lobby');
                 });
                 
                 socket.on('connect_error', (err) => {
                     console.error('Bağlantı Hatası:', err);
-                    UIElements.showGlobalMessage('XƏTA: Serverə daxil olmaq mümkün deyil.', true);
+                    UIElements.showGlobalMessage('XƏTA: Serverə daxil olmaq mümkün deyil. URL kontrol edin.', true);
                     showScreen('lobby');
                 });
                 
