@@ -8,10 +8,10 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     
     <style>
-        /* CSS Stilleri (Kart çevrilməsi, vibrasiya və s.) */
+        /* CSS Stilleri (Bütün stillər əvvəlki kimi qalır) */
         :root {
             --primary-color: #3498db;
             --secondary-color: #2980b9;
@@ -19,90 +19,46 @@
             --card-bg: white;
             --shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         }
-        
         * { -webkit-tap-highlight-color: transparent; }
-        
         body { 
-            font-family: sans-serif; 
-            background-color: var(--bg-color); 
-            color: #2c3e50;
-            min-height: 100vh; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            overflow-x: hidden; 
-            padding: 10px;
+            font-family: sans-serif; background-color: var(--bg-color); color: #2c3e50;
+            min-height: 100vh; display: flex; align-items: center; justify-content: center; 
+            overflow-x: hidden; padding: 10px;
         }
-        
-        .container {
-            width: 100%;
-            max-width: 500px;
-            margin: auto;
-        }
-        
+        .container { width: 100%; max-width: 500px; margin: auto; }
         .screen { 
-            width: 100%; 
-            display: none; 
-            flex-direction: column; 
-            align-items: center; 
-            padding: 1.5rem; 
-            box-sizing: border-box; 
-            text-align: center; 
-            background-color: var(--card-bg); 
-            border-radius: 12px; 
-            box-shadow: var(--shadow); 
+            width: 100%; display: none; flex-direction: column; align-items: center; 
+            padding: 1.5rem; box-sizing: border-box; text-align: center; 
+            background-color: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow); 
         }
         .screen.active { display: flex; }
-        
-        /* Dil Seçici */
         .language-selector { position: fixed; top: 15px; right: 15px; z-index: 100; }
         .language-button { background: rgba(255, 255, 255, 0.9); border: 2px solid #3498db; border-radius: 20px; padding: 5px 15px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: bold; }
         .language-options { display: none; position: absolute; top: 100%; right: 0; background: white; border: 1px solid #ddd; border-radius: 8px; margin-top: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden; z-index: 101; min-width: 150px; }
         .language-option { padding: 8px 15px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
         .language-option:hover { background: #f5f5f5; }
-
-        /* Utility */
         .btn { @apply w-full text-xl font-bold py-3 px-6 rounded-xl shadow-lg transition-all duration-200 ease-in-out; }
         .btn-primary { @apply bg-blue-600 text-white hover:bg-blue-500 active:scale-95; }
         .input-field { @apply w-full text-lg bg-gray-200 text-gray-900 border-2 border-gray-400 rounded-lg p-3 text-center placeholder-gray-500 focus:outline-none focus:border-blue-500; }
-        
-        /* Qlobal Mesaj */
         #globalMessage { 
-            display: none; 
-            position: fixed; 
-            top: 20px; 
-            left: 50%; 
-            transform: translateX(-50%); 
-            z-index: 50; 
-            width: 90%;
-            max-width: 400px;
+            display: none; position: fixed; top: 20px; left: 50%; 
+            transform: translateX(-50%); z-index: 50; width: 90%; max-width: 400px;
         }
         #globalMessage.show { display: block; }
-        
-        /* Oyun Taxtası */
         .memory-board {
-            display: grid;
-            gap: 8px; 
-            padding: 5px 0;
-            grid-template-columns: repeat(4, 1fr); /* 4x5 = 20 Kart */
+            display: grid; gap: 8px; padding: 5px 0;
+            grid-template-columns: repeat(4, 1fr);
         }
-        
-        /* Kart Stilleri */
-        .card-container {
-            perspective: 1000px; 
-            aspect-ratio: 1; /* Kartları kvadrat edir */
-        }
+        .card-container { perspective: 1000px; aspect-ratio: 1; }
         .card {
             width: 100%; height: 100%; border-radius: 10px; cursor: pointer; position: relative;
-            transform-style: preserve-3d; 
-            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         }
         .card.flipped { transform: rotateY(180deg); }
         .card-face {
             position: absolute; width: 100%; height: 100%;
-            backface-visibility: hidden; 
-            display: flex; justify-content: center; align-items: center;
+            backface-visibility: hidden; display: flex; justify-content: center; align-items: center;
             border-radius: 10px; font-size: 1.8rem; font-weight: bold;
         }
         .card-face.front {
@@ -114,7 +70,6 @@
             background: var(--card-bg); color: var(--text-color);
             transform: rotateY(180deg); z-index: 1;
         }
-        /* Vibrasiya */
         @keyframes vibrate {
             0% { transform: translate(1px, 1px); } 20% { transform: translate(-1px, -2px); }
             40% { transform: translate(-3px, 0px); } 60% { transform: translate(3px, 2px); }
@@ -211,18 +166,16 @@
     <script src="language.js"></script>
     
     <script type="module">
-        // game.js faylından lazımi funksiyaları import et
         import { setupSocketHandlers, showScreen, UIElements } from './game.js';
         
         let socket;
-        // Render URL'niz: (QEYD: Bu dəyişəni artıq main.js-də istifadə etmirik, io() avtomatik bağlanır)
-        // const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
+        
+        // --- DÜZƏLİŞ 2: Server Ünvanını Dəqiq Göstər ---
+        // Render URL-nizi bura yazın
+        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
         
         document.addEventListener('DOMContentLoaded', () => {
-            // Dil menecerini başlat
             window.languageManager.initLanguage();
-
-            // Socket.IO bağlantısını başlat
             connectToServer();
         });
 
@@ -237,8 +190,9 @@
 
         function connectToServer() {
             try {
-                // Render-da host edildikdə, io() avtomatik olaraq eyni ünvana bağlanır
-                socket = io(window.location.origin, {
+                // --- DÜZƏLİŞ 2 (Davamı): Dəqiq URL-ə qoşul ---
+                // Köhnə kod: socket = io(window.location.origin, ...)
+                socket = io(LIVE_SERVER_URL, {
                     transports: ['websocket', 'polling'], 
                     reconnectionAttempts: 5, 
                     timeout: 20000 
@@ -259,7 +213,7 @@
                     UIElements.showGlobalMessage(window.languageManager.t('disconnected'), true);
                 });
 
-                // --- Otaq Hadisələri ---
+                // --- Otaq Hadisələri (Dəyişməyib) ---
                 socket.on('roomCreated', (code) => {
                     document.getElementById('roomCodeDisplay').textContent = code;
                     document.getElementById('waitTitle').textContent = window.languageManager.t('roomCreated');
@@ -269,14 +223,12 @@
                 
                 socket.on('joinFailed', (message) => {
                     UIElements.showGlobalMessage(message, true);
-                    UIElements.resetGame(); // Lobi-yə qaytarır
+                    UIElements.resetGame(); 
                 });
                 
                 socket.on('gameStart', ({ players, roomCode }) => {
                     const opponent = players.find(p => p.id !== socket.id);
                     const self = players.find(p => p.id === socket.id);
-                    
-                    // Oyun məntiqini (game.js) socket ilə birləşdir
                     setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
                 });
 
@@ -286,7 +238,7 @@
             }
         }
         
-        // --- Klik Hadisələri (Event Listeners) ---
+        // --- Klik Hadisələri (Dəyişməyib) ---
         UIElements.matchBtn.addEventListener('click', () => {
             const username = validateInput();
             if (!username) return;
@@ -295,13 +247,11 @@
             const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
 
             if (roomCode === '') {
-                // Yeni Otaq Qur
                 document.getElementById('waitTitle').textContent = window.languageManager.t('creatingRoom');
                 document.getElementById('waitStatus').textContent = window.languageManager.t('pleaseWait');
                 document.getElementById('codeArea').classList.add('hidden');
                 socket.emit('createRoom', { username });
             } else {
-                // Otağa Qoşul
                 document.getElementById('waitTitle').textContent = `${window.languageManager.t('joiningRoom')} ${roomCode}`;
                 document.getElementById('waitStatus').textContent = window.languageManager.t('joining');
                 document.getElementById('codeArea').classList.add('hidden');
