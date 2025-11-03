@@ -46,8 +46,8 @@ io.on('connection', (socket) => {
                 turn: 0, // 0 = Host, 1 = Guest
                 hostBombs: [],
                 guestBombs: [],
-                hostLives: 3,  // İlk seviyede 3 bomba
-                guestLives: 3, // İlk seviyede 3 bomba
+                hostLives: 4,  // İlk seviyede 4 bomba
+                guestLives: 4, // İlk seviyede 4 bomba
                 hostBombsSelected: false,
                 guestBombsSelected: false,
                 level: 1,
@@ -88,7 +88,7 @@ io.on('connection', (socket) => {
         
         // Oyun tahtası ayarları
         const boardSize = 20; // Tüm seviyelerde 20 kart
-        const bombCount = 4; // İlk seviyede 3 bomba
+        const bombCount = 4; // İlk seviyede 4 bomba
         
         // Tüm olası kart indekslerini oluştur ve karıştır
         const allIndices = Array.from({ length: boardSize }, (_, i) => i);
@@ -205,7 +205,7 @@ io.on('connection', (socket) => {
         // 1 saniye bekle ve yeni seviyeyi başlat
         setTimeout(() => {
             // Yeni seviyeyi başlat
-            const bombCount = nextLevel === 1 ? 3 : 4; // İlk seviyede 3, sonra 4 bomba
+            const bombCount = nextLevel === 1 ? 4 : 6; // İlk seviyede 4, sonraki seviyelerde 6 bomba
             const boardSize = 20; // Tüm seviyelerde 20 kart
             
             console.log(`🔄 Yeni seviye başlatılıyor: ${nextLevel}, ${bombCount} bomba ile`);
@@ -271,7 +271,7 @@ io.on('connection', (socket) => {
         // Seviyeyi güncelle (eğer belirtilmediyse mevcut seviyeyi 1 artır)
         const currentLevel = room.gameState.level || 1;
         const newLevel = parseInt(requestedLevel) || (currentLevel + 1);
-        const bombCount = newLevel === 1 ? 3 : 4; // İlk seviyede 3, sonra 4 bomba
+        const bombCount = newLevel === 1 ? 4 : 6; // İlk seviyede 4, sonraki seviyelerde 6 bomba
         const boardSize = 20; // Tüm seviyelerde 20 kart
         
         console.log(`🔄 Yeni seviye başlatılıyor: ${newLevel}, ${bombCount} bomba ile`);
