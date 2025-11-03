@@ -412,7 +412,7 @@
             <p class="text-left text-base font-semibold mb-2 text-gray-300">
                 👤 **1. İstifadəçi Adınızı Daxil Edin:**
             </p>
-            <input type="text" id="username" class="input-field shadow-lg" placeholder="Oyuncu Adı (min 2 herf)" maxlength="15">
+            <input type="text" id="username" class="input-field shadow-lg text-black" placeholder="Oyuncu Adı (min 2 herf)" maxlength="15" style="color: #000000 !important;">
         </div>
         
         <div class="w-full animated-lobby-item input-roomcode-container max-w-md">
@@ -425,12 +425,17 @@
                     * Mövcud otağa qoşulmaq üçün dostunuzun verdiyi kodu buraya daxil edin.
                 </span>
             </p>
-            <input type="text" id="roomCodeInput" class="input-field uppercase shadow-lg" placeholder="Otaq Kodu (Boş: Yeni Otaq)" maxlength="6">
+            <input type="text" id="roomCodeInput" class="input-field uppercase shadow-lg text-black" placeholder="Otaq Kodu (Boş: Yeni Otaq)" maxlength="6" style="color: #000000 !important;">
         </div>
         
-        <button id="matchBtn" class="btn btn-primary animated-lobby-item shadow-xl max-w-md">
-            <i class="fas fa-handshake mr-2"></i> Otaq Qur / Odaya Qoşul
-        </button>
+        <div class="flex flex-col space-y-4 w-full max-w-md mx-auto">
+            <button id="createRoomBtn" class="btn btn-primary animated-lobby-item shadow-xl transform transition-all duration-300 hover:scale-105 hover:shadow-2xl">
+                <i class="fas fa-plus-circle mr-2"></i> Otaq Qur
+            </button>
+            <button id="joinRoomBtn" class="btn bg-green-600 hover:bg-green-500 text-white animated-lobby-item shadow-xl transform transition-all duration-300 hover:scale-105 hover:shadow-2xl">
+                <i class="fas fa-sign-in-alt mr-2"></i> Otağa Qoşul
+            </button>
+        </div>
     </div>
     
     <div id="waitScreen" class="screen space-y-8">
@@ -553,24 +558,32 @@
         }
         
         // --- Olay Dinleyicileri ---
-        UIElements.matchBtn.addEventListener('click', () => {
+        document.getElementById('createRoomBtn').addEventListener('click', () => {
             const username = validateInput();
             if (!username) return;
             
             showScreen('wait');
-            const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
-
-            if (roomCode === '') {
-                document.getElementById('waitTitle').textContent = 'Otaq Qurulur...';
-                document.getElementById('waitStatus').textContent = 'Zəhmət olmasa gözləyin...';
-                document.getElementById('codeArea').classList.add('hidden');
-                socket.emit('createRoom', { username });
-            } else {
-                document.getElementById('waitTitle').textContent = `Otağa Qoşulma: ${roomCode}`;
-                document.getElementById('waitStatus').textContent = 'Qoşulunur...';
-                document.getElementById('codeArea').classList.add('hidden');
-                socket.emit('joinRoom', { username, roomCode });
+            document.getElementById('waitTitle').textContent = 'Otaq Qurulur...';
+            document.getElementById('waitStatus').textContent = 'Zəhmət olmasa gözləyin...';
+            document.getElementById('codeArea').classList.add('hidden');
+            socket.emit('createRoom', { username });
+        });
+        
+        document.getElementById('joinRoomBtn').addEventListener('click', () => {
+            const username = validateInput();
+            if (!username) return;
+            
+            const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            if (!roomCode) {
+                UIElements.showGlobalMessage('Xahiş olunur otaq kodunu daxil edin', true);
+                return;
             }
+            
+            showScreen('wait');
+            document.getElementById('waitTitle').textContent = `Otağa Qoşulma: ${roomCode}`;
+            document.getElementById('waitStatus').textContent = 'Qoşulunur...';
+            document.getElementById('codeArea').classList.add('hidden');
+            socket.emit('joinRoom', { username, roomCode });
         });
 
         document.getElementById('cancelBtn').addEventListener('click', () => {
