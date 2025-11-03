@@ -142,27 +142,38 @@ function updateStatusDisplay() {
     const myLives = isHost ? gameData.hostLives : gameData.guestLives;
     const opponentLives = isHost ? gameData.guestLives : gameData.hostLives;
     
+    // Canları güncelle
     myLivesEl.textContent = '❤️'.repeat(Math.max(0, myLives));
     opponentLivesEl.textContent = '❤️'.repeat(Math.max(0, opponentLives));
+    
+    // Seviye ve bomba bilgisini göster
+    const levelInfo = document.getElementById('levelInfo');
+    if (levelInfo) {
+        levelInfo.textContent = `Seviye: ${gameData.level || 1} | Kalan Bomba: ${gameData.bombsLeft || 0}/${gameData.totalBombs || 0}`;
+    }
 
     const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
+    const waitingMessage = document.querySelector('#gameContent h3');
 
     if (gameStage === 'WAITING' || gameStage === 'SELECTION') {
         turnStatusEl.textContent = '⏳ OYUN HAZIRLANIR...';
-        actionMessageEl.textContent = "Bombalar otomatik yerleştiriliyor...";
+        actionMessageEl.textContent = `Seviye ${gameData.level || 1} yükleniyor...`;
         turnStatusEl.classList.remove('text-red-600');
         turnStatusEl.classList.add('text-yellow-600');
+        if (waitingMessage) waitingMessage.style.display = 'block';
     } else if (gameStage === 'PLAY') {
         if (isMyTurn) {
             turnStatusEl.textContent = '✅ SIRA SENDE!';
-            actionMessageEl.textContent = "Bir kart aç! Rakibinizin bombalarından kaçınmaya çalışın.";
+            actionMessageEl.textContent = `Seviye ${gameData.level || 1}: Bir kart aç! Kalan bomba: ${gameData.bombsLeft || 0}/${gameData.totalBombs || 0}`;
             turnStatusEl.classList.remove('text-red-600');
             turnStatusEl.classList.add('text-green-600');
+            if (waitingMessage) waitingMessage.style.display = 'none';
         } else {
-            turnStatusEl.textContent = '⏳ ONUN SIRASI';
-            actionMessageEl.textContent = "Rakibinizin hamlesini bekleyin...";
+            turnStatusEl.textContent = '⏳ RAKİBİN SIRASI';
+            actionMessageEl.textContent = `Seviye ${gameData.level || 1}: Rakibinizin hamlesini bekleyin...`;
             turnStatusEl.classList.remove('text-green-600');
             turnStatusEl.classList.add('text-red-600');
+            if (waitingMessage) waitingMessage.style.display = 'block';
         }
     }
     
