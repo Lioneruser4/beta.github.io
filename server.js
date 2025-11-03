@@ -1,5 +1,4 @@
 // Dosya Adı: server.js
-// Render'da yüklü olan kodunuzu bununla güncelleyin.
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -7,22 +6,21 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// Statik dosyaları sunmak için (index.html, game.js, pong.js vb.)
+// Statik dosyaları sunmak için
 app.use(express.static('.'));
 
-// CORS DÜZELTME: Tüm kaynaklardan gelen bağlantılara izin verir
+// --- KRİTİK GÜNCELLEME: CORS Ayarları ---
+// Render gibi barındırma ortamlarında bağlantı sorunlarını çözmek için
 const io = new Server(server, {
     cors: {
-        origin: "*", 
+        origin: "*", // Tüm kaynaklardan gelen bağlantılara izin verir
         methods: ["GET", "POST"]
     },
-    transports: ['websocket', 'polling'] 
+    transports: ['websocket', 'polling'] // Ağ sorunlarını gidermek için
 });
 
 const rooms = {}; 
-
-// Oyun için kullanılacak rastgele emojiler
-const EMOJIS = ['😀','😎','🦄','🐱','🍀','🍕','🌟','⚽','🎵','🚀','🎲','🥇'];
+const EMOJIS = ['😀', '😎', '🦄', '🐱', '🍀', '🍕', '🌟', '⚽', '🎵', '🚀', '🎲', '🥇'];
 
 function generateRoomCode() {
     let code = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -32,22 +30,20 @@ function generateRoomCode() {
     return code;
 }
 
-// Yeni: Oyun Başlatma Fonksiyonu
 function initializeGame(room, gameType) {
     room.gameState.currentGame = gameType;
-    room.gameState.turn = 0; // Host başlar
+    room.gameState.turn = 0; 
     room.gameState.opened = [];
     room.gameState.level = 1;
     room.gameState.stage = 'PLAY';
     
     if (gameType === 'MEMORY') {
-        const boardSize = 20; // Tüm seviyelerde 20 kart
-        const bombCount = 3; // İlk seviyede 3 bomba
+        const boardSize = 20; 
+        const bombCount = 3; 
         
         const allIndices = Array.from({ length: boardSize }, (_, i) => i);
         allIndices.sort(() => Math.random() - 0.5);
         
-        // Host ve Guest için benzersiz bombalar ayarla
         room.gameState.hostBombs = allIndices.slice(0, bombCount);
         room.gameState.guestBombs = allIndices.slice(bombCount, bombCount * 2);
         
@@ -67,7 +63,9 @@ function initializeGame(room, gameType) {
 io.on('connection', (socket) => {
     console.log(`Yeni bağlantı: ${socket.id}`);
     
-    socket.on('createRoom', ({ username, gameType }) => { // gameType alınıyor
+    // createRoom, joinRoom, gameData, levelComplete, pongMove, pongBallUpdate, pongScore, chatMessage ve disconnect olayları burada olduğu gibi kalır.
+
+    socket.on('createRoom', ({ username, gameType }) => { 
         const code = generateRoomCode();
         rooms[code] = {
             code,
@@ -79,20 +77,9 @@ io.on('connection', (socket) => {
             gameState: {
                 stage: 'WAITING', 
                 turn: 0,
-                currentGame: gameType, // Seçilen oyun tipi
-                
-                // Memory (Bomb) Özellikleri
-                hostBombs: [],
-                guestBombs: [],
-                hostLives: 3, 
-                guestLives: 3, 
-                level: 1,
-                opened: [], 
-                boardSize: 20, 
-                
-                // Pong Özellikleri
-                hostScore: 0,
-                guestScore: 0
+                currentGame: gameType, 
+                hostBombs: [], guestBombs: [], hostLives: 3, guestLives: 3, level: 1, opened: [], boardSize: 20, 
+                hostScore: 0, guestScore: 0
             }
         };
         socket.join(code);
@@ -121,10 +108,8 @@ io.on('connection', (socket) => {
             { id: room.guestId, username: room.guestUsername, isHost: false }
         ];
         
-        // Oyunu Başlat
         initializeGame(room, room.gameState.currentGame);
 
-        // Yeni: Oyunculara hangi oyunun başladığını bildir
         io.to(code).emit('gameStart', { 
             players, 
             roomCode: code,
@@ -153,8 +138,7 @@ io.on('connection', (socket) => {
         }, 500);
     });
 
-    // --- MEMORY OYUN MANTIKLARI ---
-    
+    // --- MEMORY OYUN MANTIKLARI (Kaldığı Gibi) ---
     socket.on('gameData', (data) => {
         const code = data.roomCode;
         const room = rooms[code];
@@ -175,7 +159,6 @@ io.on('connection', (socket) => {
                 return;
             }
 
-            // Host oynuyorsa Guest'in bombası patlar
             const isBomb = isHostTurn ? room.gameState.guestBombs.includes(idx) : room.gameState.hostBombs.includes(idx);
             const emoji = isBomb ? '💣' : EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
             room.gameState.opened.push(idx);
@@ -191,8 +174,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Seviye tamamlama olayı (MEMORY)
-    socket.on('levelComplete', ({ roomCode, level: completedLevel, nextLevel }) => {
+    socket.on('levelComplete', ({ roomCode, nextLevel }) => {
         const room = rooms[roomCode];
         if (!room || room.gameState.currentGame !== 'MEMORY') return;
         
@@ -233,23 +215,19 @@ io.on('connection', (socket) => {
         }, 1000);
     });
 
-    // --- PONG OYUN MANTIKLARI ---
-    
-    // Çubuk Hareketini İlet
+    // --- PONG OYUN MANTIKLARI (Kaldığı Gibi) ---
     socket.on('pongMove', ({ roomCode, y, isHost: movedByHost }) => {
         const room = rooms[roomCode];
         if (!room || room.gameState.currentGame !== 'PONG' || room.gameState.stage !== 'PLAY') return;
         socket.to(roomCode).emit('pongMove', { y, isHost: movedByHost });
     });
 
-    // Top Güncellemesini İlet (Sadece Host gönderir)
     socket.on('pongBallUpdate', (data) => {
         const room = rooms[data.roomCode];
         if (!room || room.gameState.currentGame !== 'PONG' || room.hostId !== socket.id || room.gameState.stage !== 'PLAY') return;
         socket.to(data.roomCode).emit('pongBallUpdate', data);
     });
 
-    // Skor Güncellemesini İlet
     socket.on('pongScore', ({ roomCode, score, scorerIsHost }) => {
         const room = rooms[roomCode];
         if (!room || room.gameState.currentGame !== 'PONG' || room.gameState.stage !== 'PLAY') return;
@@ -262,7 +240,7 @@ io.on('connection', (socket) => {
         socket.to(roomCode).emit('pongScore', { score, scorerIsHost });
     });
     
-    // --- CHAT ---
+    // --- CHAT (Kaldığı Gibi) ---
     socket.on('chatMessage', ({ roomCode, message }) => {
         const room = rooms[roomCode];
         if (!room) return;
@@ -279,7 +257,7 @@ io.on('connection', (socket) => {
         });
     });
 
-    // --- BAĞLANTI KESİLDİĞİNDE ---
+    // --- BAĞLANTI KESİLDİĞİNDE (Kaldığı Gibi) ---
     socket.on('disconnect', () => {
         console.log(`Bağlantı kesildi: ${socket.id}`);
         for (const code in rooms) {
@@ -309,6 +287,7 @@ io.on('connection', (socket) => {
     });
 });
 
+// Port tanımı
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Sunucu port ${PORT} üzerinde çalışıyor.`);
