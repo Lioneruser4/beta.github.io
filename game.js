@@ -45,8 +45,8 @@ function initializeGame(boardSize) {
         gameData.guestLives = 0; // Bu değer gameReady'den güncellenecek
     } else {
         // Level 2 ve sonrası 3 can, 3 bomba
-        gameData.hostLives = 3;
-        gameData.guestLives = 3;
+        gameData.hostLives = 4;
+        gameData.guestLives = 4;
     }
     
     gameStage = 'WAITING';
@@ -148,7 +148,7 @@ function updateStatusDisplay() {
     const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
 
     if (gameStage === 'WAITING' || gameStage === 'SELECTION') {
-        turnStatusEl.textContent = '⏳ OYUN HAZIRLANIYOR...';
+        turnStatusEl.textContent = '⏳ OYUN HAZIRLANIR...';
         actionMessageEl.textContent = "Bombalar otomatik yerleştiriliyor...";
         turnStatusEl.classList.remove('text-red-600');
         turnStatusEl.classList.add('text-yellow-600');
@@ -159,7 +159,7 @@ function updateStatusDisplay() {
             turnStatusEl.classList.remove('text-red-600');
             turnStatusEl.classList.add('text-green-600');
         } else {
-            turnStatusEl.textContent = '⏳ RAKİBİN SIRASI';
+            turnStatusEl.textContent = '⏳ ONUN SIRASI';
             actionMessageEl.textContent = "Rakibinizin hamlesini bekleyin...";
             turnStatusEl.classList.remove('text-green-600');
             turnStatusEl.classList.add('text-red-600');
@@ -167,7 +167,7 @@ function updateStatusDisplay() {
     }
     
     if (gameData.isGameOver && gameStage === 'ENDED') {
-        turnStatusEl.textContent = "✅ OYUN BİTTİ!";
+        turnStatusEl.textContent = "✅ OYUN BİTDİ!";
         actionMessageEl.textContent = "Sonuçlar hesaplanıyor...";
     }
 }
@@ -297,11 +297,11 @@ function endGame(winnerRole) {
         actionMessageEl.textContent = `Her iki oyuncu da tüm canlarını kaybetti!`;
         showGlobalMessage('🤝 Beraberlik! Her ikiniz de harika oynadınız!', false);
     } else if (iWon) {
-        turnStatusEl.textContent = `🎉 KAZANDIN!`;
+        turnStatusEl.textContent = `🎉 QAZANDIN!`;
         actionMessageEl.textContent = `Tebrikler! Rakibinizi yendiniz!`;
         showGlobalMessage('🎉 Tebrikler! Bu turu kazandınız!', false);
     } else {
-        turnStatusEl.textContent = `😔 KAYBETTİN`;
+        turnStatusEl.textContent = `😔 UDUZDUN!`;
         actionMessageEl.textContent = `Rakibiniz bu turu kazandı.`;
         showGlobalMessage('😔 Bu turu kaybettiniz. Bir sonrakinde daha dikkatli olun!', true);
     }
