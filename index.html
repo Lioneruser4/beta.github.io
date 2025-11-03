@@ -12,18 +12,9 @@
     <script src="language.js"></script> 
     
     <style>
-        /* CSS stillləri olduğu kimi qalir */
         :root {
             --primary-color: #3498db;
-            --secondary-color: #2980b9;
-            --success-color: #2ecc71;
-            --danger-color: #e74c3c;
-            --text-color: #2c3e50;
-            --bg-color: #ecf0f1;
-            --card-bg: white;
-            --shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         }
-        
         * {
             -webkit-tap-highlight-color: transparent;
             box-sizing: border-box;
@@ -45,15 +36,11 @@
             display: flex; 
             align-items: center; 
             justify-content: center; 
-            transition: background-color 0.3s; 
         }
 
-        /* Ana Ekran Düzeni */
         .screen { 
             width: 100%; 
             height: 100%;
-            max-width: none;
-            max-height: none;
             display: none; 
             flex-direction: column; 
             align-items: center; 
@@ -62,17 +49,15 @@
             box-sizing: border-box; 
             text-align: center; 
             background-color: #2d3748;
-            border-radius: 0;
-            box-shadow: none;
-            transition: background-color 0.3s; 
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
         }
         .screen.active { 
             display: flex; 
+            animation: screenFadeIn 0.5s ease-out forwards;
         }
         
-        /* Language Selector (Dəyişmədi) */
+        /* Language Selector Styles */
         .language-selector {
             position: fixed;
             top: env(safe-area-inset-top, 15px);
@@ -106,8 +91,6 @@
             box-shadow: 0 5px 15px rgba(0,0,0,0.4);
             overflow: hidden;
             z-index: 101;
-            min-width: 180px;
-            color: #e2e8f0;
         }
         .language-option {
             padding: 10px 20px;
@@ -119,38 +102,25 @@
         .language-option:hover {
             background: #4a5568;
         }
-        
-        /* Utility */
-        .btn { 
-            @apply w-full text-xl font-bold py-4 px-6 rounded-2xl shadow-xl transition-all duration-200 ease-in-out; 
-            letter-spacing: 0.05em;
-        }
+
+        /* Utility Styles */
+        .btn { @apply w-full text-xl font-bold py-4 px-6 rounded-2xl shadow-xl transition-all duration-200 ease-in-out; letter-spacing: 0.05em; }
         .btn-primary { 
             @apply bg-blue-600 text-white hover:bg-blue-500 active:scale-98; 
             background: linear-gradient(135deg, #4299e1, #63b3ed);
-            border: none;
-        }
-        .btn-primary:hover {
-            box-shadow: 0 8px 20px rgba(66, 153, 225, 0.6);
         }
         .input-field { 
             @apply w-full text-lg bg-white text-gray-900 border-2 border-gray-600 rounded-xl p-4 text-center placeholder-gray-400 focus:outline-none focus:border-blue-500; 
             box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
-            transition: border-color 0.2s, box-shadow 0.2s;
             color: #1f2937 !important; 
-        }
-        .input-field::placeholder {
-            color: #6b7280;
-            opacity: 1;
         }
         .code-display { 
             @apply text-5xl font-extrabold p-5 bg-gray-800 text-yellow-300 rounded-xl tracking-widest; 
             letter-spacing: 0.15em;
             text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
-            font-family: 'Chakra Petch', monospace;
         }
         
-        /* Global Mesaj */
+        /* Global Message */
         #globalMessage {
             position: fixed;
             top: env(safe-area-inset-top, 20px);
@@ -166,7 +136,6 @@
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
             transition: opacity 0.3s ease-in-out, transform 0.3s ease-out; 
         }
-        
         #globalMessage.show { 
             display: block; 
             opacity: 1;
@@ -174,20 +143,15 @@
             animation: fadeInDown 0.3s ease-out forwards; 
         }
 
+        /* Animations */
         @keyframes fadeInDown {
             from { opacity: 0; transform: translate(-50%, -20px); } 
             to { opacity: 1; transform: translate(-50%, 0); }
         }
-        
-        /* Qalan stillər olduğu kimi qalır */
         @keyframes screenFadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        #lobby.active, #waitScreen.active, #gameScreen.active {
-            animation: screenFadeIn 0.5s ease-out forwards;
-        }
-
         .wait-spinner {
             font-size: 4rem;
             color: #63b3ed;
@@ -203,14 +167,37 @@
             padding-bottom: env(safe-area-inset-bottom, 20px);
             justify-content: flex-start;
         }
-        #gameContent {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            max-width: 100%;
+        #gameBoard {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
             width: 100%;
+            max-width: 450px; /* Kart ölçülərinə uyğunlaşdırın */
+            aspect-ratio: 1; /* Kare board */
+        }
+        .card {
+            background-color: #63b3ed;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.1s, background-color 0.2s;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            border: 3px solid #4299e1;
+            transform-style: preserve-3d;
+            position: relative;
+        }
+        .card:active {
+            transform: scale(0.95);
+        }
+        .card.open {
+            background-color: #f7fafc;
+            border-color: #a0aec0;
+            transform: rotateY(180deg);
+            cursor: default;
         }
         
     </style>
@@ -264,9 +251,6 @@
                 <span class="font-normal block text-sm mt-1">
                     * Yeni otaq qurmaq üçün bu sahəni **BOŞ** buraxın.
                 </span>
-                <span class="font-normal block text-sm">
-                    * Mövcud otağa qoşulmaq üçün dostunuzun verdiyi kodu buraya daxil edin.
-                </span>
             </p>
             <input type="text" id="roomCodeInput" class="input-field uppercase shadow-lg" placeholder="Otaq Kodu (Boş: Yeni Otaq)" maxlength="6">
         </div>
@@ -314,8 +298,8 @@
             <h3 id="turnStatus" class="text-2xl font-bold text-red-400 animate-pulse">Rəqib gözlənilir...</h3>
             <p id="actionMessage" class="text-base text-blue-300 font-semibold"></p>
             
-            <div id="gameBoard" class="grid w-full mx-auto">
-            </div>
+            <div id="gameBoard">
+                </div>
         </div>
         
         <button id="endGameBtn" class="btn bg-red-600 hover:bg-red-500 text-white text-sm py-3">🚪 Oyundan Çıx <i class="fas fa-door-open ml-2"></i></button>
@@ -323,7 +307,11 @@
 
     
     <script>
-        // --- FUNKSIYALAR VƏ ELEMENTLƏR ---
+        // --- Əsas Dəyişənlər və Elementlər ---
+        
+        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com';
+        let socket;
+        let isHost = false; // ⭐ Əsas Dəyişən: Bu oyunçu hostdurmu?
         
         const UIElements = {
             usernameInput: document.getElementById('username'),
@@ -346,43 +334,35 @@
 
         window.globalMessageTimeout = null;
         
+        // --- Köməkçi Funksiyalar ---
+
         /**
-         * Gloal mesajı göstərir (2 saniyəlik limit ilə)
-         * @param {string} message 
-         * @param {boolean} isError 
+         * Global mesajı göstərir
          */
         UIElements.showGlobalMessage = (message, isError) => {
             const globalMsg = UIElements.globalMessage;
             const globalMsgText = UIElements.globalMessageText;
             
-            if (window.globalMessageTimeout) {
-                clearTimeout(window.globalMessageTimeout);
-            }
+            if (window.globalMessageTimeout) clearTimeout(window.globalMessageTimeout);
             
             globalMsgText.textContent = message;
             globalMsg.classList.remove('bg-red-600', 'bg-green-600', 'hidden');
             globalMsg.classList.add(isError ? 'bg-red-600' : 'bg-green-600');
             
             globalMsg.style.display = 'block';
-            
-            requestAnimationFrame(() => {
-                globalMsg.classList.add('show');
-            });
+            requestAnimationFrame(() => globalMsg.classList.add('show'));
             
             window.globalMessageTimeout = setTimeout(() => {
                 globalMsg.classList.remove('show');
-                
-                setTimeout(() => {
-                    globalMsg.style.display = 'none';
-                }, 300); 
+                setTimeout(() => globalMsg.style.display = 'none', 300); 
             }, 2000); 
         };
 
+        /**
+         * Ekranı dəyişir
+         */
         function showScreen(screenId) {
-            UIElements.screens.forEach(screen => {
-                screen.classList.remove('active');
-            });
-
+            UIElements.screens.forEach(screen => screen.classList.remove('active'));
             const screen = document.getElementById(screenId);
             if (screen) {
                  screen.classList.add('active');
@@ -392,10 +372,14 @@
             }
         }
         
+        /**
+         * Oyunu sıfırlayır və lobbiyə qayıdır
+         */
         UIElements.resetGame = () => {
              showScreen('lobby');
              UIElements.roomCodeDisplay.textContent = '';
              UIElements.roomCodeInput.value = '';
+             isHost = false; // Host statusunu sıfırla
              
              if (window.languageManager && window.languageManager.updateUI) {
                  window.languageManager.updateUI();
@@ -405,25 +389,6 @@
              }
              UIElements.codeArea.classList.add('hidden');
         }
-        
-        window.toggleLanguageSelector = () => {
-             const selector = document.getElementById('language-selector');
-             if (selector) {
-                 selector.style.display = selector.style.display === 'block' ? 'none' : 'block';
-             }
-        };
-        window.setLanguageAndClose = (lang) => {
-            if (window.languageManager && window.languageManager.setLanguage) {
-                window.languageManager.setLanguage(lang);
-            }
-            window.toggleLanguageSelector();
-        };
-
-
-        // --- SOCKET MƏNTİQİ ---
-
-        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com';
-        let socket;
         
         function validateInput() {
             const username = UIElements.usernameInput.value.trim();
@@ -436,6 +401,19 @@
             return username;
         }
 
+        // Dil Seçici Funksiyaları
+        window.toggleLanguageSelector = () => {
+             const selector = document.getElementById('language-selector');
+             if (selector) selector.style.display = selector.style.display === 'block' ? 'none' : 'block';
+        };
+        window.setLanguageAndClose = (lang) => {
+            if (window.languageManager && window.languageManager.setLanguage) window.languageManager.setLanguage(lang);
+            window.toggleLanguageSelector();
+        };
+
+
+        // --- SOCKET MƏNTİQİ ---
+
         function connectToServer() {
             try {
                 socket = io(LIVE_SERVER_URL, {
@@ -446,9 +424,7 @@
 
                 socket.on('connect', () => {
                     const message = (window.languageManager && window.languageManager.t) 
-                        ? window.languageManager.t('serverConnected')
-                        : 'Serverə qoşuldu. Eşləşməyə hazırsınız.'; 
-
+                        ? window.languageManager.t('serverConnected') : 'Serverə qoşuldu. Eşləşməyə hazırsınız.'; 
                     UIElements.showGlobalMessage(message, false);
                     showScreen('lobby');
                 });
@@ -463,16 +439,13 @@
                     UIElements.showGlobalMessage('Bağlantı kəsildi. Yenidən qoşulmağa çalışılır...', true);
                 });
 
-                // --- Otaq Qurulması Olayı (HOST ÜÇÜN) ---
+                // Otaq Quruldu (HOST)
                 socket.on('roomCreated', (code) => {
+                    isHost = true; // ⭐ HOST TƏSDİQLƏNİB
                     UIElements.roomCodeDisplay.textContent = code;
                     
-                    const title = (window.languageManager && window.languageManager.t) 
-                        ? window.languageManager.t('roomCreatedTitle') 
-                        : 'Otağınız Quruldu! 🎉';
-                    const status = (window.languageManager && window.languageManager.t) 
-                        ? window.languageManager.t('roomCreatedStatus') 
-                        : 'Otaq kodunu dostunuza göndərin və qoşulmasını gözləyin.';
+                    const title = (window.languageManager && window.languageManager.t) ? window.languageManager.t('roomCreatedTitle') : 'Otağınız Quruldu! 🎉';
+                    const status = (window.languageManager && window.languageManager.t) ? window.languageManager.t('roomCreatedStatus') : 'Otaq kodunu dostunuza göndərin və qoşulmasını gözləyin.';
                     
                     UIElements.waitTitle.textContent = title;
                     UIElements.codeArea.classList.remove('hidden'); // Kodu görünür et
@@ -485,12 +458,14 @@
                     UIElements.showGlobalMessage(successMsg, false);
                 });
 
+                // Qoşulma Uğursuz Oldu
                 socket.on('joinFailed', (message) => {
+                    isHost = false; 
                     UIElements.showGlobalMessage(message, true);
                     UIElements.resetGame();
                 });
                 
-                // ⭐ ƏVVƏLKİ SADƏ MƏNTİQİNİZƏ QAYITDIQ (Serverin düzgün işlədiyini fərz edirik)
+                // --- OYUN BAŞLANMASI ---
                 socket.on('gameStart', (data) => {
                     console.log("Oyun Başladı! Data:", data);
                     
@@ -502,13 +477,12 @@
                     
                     let turnMessage;
                     
-                    // Serverdən gələn data.currentTurn-a etibar edirik
-                    if (data.currentTurn === socket.id) {
+                    // ⭐ YENİ MƏNTİQ: Host birinci başlayır (Server xətasını keçmək üçün).
+                    if (isHost) {
                          turnMessage = (window.languageManager && window.languageManager.t) 
                              ? window.languageManager.t('yourTurn') 
                              : 'SİZİN növbənizdir! Kart seçin.';
-                         
-                    } else { // data.currentTurn ya rəqibin ID-si olmalıdır, ya da server xətasıdır, amma əvvəlki kimi sadə məntiqə qayıdırıq.
+                    } else { 
                         const opponentName = opponent ? opponent.username : "Rəqib";
                          turnMessage = (window.languageManager && window.languageManager.t) 
                              ? window.languageManager.t('opponentTurn', { name: opponentName }) 
@@ -541,6 +515,7 @@
             const username = validateInput();
             if (!username) return;
             
+            isHost = false; // Qoşulmağa cəhd etməzdən əvvəl sıfırla
             showScreen('waitScreen'); 
             
             const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
