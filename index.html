@@ -17,12 +17,6 @@
         :root {
             --primary-color: #3498db;
             --secondary-color: #2980b9;
-            --success-color: #2ecc71;
-            --danger-color: #e74c3c;
-            --text-color: #2c3e50;
-            --bg-color: #ecf0f1;
-            --card-bg: white;
-            --shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         }
         
         * {
@@ -73,7 +67,7 @@
             display: flex; 
         }
         
-        /* Language Selector */
+        /* Language Selector (Stilleri olduğu kimi qaldı) */
         .language-selector {
             position: fixed;
             top: env(safe-area-inset-top, 15px);
@@ -94,9 +88,6 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             transition: all 0.2s;
             backdrop-filter: blur(5px);
-        }
-        .language-button:hover {
-            background: rgba(255, 255, 255, 0.3);
         }
         .language-options {
             display: none;
@@ -154,14 +145,6 @@
             transition: border-color 0.2s, box-shadow 0.2s;
             color: #1f2937 !important; 
         }
-        .input-field:focus {
-            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5), inset 0 2px 5px rgba(0,0,0,0.2);
-        }
-        .input-field::placeholder {
-            color: #6b7280; 
-            opacity: 1; 
-        }
-
 
         .code-display { 
             @apply text-5xl font-extrabold p-5 bg-gray-800 text-yellow-300 rounded-xl tracking-widest; 
@@ -184,7 +167,6 @@
             padding: 1rem;
             border-radius: 10px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-            /* Qayıtma animasiyasını təmin edir */
             transition: opacity 0.3s ease-in-out, transform 0.3s ease-out; 
         }
         
@@ -192,17 +174,15 @@
             display: block; 
             opacity: 1;
             transform: translate(-50%, 0);
-            /* Animasiyanı CSS tərəfindən idarə edir */
             animation: fadeInDown 0.3s ease-out forwards; 
         }
-        /* Gizləmə animasiyası JavaScript tərəfindən idarə ediləcək */
 
         @keyframes fadeInDown {
             from { opacity: 0; transform: translate(-50%, -20px); } 
             to { opacity: 1; transform: translate(-50%, 0); }
         }
         
-        /* --- QALAN KOD OLDUĞU KİMİ QALIR --- */
+        /* Digər Animasiyalar (Olduğu kimi qalır) */
         @keyframes screenFadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
@@ -350,7 +330,6 @@
     <script>
         // --- FUNKSIYALAR VƏ ELEMENTLƏR ---
         
-        // Elementləri bir dəfə tapın
         const UIElements = {
             usernameInput: document.getElementById('username'),
             roomCodeInput: document.getElementById('roomCodeInput'),
@@ -374,7 +353,7 @@
         window.globalMessageTimeout = null;
         
         /**
-         * Gloal mesajı göstərir (2 saniyəlik limit ilə)
+         * Gloal mesajı göstərir (2 saniyəlik limit ilə və mobil uyumlu fade-out)
          * @param {string} message 
          * @param {boolean} isError 
          */
@@ -382,40 +361,34 @@
             const globalMsg = UIElements.globalMessage;
             const globalMsgText = UIElements.globalMessageText;
             
-            // Əvvəlki zamanlayıcını təmizləyin
             if (window.globalMessageTimeout) {
                 clearTimeout(window.globalMessageTimeout);
             }
             
             globalMsgText.textContent = message;
-            // Rəngləri təmizləyin
             globalMsg.classList.remove('bg-red-600', 'bg-green-600');
-            // Yeni rəngi əlavə edin
             globalMsg.classList.add(isError ? 'bg-red-600' : 'bg-green-600');
             
-            // Göstər (FADE-IN animasiyasını başladır)
+            // 1. Göstər (display: block)
             globalMsg.style.display = 'block';
-            // Klassı gecikməsiz əlavə etmək lazımdır ki, animasiya işləsin
+            
+            // 2. Bir az sonra fade-in başlat (opacity: 1)
             requestAnimationFrame(() => {
                 globalMsg.classList.add('show');
             });
             
-            // ⭐ GİZLƏT MƏNTİQİ: 2 saniyə (2000ms) sonra gizlət
+            // 3. 2 saniyə sonra gizlətmə prosesinə başla
             window.globalMessageTimeout = setTimeout(() => {
-                // 1. Fade-out effekti üçün 'show' klassını silin
+                // Fade-out üçün 'show' klassını silin
                 globalMsg.classList.remove('show');
                 
-                // 2. Tam yoxa çıxmaq üçün 300ms (CSS transition müddəti) sonra display: none tətbiq edin.
+                // 4. CSS transition bitdikdən sonra display: none tətbiq edin.
                 setTimeout(() => {
                     globalMsg.style.display = 'none';
-                }, 300); // CSS-dəki transition 0.3s (300ms) olduğu üçün
+                }, 300); // 300ms CSS transition vaxtıdır
             }, 2000); 
         };
 
-        /**
-         * Ekranı dəyişir
-         * @param {string} screenId - (lobby, waitScreen, gameScreen)
-         */
         function showScreen(screenId) {
             UIElements.screens.forEach(screen => {
                 screen.classList.remove('active');
@@ -430,9 +403,6 @@
             }
         }
         
-        /**
-         * Oyunu sıfırlayır və lobbiyə qayıdır.
-         */
         UIElements.resetGame = () => {
              showScreen('lobby');
              UIElements.roomCodeDisplay.textContent = '';
@@ -447,7 +417,6 @@
              UIElements.codeArea.classList.add('hidden');
         }
         
-        // Dil Seçici Köməkçi Funksiyalar
         window.toggleLanguageSelector = () => {
              const selector = document.getElementById('language-selector');
              if (selector) {
@@ -512,7 +481,7 @@
                     UIElements.showGlobalMessage(message, true);
                 });
 
-                // OTAQ QURULDU MESAJI (Bildiriş yuxarıdan gəlir)
+                // OTAQ QURULDU MESAJI 
                 socket.on('roomCreated', (code) => {
                     UIElements.roomCodeDisplay.textContent = code;
                     
@@ -539,7 +508,7 @@
                     UIElements.resetGame();
                 });
                 
-                // OYUN BAŞLANMASI MƏNTİQİ (Bildiriş yuxarıdan gəlir)
+                // OYUN BAŞLANMASI MƏNTİQİ
                 socket.on('gameStart', (data) => {
                     console.log("Oyun Başladı! Data:", data);
                     
@@ -549,12 +518,27 @@
                     UIElements.myLives.textContent = '❤️❤️❤️';
                     UIElements.opponentLives.textContent = '❤️❤️❤️';
                     
+                    let turnMessage;
+                    
+                    // Serverin Hostun ID-sini ilk növbə kimi göndərməsini güman edirik.
                     if (data.currentTurn === socket.id) {
-                         UIElements.turnStatus.textContent = 'SİZİN növbənizdir! Kart seçin.';
+                         turnMessage = (window.languageManager && window.languageManager.t) 
+                             ? window.languageManager.t('yourTurn') 
+                             : 'SİZİN növbənizdir! Kart seçin.';
+                         
+                    } else if (opponent && data.currentTurn === opponent.id) {
+                         turnMessage = (window.languageManager && window.languageManager.t) 
+                             ? window.languageManager.t('opponentTurn', { name: opponent.username }) 
+                             : `${opponent.username} növbəsidir...`;
+                         
                     } else {
-                         UIElements.turnStatus.textContent = `${UIElements.opponentName.textContent} növbəsidir...`;
+                        // Əgər server currentTurn ID-sini düzgün təyin etməyibsə
+                         turnMessage = (window.languageManager && window.languageManager.t) 
+                             ? window.languageManager.t('waitingTurn') 
+                             : 'Növbə gözlənilir... (Server Məntiq Xətası)';
                     }
 
+                    UIElements.turnStatus.textContent = turnMessage;
                     showScreen('gameScreen'); 
                     
                     if (window.languageManager && window.languageManager.updateGameUI) {
@@ -576,7 +560,6 @@
         
         // --- Olay Dinleyicileri ---
         
-        // DÜYMƏ: Otaq Qur
         UIElements.createRoomBtn.addEventListener('click', () => {
             const username = validateInput();
             if (!username) return;
@@ -590,7 +573,6 @@
             socket.emit('createRoom', { username });
         });
 
-        // DÜYMƏ: Otağa Qoşul
         UIElements.joinRoomBtn.addEventListener('click', () => {
             const username = validateInput();
             if (!username) return;
