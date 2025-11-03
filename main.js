@@ -1,22 +1,20 @@
 // Dosya Adı: main.js
 // Uygulamanın ana mantığı ve global fonksiyonları
 
-// game.js'ten (Memory/Bomb) fonksiyonları içe aktar
 import * as MemoryGame from './game.js'; 
-// pong.js'ten fonksiyonları içe aktar
 import * as PongGame from './pong.js';
 
 let socket;
 let currentScreen = 'menu';
 let selectedGame = null; 
 
-// --- DOM Referansları (Global) ---
+// --- DOM Referansları (Kaldığı Gibi) ---
 const screens = { 
     menu: document.getElementById('menu'),
     lobby: document.getElementById('lobby'), 
     wait: document.getElementById('waitScreen'), 
-    game: document.getElementById('gameScreen'), // Memory
-    pongGame: document.getElementById('pongGame') // Pong
+    game: document.getElementById('gameScreen'), 
+    pongGame: document.getElementById('pongGame') 
 };
 const waitCodeEl = document.getElementById('waitCode');
 const usernameInput = document.getElementById('username');
@@ -29,11 +27,9 @@ const joinBtn = document.getElementById('joinBtn');
 const globalMessage = document.getElementById('globalMessage');
 const globalMessageText = document.getElementById('globalMessageText');
 
-// Global dil yöneticisinden çeviri fonksiyonunu al
 export const t = window.languageManager.t;
 
-// --- Global Yardımcı Fonksiyonlar (Export ediliyor) ---
-
+// (showScreen ve showGlobalMessage fonksiyonları kaldırıldığı gibi kalır)
 export function showScreen(screenId) {
     Object.values(screens).forEach(screen => screen.classList.remove('active'));
     screens[screenId].classList.add('active');
@@ -52,8 +48,7 @@ export function showGlobalMessage(message, isError = true) {
     }, 4000);
 }
 
-// --- OYUN SEÇİM VE LOBİ MANTIĞI ---
-
+// (setupLobby ve handleLobbyAction fonksiyonları kaldırıldığı gibi kalır)
 function setupLobby(gameType) {
     selectedGame = gameType;
     const gameName = gameType === 'MEMORY' ? t('memoryGame') : t('pongGame');
@@ -70,24 +65,24 @@ function handleLobbyAction(isCreate) {
         return;
     }
     
-    // Socket bağlantısı kurulmamışsa kur
+    // --- KRİTİK GÜNCELLEME: Socket Bağlantısı ---
+    // Eğer Socket.IO bağlantısı yoksa, basitçe io() ile otomatik olarak
+    // mevcut URL'ye (Render URL'sine) bağlanmaya çalışır.
     if (!socket) {
-        socket = io(window.location.origin); 
+        // io() kullanımı window.location.origin ile aynıdır, Render için en güvenli yoldur.
+        socket = io(); 
         setupConnectionHandlers();
     }
     
     if (isCreate || !roomCode) {
-        // Oda Kur
         socket.emit('createRoom', { username, gameType: selectedGame });
         showGlobalMessage(`${selectedGame === 'MEMORY' ? '💣' : '🏓'} ${t('waitingForPlayer')}`, false);
     } else {
-        // Odaya Bağlan
         socket.emit('joinRoom', { username, roomCode });
     }
 }
 
-// --- SOCKET.IO BAĞLANTI İŞLEYİCİLERİ ---
-
+// (setupConnectionHandlers ve diğer socket olayları kaldırıldığı gibi kalır)
 function setupConnectionHandlers() {
     socket.on('roomCreated', (code) => {
         waitCodeEl.textContent = `${t('roomCode')}: ${code}`;
@@ -109,8 +104,6 @@ function setupConnectionHandlers() {
         const opponent = players.find(p => p.id !== myId);
         const opponentName = opponent ? opponent.username : 'Bilinmiyor';
 
-        console.log(`🎮 Oyun Başladı! Tip: ${gameType}, Host: ${isHost}, Rakip: ${opponentName}`);
-        
         if (gameType === 'MEMORY') {
             MemoryGame.setupMemorySocketHandlers(socket, roomCode, isHost, opponentName);
         } else if (gameType === 'PONG') {
@@ -120,7 +113,6 @@ function setupConnectionHandlers() {
         showGlobalMessage(t('gameStarting'), false);
     });
 
-    // Chat mesajları her iki oyunda da aynı HTML elementini kullanır (index.html'e göre)
     socket.on('chatMessage', ({ username, message }) => {
         const chatMessages = document.getElementById('chat-messages');
         if (chatMessages) {
@@ -136,25 +128,21 @@ function setupConnectionHandlers() {
         showGlobalMessage(message, true);
     });
     
-    // Rakip Ayrıldı (Genel İşleyici - Oyun ekranlarında da yakalanır)
     socket.on('opponentLeft', (message) => {
         showGlobalMessage(message || t('playerLeft'), true);
-        // İlgili oyunun reset fonksiyonunu çağır (PongGame/MemoryGame içinde tanımlı)
         if (currentScreen === 'game') MemoryGame.resetGame();
         if (currentScreen === 'pongGame') PongGame.resetPongGame();
         showScreen('menu');
     });
 }
 
-// --- CHAT MANTIĞI (MEMORY EKRANI İÇİN) ---
-
+// (handleSendMessage ve DOMContentLoaded olayları kaldırıldığı gibi kalır)
 function handleSendMessage() {
     const chatInput = document.getElementById('chat-input');
     if (!chatInput) return;
     
     const message = chatInput.value.trim();
     if (message && socket) {
-        // Hangi oyunda olursak olalım, chat sadece Memory ekranında aktif
         const roomCode = MemoryGame.currentRoomCode;
         if (roomCode) {
             socket.emit('chatMessage', { roomCode, message });
@@ -163,26 +151,19 @@ function handleSendMessage() {
     }
 }
 
-// --- Olay Dinleyicilerini Kurma ---
-
 document.addEventListener('DOMContentLoaded', () => {
-    // Dil ayarlarını yükle ve UI'ı güncelle
     window.languageManager.initLanguage();
 
-    // Oyun Seçim Butonları
     selectMemoryBtn.addEventListener('click', () => setupLobby('MEMORY'));
     selectPongBtn.addEventListener('click', () => setupLobby('PONG'));
 
-    // Lobi Butonları
-    matchBtn.addEventListener('click', () => handleLobbyAction(true)); // Oda Kur
-    joinBtn.addEventListener('click', () => handleLobbyAction(false)); // Odaya Bağlan
+    matchBtn.addEventListener('click', () => handleLobbyAction(true));
+    joinBtn.addEventListener('click', () => handleLobbyAction(false));
 
-    // Chat Gönderme
     document.getElementById('send-message')?.addEventListener('click', handleSendMessage);
     document.getElementById('chat-input')?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleSendMessage();
     });
 
-    // Başlangıçta menüyü göster
     showScreen('menu'); 
 });
