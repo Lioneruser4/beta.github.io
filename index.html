@@ -481,70 +481,9 @@
     <script src="languages.js"></script>
     
     <script type="module">
-        // game.js faylını istifadə etmədən UIElements və utilitlərini burada müəyyənləşdiririk.
+        import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
         
-        // ** YENİ KOD: Başqa fayllardan asılılığı azaltmaq üçün utilitlər burada təyin edilir. **
-        const UIElements = {
-            usernameInput: document.getElementById('username'),
-            roomCodeInput: document.getElementById('roomCodeInput'),
-            matchBtn: document.getElementById('matchBtn'),
-            // ... digər elementlər
-            showGlobalMessage: (message, isError) => {
-                const globalMessage = document.getElementById('globalMessage');
-                const globalMessageText = document.getElementById('globalMessageText');
-                
-                globalMessageText.textContent = message;
-                globalMessage.className = `show w-11/12 max-w-md p-4 rounded-lg shadow-lg ${isError ? 'bg-red-600' : 'bg-green-600'}`;
-                
-                setTimeout(() => {
-                    globalMessage.classList.remove('show');
-                }, 4000);
-            },
-            resetGame: () => {
-                if (window.socket && window.socket.connected) {
-                    window.socket.emit('leaveRoom'); // Serverə çıxış siqnalı göndərir
-                }
-                showScreen('lobby');
-                // Əlavə oyun təmizləmə işləri (kartları sıfırlamaq, statusları təmizləmək) burada olmalıdır.
-            }
-        };
-
-        function showScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(screen => {
-                screen.classList.remove('active');
-            });
-            const screen = document.getElementById(screenId);
-            if (screen) {
-                screen.classList.add('active');
-            }
-        }
-        
-        // Mən bu funksiyanı qoyuram ki, gameStart hadisəsi işləyə bilsin.
-        function setupSocketHandlers(socket, roomCode, isHost, opponentUsername) {
-            UIElements.showGlobalMessage('Oyun Başladı! Kartları açın!', false);
-            showScreen('gameScreen');
-            document.getElementById('opponentName').textContent = opponentUsername;
-            document.getElementById('roleStatus').textContent = isHost ? 'Sən otaq quran (Host) oyunçusan.' : 'Sən otağa qoşulan oyunçusan.';
-            // Burada oyunun başlanğıcı üçün digər UI yeniləmələri edilə bilər.
-            // Əlbəttə, real funksionallıq `game.js` daxilindədir.
-        }
-        // ** YENİ KOD SONU **
-
         document.addEventListener('DOMContentLoaded', () => {
-            // languages.js-dən gəlməli olan funksiyalar (Simulyasiya)
-            window.languageManager = {
-                initLanguage: () => { /* Simulyasiya: dil yüklənməsi */ },
-                toggleLanguageSelector: () => {
-                    document.getElementById('language-selector').style.display = 
-                        document.getElementById('language-selector').style.display === 'block' ? 'none' : 'block';
-                },
-                setLanguage: (lang) => { 
-                    document.getElementById('current-language').textContent = (lang === 'az' ? '🇦🇿 AZ' : (lang === 'tr' ? '🇹🇷 TR' : '🇬🇧 EN'));
-                    document.getElementById('language-selector').style.display = 'none';
-                    UIElements.showGlobalMessage(`Dil ${lang.toUpperCase()} olaraq dəyişdirildi.`, false);
-                }
-            };
-
             window.languageManager.initLanguage();
         });
         
@@ -554,7 +493,6 @@
         // Render URL'niz: Lütfen bu kısmı KENDİ URL'nizle değiştirin!
         const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
         let socket;
-        window.socket = socket; // ResetGame üçün socketi global etdik
         
         function validateInput() {
             const username = UIElements.usernameInput.value.trim();
@@ -567,21 +505,14 @@
 
         function connectToServer() {
             try {
-                // Əgər socket artıq varsa və qoşulubsa, yenidən qoşulmağa çalışmayın.
-                if (socket && socket.connected) {
-                    showScreen('lobby');
-                    return;
-                }
-
                 socket = io(LIVE_SERVER_URL, {
                     transports: ['websocket', 'polling'], 
                     reconnectionAttempts: 5, 
                     timeout: 20000 
                 });
-                window.socket = socket; // Global socketi yenilə
 
                 socket.on('connect', () => {
-                    UIElements.showGlobalMessage('Serverə qoşuldu. Eşleşməyə hazırsınız.', false);
+                    UIElements.showGlobalMessage('Serverə qoşuldu. Eşləşməyə hazırsınız.', false);
                     showScreen('lobby');
                 });
                 
@@ -615,11 +546,6 @@
                     setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
                 });
 
-                socket.on('opponentLeft', () => {
-                     UIElements.showGlobalMessage('Rəqib oyunu tərk etdi. Lobbiyə qayıdırsınız.', true);
-                     UIElements.resetGame();
-                });
-
             } catch (e) {
                 console.error('Socket.IO genel hatası:', e);
                 UIElements.showGlobalMessage('Kritik qoşulma xətası baş verdi.', true);
@@ -634,33 +560,22 @@
             showScreen('wait');
             const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
 
-            if (socket && socket.connected) { // Əgər qoşulmuşsa
-                if (roomCode === '') {
-                    document.getElementById('waitTitle').textContent = 'Otaq Qurulur...';
-                    document.getElementById('waitStatus').textContent = 'Zəhmət olmasa gözləyin...';
-                    document.getElementById('codeArea').classList.add('hidden');
-                    socket.emit('createRoom', { username });
-                } else {
-                    document.getElementById('waitTitle').textContent = `Otağa Qoşulma: ${roomCode}`;
-                    document.getElementById('waitStatus').textContent = 'Qoşulunur...';
-                    document.getElementById('codeArea').classList.add('hidden');
-                    socket.emit('joinRoom', { username, roomCode });
-                }
-            } else { // Əgər qoşulmayıbsa, problemi bildir
-                UIElements.showGlobalMessage('Serverə qoşulmaq üçün gözləyin, ya da bağlantı problemi var.', true);
-                showScreen('lobby');
-                // Təkrar qoşulmağa cəhd edin
-                connectToServer();
+            if (roomCode === '') {
+                document.getElementById('waitTitle').textContent = 'Otaq Qurulur...';
+                document.getElementById('waitStatus').textContent = 'Zəhmət olmasa gözləyin...';
+                document.getElementById('codeArea').classList.add('hidden');
+                socket.emit('createRoom', { username });
+            } else {
+                document.getElementById('waitTitle').textContent = `Otağa Qoşulma: ${roomCode}`;
+                document.getElementById('waitStatus').textContent = 'Qoşulunur...';
+                document.getElementById('codeArea').classList.add('hidden');
+                socket.emit('joinRoom', { username, roomCode });
             }
         });
 
         document.getElementById('cancelBtn').addEventListener('click', () => {
             if (socket && socket.connected) {
-                // Otaq kodu yoxlanılır və serverə tərk etmə siqnalı göndərilir
-                const currentRoomCode = document.getElementById('roomCodeDisplay').textContent;
-                if(currentRoomCode) {
-                    socket.emit('leaveRoom', { roomCode: currentRoomCode });
-                }
+                socket.emit('leaveRoom', { roomCode: document.getElementById('roomCodeDisplay').textContent });
             }
             UIElements.resetGame();
         });
