@@ -139,7 +139,6 @@
         }
         
         .btn-secondary {
-            /* Yeni Qoşulmaq üçün Fərqli Rəng */
             @apply bg-green-600 text-white hover:bg-green-500 active:scale-98; 
             background: linear-gradient(135deg, #48bb78, #68d391);
             border: none;
@@ -153,7 +152,7 @@
             @apply w-full text-lg bg-white text-gray-900 border-2 border-gray-600 rounded-xl p-4 text-center placeholder-gray-400 focus:outline-none focus:border-blue-500; 
             box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
             transition: border-color 0.2s, box-shadow 0.2s;
-            color: #1f2937 !important; /* Məcburi qara şrift */
+            color: #1f2937 !important; 
         }
         .input-field:focus {
             box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5), inset 0 2px 5px rgba(0,0,0,0.2);
@@ -171,7 +170,7 @@
             font-family: 'Chakra Petch', monospace;
         }
         
-        /* ⭐ GLOBAL MESAJ: Yuxarıda qalması və Animasiya */
+        /* ⭐ GLOBAL MESAJ: Düzəlişlər */
         #globalMessage {
             position: fixed;
             top: env(safe-area-inset-top, 20px);
@@ -179,25 +178,31 @@
             transform: translateX(-50%);
             z-index: 50;
             opacity: 0;
-            display: none; /* Başlanğıcda gizlət */
-            transition: none; /* 'hidden' klassı istifadə olunmur, opacity ilə idarə olunur */
-        }
-        
-        #globalMessage.show { 
-            display: block; 
-            animation: fadeInDown 0.3s ease-out forwards; 
+            display: none; 
             width: 90%;
             max-width: 400px;
             padding: 1rem;
             border-radius: 10px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            /* Qayıtma animasiyasını təmin edir */
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-out; 
         }
+        
+        #globalMessage.show { 
+            display: block; 
+            opacity: 1;
+            transform: translate(-50%, 0);
+            /* Animasiyanı CSS tərəfindən idarə edir */
+            animation: fadeInDown 0.3s ease-out forwards; 
+        }
+        /* Gizləmə animasiyası JavaScript tərəfindən idarə ediləcək */
+
         @keyframes fadeInDown {
             from { opacity: 0; transform: translate(-50%, -20px); } 
             to { opacity: 1; transform: translate(-50%, 0); }
         }
         
-        /* --- ANİMASYONLAR: LOBİ GİRİŞİ VƏ BUTONLAR --- */
+        /* --- QALAN KOD OLDUĞU KİMİ QALIR --- */
         @keyframes screenFadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
@@ -206,7 +211,6 @@
             animation: screenFadeIn 0.5s ease-out forwards;
         }
 
-        /* Bekleme Ekranı (WaitScreen) için dönme animasyonu */
         .wait-spinner {
             font-size: 4rem;
             color: #63b3ed;
@@ -217,7 +221,6 @@
             to { transform: rotate(360deg); }
         }
         
-        /* OYUN İÇİ STILLƏRİN QALAN HİSSƏSİ QORUNUR */
         #gameScreen {
             padding-top: env(safe-area-inset-top, 20px);
             padding-bottom: env(safe-area-inset-bottom, 20px);
@@ -368,7 +371,6 @@
             screens: document.querySelectorAll('.screen')
         };
 
-        // Global zamanlayıcını saxlamaq üçün dəyişən
         window.globalMessageTimeout = null;
         
         /**
@@ -386,15 +388,28 @@
             }
             
             globalMsgText.textContent = message;
-            // Əvvəlki rəngləri təmizləyin
+            // Rəngləri təmizləyin
             globalMsg.classList.remove('bg-red-600', 'bg-green-600');
-            // Yeni rəngi əlavə edin və göstərin
-            globalMsg.classList.add(isError ? 'bg-red-600' : 'bg-green-600', 'show');
+            // Yeni rəngi əlavə edin
+            globalMsg.classList.add(isError ? 'bg-red-600' : 'bg-green-600');
             
-            // ⭐ 2 SANİYƏ SONRA GİZLƏT MƏNTİQİ
+            // Göstər (FADE-IN animasiyasını başladır)
+            globalMsg.style.display = 'block';
+            // Klassı gecikməsiz əlavə etmək lazımdır ki, animasiya işləsin
+            requestAnimationFrame(() => {
+                globalMsg.classList.add('show');
+            });
+            
+            // ⭐ GİZLƏT MƏNTİQİ: 2 saniyə (2000ms) sonra gizlət
             window.globalMessageTimeout = setTimeout(() => {
+                // 1. Fade-out effekti üçün 'show' klassını silin
                 globalMsg.classList.remove('show');
-            }, 2000); // 2000ms = 2 saniyə
+                
+                // 2. Tam yoxa çıxmaq üçün 300ms (CSS transition müddəti) sonra display: none tətbiq edin.
+                setTimeout(() => {
+                    globalMsg.style.display = 'none';
+                }, 300); // CSS-dəki transition 0.3s (300ms) olduğu üçün
+            }, 2000); 
         };
 
         /**
