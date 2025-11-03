@@ -10,10 +10,17 @@ const server = http.createServer(app);
 // CORS DÜZELTME: Tüm kaynaklardan gelen bağlantılara izin verir
 const io = new Server(server, {
     cors: {
-        origin: "*", 
-        methods: ["GET", "POST"]
+        origin: "*",
+        methods: ["GET", "POST", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+        credentials: true
     },
-    transports: ['websocket', 'polling'] 
+    transports: ['websocket', 'polling'],
+    pingInterval: 10000,  // 10 saniyede bir ping at
+    pingTimeout: 5000,    // 5 saniye yanıt bekle
+    cookie: false,
+    serveClient: false,
+    allowEIO3: true       // Socket.IO v3 uyumluluğu için
 });
 
 const rooms = {}; 
@@ -29,8 +36,55 @@ function generateRoomCode() {
     return code;
 }
 
+// Bağlantı istatistikleri
+const connectionStats = {
+    totalConnections: 0,
+    activeConnections: 0,
+    byPlatform: {}
+};
+
+// Tüm bağlantıları takip etmek için bir Set
+global.connectedSockets = new Set();
+
 io.on('connection', (socket) => {
-    console.log(`Yeni bağlantı: ${socket.id}`);
+    console.log(`Yeni bağlantı: ${socket.id} - IP: ${socket.handshake.address} - Platform: ${socket.handshake.headers['user-agent']}`);
+    
+    // İstatistikleri güncelle
+    connectionStats.totalConnections++;
+    connectionStats.activeConnections++;
+    global.connectedSockets.add(socket.id);
+    
+    // Platform bilgisini al
+    const userAgent = socket.handshake.headers['user-agent'] || 'unknown';
+    const platform = userAgent.includes('iPhone') ? 'ios' : 
+                    userAgent.includes('Android') ? 'android' : 
+                    userAgent.includes('Telegram') ? 'telegram' : 'web';
+    
+    connectionStats.byPlatform[platform] = (connectionStats.byPlatform[platform] || 0) + 1;
+    
+    // Bağlantı bilgilerini logla
+    console.log(`Aktif bağlantılar: ${connectionStats.activeConnections} - Platform: ${platform}`);
+    
+    // Ping-pong mekanizması
+    let pingTimeout;
+    
+    function resetPingTimeout() {
+        if (pingTimeout) clearTimeout(pingTimeout);
+        pingTimeout = setTimeout(() => {
+            console.log(`Bağlantı zaman aşımı: ${socket.id}`);
+            socket.disconnect(true);
+        }, 60000); // 60 saniye içinde yanıt gelmezse bağlantıyı kes
+    }
+    
+    resetPingTimeout();
+    
+    socket.on('ping', (data) => {
+        socket.emit('pong', { ...data, serverTime: Date.now() });
+    });
+    
+    socket.on('pong', () => {
+        resetPingTimeout();
+    });
     
     socket.on('createRoom', ({ username }) => {
         const code = generateRoomCode();
@@ -350,8 +404,32 @@ io.on('connection', (socket) => {
     });
 
     // Bağlantı kesildiğinde
-    socket.on('disconnect', () => {
-        console.log(`Bağlantı kesildi: ${socket.id}`);
+    // Bağlantı koptuğunda
+    socket.on('disconnect', (reason) => {
+        console.log(`Bağlantı kesildi: ${socket.id} - Sebep: ${reason}`);
+        
+        // İstatistikleri güncelle
+        connectionStats.activeConnections--;
+        global.connectedSockets.delete(socket.id);
+        
+        // Tüm odalardan bu kullanıcıyı çıkar
+        for (const roomCode in rooms) {
+            const room = rooms[roomCode];
+            if (room.hostId === socket.id || room.guestId === socket.id) {
+                const isHost = room.hostId === socket.id;
+                const opponentId = isHost ? room.guestId : room.hostId;
+                const opponentSocket = io.sockets.sockets.get(opponentId);
+                
+                if (opponentSocket) {
+                    opponentSocket.emit('opponentDisconnected');
+                }
+                
+                // Odayı temizle
+                delete rooms[roomCode];
+                console.log(`Oda kaldırıldı: ${roomCode}`);
+                break;
+            }
+        }
         for (const code in rooms) {
             const room = rooms[code];
             if (room.hostId === socket.id || room.guestId === socket.id) {
