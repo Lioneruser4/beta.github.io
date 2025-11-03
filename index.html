@@ -324,11 +324,14 @@
             waitTitle: document.getElementById('waitTitle'),
             codeArea: document.getElementById('codeArea'),
             waitStatus: document.getElementById('waitStatus'),
+            
+            // Oyun Ekranı Elementləri
             opponentName: document.getElementById('opponentName'),
             myLives: document.getElementById('myLives'),
             opponentLives: document.getElementById('opponentLives'),
             turnStatus: document.getElementById('turnStatus'),
             actionMessage: document.getElementById('actionMessage'),
+            gameBoard: document.getElementById('gameBoard'), // ⭐ Kartların yerləşdiriləcəyi yer
             screens: document.querySelectorAll('.screen')
         };
 
@@ -376,6 +379,11 @@
          * Oyunu sıfırlayır və lobbiyə qayıdır
          */
         UIElements.resetGame = () => {
+             if (socket && socket.connected && UIElements.roomCodeDisplay.textContent) {
+                 // Əgər otaq kodu varsa, serverə otaqdan çıxmaq siqnalı göndər
+                 socket.emit('leaveRoom', { roomCode: UIElements.roomCodeDisplay.textContent });
+             }
+             
              showScreen('lobby');
              UIElements.roomCodeDisplay.textContent = '';
              UIElements.roomCodeInput.value = '';
@@ -388,6 +396,7 @@
                  UIElements.waitStatus.textContent = 'Rəqib qoşulmasını gözləyirsiniz...';
              }
              UIElements.codeArea.classList.add('hidden');
+             UIElements.gameBoard.innerHTML = ''; // Kartları təmizlə
         }
         
         function validateInput() {
@@ -410,6 +419,46 @@
             if (window.languageManager && window.languageManager.setLanguage) window.languageManager.setLanguage(lang);
             window.toggleLanguageSelector();
         };
+
+        // ⭐ KART YARADILMASI FUNKSİYASI (5x5 Board)
+        function createGameBoard() {
+            const board = UIElements.gameBoard;
+            board.innerHTML = ''; // Əvvəlki kartları təmizlə
+            
+            for (let i = 0; i < 25; i++) {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.dataset.index = i;
+                
+                // Kartın üzərindəki mətn
+                card.textContent = '❓'; 
+                
+                // Kart kliklənmə funksiyası (əsas oyun məntiqi)
+                card.addEventListener('click', () => {
+                     // Növbəni yoxlamaq üçün müvəqqəti məntiq (Server tərəfindən idarə olunmalıdır!)
+                     if (UIElements.turnStatus.textContent.includes('SİZİN')) { 
+                          console.log(`Kart ${i} seçildi. Serverə göndərilir...`);
+                          // Kartın seçilməsi üçün serverə siqnal göndərilir
+                          // socket.emit('cardSelect', { index: i, roomCode: UIElements.roomCodeDisplay.textContent });
+                          
+                          // Müvəqqəti olaraq kartı açıq göstərək:
+                          card.classList.add('open');
+                          card.textContent = '💣'; // Məsələn, bomba vurdun
+                          
+                          // Növbəni dəyişdirmək üçün müvəqqəti məntiq:
+                          const opponentName = UIElements.opponentName.textContent;
+                          const opponentTurnMsg = (window.languageManager && window.languageManager.t) 
+                             ? window.languageManager.t('opponentTurn', { name: opponentName }) 
+                             : `${opponentName} növbəsidir...`;
+                          UIElements.turnStatus.textContent = opponentTurnMsg;
+                     } else {
+                          UIElements.showGlobalMessage('Rəqibin növbəsidir!', true);
+                     }
+                });
+
+                board.appendChild(card);
+            }
+        }
 
 
         // --- SOCKET MƏNTİQİ ---
@@ -477,7 +526,7 @@
                     
                     let turnMessage;
                     
-                    // ⭐ YENİ MƏNTİQ: Host birinci başlayır (Server xətasını keçmək üçün).
+                    // HOST (Otağı quran) birinci başlayır
                     if (isHost) {
                          turnMessage = (window.languageManager && window.languageManager.t) 
                              ? window.languageManager.t('yourTurn') 
@@ -490,6 +539,10 @@
                     }
 
                     UIElements.turnStatus.textContent = turnMessage;
+                    
+                    // ⭐ KARTLARI YARAT
+                    createGameBoard(); 
+
                     showScreen('gameScreen'); 
                     
                     if (window.languageManager && window.languageManager.updateGameUI) {
@@ -503,6 +556,8 @@
                     UIElements.showGlobalMessage(gameStartMsg, false);
                 });
 
+                // Serverdən gələn digər oyun hadisələri (Məsələn: 'cardRevealed', 'turnChanged') buraya əlavə edilməlidir.
+
             } catch (e) {
                 console.error('Socket.IO genel hatası:', e);
                 UIElements.showGlobalMessage('Kritik qoşulma xətası baş verdi.', true);
@@ -515,7 +570,7 @@
             const username = validateInput();
             if (!username) return;
             
-            isHost = false; // Qoşulmağa cəhd etməzdən əvvəl sıfırla
+            isHost = false; 
             showScreen('waitScreen'); 
             
             const roomCode = UIElements.roomCodeInput.value.trim().toUpperCase();
@@ -537,7 +592,7 @@
 
         document.getElementById('cancelBtn').addEventListener('click', () => {
             if (socket && socket.connected && UIElements.roomCodeDisplay.textContent) {
-                socket.emit('leaveRoom', { roomCode: UIElements.roomCodeDisplay.textContent });
+                 socket.emit('leaveRoom', { roomCode: UIElements.roomCodeDisplay.textContent });
             }
             UIElements.resetGame();
         });
