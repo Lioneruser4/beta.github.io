@@ -629,6 +629,16 @@
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
         
+        // Hata ayıklama için konsol çıktıları
+        console.log('Script yüklendi, socket.io versiyonu:', io?.version);
+        
+        // Platform kontrolü
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isTelegram = window.navigator.userAgent.includes('Telegram');
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        
+        console.log('Platform bilgisi:', { isIOS, isTelegram, isSafari });
+        
         document.addEventListener('DOMContentLoaded', () => {
             window.languageManager.initLanguage();
         });
@@ -636,9 +646,27 @@
         window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
         window.setLanguage = languageManager.setLanguage;
 
-        // Render URL'niz: Lütfen bu kısmı KENDİ URL'nizle değiştirin!
-        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
+        // Sunucu URL'si - WebSocket protokolü ile başlamalı
+        const LIVE_SERVER_URL = 'wss://beta-github-io.onrender.com';
         let socket;
+        
+        // Socket bağlantı seçenekleri
+        const socketOptions = {
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+            transports: ['websocket'],
+            upgrade: false,
+            forceNew: true,
+            withCredentials: true,
+            secure: true,
+            rejectUnauthorized: false,
+            extraHeaders: {
+                'X-Platform': isIOS ? 'ios' : isTelegram ? 'telegram' : 'web'
+            }
+        };
+        
+        console.log('Socket bağlantı ayarları:', socketOptions);
         
         function validateInput() {
             const username = UIElements.usernameInput.value.trim();
@@ -694,76 +722,194 @@
 
             } catch (e) {
                 console.error('Socket.IO genel hatası:', e);
-                UIElements.showGlobalMessage('Kritik qoşulma xətası baş verdi.', true);
-            }
+        
+        <div id="gameBoard" class="grid w-full mx-auto">
+        </div>
+    </div>
+    
+    <button id="endGameBtn" class="btn bg-red-600 hover:bg-red-500 text-white text-sm py-3">🚪 Oyundan Çıx <i class="fas fa-door-open ml-2"></i></button>
+</div>
+
+<script src="languages.js"></script>
+    
+<script type="module">
+    import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
+    
+    // Hata ayıklama için konsol çıktıları
+    console.log('Script yüklendi, socket.io versiyonu:', io?.version);
+    
+    // iOS ve Telegram kontrolü
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isTelegram = window.navigator.userAgent.includes('Telegram');
+    
+    if (isIOS) console.log('iOS cihaz tespit edildi');
+    if (isTelegram) console.log('Telegram WebView tespit edildi');
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        window.languageManager.initLanguage();
+    });
+    
+    window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
+    window.setLanguage = languageManager.setLanguage;
+
+    // Sunucu URL'si
+    const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com';
+    let socket;
+    
+    // Socket bağlantı seçenekleri
+    const socketOptions = {
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        transports: ['websocket'], // Sadece WebSocket kullan
+        upgrade: false,
+        forceNew: true,
+        withCredentials: true,
+        extraHeaders: {
+            'X-Platform': isIOS ? 'ios' : isTelegram ? 'telegram' : 'web'
         }
+    };
+    
+    console.log('Socket bağlantı ayarları:', socketOptions);
+    
+    function validateInput() {
+        const username = UIElements.usernameInput.value.trim();
+        if (username.length < 2) {
+            UIElements.showGlobalMessage('Zəhmət olmasa etibarlı bir istifadəçi adı daxil edin.', true);
+            return false;
+        }
+        return username;
+    }
+
+    async function connectToServer(roomCode = '') {
+        const username = validateInput();
+        if (!username) return;
         
-        // --- Olay Dinleyicileri ---
-        document.getElementById('createRoomBtn').addEventListener('click', () => {
-            const username = validateInput();
-            if (!username) return;
-            
-            showScreen('wait');
-            document.getElementById('waitTitle').textContent = 'Otaq Qurulur...';
-            document.getElementById('waitStatus').textContent = 'Zəhmət olmasa gözləyin...';
-            document.getElementById('codeArea').classList.add('hidden');
-            socket.emit('createRoom', { username });
-        });
+        console.log('Sunucuya bağlanılıyor...', LIVE_SERVER_URL);
         
-        document.getElementById('joinRoomBtn').addEventListener('click', () => {
-            const username = validateInput();
-            if (!username) return;
-            
-            const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-            if (!roomCode) {
-                UIElements.showGlobalMessage('Xahiş olunur otaq kodunu daxil edin', true);
+        try {
+            // Socket.IO kütüphanesinin yüklü olduğundan emin ol
+            if (typeof io === 'undefined') {
+                console.error('Socket.IO kütüphanesi yüklenemedi!');
+                showGlobalMessage('Bağlantı hatası: Socket.IO yüklenemedi', true);
                 return;
             }
             
-            showScreen('wait');
-            document.getElementById('waitTitle').textContent = `Otağa Qoşulma: ${roomCode}`;
-            document.getElementById('waitStatus').textContent = 'Qoşulunur...';
-            document.getElementById('codeArea').classList.add('hidden');
-            socket.emit('joinRoom', { username, roomCode });
-        });
-
-        document.getElementById('cancelBtn').addEventListener('click', () => {
-            if (socket && socket.connected) {
-                socket.emit('leaveRoom', { roomCode: document.getElementById('roomCodeDisplay').textContent });
+            // iOS ve Telegram için özel işlemler
+            if (isIOS || isTelegram) {
+                // iOS'ta WebSocket bağlantısı için gerekli izinler
+                if (window.webkit && window.webkit.messageHandlers) {
+                    console.log('iOS WebView tespit edildi, özel ayarlar uygulanıyor...');
+                }
+                
+                // Telegram WebView için özel ayarlar
+                if (isTelegram && window.Telegram?.WebApp) {
+                    console.log('Telegram WebView tespit edildi, özel ayarlar uygulanıyor...');
+                    window.Telegram.WebApp.expand();
+                    window.Telegram.WebApp.enableClosingConfirmation();
+                }
             }
-            UIElements.resetGame();
-        });
-        
-        document.getElementById('endGameBtn').addEventListener('click', UIElements.resetGame);
-        
-        document.getElementById('copyCodeBtn').addEventListener('click', () => {
-            const textToCopy = document.getElementById('roomCodeDisplay').textContent;
-            navigator.clipboard.writeText(textToCopy)
-                .then(() => UIElements.showGlobalMessage('Otaq Kodu Kopyalandı!', false))
-                .catch(() => UIElements.showGlobalMessage('Kopyalama uğursuz oldu.', true));
-        });
-
-        document.addEventListener('DOMContentLoaded', function() {
-            // iOS ve Telegram WebView için ses başlatma
-            const initAudioContext = () => {
-                if (window.AudioContext || window.webkitAudioContext) {
-                    const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    const audioContext = new AudioContext();
-                    
-                    // iOS için kullanıcı etkileşimi gerekiyor
-                    const unlockAudio = () => {
-                        const buffer = audioContext.createBuffer(1, 1, 22050);
-                        const source = audioContext.createBufferSource();
-                        source.buffer = buffer;
-                        source.connect(audioContext.destination);
-                        source.start(0);
-                        
+            
+            // Socket bağlantısını başlat
+            console.log('Socket bağlantısı başlatılıyor...');
+            socket = io(LIVE_SERVER_URL, socketOptions);
+            
+            // Bağlantı olaylarını dinle
+            socket.on('connect', () => {
+                console.log('Sunucuya bağlandı. Socket ID:', socket.id);
+                
+                // Odaya katıl
+                socket.emit('joinRoom', { 
+                    username, 
+                    roomCode: roomCode.toUpperCase(),
+                    platform: isIOS ? 'ios' : isTelegram ? 'telegram' : 'web',
+                    userAgent: navigator.userAgent
+                });
+                
+                // Bekleme ekranını göster
+                showScreen('wait');
+                document.getElementById('roomCodeDisplay').textContent = roomCode || 'Yükleniyor...';
+                
+                // iOS ve Telegram için bağlantı testi
+                if (isIOS || isTelegram) {
+                    console.log('iOS/Telegram bağlantı testi yapılıyor...');
+                    socket.emit('ping', { timestamp: Date.now() });
+                }
+            });
+            
+            // Ping yanıtı
+            socket.on('pong', (data) => {
+                console.log('Sunucudan ping yanıtı:', data);
+            });
+            
+            socket.on('connect_error', (error) => {
+                console.error('Bağlantı hatası:', error);
+                let errorMessage = 'Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.';
+                
+                if (error.message.includes('websocket error')) {
+                    errorMessage = 'WebSocket bağlantı hatası. Lütcep şebekenizi veya Wi-Fi bağlantınızı kontrol edin.';
+                } else if (error.message.includes('xhr poll error')) {
+                    errorMessage = 'Sunucuya erişilemiyor. Lütfen daha sonra tekrar deneyin.';
+                }
+                
+                showGlobalMessage(errorMessage, true);
+                showScreen('lobby');
+                
+                // 5 saniye sonra tekrar dene
+                setTimeout(() => {
+                    if (!socket.connected) {
+                        console.log('Otomatik yeniden bağlanma deniyor...');
+                        connectToServer(roomCode);
+                    }
+                }, 5000);
+            });
+            
+            socket.on('roomCreated', (data) => {
+                console.log('Oda oluşturuldu:', data);
+                document.getElementById('roomCodeDisplay').textContent = data.roomCode;
+                document.getElementById('waitTitle').textContent = 'Oda Oluşturuldu';
+                document.getElementById('waitStatus').textContent = 'Rakip bekleniyor...';
+            });
+            
+            socket.on('gameStart', (data) => {
+                console.log('Oyun başladı:', data);
+                setupSocketHandlers(socket, data.roomCode, data.isHost, data.opponentName);
+                showScreen('game');
+            });
+            
+            // Genel hata yönetimi
+            socket.on('error', (error) => {
+                console.error('Socket hatası:', error);
+                showGlobalMessage('Bir hata oluştu: ' + (error.message || 'Bilinmeyen hata'), true);
+            });
+            
+            // Bağlantı koptuğunda
+            socket.on('disconnect', (reason) => {
+                console.log('Bağlantı kesildi:', reason);
+                if (reason === 'io server disconnect') {
+                    // Sunucu tarafından bağlantı kesildi
+                    showGlobalMessage('Sunucu bağlantısı kesildi. Tekrar bağlanılıyor...', true);
+                    socket.connect();
+                }
+            });
+            
+        } catch (error) {
+            console.error('Bağlantı hatası:', error);
+            showGlobalMessage('Bağlantı hatası oluştu: ' + (error.message || 'Bilinmeyen hata'), true);
+            showScreen('lobby');
+            
+            // Hata durumunda 3 saniye sonra tekrar dene
+            setTimeout(() => {
+                console.log('Hata sonrası tekrar bağlanılıyor...');
+                connectToServer(roomCode);
+            }, 3000);
+        }            
                         // iOS için sessiz bir ses çal
                         if (audioContext.state === 'suspended') {
                             audioContext.resume();
                         }
                         
-                        // Tekrar tıklamayı önlemek için event listener'ları kaldır
+<!-- ... -->
                         document.removeEventListener('touchstart', unlockAudio);
                         document.removeEventListener('touchend', unlockAudio);
                         document.removeEventListener('click', unlockAudio);
