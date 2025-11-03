@@ -673,11 +673,110 @@
 
     <script src="languages.js"></script>
     
+    <script>
+        // Butonlara tıklama olaylarını ekle
+        document.addEventListener('DOMContentLoaded', function() {
+            // Oda oluştur butonu
+            document.getElementById('createRoomBtn').addEventListener('click', function() {
+                console.log('Oda oluştur butonuna tıklandı');
+                const username = document.getElementById('username').value.trim();
+                if (!username) {
+                    alert('Lütfen bir kullanıcı adı girin');
+                    return;
+                }
+                connectToServer();
+            });
+
+            // Odaya katıl butonu
+            document.getElementById('joinRoomBtn').addEventListener('click', function() {
+                console.log('Odaya katıl butonuna tıklandı');
+                const username = document.getElementById('username').value.trim();
+                const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+                
+                if (!username) {
+                    alert('Lütfen bir kullanıcı adı girin');
+                    return;
+                }
+                
+                if (!roomCode) {
+                    alert('Lütfen bir oda kodu girin');
+                    return;
+                }
+                
+                connectToServer(roomCode);
+            });
+
+            // Kodu kopyala butonu
+            document.getElementById('copyCodeBtn').addEventListener('click', function() {
+                const roomCode = document.getElementById('roomCodeDisplay').textContent;
+                if (roomCode && roomCode !== 'Yükleniyor...') {
+                    navigator.clipboard.writeText(roomCode).then(function() {
+                        alert('Oda kodu panoya kopyalandı: ' + roomCode);
+                    }).catch(function() {
+                        // Tarayıcı desteklemiyorsa
+                        const tempInput = document.createElement('input');
+                        document.body.appendChild(tempInput);
+                        tempInput.value = roomCode;
+                        tempInput.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(tempInput);
+                        alert('Oda kodu kopyalandı: ' + roomCode);
+                    });
+                }
+            });
+
+            // İptal butonu
+            document.getElementById('cancelBtn').addEventListener('click', function() {
+                if (socket && socket.connected) {
+                    socket.disconnect();
+                }
+                showScreen('lobby');
+            });
+
+            // Oyunu bitir butonu
+            document.getElementById('endGameBtn').addEventListener('click', function() {
+                if (confirm('Oyundan çıkmak istediğinize emin misiniz?')) {
+                    if (socket && socket.connected) {
+                        socket.disconnect();
+                    }
+                    showScreen('lobby');
+                }
+            });
+
+            // Kullanıcı adı alanına enter tuşu ile submit özelliği ekle
+            document.getElementById('username').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const roomCode = document.getElementById('roomCodeInput').value.trim();
+                    if (roomCode) {
+                        document.getElementById('joinRoomBtn').click();
+                    } else {
+                        document.getElementById('createRoomBtn').click();
+                    }
+                }
+            });
+
+            // Oda kodu alanına enter tuşu ile submit özelliği ekle
+            document.getElementById('roomCodeInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    document.getElementById('joinRoomBtn').click();
+                }
+            });
+        });
+    </script>
+    
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
         
+        // Global socket değişkeni
+        let socket;
+        
         // Hata ayıklama için konsol çıktıları
         console.log('Script yüklendi, socket.io versiyonu:', io?.version);
+        
+        // Global showScreen fonksiyonu
+        window.showScreen = showScreen;
         
         // Platform kontrolü
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -838,7 +937,96 @@
             return username;
         }
 
-        function connectToServer() {
+        // Sunucuya bağlanma fonksiyonu
+    async function connectToServer(roomCode = '') {
+        const username = document.getElementById('username').value.trim();
+        if (!username) {
+            showGlobalMessage('Lütfen bir kullanıcı adı girin', true);
+            return;
+        }
+        
+        console.log('Sunucuya bağlanılıyor...', LIVE_SERVER_URL);
+        
+        // Bağlantı durumu göster
+        showScreen('wait');
+        document.getElementById('waitTitle').textContent = 'Sunucuya bağlanılıyor...';
+        document.getElementById('waitStatus').textContent = 'Lütfen bekleyin...';
+        
+        try {
+            // Socket bağlantısını oluştur
+            socket = io(LIVE_SERVER_URL, socketOptions);
+            
+            // Bağlantı başarılı olduğunda
+            socket.on('connect', () => {
+                console.log('Sunucuya bağlandı. Socket ID:', socket.id);
+                
+                // Odaya katıl veya oluştur
+                if (roomCode) {
+                    // Odaya katıl
+                    socket.emit('joinRoom', { 
+                        username: username,
+                        roomCode: roomCode 
+                    });
+                    console.log('Odaya katılım isteği gönderildi:', roomCode);
+                } else {
+                    // Yeni oda oluştur
+                    socket.emit('createRoom', { 
+                        username: username 
+                    });
+                    console.log('Yeni oda oluşturuluyor...');
+                }
+            });
+            
+            // Oda oluşturulduğunda
+            socket.on('roomCreated', (code) => {
+                console.log('Oda oluşturuldu:', code);
+                document.getElementById('roomCodeDisplay').textContent = code;
+                document.getElementById('waitTitle').textContent = 'Otağınız Kuruldu! 🎉';
+                document.getElementById('codeArea').classList.remove('hidden');
+                document.getElementById('waitStatus').textContent = 'Oda kodunu dostunuza gönderin ve katılmasını bekleyin.';
+            });
+            
+            // Odaya katılım başarısız olduğunda
+            socket.on('joinFailed', (message) => {
+                console.error('Odaya katılamadı:', message);
+                showGlobalMessage(message, true);
+                showScreen('lobby');
+            });
+            
+            // Oyun başladığında
+            socket.on('gameStart', (data) => {
+                console.log('Oyun başladı:', data);
+                setupSocketHandlers(socket, data.roomCode, data.isHost, data.opponentName);
+                showScreen('game');
+            });
+            
+            // Hata durumunda
+            socket.on('error', (error) => {
+                console.error('Socket hatası:', error);
+                showGlobalMessage('Bir hata oluştu: ' + (error.message || 'Bilinmeyen hata'), true);
+            });
+            
+            // Bağlantı koptuğunda
+            socket.on('disconnect', (reason) => {
+                console.log('Bağlantı kesildi:', reason);
+                if (reason === 'io server disconnect') {
+                    // Sunucu tarafından bağlantı kesildi
+                    showGlobalMessage('Sunucu bağlantısı kesildi. Tekrar bağlanılıyor...', true);
+                    socket.connect();
+                }
+            });
+            
+        } catch (error) {
+            console.error('Bağlantı hatası:', error);
+            showGlobalMessage('Bağlantı hatası oluştu: ' + (error.message || 'Bilinmeyen hata'), true);
+            showScreen('lobby');
+            
+            // Hata durumunda 3 saniye sonra tekrar dene
+            setTimeout(() => {
+                console.log('Hata sonrası tekrar bağlanılıyor...');
+                connectToServer(roomCode);
+            }, 3000);
+        }
             try {
                 socket = io(LIVE_SERVER_URL, {
                     transports: ['websocket', 'polling'], 
