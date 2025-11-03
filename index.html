@@ -1,17 +1,89 @@
 <!DOCTYPE html>
-<html lang="az">
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, height=device-height">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1a202c">
     <title>💣 Emoji Kart Bomb 1v1</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        // iOS ve Telegram WebView için touch event desteği
+        document.addEventListener('DOMContentLoaded', function() {
+            // iOS için touch event'leri etkinleştir
+            document.body.addEventListener('touchstart', function() {}, { passive: true });
+            
+            // Telegram WebView tespiti
+            const isTelegram = window.navigator.userAgent.includes('Telegram');
+            if (isTelegram) {
+                document.documentElement.classList.add('telegram-webview');
+            }
+            
+            // iOS tespiti
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            if (isIOS) {
+                document.documentElement.classList.add('ios-device');
+            }
+        });
+    </script>
     
     <style>
-        /* === KENDİ OYUNUNUZDAN ALINAN CSS STİLLERİ VE MOBİL UYUM === */
+        /* === iOS ve Telegram WebView Düzeltmeleri === */
+        html {
+            -webkit-text-size-adjust: 100%;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-overflow-scrolling: touch;
+            height: 100%;
+            overflow: hidden;
+        }
         
+        body {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+            height: 100%;
+            position: fixed;
+            width: 100%;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* iOS ve Telegram için özel stiller */
+        .ios-device .screen,
+        .telegram-webview .screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Input alanları için iOS düzeltmesi */
+        input, select, textarea {
+            font-size: 16px !important;
+        }
+        
+        /* Butonlar için dokunma efekti */
+        button, [role="button"] {
+            -webkit-appearance: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Oyun tahtası için kaydırma düzeltmesi */
+        .game-board {
+            -webkit-overflow-scrolling: touch;
+            overflow-y: auto;
+        }
+        
+        /* === OYUN STİLLERİ === */
         :root {
             --primary-color: #3498db;
             --secondary-color: #2980b9;
@@ -618,7 +690,81 @@
                 .catch(() => UIElements.showGlobalMessage('Kopyalama uğursuz oldu.', true));
         });
 
-        document.addEventListener('DOMContentLoaded', connectToServer);
+        document.addEventListener('DOMContentLoaded', function() {
+            // iOS ve Telegram WebView için ses başlatma
+            const initAudioContext = () => {
+                if (window.AudioContext || window.webkitAudioContext) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    const audioContext = new AudioContext();
+                    
+                    // iOS için kullanıcı etkileşimi gerekiyor
+                    const unlockAudio = () => {
+                        const buffer = audioContext.createBuffer(1, 1, 22050);
+                        const source = audioContext.createBufferSource();
+                        source.buffer = buffer;
+                        source.connect(audioContext.destination);
+                        source.start(0);
+                        
+                        // iOS için sessiz bir ses çal
+                        if (audioContext.state === 'suspended') {
+                            audioContext.resume();
+                        }
+                        
+                        // Tekrar tıklamayı önlemek için event listener'ları kaldır
+                        document.removeEventListener('touchstart', unlockAudio);
+                        document.removeEventListener('touchend', unlockAudio);
+                        document.removeEventListener('click', unlockAudio);
+                    };
+                    
+                    // Kullanıcı etkileşimi için event listener'lar ekle
+                    document.addEventListener('touchstart', unlockAudio, { once: true });
+                    document.addEventListener('touchend', unlockAudio, { once: true });
+                    document.addEventListener('click', unlockAudio, { once: true });
+                    
+                    // Telegram WebView için ekstra kontrol
+                    if (window.Telegram && window.Telegram.WebApp) {
+                        window.Telegram.WebApp.expand();
+                        window.Telegram.WebApp.enableClosingConfirmation();
+                    }
+                }
+            };
+            
+            // Sayfa yüklendiğinde ses başlatmayı dene
+            initAudioContext();
+            
+            // Oyun başlatma işlemi
+            connectToServer();
+        });
+    </script>
+    
+    <!-- iOS için ek script -->
+    <script>
+        // iOS için viewport düzeltmesi
+        document.addEventListener('DOMContentLoaded', function() {
+            // iOS için viewport düzeltmesi
+            if (/(iPad|iPhone|iPod)/g.test(navigator.userAgent)) {
+                const viewport = document.querySelector('meta[name=viewport]');
+                if (viewport) {
+                    viewport.content = viewport.content + ', maximum-scale=1.0';
+                }
+                
+                // iOS için touch event'leri
+                document.body.style.cursor = 'pointer';
+                
+                // iOS için scroll düzeltmesi
+                document.body.addEventListener('touchmove', function(e) {
+                    if (e.target.tagName === 'DIV' || e.target.tagName === 'BUTTON') {
+                        e.preventDefault();
+                    }
+                }, { passive: false });
+            }
+            
+            // Telegram WebView için ekstra düzenleme
+            if (window.navigator.userAgent.includes('Telegram')) {
+                document.documentElement.style.overflow = 'auto';
+                document.body.style.overflow = 'auto';
+            }
+        });
     </script>
 </body>
 </html>
