@@ -40,11 +40,11 @@ function initializeGame(boardSize) {
     
     // Seviyeye göre can ve bomba sayısını ayarla
     if (level === 1) {
-        // Level 1'de bomba yok, can yok
-        gameData.hostLives = 0; // Bu değer gameReady'den güncellenecek
-        gameData.guestLives = 0; // Bu değer gameReady'den güncellenecek
+        // Level 1'de 4 bomba
+        gameData.hostLives = 4; 
+        gameData.guestLives = 4;
     } else {
-        // Level 2 ve sonrası 3 can, 3 bomba
+        // Level 2 ve sonrası 6 bomba
         gameData.hostLives = 6;
         gameData.guestLives = 6;
     }
@@ -271,14 +271,29 @@ async function applyMove(index, emoji, isBomb) {
         gameData.turn = gameData.turn === 0 ? 1 : 0;
         updateStatusDisplay();
         
-        // Oyunun bitip bitmediğini kontrol et
-        if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
-            const winner = (gameData.hostLives <= 0 && gameData.guestLives <= 0) ? 'DRAW' : 
-                         (gameData.hostLives <= 0 ? 'Guest' : 'Host');
+        // Tüm bombalar patladı mı kontrol et
+        const allBombsExploded = (gameData.hostLives <= 0 && gameData.guestLives <= 0);
+        
+        if (allBombsExploded) {
+            // Tüm bombalar patladı, bir sonraki seviyeye geç
+            const nextLevel = level + 1;
+            showGlobalMessage(`🎉 Tüm bombalar patladı! Seviye ${nextLevel}'e geçiliyor...`, false);
+            
+            // Sunucuya seviye tamamlandı bilgisini gönder
+            if (socket && socket.connected) {
+                socket.emit('levelComplete', { 
+                    roomCode: currentRoomCode,
+                    level: level,
+                    nextLevel: nextLevel
+                });
+            }
+        } else if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
+            // Normal oyun bitişi (bir oyuncu tüm canlarını kaybetti)
+            const winner = gameData.hostLives <= 0 ? 'Guest' : 'Host';
             endGame(winner);
         } else {
-            // Tüm kartların açılıp açılmadığını kontrol et
-            checkLevelCompletion(); // ✅ GLOBAL FONKSİYONU ÇAĞIR!
+            // Oyun devam ediyor, sıradaki oyuncu
+            checkLevelCompletion();
         }
         
     }, 1000);
@@ -391,8 +406,14 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     
     // Can sayılarını server'dan gelen bilgiyle güncelle
     socket.once('gameReady', ({ hostBombs, guestBombs }) => {
-        gameData.hostLives = hostBombs.length;
-        gameData.guestLives = guestBombs.length;
+        // Seviyeye göre can sayılarını ayarla
+        if (level === 1) {
+            gameData.hostLives = 4;
+            gameData.guestLives = 4;
+        } else {
+            gameData.hostLives = 6;
+            gameData.guestLives = 6;
+        }
         updateStatusDisplay();
     });
     
