@@ -480,6 +480,26 @@
     <div id="gameScreen" class="screen space-y-4">
         <h1 class="text-4xl font-black">🕹️ Emoji Bombası</h1>
         
+        <div class="fixed bottom-4 right-4 z-50">
+                <button id="emojiToggle" class="bg-blue-600 hover:bg-blue-700 text-white text-2xl w-12 h-12 rounded-full flex items-center justify-center shadow-lg">
+                    😊
+                </button>
+                <div id="emojiPicker" class="hidden absolute bottom-16 right-0 bg-gray-800 p-2 rounded-lg shadow-xl grid grid-cols-4 gap-2">
+                    <button class="emoji-btn text-2xl hover:bg-gray-700 rounded p-2" data-emoji="😊">😊</button>
+                    <button class="emoji-btn text-2xl hover:bg-gray-700 rounded p-2" data-emoji="😂">😂</button>
+                    <button class="emoji-btn text-2xl hover:bg-gray-700 rounded p-2" data-emoji="😍">😍</button>
+                    <button class="emoji-btn text-2xl hover:bg-gray-700 rounded p-2" data-emoji="🎉">🎉</button>
+                    <button class="emoji-btn text-2xl hover:bg-gray-700 rounded p-2" data-emoji="👍">👍</button>
+                    <button class="emoji-btn text-2xl hover:bg-gray-700 rounded p-2" data-emoji="👎">👎</button>
+                    <button class="emoji-btn text-2xl hover:bg-gray-700 rounded p-2" data-emoji="❤️">❤️</button>
+                    <button class="emoji-btn text-2xl hover:bg-gray-700 rounded p-2" data-emoji="😎">😎</button>
+                </div>
+            </div>
+
+            <div id="emojiDisplay" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-6xl z-50 pointer-events-none opacity-0 transition-opacity duration-300">
+                
+            </div>
+
         <div class="flex justify-between items-center w-full text-gray-100 font-bold p-3 status-panel max-w-md">
             <div class="text-center">
                 <p class="text-sm text-blue-200">SƏN</p>
