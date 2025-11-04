@@ -9,17 +9,18 @@ const server = http.createServer(app);
 
 // CORS DÜZELTME: Tüm kaynaklardan gelen bağlantılara izin verir
 const io = new Server(server, {
-    cors: {
-        origin: "*", 
-        methods: ["GET", "POST"]
-    },
-    transports: ['websocket', 'polling'] 
+    cors: {
+        origin: "*", 
+        methods: ["GET", "POST"]
+    },
+    transports: ['websocket', 'polling'] 
 });
 
-const rooms = {}; 
+const rooms = {}; 
 
 // Oyun için kullanılacak rastgele emojiler
-const EMOJIS = ['😀','😎','🦄','🐱','🍀','🍕','🌟','⚽','🎵','🚀','🎲','🥇'];
+// 👇 DÜZELTME: iOS uyumluluğunu artırmak için emoji seti değiştirildi.
+const EMOJIS = ['🙂','😂','😍','🤩','👍','🎉','⭐','🎯','🍎','🦁','✅','💯'];
 
 function generateRoomCode() {
     let code = Math.random().toString(36).substring(2, 6).toUpperCase();
