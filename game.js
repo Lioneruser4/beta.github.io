@@ -9,7 +9,7 @@ const screens = {
     lobby: document.getElementById('lobby'), 
     wait: document.getElementById('waitScreen'), 
     game: document.getElementById('gameScreen') 
-}; 
+};
 const gameBoardEl = document.getElementById('gameBoard');
 const turnStatusEl = document.getElementById('turnStatus');
 const actionMessageEl = document.getElementById('actionMessage');
