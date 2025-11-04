@@ -107,15 +107,40 @@ function drawBoard() {
         cardContainer.className = 'card-container aspect-square';
 
         const card = document.createElement('div');
-        card.className = `card cursor-pointer`;
+        card.className = 'card cursor-pointer';
         card.dataset.index = index;
+        // iOS için özel stil
+        card.style.webkitTransformStyle = 'preserve-3d';
+        card.style.transformStyle = 'preserve-3d';
+        card.style.webkitBackfaceVisibility = 'hidden';
+        card.style.backfaceVisibility = 'hidden';
+        card.style.transition = 'transform 0.6s';
 
         const front = document.createElement('div');
-        front.className = 'card-face front'; // Sizin stilinize göre front/back
+        front.className = 'card-face front';
+        front.style.webkitBackfaceVisibility = 'hidden';
+        front.style.backfaceVisibility = 'hidden';
+        front.style.position = 'absolute';
+        front.style.width = '100%';
+        front.style.height = '100%';
+        front.style.display = 'flex';
+        front.style.alignItems = 'center';
+        front.style.justifyContent = 'center';
+        front.style.fontSize = '2rem';
         front.textContent = '?';
         
         const back = document.createElement('div');
         back.className = 'card-face back';
+        back.style.webkitBackfaceVisibility = 'hidden';
+        back.style.backfaceVisibility = 'hidden';
+        back.style.position = 'absolute';
+        back.style.width = '100%';
+        back.style.height = '100%';
+        back.style.display = 'flex';
+        back.style.alignItems = 'center';
+        back.style.justifyContent = 'center';
+        back.style.fontSize = '2rem';
+        back.style.transform = 'rotateY(180deg)';
         back.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI Emoji", "Segoe UI", "Apple Color Emoji", sans-serif';
         back.style.webkitTextStroke = '0.5px transparent';
         back.style.textShadow = '0 0 1px rgba(0, 0, 0, 0.1)';
@@ -123,6 +148,16 @@ function drawBoard() {
 
         card.appendChild(front);
         card.appendChild(back);
+        
+        // iOS için touch event'leri
+        card.ontouchstart = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!card.classList.contains('flipped')) {
+                handleCardClick({ currentTarget: card });
+            }
+        };
+        
         cardContainer.appendChild(card);
         
         if (cardState.opened) {
@@ -177,6 +212,56 @@ function updateStatusDisplay() {
 }
 
 // --- ANIMASYON VE SES ---
+
+// iOS için kart çevirme stilleri
+const style = document.createElement('style');
+style.textContent = `
+    @media (max-width: 768px) {
+        .card {
+            -webkit-transform-style: preserve-3d;
+            transform-style: preserve-3d;
+            -webkit-transition: -webkit-transform 0.6s;
+            transition: transform 0.6s;
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        .card.flipped {
+            -webkit-transform: rotateY(180deg);
+            transform: rotateY(180deg);
+        }
+        .card-container {
+            -webkit-perspective: 1000px;
+            perspective: 1000px;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        .card-face {
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .front {
+            background: #4a5568;
+            color: white;
+        }
+        .back {
+            transform: rotateY(180deg);
+        }
+    }
+`;
+document.head.appendChild(style);
+
 
 async function triggerWaitAndVibrate() {
     if (gameData.cardsLeft < 8 && gameStage === 'PLAY') { 
