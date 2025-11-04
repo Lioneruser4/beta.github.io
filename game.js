@@ -114,6 +114,28 @@ export function showGlobalMessage(message, isError = true) {
 
 // --- OYUN MANTIĞI VE ÇİZİM ---
 
+// Puan animasyonu oluşturma fonksiyonu
+function createScoreAnimation(value, x, y, isBomb = false) {
+    const scoreEl = document.createElement('div');
+    scoreEl.className = 'score-point';
+    scoreEl.textContent = (isBomb ? '💣 -100' : `+${value}`);
+    scoreEl.style.color = isBomb ? '#ff4444' : '#4CAF50';
+    scoreEl.style.left = `${x}px`;
+    scoreEl.style.top = `${y}px`;
+    
+    document.body.appendChild(scoreEl);
+    
+    // Animasyon bittiğinde elementi kaldır
+    setTimeout(() => {
+        scoreEl.classList.add('score-float');
+        setTimeout(() => {
+            if (document.body.contains(scoreEl)) {
+                document.body.removeChild(scoreEl);
+            }
+        }, 1000);
+    }, 10);
+}
+
 function drawBoard() {
     const boardSize = LEVELS[level - 1] || 20; // Default 20
     
@@ -126,21 +148,71 @@ function drawBoard() {
     gameData.board.forEach((cardState, index) => {
         const cardContainer = document.createElement('div');
         cardContainer.className = 'card-container aspect-square';
+        cardContainer.dataset.index = index;
 
         const card = document.createElement('div');
-        card.className = `card cursor-pointer`;
-        card.dataset.index = index;
-
+        card.className = `card ${cardState.opened ? 'flipped' : ''}`;
+        
         const front = document.createElement('div');
         front.className = 'card-face front';
-        const frontContent = document.createElement('span');
-        frontContent.textContent = '?';
-        front.appendChild(frontContent);
+        
+        // Kartın puanını veya içeriğini göster
+        if (cardState.opened) {
+            if (cardState.isBomb) {
+                front.textContent = '💣';
+                // Bomba ikonu büyük olsun
+                front.style.fontSize = '2.5rem';
+                front.style.display = 'flex';
+                front.style.alignItems = 'center';
+                front.style.justifyContent = 'center';
+            } else {
+                front.textContent = cardState.content;
+                // Eğer puan kartıysa, üzerinde puanı göster
+                if (cardState.content && !isNaN(parseInt(cardState.content))) {
+                    const pointsBadge = document.createElement('div');
+                    pointsBadge.className = 'card-points';
+                    pointsBadge.textContent = cardState.content;
+                    front.appendChild(pointsBadge);
+                    
+                    // Puan kartının reklini puanına göre ayarla
+                    const pointValue = parseInt(cardState.content);
+                    if (pointValue >= 70) {
+                        front.style.background = 'linear-gradient(135deg, #4CAF50, #2E7D32)';
+                    } else if (pointValue >= 30) {
+                        front.style.background = 'linear-gradient(135deg, #2196F3, #1565C0)';
+                    } else {
+                        front.style.background = 'linear-gradient(135deg, #f5f5f5, #e0e0e0)';
+                        front.style.color = '#333';
+                    }
+                    
+                    // Puan yazısını ortala
+                    front.style.display = 'flex';
+                    front.style.alignItems = 'center';
+                    front.style.justifyContent = 'center';
+                    front.style.fontSize = '2rem';
+                    front.style.fontWeight = 'bold';
+                }
+            }
+        } else {
+            front.textContent = '?';
+            // Kapalı kart stili
+            front.style.background = 'linear-gradient(135deg, #3B82F6, #1D4ED8)';
+            front.style.color = 'white';
+            front.style.display = 'flex';
+            front.style.alignItems = 'center';
+            front.style.justifyContent = 'center';
+            front.style.fontSize = '2rem';
+        }
         
         const back = document.createElement('div');
         back.className = 'card-face back';
+        back.style.background = '#f5f5f5';
+        back.style.display = 'flex';
+        back.style.alignItems = 'center';
+        back.style.justifyContent = 'center';
+        
         const backContent = document.createElement('span');
-        backContent.textContent = cardState.content;
+        backContent.textContent = cardState.isBomb ? '💣' : (cardState.content || '?');
         backContent.style.fontSize = '2rem';
         backContent.style.lineHeight = '1';
         back.appendChild(backContent);
@@ -157,8 +229,20 @@ function drawBoard() {
                 card.classList.add('bomb-selected'); 
             }
             
-            // KRİTİK DÜZELTME: TIKLAMA OLAYINI CARD-CONTAINER'A EKLE!
-            cardContainer.addEventListener('click', handleCardClick);
+            // Tıklama olayını ekle
+            cardContainer.addEventListener('click', () => {
+                const rect = cardContainer.getBoundingClientRect();
+                const x = rect.left + rect.width / 2;
+                const y = rect.top + rect.height / 2;
+                
+                if (gameData.board[index].isBomb) {
+                    createScoreAnimation(100, x, y, true);
+                } else if (gameData.board[index].content) {
+                    createScoreAnimation(parseInt(gameData.board[index].content), x, y);
+                }
+                
+                handleCardClick(index);
+            });
         }
         
         gameBoardEl.appendChild(cardContainer);
