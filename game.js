@@ -38,17 +38,16 @@ function initializeGame(boardSize) {
     gameData.turn = 0; // Host başlar
     gameData.isGameOver = false;
     
-    // Sadece oyun ilk başladığında veya bir oyuncu öldüğünde canları sıfırla
-    if (gameData.hostLives === undefined || gameData.hostLives <= 0) {
-        gameData.hostLives = level === 1 ? 3 : 4; // Level 1'de 3 can, diğerlerinde 4 can
+    // Seviyeye göre can ve bomba sayısını ayarla
+    if (level === 1) {
+        // Level 1'de 4 bomba
+        gameData.hostLives = 4; 
+        gameData.guestLives = 4;
+    } else {
+        // Level 2 ve sonrası 6 bomba
+        gameData.hostLives = 6;
+        gameData.guestLives = 6;
     }
-    
-    if (gameData.guestLives === undefined || gameData.guestLives <= 0) {
-        gameData.guestLives = level === 1 ? 3 : 4; // Level 1'de 3 can, diğerlerinde 4 can
-    }
-    
-    // Seviyeye göre bomba sayısını ayarla
-    gameData.bombCount = level === 1 ? 4 : 6; // Level 1'de 4 bomba, diğerlerinde 6 bomba
     
     gameStage = 'WAITING';
 }
@@ -56,12 +55,7 @@ function initializeGame(boardSize) {
 // --- OYUN DURUMU ---
 let level = 1; 
 // Kart sayıları: Level 1'de 16, sonraki tüm levellerde 20 kart
-const LEVELS = [16, 20];
-// Oyuncu canları
-let playerLives = {
-    host: 3,  // Level 1'de 3 can
-    guest: 3  // Level 1'de 3 can
-};
+const LEVELS = [16, 20]; 
 let gameStage = 'SELECTION'; // 'SELECTION' veya 'PLAY'
 let selectedBombs = []; // Kendi seçtiğimiz bombaların indexleri
 
@@ -283,37 +277,20 @@ async function applyMove(index, emoji, isBomb) {
         gameData.turn = gameData.turn === 0 ? 1 : 0;
         updateStatusDisplay();
         
-        // Bir oyuncu öldü mü kontrol et
-        if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
-            // Bir oyuncu öldü, canları sıfırla ve yeni seviyeye geç
-            const winner = gameData.hostLives <= 0 ? 'Guest' : 'Host';
-            const nextLevel = level + 1;
-            
-            showGlobalMessage(`🎉 ${winner} kazandı! Seviye ${nextLevel}'e geçiliyor...`, false);
-            
-            // Sunucuya seviye tamamlandı bilgisini gönder ve canları sıfırla
-            if (socket && socket.connected) {
-                socket.emit('levelComplete', { 
-                    roomCode: currentRoomCode,
-                    level: level,
-                    nextLevel: nextLevel,
-                    resetLives: true  // Canların sıfırlanacağını belirt
-                });
-            }
-        } 
-        // Tüm bombalar patladı mı kontrol et (ama kimse ölmediyse)
-        else if (gameData.cardsLeft <= 0) {
-            // Tüm bombalar patladı, bir sonraki seviyeye geç (canlar korunacak)
+        // Tüm bombalar patladı mı kontrol et
+        const allBombsExploded = (gameData.hostLives <= 0 && gameData.guestLives <= 0);
+        
+        if (allBombsExploded) {
+            // Tüm bombalar patladı, bir sonraki seviyeye geç
             const nextLevel = level + 1;
             showGlobalMessage(`🎉 Tüm bombalar patladı! Seviye ${nextLevel}'e geçiliyor...`, false);
             
-            // Sunucuya seviye tamamlandı bilgisini gönder (canlar korunacak)
+            // Sunucuya seviye tamamlandı bilgisini gönder
             if (socket && socket.connected) {
                 socket.emit('levelComplete', { 
                     roomCode: currentRoomCode,
                     level: level,
-                    nextLevel: nextLevel,
-                    resetLives: false  // Canlar korunacak
+                    nextLevel: nextLevel
                 });
             }
         } else if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
@@ -409,74 +386,10 @@ function checkLevelCompletion() {
         setTimeout(() => {
             console.log(`🔄 Sunucudan Seviye ${nextLevel} bilgisini bekle...`);
         }, 1000);
-}
-
-// Sayfa yüklendiğinde emoji seçiciyi kur
-if (typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', setupEmojiPicker);
-}
-
-// Emoji gönderme işlevi
-function sendEmoji(emoji) {
-    if (socket && socket.connected) {
-        socket.emit('gameData', {
-            roomCode: currentRoomCode,
-            type: 'EMOJI',
-            emoji: emoji
-        });
-        // Kendi ekranımızda da göster
-        showEmoji(emoji);
     }
 }
+// --- SON ---
 
-// Emoji gösterme işlevi
-function showEmoji(emoji) {
-    const emojiDisplay = document.getElementById('emojiDisplay');
-    if (!emojiDisplay) return;
-    
-    emojiDisplay.textContent = emoji;
-    emojiDisplay.style.opacity = '1';
-    
-    // 2 saniye sonra emojiyi gizle
-    setTimeout(() => {
-        emojiDisplay.style.opacity = '0';
-    }, 2000);
-}
-
-// Emoji seçim menüsünü açıp kapatma
-function setupEmojiPicker() {
-    const emojiToggle = document.getElementById('emojiToggle');
-    const emojiPicker = document.getElementById('emojiPicker');
-    
-    if (!emojiToggle || !emojiPicker) return;
-    
-    emojiToggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        emojiPicker.classList.toggle('hidden');
-    });
-    
-    // Dışarı tıklandığında menüyü kapat
-    document.addEventListener('click', () => {
-        if (!emojiPicker.classList.contains('hidden')) {
-            emojiPicker.classList.add('hidden');
-        }
-    });
-    
-    // Emoji butonlarına tıklama olayı ekle
-    document.querySelectorAll('.emoji-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const emoji = btn.getAttribute('data-emoji');
-            sendEmoji(emoji);
-            emojiPicker.classList.add('hidden');
-        });
-    });
-}
-
-// Sayfa yüklendiğinde emoji seçiciyi kur
-if (typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', setupEmojiPicker);
-}
 
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
 export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
@@ -561,31 +474,22 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         
         gameStage = 'PLAY';
         
-        // Canları güncelle (eğer bir oyuncu öldüyse sıfırlanır)
-        if (data.resetLives) {
-            gameData.hostLives = level === 1 ? 3 : 4;
-            gameData.guestLives = level === 1 ? 3 : 4;
-        }
-        
+        // Yeni oyun tahtasını oluştur
         initializeGame(data.boardSize);
         
         // UI'ı güncelle
         updateStatusDisplay();
         
-        showGlobalMessage(`🎮 Seviye ${level} başladı! ${gameData.hostLives} can ile oynanıyor.`, false);
+        showGlobalMessage(`🎮 Seviye ${level} başladı! ${data.hostLives} can ile oynanıyor.`, false);
     });
 
     // gameData Olayı (Hamle Geldi - Kendi veya Rakip)
     socket.on('gameData', (data) => {
-        if (data.type === 'MOVE' && gameStage === 'PLAY') {
+        if (gameStage !== 'PLAY') return;
+        
+        if (data.type === 'MOVE') {
             // Server tarafından onaylanmış hamleyi uygula (emoji ve bomba bilgisi ile)
-            applyMove(data.cardIndex, data.emoji, data.isBomb);
-        } else if (data.type === 'EMOJI') {
-            // Karşı taraftan gelen emojiyi göster
-            showEmoji(data.emoji);
-        } else if (data.type === 'GAME_START') {
-            // Oyun başlangıç bilgisini işle
-            console.log('🎉 Oyun başladı!');
+            applyMove(data.cardIndex, data.emoji, data.isBomb); 
         }
     });
 
