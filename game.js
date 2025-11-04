@@ -33,16 +33,20 @@ function playSound(audioElement) {
 
 // Oyun başlatma / seviye hazırlama
 function initializeGame(boardSize) {
-    // Rastgele puanlar ve bombalar için dizi oluştur
+    // Oda kodu ve seviye bilgisiyle rastgele tohum oluştur
+    const seed = currentRoomCode + level;
+    const seededRandom = createSeededRandom(seed);
+    
     const points = [];
     const bombCount = Math.min(level, 4); // Seviyeye göre bomba sayısı (max 4)
     
     // Kartları doldur
     const board = [];
     
-    // Rastgele puanlar ekle
+    // Rastgele puanlar ekle (her oyuncu için aynı olacak şekilde)
     for (let i = 0; i < boardSize - bombCount; i++) {
-        const randomPoint = POINTS[Math.floor(Math.random() * POINTS.length)];
+        const randomIndex = Math.floor(seededRandom() * POINTS.length);
+        const randomPoint = POINTS[randomIndex];
         points.push(randomPoint);
     }
     
@@ -51,9 +55,9 @@ function initializeGame(boardSize) {
         points.push('💣');
     }
     
-    // Karıştır
+    // Karıştır (her oyuncu için aynı sıralamada olacak şekilde)
     for (let i = points.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+        const j = Math.floor(seededRandom() * (i + 1));
         [points[i], points[j]] = [points[j], points[i]];
     }
     
@@ -72,7 +76,23 @@ function initializeGame(boardSize) {
     gameStage = 'PLAY';
     
     console.log(`Yeni seviye başlatıldı - Seviye: ${level}, Bombalar: ${bombCount}`);
+    console.log('Kart değerleri:', gameData.board.map(card => card.isBomb ? '💣' : card.content));
     updateStatusDisplay();
+}
+
+// Aynı tohum değeriyle aynı rastgele sayıları üreten fonksiyon
+function createSeededRandom(seed) {
+    let value = 0;
+    for (let i = 0; i < seed.length; i++) {
+        value = (value << 5) - value + seed.charCodeAt(i);
+        value |= 0;
+    }
+    
+    // Basit bir rastgele sayı üreteci
+    return function() {
+        value = (value * 9301 + 49297) % 233280;
+        return value / 233280;
+    };
 }
 
 // --- OYUN DURUMU ---
@@ -344,23 +364,48 @@ function sendMove(index) {
     }
 }
 
-async function applyMove(index) {
+async function applyMove(index, fromServer = false) {
     if (gameData.board[index].opened) return;
 
-    await triggerWaitAndVibrate();
+    if (!fromServer) {
+        // Eğer bu hamle sunucudan gelmediyse, sunucuya gönder
+        if (socket && socket.connected) {
+            socket.emit('gameMove', {
+                roomCode: currentRoomCode,
+                cardIndex: index,
+                turn: gameData.turn
+            });
+        }
+        
+        await triggerWaitAndVibrate();
+    }
 
     const card = gameData.board[index];
     card.opened = true;
     gameData.cardsLeft -= 1;
     
+    // Animasyon için kartın konumunu al
+    const cardElement = document.querySelector(`.card-container[data-index="${index}"]`);
+    let x, y;
+    
+    if (cardElement) {
+        const rect = cardElement.getBoundingClientRect();
+        x = rect.left + rect.width / 2;
+        y = rect.top + rect.height / 2;
+    }
+    
     if (card.isBomb) {
         // Bomba ise karşı oyuncudan 100 puan düş
         if (gameData.turn === 0) { // Host bombaya bastı
             gameData.guestScore = Math.max(0, gameData.guestScore - 100);
-            showGlobalMessage(`💣 Rakibiniz bombaya bastı! -100 puan!`, true);
+            const message = isHost ? 'Siz bombaya bastınız! -100 puan!' : 'Rakibiniz bombaya bastı! -100 puan!';
+            showGlobalMessage(`💣 ${message}`, true);
+            if (cardElement) createScoreAnimation(100, x, y, true);
         } else { // Guest bombaya bastı
             gameData.hostScore = Math.max(0, gameData.hostScore - 100);
-            showGlobalMessage(`💣 Rakibiniz bombaya bastı! -100 puan!`, true);
+            const message = !isHost ? 'Siz bombaya bastınız! -100 puan!' : 'Rakibiniz bombaya bastı! -100 puan!';
+            showGlobalMessage(`💣 ${message}`, true);
+            if (cardElement) createScoreAnimation(100, x, y, true);
         }
         playSound(audioBomb);
     } else {
@@ -368,7 +413,16 @@ async function applyMove(index) {
         const points = parseInt(card.content);
         const currentPlayer = gameData.turn === 0 ? 'hostScore' : 'guestScore';
         gameData[currentPlayer] += points;
-        showGlobalMessage(`+${points} puan kazandınız!`, false);
+        
+        // Sadece kendi puan kazandığında mesaj göster
+        const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
+        if (isMyTurn) {
+            showGlobalMessage(`+${points} puan kazandınız!`, false);
+        } else {
+            showGlobalMessage(`Rakibiniz ${points} puan kazandı!`, false);
+        }
+        
+        if (cardElement) createScoreAnimation(points, x, y);
         playSound(audioEmoji);
     }
     
@@ -384,28 +438,9 @@ async function applyMove(index) {
         if (gameData.hostScore > gameData.guestScore) {
             winner = isHost ? 'Siz' : opponentName;
             winnerScore = gameData.hostScore;
-            endGame('Host');
-        } else if (gameData.guestScore > gameData.hostScore) {
-            winner = isHost ? opponentName : 'Siz';
-            winnerScore = gameData.guestScore;
-            endGame('Guest');
-        } else {
-            showGlobalMessage(`🤝 Berabere! Her iki oyuncu da ${gameData.hostScore} puan aldı!`, false);
+            if (!fromServer) endGame('Host');
+            });
         }
-        
-        if (winner) {
-            showGlobalMessage(`🏆 ${winner} kazandı! (${winnerScore} puan)`, false);
-        }
-        
-        // Bir sonraki seviyeye geç
-        level++;
-        setTimeout(() => {
-            initializeGame(LEVELS[level - 1] || 20);
-        }, 3000);
-    } else {
-        // Sırayı değiştir
-        gameData.turn = gameData.turn === 0 ? 1 : 0;
-        updateStatusDisplay();
     }
 }
 
