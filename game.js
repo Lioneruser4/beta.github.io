@@ -1,4 +1,4 @@
-// Dosya Adı: game.js (CSS ZORLAMA VE UYUMLU EMOJİLER DAHİL TAM KOD)
+// Dosya Adı: game.js
 let socket;
 let currentRoomCode = '';
 let isHost = false;
@@ -61,17 +61,17 @@ let selectedBombs = []; // Kendi seçtiğimiz bombaların indexleri
 
 let gameData = {
     board: [], 
-    turn: 0, 
-    hostLives: 0, 
-    guestLives: 0, 
+    turn: 0,  // 0 = Host, 1 = Guest
+    hostLives: 0,  // Server'dan gelen değerlerle güncellenecek
+    guestLives: 0, // Server'dan gelen değerlerle güncellenecek
     cardsLeft: 0,
     hostBombs: [], 
     guestBombs: [],
     isGameOver: false
 };
 
-// YENİ, UYUMLU EMOJİ LİSTESİ (Sadece client-side yedek için)
-const EMOTICONS = ['😀', '😍', '😂', '👍', '😊', '🎉', '🌟', '❤️', '🔥', '🚀']; 
+// iOS uyumlu emoji seti
+const EMOTICONS = ['😊', '😃', '😍', '😎', '🤩', '👍', '🎉', '✨', '🍕', '🐱'];
 
 // --- TEMEL UI FONKSİYONLARI ---
 
@@ -84,8 +84,9 @@ export function showGlobalMessage(message, isError = true) {
     const globalMessage = document.getElementById('globalMessage');
     const globalMessageText = document.getElementById('globalMessageText');
     globalMessageText.textContent = message;
-    globalMessage.classList.remove('bg-red-600', 'bg-green-600', 'hidden');
+    globalMessage.classList.remove('bg-red-600', 'bg-green-600');
     globalMessage.classList.add(isError ? 'bg-red-600' : 'bg-green-600');
+    globalMessage.classList.remove('hidden');
     globalMessage.classList.add('show');
     setTimeout(() => { globalMessage.classList.add('hidden'); globalMessage.classList.remove('show'); }, 4000);
 }
@@ -115,14 +116,10 @@ function drawBoard() {
         
         const back = document.createElement('div');
         back.className = 'card-face back';
+        back.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI Emoji", "Segoe UI", "Apple Color Emoji", sans-serif';
+        back.style.webkitTextStroke = '0.5px transparent';
+        back.style.textShadow = '0 0 1px rgba(0, 0, 0, 0.1)';
         back.textContent = cardState.content;
-        
-        // 👇 DÜZELTME: Kartın arka yüzüne emojinin renkli görünmesini sağlayan (Düşük öncelikli) stilleri uygula
-        back.style.fontFamily = 'Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji';
-        back.style.webkitTextFillColor = 'initial'; 
-        back.style.color = 'initial'; 
-        back.style.textShadow = 'none'; 
-        // 👆 DÜZELTME SONU
 
         card.appendChild(front);
         card.appendChild(back);
@@ -157,18 +154,18 @@ function updateStatusDisplay() {
     if (gameStage === 'WAITING' || gameStage === 'SELECTION') {
         turnStatusEl.textContent = '⏳ OYUN HAZIRLANIR...';
         actionMessageEl.textContent = "Bombalar otomatik yerleştiriliyor...";
-        turnStatusEl.classList.remove('text-red-600', 'text-green-600');
+        turnStatusEl.classList.remove('text-red-600');
         turnStatusEl.classList.add('text-yellow-600');
     } else if (gameStage === 'PLAY') {
         if (isMyTurn) {
             turnStatusEl.textContent = '✅ SIRA SENDE!';
             actionMessageEl.textContent = "Bir kart aç! Rakibinizin bombalarından kaçınmaya çalışın.";
-            turnStatusEl.classList.remove('text-red-600', 'text-yellow-600');
+            turnStatusEl.classList.remove('text-red-600');
             turnStatusEl.classList.add('text-green-600');
         } else {
             turnStatusEl.textContent = '⏳ ONUN SIRASI';
             actionMessageEl.textContent = "Rakibinizin hamlesini bekleyin...";
-            turnStatusEl.classList.remove('text-green-600', 'text-yellow-600');
+            turnStatusEl.classList.remove('text-green-600');
             turnStatusEl.classList.add('text-red-600');
         }
     }
@@ -251,41 +248,9 @@ async function applyMove(index, emoji, isBomb) {
     gameData.board[index].opened = true;
     gameData.cardsLeft -= 1;
     
-    // Kartı bul ve içeriğini ayarla
-    const cardContainer = gameBoardEl.querySelector(`.card-container:nth-child(${index + 1})`);
-    if (!cardContainer) return;
-
-    const cardElement = cardContainer.querySelector('.card');
-    const backElement = cardElement.querySelector('.back'); // Emojinin gösterildiği yüz
-
-    // Bomba için en uyumlu emojiyi kullanıyoruz
-    const content = isBomb ? '💥' : emoji; 
-    
-    gameData.board[index].content = content; 
-    backElement.textContent = content;
-    
-    // Kartı aç (flip)
-    cardElement.classList.add('flipped');
-
-    // 👇👇 SON VE EN GÜÇLÜ EMOJİ DÜZELTMESİ (!important İLE CSS'İ EZMEK) 👇👇
-    // setProperty ile !important kullanarak harici CSS kurallarını geçersiz kıl.
-    
-    // 1. Metin Rengi: Emojinin siyah/beyaz olmasını engeller
-    backElement.style.setProperty('color', 'initial', 'important'); 
-
-    // 2. Webkit Metin Dolgusu (Safari/Chrome): Siyah kutu sorununu çözer
-    backElement.style.setProperty('-webkit-text-fill-color', 'initial', 'important');
-
-    // 3. Gölgeler: Renklendirmeyi bozan gölgeleri kesinlikle kaldırır.
-    backElement.style.setProperty('text-shadow', 'none', 'important');
-    
-    // 4. Font Ailesi: Renkli emojiyi zorlayan fontları en yüksek öncelikte tutar.
-    backElement.style.setProperty('font-family', 'Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji', 'important');
-
-    // 👆👆 DÜZELTME SONU 👆👆
-    
     if (isBomb) {
-        // ... (Can kaybetme mantığı)
+        gameData.board[index].content = '💣';
+        // Hamle yapan oyuncu can kaybeder
         const currentPlayerIsHost = gameData.turn === 0;
         if (currentPlayerIsHost) {
             gameData.hostLives--;
@@ -296,20 +261,29 @@ async function applyMove(index, emoji, isBomb) {
         playSound(audioBomb);
         showGlobalMessage(`BOOM! Bombaya bastınız!`, true);
     } else {
+        gameData.board[index].content = emoji; // Server'dan gelen emoji
         playSound(audioEmoji);
     }
+    
+    drawBoard(); 
+    
+    // Oyun tahtasını güncelle
+    drawBoard();
     
     setTimeout(() => {
         // Sırayı değiştir
         gameData.turn = gameData.turn === 0 ? 1 : 0;
         updateStatusDisplay();
         
-        // ... (Oyun bitiş/seviye tamamlama mantığı)
+        // Tüm bombalar patladı mı kontrol et
         const allBombsExploded = (gameData.hostLives <= 0 && gameData.guestLives <= 0);
         
         if (allBombsExploded) {
+            // Tüm bombalar patladı, bir sonraki seviyeye geç
             const nextLevel = level + 1;
             showGlobalMessage(`🎉 Tüm bombalar patladı! Seviye ${nextLevel}'e geçiliyor...`, false);
+            
+            // Sunucuya seviye tamamlandı bilgisini gönder
             if (socket && socket.connected) {
                 socket.emit('levelComplete', { 
                     roomCode: currentRoomCode,
@@ -318,9 +292,11 @@ async function applyMove(index, emoji, isBomb) {
                 });
             }
         } else if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
+            // Normal oyun bitişi (bir oyuncu tüm canlarını kaybetti)
             const winner = gameData.hostLives <= 0 ? 'Guest' : 'Host';
             endGame(winner);
         } else {
+            // Oyun devam ediyor, sıradaki oyuncu
             checkLevelCompletion();
         }
         
@@ -350,6 +326,7 @@ function endGame(winnerRole) {
     }
     
     // 2 saniye bekle ve sunucuya oyun bitti bilgisini gönder
+    // Sunucu yeni seviyeyi başlatma işini yapacaktır.
     setTimeout(() => {
         const nextLevel = level + 1;
         
@@ -370,12 +347,13 @@ function endGame(winnerRole) {
 }
 
 // --- SEVİYE TAMAMLAMA KONTROLÜ (GLOBAL ALAN) ---
+// Bu fonksiyonu global alana taşıyarak, applyMove içerisinden erişilebilir kıldık.
 function checkLevelCompletion() {
     if (gameStage !== 'PLAY' || gameData.isGameOver) return;
     if (!gameData.board || gameData.board.length === 0) return;
     
     // Açılan kart sayısını kontrol et
-    const openedCards = gameBoardEl.querySelectorAll('.flipped').length;
+    const openedCards = gameData.board.filter(card => card && card.opened).length;
     const totalCards = gameData.board.length;
     
     console.log(`🔍 Seviye tamamlama kontrolü: Açılan ${openedCards}/${totalCards} kart`);
