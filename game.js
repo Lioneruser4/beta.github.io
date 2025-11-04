@@ -38,15 +38,15 @@ function initializeGame(boardSize) {
     gameData.turn = 0; // Host başlar
     gameData.isGameOver = false;
     
-    // Seviyeye göre can ve bomba sayısını ayarla
+    // Seviyeye göre can sayısını ayarla
     if (level === 1) {
-        // Level 1'de 4 bomba
-        gameData.hostLives = 4; 
-        gameData.guestLives = 4;
+        // Level 1'de 3 can
+        gameData.hostLives = 3; 
+        gameData.guestLives = 3;
     } else {
-        // Level 2 ve sonrası 6 bomba
-        gameData.hostLives = 6;
-        gameData.guestLives = 6;
+        // Level 2 ve sonrasında 4 can
+        gameData.hostLives = 4;
+        gameData.guestLives = 4;
     }
     
     gameStage = 'WAITING';
@@ -96,69 +96,95 @@ export function showGlobalMessage(message, isError = true) {
 function drawBoard() {
     const boardSize = LEVELS[level - 1] || 20; // Default 20
     
-    // Grid düzenini sadece 4 sütun (4 aşağı inme) olarak ayarla
-    gameBoardEl.className = 'grid w-full max-w-sm mx-auto memory-board'; 
-    gameBoardEl.style.gridTemplateColumns = 'repeat(4, 1fr)'; // 4 sütun (4x3, 4x4, 4x5 için)
-    
+    // Grid düzenini ayarla
     gameBoardEl.innerHTML = '';
+    gameBoardEl.className = 'memory-board';
+    gameBoardEl.style.display = 'grid';
+    gameBoardEl.style.gridTemplateColumns = 'repeat(4, 1fr)';
+    gameBoardEl.style.gap = '6px';
+    gameBoardEl.style.width = '100%';
+    gameBoardEl.style.maxWidth = '100%';
+    gameBoardEl.style.margin = '0';
+    gameBoardEl.style.padding = '5px';
+    gameBoardEl.style.boxSizing = 'border-box';
     
     gameData.board.forEach((cardState, index) => {
         const cardContainer = document.createElement('div');
-        cardContainer.className = 'card-container aspect-square';
+        cardContainer.className = 'card-container';
+        cardContainer.style.position = 'relative';
+        cardContainer.style.width = '100%';
+        cardContainer.style.paddingTop = '100%'; // 1:1 aspect ratio
+        cardContainer.style.cursor = 'pointer';
+        cardContainer.style.userSelect = 'none';
+        cardContainer.style.webkitTapHighlightColor = 'transparent';
+        cardContainer.style.touchAction = 'manipulation';
 
         const card = document.createElement('div');
-        card.className = 'card cursor-pointer';
+        card.className = 'card';
         card.dataset.index = index;
-        // iOS için özel stil
-        card.style.webkitTransformStyle = 'preserve-3d';
+        card.style.position = 'absolute';
+        card.style.top = '0';
+        card.style.left = '0';
+        card.style.width = '100%';
+        card.style.height = '100%';
         card.style.transformStyle = 'preserve-3d';
-        card.style.webkitBackfaceVisibility = 'hidden';
-        card.style.backfaceVisibility = 'hidden';
+        card.style.webkitTransformStyle = 'preserve-3d';
         card.style.transition = 'transform 0.6s';
+        card.style.borderRadius = '8px';
+        card.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+        card.style.overflow = 'hidden';
 
         const front = document.createElement('div');
         front.className = 'card-face front';
-        front.style.webkitBackfaceVisibility = 'hidden';
-        front.style.backfaceVisibility = 'hidden';
         front.style.position = 'absolute';
         front.style.width = '100%';
         front.style.height = '100%';
         front.style.display = 'flex';
         front.style.alignItems = 'center';
         front.style.justifyContent = 'center';
-        front.style.fontSize = '2rem';
+        front.style.fontSize = '3rem';
+        front.style.backgroundColor = '#4a5568';
+        front.style.color = 'white';
+        front.style.borderRadius = '8px';
+        front.style.backfaceVisibility = 'hidden';
+        front.style.webkitBackfaceVisibility = 'hidden';
         front.textContent = '?';
         
         const back = document.createElement('div');
         back.className = 'card-face back';
-        back.style.webkitBackfaceVisibility = 'hidden';
-        back.style.backfaceVisibility = 'hidden';
         back.style.position = 'absolute';
         back.style.width = '100%';
         back.style.height = '100%';
         back.style.display = 'flex';
         back.style.alignItems = 'center';
         back.style.justifyContent = 'center';
-        back.style.fontSize = '2rem';
+        back.style.fontSize = '3rem';
         back.style.transform = 'rotateY(180deg)';
+        back.style.backgroundColor = 'white';
+        back.style.borderRadius = '8px';
+        back.style.backfaceVisibility = 'hidden';
+        back.style.webkitBackfaceVisibility = 'hidden';
         back.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI Emoji", "Segoe UI", "Apple Color Emoji", sans-serif';
-        back.style.webkitTextStroke = '0.5px transparent';
-        back.style.textShadow = '0 0 1px rgba(0, 0, 0, 0.1)';
+        back.style.pointerEvents = 'none';
+        back.style.padding = '10px';
+        back.style.boxSizing = 'border-box';
         back.textContent = cardState.content;
 
         card.appendChild(front);
         card.appendChild(back);
-        
-        // iOS için touch event'leri
-        card.ontouchstart = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!card.classList.contains('flipped')) {
-                handleCardClick({ currentTarget: card });
-            }
-        };
-        
         cardContainer.appendChild(card);
+        
+        // iOS için dokunma olaylarını ekle
+        if ('ontouchstart' in window) {
+            // iOS için touchstart ve touchend olaylarını ekle
+            cardContainer.addEventListener('touchstart', handleCardClick, { passive: false });
+            cardContainer.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }, { passive: false });
+        }
+        // Tüm cihazlar için tıklama olayını ekle
+        cardContainer.addEventListener('click', handleCardClick);
         
         if (cardState.opened) {
             card.classList.add('flipped');
@@ -296,7 +322,20 @@ function stopVibration() {
 
 // --- HAREKET İŞLEYİCİLERİ ---
 
+// iOS için dokunma olayı engelleyicisi
+function preventDefault(e) {
+    if (e.cancelable) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+}
+
 function handleCardClick(event) {
+    // iOS'ta çift tıklamayı önle
+    if (event.type === 'touchend') {
+        event.preventDefault();
+    }
+    
     // Tıklama olayını başlatan card-container'ı bul
     const cardContainer = event.currentTarget; 
     // İçindeki asıl .card elementini bul
@@ -311,7 +350,17 @@ function handleCardClick(event) {
         const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
         if (!isMyTurn || gameData.isGameOver) return; 
         
-        sendMove(cardIndex);
+        // iOS'ta animasyon için kısa bir gecikme ekle
+        if ('ontouchstart' in window) {
+            cardElement.style.transition = 'transform 0.3s ease';
+            cardElement.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                cardElement.style.transform = 'scale(1)';
+                setTimeout(() => sendMove(cardIndex), 100);
+            }, 100);
+        } else {
+            sendMove(cardIndex);
+        }
     }
 }
 
