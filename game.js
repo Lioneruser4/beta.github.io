@@ -9,7 +9,7 @@ const screens = {
     lobby: document.getElementById('lobby'), 
     wait: document.getElementById('waitScreen'), 
     game: document.getElementById('gameScreen') 
-};
+}; 
 const gameBoardEl = document.getElementById('gameBoard');
 const turnStatusEl = document.getElementById('turnStatus');
 const actionMessageEl = document.getElementById('actionMessage');
@@ -38,15 +38,15 @@ function initializeGame(boardSize) {
     gameData.turn = 0; // Host başlar
     gameData.isGameOver = false;
     
-    // Seviyeye göre can sayısını ayarla
+    // Seviyeye göre can ve bomba sayısını ayarla
     if (level === 1) {
-        // Level 1'de 3 can
-        gameData.hostLives = 3; 
-        gameData.guestLives = 3;
-    } else {
-        // Level 2 ve sonrasında 4 can
-        gameData.hostLives = 4;
+        // Level 1'de 4 bomba
+        gameData.hostLives = 4; 
         gameData.guestLives = 4;
+    } else {
+        // Level 2 ve sonrası 6 bomba
+        gameData.hostLives = 6;
+        gameData.guestLives = 6;
     }
     
     gameStage = 'WAITING';
@@ -70,8 +70,7 @@ let gameData = {
     isGameOver: false
 };
 
-// iOS uyumlu emoji seti
-const EMOTICONS = ['😊', '😃', '😍', '😎', '🤩', '👍', '🎉', '✨', '🍕', '🐱'];
+const EMOTICONS = ['🙂', '😂', '😍', '😎', '🤩', '👍', '🎉', '🌟', '🍕', '🐱'];
 
 // --- TEMEL UI FONKSİYONLARI ---
 
@@ -96,94 +95,31 @@ export function showGlobalMessage(message, isError = true) {
 function drawBoard() {
     const boardSize = LEVELS[level - 1] || 20; // Default 20
     
-    // Grid düzenini ayarla
+    // Grid düzenini sadece 4 sütun (4 aşağı inme) olarak ayarla
+    gameBoardEl.className = 'grid w-full max-w-sm mx-auto memory-board'; 
+    gameBoardEl.style.gridTemplateColumns = 'repeat(4, 1fr)'; // 4 sütun (4x3, 4x4, 4x5 için)
+    
     gameBoardEl.innerHTML = '';
-    gameBoardEl.className = 'memory-board';
-    gameBoardEl.style.display = 'grid';
-    gameBoardEl.style.gridTemplateColumns = 'repeat(4, 1fr)';
-    gameBoardEl.style.gap = '6px';
-    gameBoardEl.style.width = '100%';
-    gameBoardEl.style.maxWidth = '100%';
-    gameBoardEl.style.margin = '0';
-    gameBoardEl.style.padding = '5px';
-    gameBoardEl.style.boxSizing = 'border-box';
     
     gameData.board.forEach((cardState, index) => {
         const cardContainer = document.createElement('div');
-        cardContainer.className = 'card-container';
-        cardContainer.style.position = 'relative';
-        cardContainer.style.width = '100%';
-        cardContainer.style.paddingTop = '100%'; // 1:1 aspect ratio
-        cardContainer.style.cursor = 'pointer';
-        cardContainer.style.userSelect = 'none';
-        cardContainer.style.webkitTapHighlightColor = 'transparent';
+        cardContainer.className = 'card-container aspect-square';
 
         const card = document.createElement('div');
-        card.className = 'card';
+        card.className = `card cursor-pointer`;
         card.dataset.index = index;
-        card.style.position = 'absolute';
-        card.style.top = '0';
-        card.style.left = '0';
-        card.style.width = '100%';
-        card.style.height = '100%';
-        card.style.transformStyle = 'preserve-3d';
-        card.style.webkitTransformStyle = 'preserve-3d';
-        card.style.transition = 'transform 0.6s';
-        card.style.borderRadius = '8px';
-        card.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-        card.style.overflow = 'hidden';
-        card.style.transform = cardState.opened ? 'rotateY(180deg)' : 'rotateY(0deg)';
 
         const front = document.createElement('div');
-        front.className = 'card-face front';
-        front.style.position = 'absolute';
-        front.style.width = '100%';
-        front.style.height = '100%';
-        front.style.display = 'flex';
-        front.style.alignItems = 'center';
-        front.style.justifyContent = 'center';
-        front.style.fontSize = '2.5rem';
-        front.style.backgroundColor = '#4a5568';
-        front.style.color = 'white';
-        front.style.borderRadius = '8px';
-        front.style.backfaceVisibility = 'hidden';
-        front.style.webkitBackfaceVisibility = 'hidden';
+        front.className = 'card-face front'; // Sizin stilinize göre front/back
         front.textContent = '?';
         
         const back = document.createElement('div');
         back.className = 'card-face back';
-        back.style.position = 'absolute';
-        back.style.width = '100%';
-        back.style.height = '100%';
-        back.style.display = 'flex';
-        back.style.alignItems = 'center';
-        back.style.justifyContent = 'center';
-        back.style.fontSize = '2.5rem';
-        back.style.transform = 'rotateY(180deg)';
-        back.style.backgroundColor = 'white';
-        back.style.borderRadius = '8px';
-        back.style.backfaceVisibility = 'hidden';
-        back.style.webkitBackfaceVisibility = 'hidden';
-        back.style.fontFamily = 'Arial, "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
-        back.style.pointerEvents = 'none';
-        back.style.padding = '10px';
-        back.style.boxSizing = 'border-box';
-        back.style.transform = 'rotateY(180deg) translateZ(1px)';
         back.textContent = cardState.content;
 
         card.appendChild(front);
         card.appendChild(back);
         cardContainer.appendChild(card);
-        
-        // iOS için dokunma olaylarını ekle
-        if ('ontouchstart' in window) {
-            cardContainer.addEventListener('touchstart', handleCardClick, { passive: false });
-            cardContainer.addEventListener('touchend', function(e) {
-                e.preventDefault();
-            }, { passive: false });
-        }
-        // Tüm cihazlar için tıklama olayını ekle
-        cardContainer.addEventListener('click', handleCardClick);
         
         if (cardState.opened) {
             card.classList.add('flipped');
@@ -238,56 +174,6 @@ function updateStatusDisplay() {
 
 // --- ANIMASYON VE SES ---
 
-// iOS için kart çevirme stilleri
-const style = document.createElement('style');
-style.textContent = `
-    @media (max-width: 768px) {
-        .card {
-            -webkit-transform-style: preserve-3d;
-            transform-style: preserve-3d;
-            -webkit-transition: -webkit-transform 0.6s;
-            transition: transform 0.6s;
-            position: relative;
-            width: 100%;
-            height: 100%;
-        }
-        .card.flipped {
-            -webkit-transform: rotateY(180deg);
-            transform: rotateY(180deg);
-        }
-        .card-container {
-            -webkit-perspective: 1000px;
-            perspective: 1000px;
-            width: 100%;
-            height: 100%;
-            position: relative;
-        }
-        .card-face {
-            -webkit-backface-visibility: hidden;
-            backface-visibility: hidden;
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            background: white;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .front {
-            background: #4a5568;
-            color: white;
-        }
-        .back {
-            transform: rotateY(180deg);
-        }
-    }
-`;
-document.head.appendChild(style);
-
-
 async function triggerWaitAndVibrate() {
     if (gameData.cardsLeft < 8 && gameStage === 'PLAY') { 
         startVibration();
@@ -321,20 +207,7 @@ function stopVibration() {
 
 // --- HAREKET İŞLEYİCİLERİ ---
 
-// iOS için dokunma olayı engelleyicisi
-function preventDefault(e) {
-    if (e.cancelable) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-}
-
 function handleCardClick(event) {
-    // iOS'ta çift tıklamayı önle
-    if (event.type === 'touchend') {
-        event.preventDefault();
-    }
-    
     // Tıklama olayını başlatan card-container'ı bul
     const cardContainer = event.currentTarget; 
     // İçindeki asıl .card elementini bul
@@ -349,17 +222,7 @@ function handleCardClick(event) {
         const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
         if (!isMyTurn || gameData.isGameOver) return; 
         
-        // iOS'ta animasyon için kısa bir gecikme ekle
-        if ('ontouchstart' in window) {
-            cardElement.style.transition = 'transform 0.3s ease';
-            cardElement.style.transform = 'scale(0.95)';
-            setTimeout(() => {
-                cardElement.style.transform = 'scale(1)';
-                setTimeout(() => sendMove(cardIndex), 100);
-            }, 100);
-        } else {
-            sendMove(cardIndex);
-        }
+        sendMove(cardIndex);
     }
 }
 
@@ -401,10 +264,7 @@ async function applyMove(index, emoji, isBomb) {
     drawBoard(); 
     
     // Oyun tahtasını güncelle
-    const cardElement = document.querySelector(`.card[data-index="${index}"]`);
-    if (cardElement) {
-        cardElement.style.transform = 'rotateY(180deg)';
-    }
+    drawBoard();
     
     setTimeout(() => {
         // Sırayı değiştir
