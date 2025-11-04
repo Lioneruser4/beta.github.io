@@ -665,61 +665,28 @@
         document.addEventListener('DOMContentLoaded', () => {
             window.languageManager.initLanguage();
             
-            // Chat functionality
+            // Initialize chat UI elements (but not functionality yet)
             const chatInput = document.getElementById('chatInput');
             const sendChatBtn = document.getElementById('sendChatBtn');
             const chatMessages = document.getElementById('chatMessages');
             const toggleChatBtn = document.getElementById('toggleChatBtn');
             const chatContainer = document.querySelector('.chat-container');
             
-            // Toggle chat
+            // Toggle chat (UI only)
             toggleChatBtn.addEventListener('click', () => {
                 chatContainer.classList.toggle('collapsed');
             });
             
-            // Send message on button click
-            sendChatBtn.addEventListener('click', sendMessage);
-            
-            // Send message on Enter key
-            chatInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    sendMessage();
-                }
-            });
-            
-            function sendMessage() {
-                const message = chatInput.value.trim();
-                if (message && socket) {
-                    // Emit message to server
-                    socket.emit('chatMessage', {
-                        roomCode: currentRoomCode,
-                        message: message,
-                        sender: document.getElementById('username').value || 'Oyuncu'
-                    });
-                    
-                    // Add message to chat
-                    addMessage(message, 'sent');
-                    chatInput.value = '';
-                }
-            }
-            
-            // Listen for chat messages
-            if (socket) {
-                socket.on('chatMessage', (data) => {
-                    addMessage(data.message, 'received');
-                    showNotification(`Yeni mesaj: ${data.message}`);
-                });
-            }
-            
-            function addMessage(message, type) {
+            // Make chat functions available globally
+            window.addMessage = function(message, type) {
                 const messageElement = document.createElement('div');
                 messageElement.classList.add('message', type);
                 messageElement.textContent = message;
                 chatMessages.appendChild(messageElement);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
-            }
+            };
             
-            function showNotification(message) {
+            window.showNotification = function(message) {
                 const notification = document.getElementById('notification');
                 notification.textContent = message;
                 notification.style.display = 'block';
@@ -732,7 +699,9 @@
                         notification.style.animation = '';
                     }, 500);
                 }, 2000);
-            }
+            };
+            
+            // Initialize chat functionality will be called after socket connection is established
         });
         
         window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
@@ -753,6 +722,47 @@
             return username;
         }
 
+        function initializeChat() {
+            const chatInput = document.getElementById('chatInput');
+            const sendChatBtn = document.getElementById('sendChatBtn');
+            
+            // Send message on button click
+            sendChatBtn.onclick = sendMessage;
+            
+            // Send message on Enter key
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            function sendMessage() {
+                const message = chatInput.value.trim();
+                if (message && socket && currentRoomCode) {
+                    console.log('Sending message:', message);
+                    // Emit message to server
+                    socket.emit('chatMessage', {
+                        roomCode: currentRoomCode,
+                        message: message,
+                        sender: document.getElementById('username').value || 'Oyuncu'
+                    });
+                    
+                    // Add message to chat
+                    window.addMessage(message, 'sent');
+                    chatInput.value = '';
+                }
+            }
+            
+            // Listen for chat messages
+            socket.on('chatMessage', (data) => {
+                console.log('Received message:', data);
+                window.addMessage(data.message, 'received');
+                window.showNotification(`Yeni mesaj: ${data.message}`);
+            });
+            
+            console.log('Chat başlatıldı');
+        }
+        
         function connectToServer() {
             try {
                 console.log('Sunucuya bağlanılıyor:', LIVE_SERVER_URL);
@@ -768,9 +778,12 @@
                 });
 
                 socket.on('connect', () => {
-                    console.log('Sunucuya başarıyla bağlandı');
-                    reconnectAttempts = 0; // Bağlantı başarılı olursa yeniden deneme sayacını sıfırla
-                    UIElements.showGlobalMessage('Sunucuya bağlandı. Eşleşmeye hazırsınız.', false);
+                    console.log('✅ Sunucuya bağlanıldı!');
+                    reconnectAttempts = 0; // Bağlantı başarılı olduğunda yeniden bağlanma sayacını sıfırla
+                    showGlobalMessage('Sunucuya başarıyla bağlanıldı!', false);
+                    
+                    // Chat'i başlat
+                    initializeChat();
                     showScreen('lobby');
                 });
                 
