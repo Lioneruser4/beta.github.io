@@ -1,4 +1,4 @@
-// Dosya Adı: game.js (iOS Emoji Düzeltmeleri Dahil Tam Kod)
+// Dosya Adı: game.js (YENİ UYUMLU EMOJİ LİSTESİ VE DÜZELTMELER DAHİL TAM KOD)
 let socket;
 let currentRoomCode = '';
 let isHost = false;
@@ -70,7 +70,9 @@ let gameData = {
     isGameOver: false
 };
 
-const EMOTICONS = ['🙂', '😂', '😍', '😎', '🤩', '👍', '🎉', '🌟', '🍕', '🐱'];
+// 👇 YENİ, UYUMLU EMOJİ LİSTESİ 👇
+const EMOTICONS = ['😀', '😍', '😂', '👍', '😊', '🎉', '🌟', '❤️', '🔥', '🚀']; 
+// 👆 YENİ, UYUMLU EMOJİ LİSTESİ SONU 👆
 
 // --- TEMEL UI FONKSİYONLARI ---
 
@@ -118,8 +120,8 @@ function drawBoard() {
         
         // 👇 DÜZELTME: Kartın arka yüzüne emojinin renkli görünmesini sağlayan stilleri uygula
         back.style.fontFamily = 'Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji';
-        back.style.webkitTextFillColor = 'initial'; // iOS için kritik
-        back.style.color = 'initial'; // Genel tarayıcılar için kritik
+        back.style.webkitTextFillColor = 'initial'; // iOS için KRİTİK
+        back.style.color = 'initial'; // Genel tarayıcılar için KRİTİK
         back.style.textShadow = 'none'; // Gölgeleri devre dışı bırak
         // 👆 DÜZELTME SONU
 
@@ -263,7 +265,7 @@ async function applyMove(index, emoji, isBomb) {
     // Kartı aç (flip)
     cardElement.classList.add('flipped');
 
-    // 👇👇 KRİTİK EMOJİ RENK DÜZELTMESİ (applyMove İÇİNDE İKİNCİ KEZ ZORLANIYOR) 👇👇
+    // 👇👇 KRİTİK EMOJİ RENK DÜZELTMESİ (SON KEZ ZORLANIYOR) 👇👇
     backElement.style.webkitTextFillColor = 'initial';
     backElement.style.color = 'initial';
     backElement.style.textShadow = 'none';
@@ -285,8 +287,6 @@ async function applyMove(index, emoji, isBomb) {
         playSound(audioEmoji);
     }
     
-    // drawBoard(); // drawBoard() çağırmak yerine sadece ilgili kartı güncelledik.
-
     setTimeout(() => {
         // Sırayı değiştir
         gameData.turn = gameData.turn === 0 ? 1 : 0;
