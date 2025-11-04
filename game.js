@@ -386,10 +386,74 @@ function checkLevelCompletion() {
         setTimeout(() => {
             console.log(`🔄 Sunucudan Seviye ${nextLevel} bilgisini bekle...`);
         }, 1000);
+}
+
+// Sayfa yüklendiğinde emoji seçiciyi kur
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', setupEmojiPicker);
+}
+
+// Emoji gönderme işlevi
+function sendEmoji(emoji) {
+    if (socket && socket.connected) {
+        socket.emit('gameData', {
+            roomCode: currentRoomCode,
+            type: 'EMOJI',
+            emoji: emoji
+        });
+        // Kendi ekranımızda da göster
+        showEmoji(emoji);
     }
 }
-// --- SON ---
 
+// Emoji gösterme işlevi
+function showEmoji(emoji) {
+    const emojiDisplay = document.getElementById('emojiDisplay');
+    if (!emojiDisplay) return;
+    
+    emojiDisplay.textContent = emoji;
+    emojiDisplay.style.opacity = '1';
+    
+    // 2 saniye sonra emojiyi gizle
+    setTimeout(() => {
+        emojiDisplay.style.opacity = '0';
+    }, 2000);
+}
+
+// Emoji seçim menüsünü açıp kapatma
+function setupEmojiPicker() {
+    const emojiToggle = document.getElementById('emojiToggle');
+    const emojiPicker = document.getElementById('emojiPicker');
+    
+    if (!emojiToggle || !emojiPicker) return;
+    
+    emojiToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        emojiPicker.classList.toggle('hidden');
+    });
+    
+    // Dışarı tıklandığında menüyü kapat
+    document.addEventListener('click', () => {
+        if (!emojiPicker.classList.contains('hidden')) {
+            emojiPicker.classList.add('hidden');
+        }
+    });
+    
+    // Emoji butonlarına tıklama olayı ekle
+    document.querySelectorAll('.emoji-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const emoji = btn.getAttribute('data-emoji');
+            sendEmoji(emoji);
+            emojiPicker.classList.add('hidden');
+        });
+    });
+}
+
+// Sayfa yüklendiğinde emoji seçiciyi kur
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', setupEmojiPicker);
+}
 
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
 export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
@@ -485,11 +549,15 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
 
     // gameData Olayı (Hamle Geldi - Kendi veya Rakip)
     socket.on('gameData', (data) => {
-        if (gameStage !== 'PLAY') return;
-        
-        if (data.type === 'MOVE') {
+        if (data.type === 'MOVE' && gameStage === 'PLAY') {
             // Server tarafından onaylanmış hamleyi uygula (emoji ve bomba bilgisi ile)
-            applyMove(data.cardIndex, data.emoji, data.isBomb); 
+            applyMove(data.cardIndex, data.emoji, data.isBomb);
+        } else if (data.type === 'EMOJI') {
+            // Karşı taraftan gelen emojiyi göster
+            showEmoji(data.emoji);
+        } else if (data.type === 'GAME_START') {
+            // Oyun başlangıç bilgisini işle
+            console.log('🎉 Oyun başladı!');
         }
     });
 
