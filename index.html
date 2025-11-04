@@ -51,8 +51,8 @@
         .screen { 
             width: 100%; 
             height: 100vh;
-            max-width: none;
-            max-height: none;
+            max-width: 100%;
+            max-height: 100%;
             display: none; 
             flex-direction: column; 
             align-items: center; 
@@ -63,7 +63,7 @@
             background-color: #2d3748;
             border-radius: 0;
             box-shadow: none;
-            overflow-y: auto;
+            overflow: hidden;
             -webkit-overflow-scrolling: touch;
             position: fixed;
             top: 0;
@@ -83,19 +83,20 @@
             z-index: 100;
         }
         .language-button {
-            background: rgba(255, 255, 255, 0.2); /* Hafif şeffaf */
-            border: 2px solid #63b3ed; /* Daha belirgin kenarlık */
-            border-radius: 25px; /* Daha yuvarlak */
-            padding: 8px 18px; /* Daha geniş padding */
-            cursor: pointer;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid #63b3ed;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
             display: flex;
             align-items: center;
-            gap: 10px;
-            font-weight: bold;
+            justify-content: center;
+            cursor: pointer;
             color: #e2e8f0;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             transition: all 0.2s;
-            backdrop-filter: blur(5px); /* Arka plan bulanıklığı */
+            backdrop-filter: blur(5px);
+            padding: 0;
         }
         .language-button:hover {
             background: rgba(255, 255, 255, 0.3);
@@ -103,24 +104,27 @@
         .language-options {
             display: none;
             position: absolute;
-            top: 100%;
+            top: calc(100% + 5px);
             right: 0;
-            background: #2d3748; /* Koyu arka plan */
+            background: #2d3748;
             border: 1px solid #4a5568;
             border-radius: 12px;
-            margin-top: 8px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.4);
             overflow: hidden;
             z-index: 101;
-            min-width: 180px;
+            min-width: 150px;
             color: #e2e8f0;
         }
         .language-option {
-            padding: 10px 20px;
+            padding: 10px 15px;
             cursor: pointer;
             display: flex;
             align-items: center;
             gap: 10px;
+            transition: background-color 0.2s;
+        }
+        .language-option:hover {
+            background-color: #4a5568;
         }
         .language-option:hover {
             background: #4a5568;
@@ -142,14 +146,9 @@
         .btn-primary:hover {
             box-shadow: 0 8px 20px rgba(66, 153, 225, 0.6);
         }
-        .input-field {
-            @apply w-full p-5 text-xl rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200;
-            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
-            height: 60px;
-            font-size: 1.1rem;
-        }
-        .input-field:focus {
-            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5), inset 0 2px 5px rgba(0,0,0,0.2);
+        .btn:active {
+            transform: translateY(0) scale(0.98);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
 
         /* Global Mesaj */
@@ -237,14 +236,15 @@
         .game-board {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 3px;
-            margin: 5px auto;
+            gap: 0.25rem;
+            margin: 0 auto;
             max-width: 100%;
             width: 100%;
             perspective: 1000px;
-            padding: 0 5px;
+            padding: 0.25rem;
             box-sizing: border-box;
             flex: 1;
+            overflow: hidden;
         }
         .card-container {
             perspective: 1000px; 
@@ -252,35 +252,29 @@
             width: 100%; /* Esneklik */
         }
         .card {
-            aspect-ratio: 1/1;
+            aspect-ratio: 1;
             background: #4a5568;
-            border-radius: 6px;
+            border-radius: 0.5rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.2rem;
+            font-size: 1.25rem;
             cursor: pointer;
-            -webkit-transform-style: preserve-3d;
+            user-select: none;
+            transition: all 0.2s ease;
             transform-style: preserve-3d;
-            -webkit-transition: -webkit-transform 0.4s, background-color 0.2s;
-            transition: transform 0.4s, background-color 0.2s;
             position: relative;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
             min-width: 0;
-            border: 1px solid #2d3748;
-            -webkit-backface-visibility: hidden; /* iOS için eklendi */
-            backface-visibility: hidden;
-            -webkit-perspective: 1000px; /* iOS için 3D dönüş desteği */
-            perspective: 1000px;
+            min-height: 0;
         }
         .card.flipped {
-            -webkit-transform: rotateY(180deg);
             transform: rotateY(180deg);
         }
         .card-face {
             position: absolute;
             width: 100%;
             height: 100%;
-            -webkit-backface-visibility: hidden; /* iOS için eklendi */
             backface-visibility: hidden; 
             display: flex;
             justify-content: center;
@@ -288,10 +282,6 @@
             border-radius: 12px;
             font-size: 2rem; /* Büyük emoji */
             font-weight: bold;
-            -webkit-transform: translateZ(0); /* iOS için donanım hızlandırma */
-            transform: translateZ(0);
-            -webkit-font-smoothing: antialiased; /* Emoji kenarlarını yumuşat */
-            -moz-osx-font-smoothing: grayscale;
         }
         @media (min-width: 400px) {
             .card-face { font-size: 2.5rem; }
@@ -306,11 +296,8 @@
         .card-face.back {
             background: #e2e8f0; /* Açık arka plan */
             color: #2d3748; /* Koyu metin */
-            -webkit-transform: rotateY(180deg);
             transform: rotateY(180deg);
             z-index: 1;
-            -webkit-transform-style: preserve-3d;
-            transform-style: preserve-3d;
         }
         .card.bomb-selected .card-face.front {
             background: linear-gradient(135deg, #f56565, #e53e3e); /* Kırmızı gradient */
@@ -338,12 +325,13 @@
             margin-bottom: 1rem;
         }
         #gameScreen .status-panel {
-            background: linear-gradient(135deg, #3182ce, #667eea); /* Güzel bir gradient */
-            color: #f7fafc;
-            border-radius: 15px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            background: rgba(45, 55, 72, 0.9);
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            margin: 0.25rem 0;
+            width: 100%;
+            max-width: 100%;
+            font-size: 0.9rem;
         }
         #turnStatus {
             font-size: 1.8rem;
@@ -400,8 +388,7 @@
 <body class="bg-gray-900 select-none">
     <div class="language-selector">
         <button id="language-button" class="language-button" onclick="toggleLanguageSelector()">
-            <span id="current-language">🇦🇿 AZ</span>
-            <i class="fas fa-chevron-down"></i>
+            <span id="current-language">🇦🇿</span>
         </button>
         <div id="language-selector" class="language-options">
             <div class="language-option" onclick="setLanguage('az')">🇦🇿 Azərbaycanca</div>
@@ -415,110 +402,95 @@
     </div>
 
     <div id="lobby" class="screen active space-y-6">
-        <h1 class="text-5xl font-black animated-lobby-item lobby-title">
+        <h1 class="text-4xl font-black animated-lobby-item lobby-title mb-1">
             💣 Emoji Bombası
         </h1>
-        <p class="text-lg text-gray-400 animated-lobby-item lobby-subtitle">
+        <p class="text-sm text-gray-400 animated-lobby-item lobby-subtitle mb-4">
             1v1 Çox Oyunçulu Bomba Oyunu
         </p>
         
-        <div class="bg-blue-800 bg-opacity-30 border-l-4 border-blue-500 text-blue-100 p-4 rounded-lg shadow-lg animated-lobby-item rules-box w-full max-w-md">
-            <p class="font-bold text-xl mb-3 text-white">📋 Oyun Qaydaları:</p>
-            <ul class="list-disc list-inside mt-2 text-left space-y-2 text-lg">
-                <li>Kartları açaraq rəqibinizin bombalarından qaçın.</li>
-                <li>Hər kəsin **3 canı** var. Bombaya bassanız can itirirsiniz.</li>
-                <li>Canı bitən oyunu uduzur!</li>
-                <li>Bütün kartlar açılarsa, yeni səviyyəyə keçirsiniz.</li>
+        <div class="bg-blue-800 bg-opacity-30 border-l-2 border-blue-500 text-blue-100 p-2 rounded-lg shadow-lg animated-lobby-item rules-box w-full max-w-md">
+            <p class="font-bold text-sm mb-1 text-white">📋 Oyun Qaydaları:</p>
+            <ul class="list-disc list-inside text-left text-xs space-y-1">
+                <li>Kartları açaraq rəqibinizin bombalarından qaçın</li>
+                <li>Hər kəsin 3 canı var</li>
+                <li>Canı bitən oyunu uduzur</li>
             </ul>
         </div>
         
         <div class="w-full animated-lobby-item input-username-container max-w-md">
-            <p class="text-left text-base font-semibold mb-2 text-gray-300">
-                👤 **1. İstifadəçi Adınızı Daxil Edin:**
+            <p class="text-center text-lg font-bold mb-1 text-white">
+                👤 İstifadəçi Adı
             </p>
-            <input type="text" id="username" class="input-field shadow-lg text-black" placeholder="Oyuncu Adı (min 2 herf)" maxlength="15" style="color: #000000 !important;">
+            <input type="text" id="username" class="w-full p-3 text-lg text-center rounded-lg shadow-lg text-black" placeholder="Adınız" maxlength="15" style="color: #000000 !important;">
         </div>
         
         <div class="w-full animated-lobby-item input-roomcode-container max-w-md">
-            <p class="text-left text-base font-semibold mb-2 text-gray-300">
-                🚪 **2. Otaq Kodu:**
-                <span class="font-normal block text-sm mt-1">
-                    * Yeni otaq qurmaq üçün bu sahəni **BOŞ** buraxın.
-                </span>
-                <span class="font-normal block text-sm">
-                    * Mövcud otağa qoşulmaq üçün dostunuzun verdiyi kodu buraya daxil edin.
-                </span>
+            <p class="text-center text-lg font-bold mb-1 text-white mt-4">
+                🚪 Otaq Kodu
             </p>
-            <input type="text" id="roomCodeInput" class="input-field uppercase shadow-lg text-black" placeholder="Otaq Kodu (Boş: Yeni Otaq)" maxlength="6" style="color: #000000 !important;">
+            <input type="text" id="roomCodeInput" class="w-full p-3 text-lg text-center rounded-lg shadow-lg text-black uppercase" placeholder="Otaq Kodu (Boşsa yeni otaq)" maxlength="6" style="color: #000000 !important;">
         </div>
         
-        <div class="flex flex-col space-y-4 w-full max-w-md mx-auto">
-            <button id="createRoomBtn" class="btn btn-primary animated-lobby-item shadow-xl transform transition-all duration-300 hover:scale-105 hover:shadow-2xl">
+        <div class="flex flex-col space-y-3 w-full max-w-md mx-auto mt-6">
+            <button id="createRoomBtn" class="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg transform transition-all duration-200 active:scale-95">
                 <i class="fas fa-plus-circle mr-2"></i> Otaq Qur
             </button>
-            <button id="joinRoomBtn" class="btn bg-green-600 hover:bg-green-500 text-white animated-lobby-item shadow-xl transform transition-all duration-300 hover:scale-105 hover:shadow-2xl">
+            <button id="joinRoomBtn" class="w-full py-4 px-6 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg transform transition-all duration-200 active:scale-95">
                 <i class="fas fa-sign-in-alt mr-2"></i> Otağa Qoşul
             </button>
         </div>
     </div>
     
-    <div id="waitScreen" class="screen space-y-8">
-        <div class="wait-spinner">
-            <i class="fas fa-spinner fa-spin"></i> 
+    <div id="waitScreen" class="screen p-4">
+        <div class="flex flex-col items-center justify-center h-full">
+            <div class="wait-spinner mb-4">
+                <i class="fas fa-spinner fa-spin text-4xl text-blue-400"></i> 
+            </div>
+            <h2 id="waitTitle" class="text-2xl font-bold mb-6">Otaq Hazırlanır...</h2>
+            
+            <div id="codeArea" class="w-full max-w-md mb-6">
+                <p class="text-sm text-gray-300 mb-2">Otaq kodunuzu dostunuzla paylaşın:</p>
+                <div id="roomCodeDisplay" class="text-3xl font-bold bg-gray-800 p-4 rounded-lg mb-4 text-center tracking-widest"></div>
+                <button id="copyCodeBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-lg">
+                    <i class="fas fa-copy mr-2"></i> Kodu Kopyala
+                </button>
+            </div>
+            
+            <p id="waitStatus" class="text-lg text-gray-300 mb-6">Rəqib qoşulması gözlənilir...</p>
+            
+            <button id="cancelBtn" class="w-full max-w-xs py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-lg">
+                <i class="fas fa-times-circle mr-2"></i> Ləğv Et / Lobiye Qayıt
+            </button>
         </div>
-        <h2 id="waitTitle" class="text-4xl font-bold">Otaq Hazırlanır...</h2>
-        
-        <div id="codeArea" class="space-y-4 hidden w-full max-w-md">
-            <p class="text-lg text-gray-300">Otaq kodunuzu dostunuzla paylaşın:</p>
-            <div id="roomCodeDisplay" class="code-display"></div>
-            <button id="copyCodeBtn" class="btn bg-gray-600 text-white text-base py-3 max-w-xs">Kodu Kopyala <i class="fas fa-copy ml-2"></i></button>
-        </div>
-        <p id="waitStatus" class="text-xl text-gray-300">Rəqib qoşulmasını gözləyirsiniz...</p>
-        <button id="cancelBtn" class="btn bg-red-600 text-base py-3 max-w-xs">Ləğv Et / Lobiye Qayıt <i class="fas fa-times-circle ml-2"></i></button>
     </div>
 
-    <div id="gameScreen" class="screen space-y-4">
-        <h1 class="text-4xl font-black">🕹️ Emoji Bombası</h1>
+    <div id="gameScreen" class="screen">
+        <div class="w-full flex justify-between items-center p-1">
+            <div class="text-left pl-2">
+                <div id="myLives" class="text-xl">❤️❤️❤️</div>
+                <div class="text-xs text-blue-300">SEN</div>
+            </div>
+            
+            <div class="text-center">
+                <h1 class="text-xl font-bold m-0 p-0">💣</h1>
+                <div id="levelInfo" class="text-xs">Seviye: 1</div>
+            </div>
+            
+            <div class="text-right pr-2">
+                <div id="opponentLives" class="text-xl">❤️❤️❤️</div>
+                <div id="opponentName" class="text-xs text-blue-300">Rakip</div>
+            </div>
+        </div>
         
-        <div class="fixed bottom-4 right-4 z-50">
-                <button id="emojiToggle" class="bg-blue-600 hover:bg-blue-700 text-white text-2xl w-12 h-12 rounded-full flex items-center justify-center shadow-lg">
-                    😊
-                </button>
-                <div id="emojiPicker" class="hidden absolute bottom-16 right-0 bg-gray-800 p-2 rounded-lg shadow-xl grid grid-cols-4 gap-2">
-                    <button class="emoji-btn text-2xl hover:bg-gray-700 rounded p-2" data-emoji="😊">😊</button>
-                    <button class="emoji-btn text-2xl hover:bg-gray-700 rounded p-2" data-emoji="😂">😂</button>
-                    <button class="emoji-btn text-2xl hover:bg-gray-700 rounded p-2" data-emoji="😍">😍</button>
-                    <button class="emoji-btn text-2xl hover:bg-gray-700 rounded p-2" data-emoji="🎉">🎉</button>
-                    <button class="emoji-btn text-2xl hover:bg-gray-700 rounded p-2" data-emoji="👍">👍</button>
-                    <button class="emoji-btn text-2xl hover:bg-gray-700 rounded p-2" data-emoji="👎">👎</button>
-                    <button class="emoji-btn text-2xl hover:bg-gray-700 rounded p-2" data-emoji="❤️">❤️</button>
-                    <button class="emoji-btn text-2xl hover:bg-gray-700 rounded p-2" data-emoji="😎">😎</button>
-                </div>
-            </div>
-
-            <div id="emojiDisplay" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-6xl z-50 pointer-events-none opacity-0 transition-opacity duration-300">
-                
-            </div>
-
-        <div class="flex justify-between items-center w-full text-gray-100 font-bold p-3 status-panel max-w-md">
-            <div class="text-center">
-                <p class="text-sm text-blue-200">SƏN</p>
-                <p id="myLives" class="text-3xl text-red-400">❤️❤️❤️</p>
-            </div>
-            <div class="text-center">
-                <p class="text-sm text-blue-200">VS</p>
-                <p id="opponentName" class="text-xl text-blue-100 font-bold"></p>
-            </div>
-            <div class="text-center">
-                <p class="text-sm text-blue-200">RƏQİB</p>
-                <p id="opponentLives" class="text-3xl text-red-400">❤️❤️❤️</p>
-            </div>
+        <div class="w-full text-center p-1">
+            <div id="turnStatus" class="text-sm font-bold text-yellow-400">SIRA SENDE</div>
+            <div id="actionMessage" class="text-xs text-gray-300">Bir kart seç</div>
         </div>
         <p id="roleStatus" class="text-gray-300 text-xs bg-gray-700 p-2 rounded-lg"></p>
 
         <div id="gameContent" class="bg-gray-800 rounded-xl w-full space-y-4 p-4 shadow-xl">
-            <h3 id="turnStatus" class="text-2xl font-bold text-red-400 animate-pulse">Rəqib gözlənilir...</h3>
-            <p id="actionMessage" class="text-base text-blue-300 font-semibold"></p>
+            <h3 id="turnStatus" class="text-2xl font-bold text-red-400"></h3>
             
             <div id="gameBoard" class="grid w-full mx-auto">
             </div>
@@ -539,9 +511,11 @@
         window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
         window.setLanguage = languageManager.setLanguage;
 
-        // Render URL'niz: Lütfen bu kısmı KENDİ URL'nizle değiştirin!
-        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
+        // Socket.IO sunucu URL'si
+        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; // Render üzerindeki Socket.IO sunucusu
         let socket;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 5;
         
         function validateInput() {
             const username = UIElements.usernameInput.value.trim();
@@ -554,25 +528,55 @@
 
         function connectToServer() {
             try {
+                console.log('Sunucuya bağlanılıyor:', LIVE_SERVER_URL);
+                
                 socket = io(LIVE_SERVER_URL, {
-                    transports: ['websocket', 'polling'], 
-                    reconnectionAttempts: 5, 
-                    timeout: 20000 
+                    transports: ['websocket', 'polling'],
+                    reconnection: true,
+                    reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
+                    reconnectionDelay: 1000,
+                    reconnectionDelayMax: 5000,
+                    timeout: 20000,
+                    forceNew: true
                 });
 
                 socket.on('connect', () => {
-                    UIElements.showGlobalMessage('Serverə qoşuldu. Eşləşməyə hazırsınız.', false);
+                    console.log('Sunucuya başarıyla bağlandı');
+                    reconnectAttempts = 0; // Bağlantı başarılı olursa yeniden deneme sayacını sıfırla
+                    UIElements.showGlobalMessage('Sunucuya bağlandı. Eşleşmeye hazırsınız.', false);
                     showScreen('lobby');
                 });
                 
                 socket.on('connect_error', (err) => {
                     console.error('Bağlantı Hatası:', err);
-                    UIElements.showGlobalMessage('XƏTA: Serverə daxil olmaq mümkün deyil.', true);
+                    reconnectAttempts++;
+                    
+                    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+                        UIElements.showGlobalMessage('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edip sayfayı yenileyin.', true);
+                    } else {
+                        UIElements.showGlobalMessage(`Bağlantı hatası. Tekrar deneniyor (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`, true);
+                    }
+                    
                     showScreen('lobby');
                 });
                 
-                socket.on('disconnect', () => {
-                    UIElements.showGlobalMessage('Bağlantı kəsildi. Yenidən qoşulmağa çalışılır...', true);
+                socket.on('disconnect', (reason) => {
+                    console.log('Bağlantı kesildi, sebep:', reason);
+                    if (reason === 'io server disconnect') {
+                        // Sunucu bağlantıyı kestiğinde yeniden bağlan
+                        socket.connect();
+                    }
+                    UIElements.showGlobalMessage('Bağlantı kesildi. Yeniden bağlanılıyor...', true);
+                });
+                
+                socket.on('reconnect', (attemptNumber) => {
+                    console.log(`Yeniden bağlantı başarılı (${attemptNumber}. deneme)`);
+                    UIElements.showGlobalMessage('Sunucuya yeniden bağlanıldı.', false);
+                });
+                
+                socket.on('reconnect_failed', () => {
+                    console.error('Yeniden bağlantı başarısız oldu');
+                    UIElements.showGlobalMessage('Sunucuya bağlanılamadı. Lütfen sayfayı yenileyin.', true);
                 });
 
                 // --- Eşleşme Olayları ---
