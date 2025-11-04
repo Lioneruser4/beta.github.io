@@ -307,6 +307,29 @@
             from { opacity: 1; }
             to { opacity: 0.8; }
         }
+        /* Chat styles have been removed */
+        
+        /* Notification Styles */
+        .notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 1001;
+            display: none;
+            backdrop-filter: blur(5px);
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translate(-50%, -20px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+        
         @keyframes vibrate {
             0% { transform: translate(1px, 1px) rotate(0deg); }
             20% { transform: translate(-1px, -2px) rotate(-1deg); }
@@ -497,6 +520,9 @@
         </div>
         
         <button id="endGameBtn" class="btn bg-red-600 hover:bg-red-500 text-white text-sm py-3">🚪 Oyundan Çıx <i class="fas fa-door-open ml-2"></i></button>
+        
+        <!-- Notification Container -->
+        <div id="notification" class="notification"></div>
     </div>
 
     <script src="languages.js"></script>
@@ -506,7 +532,25 @@
         
         document.addEventListener('DOMContentLoaded', () => {
             window.languageManager.initLanguage();
+            
+            // Initialize notification function
+            window.showNotification = function(message, isError = false) {
+                const notification = document.getElementById('notification');
+                if (notification) {
+                    notification.textContent = message;
+                    notification.style.display = 'block';
+                    notification.style.backgroundColor = isError ? 'rgba(220, 38, 38, 0.9)' : 'rgba(0, 0, 0, 0.8)';
+                    
+                    setTimeout(() => {
+                        notification.style.display = 'none';
+                    }, 3000);
+                }
+            };
+            
+            // Initialize socket connection
+            connectToServer();
         });
+
         
         window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
         window.setLanguage = languageManager.setLanguage;
@@ -526,6 +570,8 @@
             return username;
         }
 
+        // Chat functionality has been removed
+        
         function connectToServer() {
             try {
                 console.log('Sunucuya bağlanılıyor:', LIVE_SERVER_URL);
@@ -541,9 +587,9 @@
                 });
 
                 socket.on('connect', () => {
-                    console.log('Sunucuya başarıyla bağlandı');
-                    reconnectAttempts = 0; // Bağlantı başarılı olursa yeniden deneme sayacını sıfırla
-                    UIElements.showGlobalMessage('Sunucuya bağlandı. Eşleşmeye hazırsınız.', false);
+                    console.log('✅ Sunucuya bağlanıldı!');
+                    reconnectAttempts = 0; // Bağlantı başarılı olduğunda yeniden bağlanma sayacını sıfırla
+                    showGlobalMessage('Sunucuya başarıyla bağlanıldı!', false);
                     showScreen('lobby');
                 });
                 
