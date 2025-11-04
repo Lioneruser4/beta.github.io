@@ -133,6 +133,7 @@ function drawBoard() {
         card.style.borderRadius = '8px';
         card.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
         card.style.overflow = 'hidden';
+        card.style.transform = cardState.opened ? 'rotateY(180deg)' : 'rotateY(0deg)';
 
         const front = document.createElement('div');
         front.className = 'card-face front';
@@ -164,10 +165,11 @@ function drawBoard() {
         back.style.borderRadius = '8px';
         back.style.backfaceVisibility = 'hidden';
         back.style.webkitBackfaceVisibility = 'hidden';
-        back.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI Emoji", "Segoe UI", "Apple Color Emoji", sans-serif';
+        back.style.fontFamily = 'Arial, "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
         back.style.pointerEvents = 'none';
         back.style.padding = '10px';
         back.style.boxSizing = 'border-box';
+        back.style.transform = 'rotateY(180deg) translateZ(1px)';
         back.textContent = cardState.content;
 
         card.appendChild(front);
@@ -402,7 +404,10 @@ async function applyMove(index, emoji, isBomb) {
     drawBoard(); 
     
     // Oyun tahtasını güncelle
-    drawBoard();
+    const cardElement = document.querySelector(`.card[data-index="${index}"]`);
+    if (cardElement) {
+        cardElement.style.transform = 'rotateY(180deg)';
+    }
     
     setTimeout(() => {
         // Sırayı değiştir
