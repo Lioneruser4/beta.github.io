@@ -38,16 +38,17 @@ function initializeGame(boardSize) {
     gameData.turn = 0; // Host başlar
     gameData.isGameOver = false;
     
-    // Seviyeye göre can ve bomba sayısını ayarla
-    if (level === 1) {
-        // Level 1'de 4 bomba
-        gameData.hostLives = 4; 
-        gameData.guestLives = 4;
-    } else {
-        // Level 2 ve sonrası 6 bomba
-        gameData.hostLives = 6;
-        gameData.guestLives = 6;
+    // Sadece oyun ilk başladığında veya bir oyuncu öldüğünde canları sıfırla
+    if (gameData.hostLives === undefined || gameData.hostLives <= 0) {
+        gameData.hostLives = level === 1 ? 3 : 4; // Level 1'de 3 can, diğerlerinde 4 can
     }
+    
+    if (gameData.guestLives === undefined || gameData.guestLives <= 0) {
+        gameData.guestLives = level === 1 ? 3 : 4; // Level 1'de 3 can, diğerlerinde 4 can
+    }
+    
+    // Seviyeye göre bomba sayısını ayarla
+    gameData.bombCount = level === 1 ? 4 : 6; // Level 1'de 4 bomba, diğerlerinde 6 bomba
     
     gameStage = 'WAITING';
 }
@@ -55,7 +56,12 @@ function initializeGame(boardSize) {
 // --- OYUN DURUMU ---
 let level = 1; 
 // Kart sayıları: Level 1'de 16, sonraki tüm levellerde 20 kart
-const LEVELS = [16, 20]; 
+const LEVELS = [16, 20];
+// Oyuncu canları
+let playerLives = {
+    host: 3,  // Level 1'de 3 can
+    guest: 3  // Level 1'de 3 can
+};
 let gameStage = 'SELECTION'; // 'SELECTION' veya 'PLAY'
 let selectedBombs = []; // Kendi seçtiğimiz bombaların indexleri
 
@@ -277,20 +283,37 @@ async function applyMove(index, emoji, isBomb) {
         gameData.turn = gameData.turn === 0 ? 1 : 0;
         updateStatusDisplay();
         
-        // Tüm bombalar patladı mı kontrol et
-        const allBombsExploded = (gameData.hostLives <= 0 && gameData.guestLives <= 0);
-        
-        if (allBombsExploded) {
-            // Tüm bombalar patladı, bir sonraki seviyeye geç
+        // Bir oyuncu öldü mü kontrol et
+        if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
+            // Bir oyuncu öldü, canları sıfırla ve yeni seviyeye geç
+            const winner = gameData.hostLives <= 0 ? 'Guest' : 'Host';
             const nextLevel = level + 1;
-            showGlobalMessage(`🎉 Tüm bombalar patladı! Seviye ${nextLevel}'e geçiliyor...`, false);
             
-            // Sunucuya seviye tamamlandı bilgisini gönder
+            showGlobalMessage(`🎉 ${winner} kazandı! Seviye ${nextLevel}'e geçiliyor...`, false);
+            
+            // Sunucuya seviye tamamlandı bilgisini gönder ve canları sıfırla
             if (socket && socket.connected) {
                 socket.emit('levelComplete', { 
                     roomCode: currentRoomCode,
                     level: level,
-                    nextLevel: nextLevel
+                    nextLevel: nextLevel,
+                    resetLives: true  // Canların sıfırlanacağını belirt
+                });
+            }
+        } 
+        // Tüm bombalar patladı mı kontrol et (ama kimse ölmediyse)
+        else if (gameData.cardsLeft <= 0) {
+            // Tüm bombalar patladı, bir sonraki seviyeye geç (canlar korunacak)
+            const nextLevel = level + 1;
+            showGlobalMessage(`🎉 Tüm bombalar patladı! Seviye ${nextLevel}'e geçiliyor...`, false);
+            
+            // Sunucuya seviye tamamlandı bilgisini gönder (canlar korunacak)
+            if (socket && socket.connected) {
+                socket.emit('levelComplete', { 
+                    roomCode: currentRoomCode,
+                    level: level,
+                    nextLevel: nextLevel,
+                    resetLives: false  // Canlar korunacak
                 });
             }
         } else if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
@@ -538,13 +561,18 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         
         gameStage = 'PLAY';
         
-        // Yeni oyun tahtasını oluştur
+        // Canları güncelle (eğer bir oyuncu öldüyse sıfırlanır)
+        if (data.resetLives) {
+            gameData.hostLives = level === 1 ? 3 : 4;
+            gameData.guestLives = level === 1 ? 3 : 4;
+        }
+        
         initializeGame(data.boardSize);
         
         // UI'ı güncelle
         updateStatusDisplay();
         
-        showGlobalMessage(`🎮 Seviye ${level} başladı! ${data.hostLives} can ile oynanıyor.`, false);
+        showGlobalMessage(`🎮 Seviye ${level} başladı! ${gameData.hostLives} can ile oynanıyor.`, false);
     });
 
     // gameData Olayı (Hamle Geldi - Kendi veya Rakip)
