@@ -1,4 +1,4 @@
-// Dosya Adı: game.js (YENİ UYUMLU EMOJİ LİSTESİ VE DÜZELTMELER DAHİL TAM KOD)
+// Dosya Adı: game.js (CSS ZORLAMA VE UYUMLU EMOJİLER DAHİL TAM KOD)
 let socket;
 let currentRoomCode = '';
 let isHost = false;
@@ -70,9 +70,8 @@ let gameData = {
     isGameOver: false
 };
 
-// 👇 YENİ, UYUMLU EMOJİ LİSTESİ 👇
+// YENİ, UYUMLU EMOJİ LİSTESİ (Sadece client-side yedek için)
 const EMOTICONS = ['😀', '😍', '😂', '👍', '😊', '🎉', '🌟', '❤️', '🔥', '🚀']; 
-// 👆 YENİ, UYUMLU EMOJİ LİSTESİ SONU 👆
 
 // --- TEMEL UI FONKSİYONLARI ---
 
@@ -118,11 +117,11 @@ function drawBoard() {
         back.className = 'card-face back';
         back.textContent = cardState.content;
         
-        // 👇 DÜZELTME: Kartın arka yüzüne emojinin renkli görünmesini sağlayan stilleri uygula
+        // 👇 DÜZELTME: Kartın arka yüzüne emojinin renkli görünmesini sağlayan (Düşük öncelikli) stilleri uygula
         back.style.fontFamily = 'Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji';
-        back.style.webkitTextFillColor = 'initial'; // iOS için KRİTİK
-        back.style.color = 'initial'; // Genel tarayıcılar için KRİTİK
-        back.style.textShadow = 'none'; // Gölgeleri devre dışı bırak
+        back.style.webkitTextFillColor = 'initial'; 
+        back.style.color = 'initial'; 
+        back.style.textShadow = 'none'; 
         // 👆 DÜZELTME SONU
 
         card.appendChild(front);
@@ -259,21 +258,34 @@ async function applyMove(index, emoji, isBomb) {
     const cardElement = cardContainer.querySelector('.card');
     const backElement = cardElement.querySelector('.back'); // Emojinin gösterildiği yüz
 
-    gameData.board[index].content = isBomb ? '💣' : emoji; 
-    backElement.textContent = gameData.board[index].content;
+    // Bomba için en uyumlu emojiyi kullanıyoruz
+    const content = isBomb ? '💥' : emoji; 
+    
+    gameData.board[index].content = content; 
+    backElement.textContent = content;
     
     // Kartı aç (flip)
     cardElement.classList.add('flipped');
 
-    // 👇👇 KRİTİK EMOJİ RENK DÜZELTMESİ (SON KEZ ZORLANIYOR) 👇👇
-    backElement.style.webkitTextFillColor = 'initial';
-    backElement.style.color = 'initial';
-    backElement.style.textShadow = 'none';
-    backElement.style.fontFamily = 'Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji';
+    // 👇👇 SON VE EN GÜÇLÜ EMOJİ DÜZELTMESİ (!important İLE CSS'İ EZMEK) 👇👇
+    // setProperty ile !important kullanarak harici CSS kurallarını geçersiz kıl.
+    
+    // 1. Metin Rengi: Emojinin siyah/beyaz olmasını engeller
+    backElement.style.setProperty('color', 'initial', 'important'); 
+
+    // 2. Webkit Metin Dolgusu (Safari/Chrome): Siyah kutu sorununu çözer
+    backElement.style.setProperty('-webkit-text-fill-color', 'initial', 'important');
+
+    // 3. Gölgeler: Renklendirmeyi bozan gölgeleri kesinlikle kaldırır.
+    backElement.style.setProperty('text-shadow', 'none', 'important');
+    
+    // 4. Font Ailesi: Renkli emojiyi zorlayan fontları en yüksek öncelikte tutar.
+    backElement.style.setProperty('font-family', 'Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji', 'important');
+
     // 👆👆 DÜZELTME SONU 👆👆
     
     if (isBomb) {
-        // Hamle yapan oyuncu can kaybeder (Sıra, hamleyi yapan oyuncuyu gösterir)
+        // ... (Can kaybetme mantığı)
         const currentPlayerIsHost = gameData.turn === 0;
         if (currentPlayerIsHost) {
             gameData.hostLives--;
@@ -292,15 +304,12 @@ async function applyMove(index, emoji, isBomb) {
         gameData.turn = gameData.turn === 0 ? 1 : 0;
         updateStatusDisplay();
         
-        // Tüm bombalar patladı mı kontrol et
+        // ... (Oyun bitiş/seviye tamamlama mantığı)
         const allBombsExploded = (gameData.hostLives <= 0 && gameData.guestLives <= 0);
         
         if (allBombsExploded) {
-            // Tüm bombalar patladı, bir sonraki seviyeye geç
             const nextLevel = level + 1;
             showGlobalMessage(`🎉 Tüm bombalar patladı! Seviye ${nextLevel}'e geçiliyor...`, false);
-            
-            // Sunucuya seviye tamamlandı bilgisini gönder
             if (socket && socket.connected) {
                 socket.emit('levelComplete', { 
                     roomCode: currentRoomCode,
@@ -309,11 +318,9 @@ async function applyMove(index, emoji, isBomb) {
                 });
             }
         } else if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
-            // Normal oyun bitişi (bir oyuncu tüm canlarını kaybetti)
             const winner = gameData.hostLives <= 0 ? 'Guest' : 'Host';
             endGame(winner);
         } else {
-            // Oyun devam ediyor, sıradaki oyuncu
             checkLevelCompletion();
         }
         
