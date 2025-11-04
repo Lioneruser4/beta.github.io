@@ -252,24 +252,37 @@
             width: 100%; /* Esneklik */
         }
         .card {
+            width: 100%;
             aspect-ratio: 1;
-            background: #4a5568;
-            border-radius: 0.5rem;
+            background: white;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.25rem;
+            font-size: 2rem;
             cursor: pointer;
             user-select: none;
-            transition: all 0.2s ease;
-            transform-style: preserve-3d;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             position: relative;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-            min-width: 0;
-            min-height: 0;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            -webkit-text-stroke: 1px transparent;
+            text-shadow: none;
+        }
+        .card i {
+            display: inline-block;
+            -webkit-text-stroke: 0;
+            text-shadow: none;
         }
         .card.flipped {
             transform: rotateY(180deg);
+            background: #f8f9fa;
+            -webkit-transform: rotateY(180deg);
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
         }
         .card-face {
             position: absolute;
