@@ -117,7 +117,6 @@ function drawBoard() {
         cardContainer.style.cursor = 'pointer';
         cardContainer.style.userSelect = 'none';
         cardContainer.style.webkitTapHighlightColor = 'transparent';
-        cardContainer.style.touchAction = 'manipulation';
 
         const card = document.createElement('div');
         card.className = 'card';
@@ -143,7 +142,7 @@ function drawBoard() {
         front.style.display = 'flex';
         front.style.alignItems = 'center';
         front.style.justifyContent = 'center';
-        front.style.fontSize = '3rem';
+        front.style.fontSize = '2.5rem';
         front.style.backgroundColor = '#4a5568';
         front.style.color = 'white';
         front.style.borderRadius = '8px';
@@ -159,7 +158,7 @@ function drawBoard() {
         back.style.display = 'flex';
         back.style.alignItems = 'center';
         back.style.justifyContent = 'center';
-        back.style.fontSize = '3rem';
+        back.style.fontSize = '2.5rem';
         back.style.transform = 'rotateY(180deg)';
         back.style.backgroundColor = 'white';
         back.style.borderRadius = '8px';
@@ -178,11 +177,9 @@ function drawBoard() {
         
         // iOS için dokunma olaylarını ekle
         if ('ontouchstart' in window) {
-            // iOS için touchstart ve touchend olaylarını ekle
             cardContainer.addEventListener('touchstart', handleCardClick, { passive: false });
             cardContainer.addEventListener('touchend', function(e) {
                 e.preventDefault();
-                e.stopPropagation();
             }, { passive: false });
         }
         // Tüm cihazlar için tıklama olayını ekle
