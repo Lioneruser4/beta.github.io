@@ -252,37 +252,24 @@
             width: 100%; /* Esneklik */
         }
         .card {
-            width: 100%;
             aspect-ratio: 1;
-            background: white;
-            border-radius: 12px;
+            background: #4a5568;
+            border-radius: 0.5rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2rem;
+            font-size: 1.25rem;
             cursor: pointer;
             user-select: none;
-            -webkit-user-select: none;
-            -webkit-tap-highlight-color: transparent;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+            transform-style: preserve-3d;
             position: relative;
-            overflow: hidden;
-            -webkit-font-smoothing: antialiased;
-            -webkit-text-stroke: 1px transparent;
-            text-shadow: none;
-        }
-        .card i {
-            display: inline-block;
-            -webkit-text-stroke: 0;
-            text-shadow: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            min-width: 0;
+            min-height: 0;
         }
         .card.flipped {
             transform: rotateY(180deg);
-            background: #f8f9fa;
-            -webkit-transform: rotateY(180deg);
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
         }
         .card-face {
             position: absolute;
@@ -524,9 +511,11 @@
         window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
         window.setLanguage = languageManager.setLanguage;
 
-        // Render URL'niz: Lütfen bu kısmı KENDİ URL'nizle değiştirin!
-        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; 
+        // Socket.IO sunucu URL'si
+        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; // Render üzerindeki Socket.IO sunucusu
         let socket;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 5;
         
         function validateInput() {
             const username = UIElements.usernameInput.value.trim();
@@ -539,25 +528,55 @@
 
         function connectToServer() {
             try {
+                console.log('Sunucuya bağlanılıyor:', LIVE_SERVER_URL);
+                
                 socket = io(LIVE_SERVER_URL, {
-                    transports: ['websocket', 'polling'], 
-                    reconnectionAttempts: 5, 
-                    timeout: 20000 
+                    transports: ['websocket', 'polling'],
+                    reconnection: true,
+                    reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
+                    reconnectionDelay: 1000,
+                    reconnectionDelayMax: 5000,
+                    timeout: 20000,
+                    forceNew: true
                 });
 
                 socket.on('connect', () => {
-                    UIElements.showGlobalMessage('Serverə qoşuldu. Eşləşməyə hazırsınız.', false);
+                    console.log('Sunucuya başarıyla bağlandı');
+                    reconnectAttempts = 0; // Bağlantı başarılı olursa yeniden deneme sayacını sıfırla
+                    UIElements.showGlobalMessage('Sunucuya bağlandı. Eşleşmeye hazırsınız.', false);
                     showScreen('lobby');
                 });
                 
                 socket.on('connect_error', (err) => {
                     console.error('Bağlantı Hatası:', err);
-                    UIElements.showGlobalMessage('XƏTA: Serverə daxil olmaq mümkün deyil.', true);
+                    reconnectAttempts++;
+                    
+                    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+                        UIElements.showGlobalMessage('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edip sayfayı yenileyin.', true);
+                    } else {
+                        UIElements.showGlobalMessage(`Bağlantı hatası. Tekrar deneniyor (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`, true);
+                    }
+                    
                     showScreen('lobby');
                 });
                 
-                socket.on('disconnect', () => {
-                    UIElements.showGlobalMessage('Bağlantı kəsildi. Yenidən qoşulmağa çalışılır...', true);
+                socket.on('disconnect', (reason) => {
+                    console.log('Bağlantı kesildi, sebep:', reason);
+                    if (reason === 'io server disconnect') {
+                        // Sunucu bağlantıyı kestiğinde yeniden bağlan
+                        socket.connect();
+                    }
+                    UIElements.showGlobalMessage('Bağlantı kesildi. Yeniden bağlanılıyor...', true);
+                });
+                
+                socket.on('reconnect', (attemptNumber) => {
+                    console.log(`Yeniden bağlantı başarılı (${attemptNumber}. deneme)`);
+                    UIElements.showGlobalMessage('Sunucuya yeniden bağlanıldı.', false);
+                });
+                
+                socket.on('reconnect_failed', () => {
+                    console.error('Yeniden bağlantı başarısız oldu');
+                    UIElements.showGlobalMessage('Sunucuya bağlanılamadı. Lütfen sayfayı yenileyin.', true);
                 });
 
                 // --- Eşleşme Olayları ---
