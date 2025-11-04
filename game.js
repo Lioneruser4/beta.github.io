@@ -1,4 +1,4 @@
-// Dosya Adı: game.js (CSS Zorlama ve Uyumlu Emojiler Dahil Tam Kod)
+// Dosya Adı: game.js (CSS ZORLAMA VE UYUMLU EMOJİLER DAHİL TAM KOD)
 let socket;
 let currentRoomCode = '';
 let isHost = false;
@@ -118,7 +118,6 @@ function drawBoard() {
         back.textContent = cardState.content;
         
         // 👇 DÜZELTME: Kartın arka yüzüne emojinin renkli görünmesini sağlayan (Düşük öncelikli) stilleri uygula
-        // Bu stiller, CSS dosyanızdaki `!important` kuralı ile desteklenmelidir.
         back.style.fontFamily = 'Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji';
         back.style.webkitTextFillColor = 'initial'; 
         back.style.color = 'initial'; 
