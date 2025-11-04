@@ -33,40 +33,62 @@ function playSound(audioElement) {
 
 // Oyun başlatma / seviye hazırlama
 function initializeGame(boardSize) {
-    gameData.board = Array.from({ length: boardSize }, () => ({ opened: false, content: '' }));
+    // Rastgele puanlar ve bombalar için dizi oluştur
+    const points = [];
+    const bombCount = Math.min(level, 4); // Seviyeye göre bomba sayısı (max 4)
+    
+    // Kartları doldur
+    const board = [];
+    
+    // Rastgele puanlar ekle
+    for (let i = 0; i < boardSize - bombCount; i++) {
+        const randomPoint = POINTS[Math.floor(Math.random() * POINTS.length)];
+        points.push(randomPoint);
+    }
+    
+    // Bombaları ekle
+    for (let i = 0; i < bombCount; i++) {
+        points.push('💣');
+    }
+    
+    // Karıştır
+    for (let i = points.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [points[i], points[j]] = [points[j], points[i]];
+    }
+    
+    // Oyun tahtasını oluştur
+    gameData.board = points.map(point => ({
+        opened: false,
+        content: point,
+        isBomb: point === '💣'
+    }));
+    
     gameData.cardsLeft = boardSize;
     gameData.turn = 0; // Host başlar
     gameData.isGameOver = false;
+    gameData.bombCount = bombCount;
     
-    // Seviyeye göre can ve bomba sayısını ayarla
-    if (level === 1) {
-        // Level 1'de 4 bomba
-        gameData.hostLives = 4; 
-        gameData.guestLives = 4;
-    } else {
-        // Level 2 ve sonrası 6 bomba
-        gameData.hostLives = 6;
-        gameData.guestLives = 6;
-    }
+    gameStage = 'PLAY';
     
-    gameStage = 'WAITING';
+    console.log(`Yeni seviye başlatıldı - Seviye: ${level}, Bombalar: ${bombCount}`);
+    updateStatusDisplay();
 }
 
 // --- OYUN DURUMU ---
 let level = 1; 
 // Kart sayıları: Level 1'de 16, sonraki tüm levellerde 20 kart
 const LEVELS = [16, 20]; 
+const POINTS = [10, 15, 20, 50, 70, 100]; // Olası puan değerleri
 let gameStage = 'SELECTION'; // 'SELECTION' veya 'PLAY'
-let selectedBombs = []; // Kendi seçtiğimiz bombaların indexleri
 
 let gameData = {
     board: [], 
     turn: 0,  // 0 = Host, 1 = Guest
-    hostLives: 0,  // Server'dan gelen değerlerle güncellenecek
-    guestLives: 0, // Server'dan gelen değerlerle güncellenecek
+    hostScore: 0,  // Host'un puanı
+    guestScore: 0, // Guest'in puanı
     cardsLeft: 0,
-    hostBombs: [], 
-    guestBombs: [],
+    bombCount: 1, // Başlangıçta 1 bomba
     isGameOver: false
 };
 
@@ -145,35 +167,31 @@ function drawBoard() {
 }
 
 function updateStatusDisplay() {
-    const myLives = isHost ? gameData.hostLives : gameData.guestLives;
-    const opponentLives = isHost ? gameData.guestLives : gameData.hostLives;
-    
-    myLivesEl.textContent = '❤️'.repeat(Math.max(0, myLives));
-    opponentLivesEl.textContent = '❤️'.repeat(Math.max(0, opponentLives));
-
+    // Sıra kimde gösterimi
     const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
-
-    if (gameStage === 'WAITING' || gameStage === 'SELECTION') {
-        turnStatusEl.textContent = '⏳ OYUN HAZIRLANIR...';
-        actionMessageEl.textContent = "Bombalar otomatik yerleştiriliyor...";
-        turnStatusEl.classList.remove('text-red-600');
-        turnStatusEl.classList.add('text-yellow-600');
-    } else if (gameStage === 'PLAY') {
-        if (isMyTurn) {
-            turnStatusEl.textContent = '✅ SIRA SENDE!';
-            actionMessageEl.textContent = "Bir kart aç! Rakibinizin bombalarından kaçınmaya çalışın.";
-            turnStatusEl.classList.remove('text-red-600');
-            turnStatusEl.classList.add('text-green-600');
-        } else {
-            turnStatusEl.textContent = '⏳ ONUN SIRASI';
-            actionMessageEl.textContent = "Rakibinizin hamlesini bekleyin...";
-            turnStatusEl.classList.remove('text-green-600');
-            turnStatusEl.classList.add('text-red-600');
-        }
+    
+    // Sıra durumunu güncelle
+    if (isMyTurn) {
+        turnStatusEl.textContent = 'SIRA SİZDE';
+        turnStatusEl.className = 'text-2xl font-bold text-green-600';
+        actionMessageEl.textContent = "Hamlenizi yapın!";
+    } else {
+        turnStatusEl.textContent = '⏳ RAKİBİN SIRASI';
+        turnStatusEl.className = 'text-2xl font-bold text-red-600';
+        actionMessageEl.textContent = "Rakibinizin hamlesini bekleyin...";
     }
     
+    // Puan durumlarını güncelle
+    if (myLivesEl) {
+        myLivesEl.textContent = `Puan: ${isHost ? gameData.hostScore : gameData.guestScore}`;
+    }
+    if (opponentLivesEl) {
+        opponentLivesEl.textContent = `Rakip: ${isHost ? gameData.guestScore : gameData.hostScore}`;
+    }
+    
+    // Oyun bittiyse
     if (gameData.isGameOver && gameStage === 'ENDED') {
-        turnStatusEl.textContent = "✅ OYUN BİTDİ!";
+        turnStatusEl.textContent = "✅ OYUN BİTTİ!";
         actionMessageEl.textContent = "Sonuçlar hesaplanıyor...";
     }
 }
@@ -242,67 +260,69 @@ function sendMove(index) {
     }
 }
 
-async function applyMove(index, emoji, isBomb) {
+async function applyMove(index) {
     if (gameData.board[index].opened) return;
 
     await triggerWaitAndVibrate();
 
-    gameData.board[index].opened = true;
+    const card = gameData.board[index];
+    card.opened = true;
     gameData.cardsLeft -= 1;
     
-    if (isBomb) {
-        gameData.board[index].content = '💣';
-        // Hamle yapan oyuncu can kaybeder
-        const currentPlayerIsHost = gameData.turn === 0;
-        if (currentPlayerIsHost) {
-            gameData.hostLives--;
-        } else { 
-            gameData.guestLives--;
+    if (card.isBomb) {
+        // Bomba ise karşı oyuncudan 100 puan düş
+        if (gameData.turn === 0) { // Host bombaya bastı
+            gameData.guestScore = Math.max(0, gameData.guestScore - 100);
+            showGlobalMessage(`💣 Rakibiniz bombaya bastı! -100 puan!`, true);
+        } else { // Guest bombaya bastı
+            gameData.hostScore = Math.max(0, gameData.hostScore - 100);
+            showGlobalMessage(`💣 Rakibiniz bombaya bastı! -100 puan!`, true);
         }
-        
         playSound(audioBomb);
-        showGlobalMessage(`BOOM! Bombaya bastınız!`, true);
     } else {
-        gameData.board[index].content = emoji; // Server'dan gelen emoji
+        // Puan kartı ise puanı ekle
+        const points = parseInt(card.content);
+        const currentPlayer = gameData.turn === 0 ? 'hostScore' : 'guestScore';
+        gameData[currentPlayer] += points;
+        showGlobalMessage(`+${points} puan kazandınız!`, false);
         playSound(audioEmoji);
     }
     
-    drawBoard(); 
-    
-    // Oyun tahtasını güncelle
     drawBoard();
+    updateStatusDisplay();
     
-    setTimeout(() => {
+    // Tüm kartlar açıldı mı kontrol et
+    if (gameData.cardsLeft === 0) {
+        // Oyun bitti, puanları karşılaştır
+        let winner = null;
+        let winnerScore = 0;
+        
+        if (gameData.hostScore > gameData.guestScore) {
+            winner = isHost ? 'Siz' : opponentName;
+            winnerScore = gameData.hostScore;
+            endGame('Host');
+        } else if (gameData.guestScore > gameData.hostScore) {
+            winner = isHost ? opponentName : 'Siz';
+            winnerScore = gameData.guestScore;
+            endGame('Guest');
+        } else {
+            showGlobalMessage(`🤝 Berabere! Her iki oyuncu da ${gameData.hostScore} puan aldı!`, false);
+        }
+        
+        if (winner) {
+            showGlobalMessage(`🏆 ${winner} kazandı! (${winnerScore} puan)`, false);
+        }
+        
+        // Bir sonraki seviyeye geç
+        level++;
+        setTimeout(() => {
+            initializeGame(LEVELS[level - 1] || 20);
+        }, 3000);
+    } else {
         // Sırayı değiştir
         gameData.turn = gameData.turn === 0 ? 1 : 0;
         updateStatusDisplay();
-        
-        // Tüm bombalar patladı mı kontrol et
-        const allBombsExploded = (gameData.hostLives <= 0 && gameData.guestLives <= 0);
-        
-        if (allBombsExploded) {
-            // Tüm bombalar patladı, bir sonraki seviyeye geç
-            const nextLevel = level + 1;
-            showGlobalMessage(`🎉 Tüm bombalar patladı! Seviye ${nextLevel}'e geçiliyor...`, false);
-            
-            // Sunucuya seviye tamamlandı bilgisini gönder
-            if (socket && socket.connected) {
-                socket.emit('levelComplete', { 
-                    roomCode: currentRoomCode,
-                    level: level,
-                    nextLevel: nextLevel
-                });
-            }
-        } else if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
-            // Normal oyun bitişi (bir oyuncu tüm canlarını kaybetti)
-            const winner = gameData.hostLives <= 0 ? 'Guest' : 'Host';
-            endGame(winner);
-        } else {
-            // Oyun devam ediyor, sıradaki oyuncu
-            checkLevelCompletion();
-        }
-        
-    }, 1000);
+    }
 }
 
 function endGame(winnerRole) {
@@ -313,34 +333,54 @@ function endGame(winnerRole) {
     const iWon = (winnerRole === myRole);
     const isDraw = (winnerRole === 'DRAW');
     
+    // Puanları al
+    const myScore = isHost ? gameData.hostScore : gameData.guestScore;
+    const opponentScore = isHost ? gameData.guestScore : gameData.hostScore;
+    
+    // Oyun sonucunu göster
     if (isDraw) {
-        turnStatusEl.textContent = `🤝 BERABERLİK!`;
-        actionMessageEl.textContent = `Her iki oyuncu da tüm canlarını kaybetti!`;
-        showGlobalMessage('🤝 Beraberlik! Her ikiniz de harika oynadınız!', false);
+        showGlobalMessage(`🤝 Berabere! Her iki oyuncu da ${myScore} puan aldı!`, false);
     } else if (iWon) {
-        turnStatusEl.textContent = `🎉 QAZANDIN!`;
-        actionMessageEl.textContent = `Tebrikler! Rakibinizi yendiniz!`;
-        showGlobalMessage('🎉 Tebrikler! Bu turu kazandınız!', false);
+        showGlobalMessage(`🏆 Kazandınız! (${myScore} - ${opponentScore})`, false);
+        playSound(audioWin);
     } else {
-        turnStatusEl.textContent = `😔 UDUZDUN!`;
-        actionMessageEl.textContent = `Rakibiniz bu turu kazandı.`;
-        showGlobalMessage('😔 Bu turu kaybettiniz. Bir sonrakinde daha dikkatli olun!', true);
+        showGlobalMessage(`❌ Kaybettiniz! (${opponentScore} - ${myScore})`, true);
+        playSound(audioLose);
     }
     
-    // 2 saniye bekle ve sunucuya oyun bitti bilgisini gönder
-    // Sunucu yeni seviyeyi başlatma işini yapacaktır.
+    // Oyun sonu butonlarını göster
+    const gameOverEl = document.getElementById('gameOverScreen');
+    const gameOverMessage = document.getElementById('gameOverMessage');
+    
+    if (isDraw) {
+        gameOverMessage.textContent = `Berabere! Her iki oyuncu da ${myScore} puan aldı!`;
+    } else if (iWon) {
+        gameOverMessage.textContent = `Tebrikler, kazandınız! 🏆\nSkor: ${myScore} - ${opponentScore}`;
+    } else {
+        gameOverMessage.textContent = `Maalesef kaybettiniz! 😢\nSkor: ${opponentScore} - ${myScore}`;
+    }
+    
+    gameOverEl.classList.remove('hidden');
+    
+    // 5 saniye sonra otomatik olarak yeni oyuna geç
     setTimeout(() => {
-        const nextLevel = level + 1;
+        if (gameStage === 'ENDED') {
+            startNewGame();
+        } else {
+            gameData.hostLives = !isHostWinner ? (level === 1 ? 3 : 4) : 0;
+            gameData.guestLives = isHostWinner ? (level === 1 ? 3 : 4) : 0;
+        }
         
-        console.log(`🔄 Oyun bitti, sunucudan yeni seviye bekleniyor: ${nextLevel}`);
-        
-        // Sunucuya levelComplete olayını gönder (Bu, yeni seviyenin başlamasına yol açar)
+        // Sunucuya levelComplete olayını gönder
         if (socket && socket.connected) {
             console.log(`📤 Sunucuya levelComplete gönderiliyor (endGame): Seviye ${level} tamamlandı`);
             socket.emit('levelComplete', {
                 roomCode: currentRoomCode,
                 level: level,
-                nextLevel: nextLevel
+                nextLevel: nextLevel,
+                hostLives: gameData.hostLives,
+                guestLives: gameData.guestLives,
+                resetLives: false
             });
         } else {
             console.error('❌ Sunucuya bağlı değil, yeni seviyeye geçilemiyor!');
@@ -360,6 +400,12 @@ function checkLevelCompletion() {
     
     console.log(`🔍 Seviye tamamlama kontrolü: Açılan ${openedCards}/${totalCards} kart`);
     
+    // Eğer bir oyuncu öldüyse, oyunu bitir
+    if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
+        return; // endGame fonksiyonu zaten çağrılacak
+    }
+    
+    // Tüm kartlar açıldıysa yeni seviyeye geç
     if (openedCards === totalCards) {
         const nextLevel = level + 1;
         
@@ -458,19 +504,39 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         console.log('🆕 Yeni seviye başlatılıyor:', data);
         
         // Seviye bilgisini güncelle
-        level = parseInt(data.level) || 1;
+        const newLevel = parseInt(data.level) || 1;
         
-        // Oyun durumunu sıfırla ve yeni canları ayarla
+        // Eğer bir önceki oyunda biri öldüyse, canları sıfırla (yeniden başlat)
+        const shouldResetLives = (gameData.hostLives <= 0 || gameData.guestLives <= 0);
+        
+        // Mevcut canları koru veya sıfırla
+        const hostLives = shouldResetLives ? 
+            (newLevel === 1 ? 3 : 4) : // Eğer canlar sıfırlanacaksa, seviyeye göre can ver
+            Math.max(0, gameData.hostLives); // Değilse mevcut canları koru (0'ın altına düşmesin)
+            
+        const guestLives = shouldResetLives ? 
+            (newLevel === 1 ? 3 : 4) : // Eğer canlar sıfırlanacaksa, seviyeye göre can ver
+            Math.max(0, gameData.guestLives); // Değilse mevcut canları koru (0'ın altına düşmesin)
+        
+        console.log(`🔁 Can güncellemesi - Host: ${hostLives}, Guest: ${guestLives}, Sıfırlama: ${shouldResetLives}`);
+        
+        // Oyun durumunu güncelle (mevcut durumu koruyarak)
         gameData = {
+            ...gameData, // Mevcut durumu koru
             board: [],
             turn: 0, // Host başlar
-            hostLives: data.hostLives,
-            guestLives: data.guestLives,
+            hostLives: hostLives,
+            guestLives: guestLives,
             cardsLeft: data.boardSize, // Server'dan gelen kart sayısını kullan
             hostBombs: [], 
             guestBombs: [],
-            isGameOver: false
+            isGameOver: false,
+            bombCount: newLevel === 1 ? 4 : 6, // Level 1'de 4 bomba, diğerlerinde 6 bomba
+            level: newLevel // Seviyeyi güncelle
         };
+        
+        // Seviye değişkenini güncelle
+        level = newLevel;
         
         gameStage = 'PLAY';
         
@@ -480,7 +546,8 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         // UI'ı güncelle
         updateStatusDisplay();
         
-        showGlobalMessage(`🎮 Seviye ${level} başladı! ${data.hostLives} can ile oynanıyor.`, false);
+        console.log(`Yeni seviye başlatıldı - Seviye: ${level}, Host Can: ${gameData.hostLives}, Guest Can: ${gameData.guestLives}, Bomba Sayısı: ${gameData.bombCount}`);
+        showGlobalMessage(`🎮 Seviye ${level} başladı! ${gameData.hostLives} can ile oynanıyor.`, false);
     });
 
     // gameData Olayı (Hamle Geldi - Kendi veya Rakip)
