@@ -23,6 +23,21 @@
             unicode-range: U+1F000-1F9FF, U+2600-26FF, U+1F300-1F5FF, U+1F600-1F64F, U+1F680-1F6FF, U+1F1E0-1F1FF;
         }
         
+        /* Emoji'ler için CSS sınıfları */
+        .emoji {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        
+        /* Her emoji için ayrı sınıf */
+        .emoji-1f600 { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><path fill="#FFCC4D" d="M36 18c0 9.941-8.059 18-18 18S0 27.941 0 18 8.059 0 18 0s18 8.059 18 18"/><path fill="#664500" d="M28.457 17.797c-.06-.135-1.5-3.297-10.457-3.297-8.958 0-10.397 3.162-10.457 3.297-.092.207-.032.449.145.609.175.158.426.189.636.086.042-.02 1.262-.499 3.141-.499 1.55 0 3.062.47 3.729.5.012 0 .023.005.035.005.01 0 .02-.004.03-.005.666-.03 2.18-.5 3.728-.5 1.881 0 3.102.479 3.145.5.086.039.175.058.264.058.133 0 .266-.037.385-.113.177-.14.235-.382.144-.593zM12 16c0 1.657-.895 3-2 3s-2-1.343-2-3 .895-3 2-3 2 1.343 2 3zm14 0c0 1.657-.895 3-2 3s-2-1.343-2-3 .895-3 2-3 2 1.343 2 3z"/></svg>'); }
+        .emoji-1f602 { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><path fill="#FFCC4D" d="M36 18c0 9.941-8.059 18-18 18S0 27.941 0 18 8.059 0 18 0s18 8.059 18 18"/><path fill="#664500" d="M28.457 17.797c-.06-.135-1.5-3.297-10.457-3.297-8.958 0-10.397 3.162-10.457 3.297-.092.207-.032.449.145.609.175.158.426.189.636.086.042-.02 1.262-.499 3.141-.499 1.55 0 3.062.47 3.729.5.012 0 .023.005.035.005.01 0 .02-.004.03-.005.666-.03 2.18-.5 3.728-.5 1.881 0 3.102.479 3.145.5.086.039.175.058.264.058.133 0 .266-.037.385-.113.177-.14.235-.382.144-.593zM12 16c0 1.657-.895 3-2 3s-2-1.343-2-3 .895-3 2-3 2 1.343 2 3zm14 0c0 1.657-.895 3-2 3s-2-1.343-2-3 .895-3 2-3 2 1.343 2 3z"/></svg>'); }
+        /* Diğer emojiler için de benzer şekilde ekleyebilirsiniz */
+        
         .card-face > div {
             font-family: 'EmojiFont', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', system-ui, -apple-system, sans-serif;
             -webkit-font-smoothing: antialiased;
