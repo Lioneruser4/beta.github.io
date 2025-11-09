@@ -18,21 +18,21 @@ const io = new Server(server, {
 
 const rooms = {}; 
 
-// Oyun için kullanılacak rastgele emojiler (Unicode kod noktaları ile)
-const EMOJIS = String.fromCodePoint(
-    0x1F600, // 😀
-    0x1F60E, // 😎
-    0x1F984, // 🦄
-    0x1F431, // 🐱
-    0x1F340, // 🍀
-    0x1F355, // 🍕
-    0x2B50,  // ⭐
-    0x26BD,  // ⚽
-    0x1F3B5, // 🎵
-    0x1F680, // 🚀
-    0x1F3B2, // 🎲
-    0x1F947  // 🥇
-).split('');
+// Tüm cihazlarda güvenle çalışacak emojiler
+const EMOJIS = [
+    '😀', // Gülümseyen yüz
+    '😊', // Gözleri kapalı gülümseyen yüz
+    '😎', // Güneş gözlüklü yüz
+    '😍', // Kalp gözlü yüz
+    '😜', // Dil çıkaran yüz
+    '😇', // Halo melek yüzü
+    '😴', // Uyuyan yüz
+    '😷', // Maske takan yüz
+    '🤖', // Robot
+    '👻', // Hayalet
+    '👽', // Uzaylı
+    '🤡'  // Palyaço
+];
 
 function generateRoomCode() {
     let code = Math.random().toString(36).substring(2, 6).toUpperCase();
