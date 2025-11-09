@@ -118,9 +118,11 @@ function drawBoard() {
         const back = document.createElement('div');
         back.className = 'card-face back';
         const backContent = document.createElement('span');
-        backContent.textContent = cardState.content;
+        backContent.innerHTML = cardState.content;
         backContent.style.fontSize = '2rem';
         backContent.style.lineHeight = '1';
+        backContent.style.display = 'inline-block';
+        backContent.style.verticalAlign = 'middle';
         back.appendChild(backContent);
 
         card.appendChild(front);
