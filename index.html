@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, height=device-height">
-    <title>💣 KartboBomb 1v1</title>
+    <title>💣 Emoji Kart Bomb 1v1</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
     <script src="https://cdn.tailwindcss.com"></script>
@@ -261,12 +261,16 @@
             font-size: 1.25rem;
             cursor: pointer;
             user-select: none;
-            transition: all 0.2s ease;
+            -webkit-transform-style: preserve-3d;
             transform-style: preserve-3d;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
             position: relative;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
             min-width: 0;
             min-height: 0;
+            -webkit-transform: translate3d(0,0,0);
+            transform: translate3d(0,0,0);
         }
         .card.flipped {
             transform: rotateY(180deg);
@@ -298,6 +302,10 @@
             color: #2d3748; /* Koyu metin */
             transform: rotateY(180deg);
             z-index: 1;
+            -webkit-backface-visibility: visible !important;
+            backface-visibility: visible !important;
+            -webkit-transform: rotateY(180deg) translateZ(1px);
+            transform: rotateY(180deg) translateZ(1px);
         }
         .card.bomb-selected .card-face.front {
             background: linear-gradient(135deg, #f56565, #e53e3e); /* Kırmızı gradient */
