@@ -110,12 +110,18 @@ function drawBoard() {
         card.dataset.index = index;
 
         const front = document.createElement('div');
-        front.className = 'card-face front'; // Sizin stilinize göre front/back
-        front.textContent = '?';
+        front.className = 'card-face front';
+        const frontContent = document.createElement('span');
+        frontContent.textContent = '?';
+        front.appendChild(frontContent);
         
         const back = document.createElement('div');
         back.className = 'card-face back';
-        back.textContent = cardState.content;
+        const backContent = document.createElement('span');
+        backContent.textContent = cardState.content;
+        backContent.style.fontSize = '2rem';
+        backContent.style.lineHeight = '1';
+        back.appendChild(backContent);
 
         card.appendChild(front);
         card.appendChild(back);
