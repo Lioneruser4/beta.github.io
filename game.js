@@ -70,7 +70,19 @@ let gameData = {
     isGameOver: false
 };
 
-const EMOTICONS = ['🙂', '😂', '😍', '😎', '🤩', '👍', '🎉', '🌟', '🍕', '🐱'];
+// iOS uyumlu emoji karakterleri
+const EMOTICONS = String.fromCodePoint(
+    0x1F600, // 😀
+    0x1F603, // 😃
+    0x1F604, // 😄
+    0x1F601, // 😁
+    0x1F60A, // 😊
+    0x1F60D, // 😍
+    0x1F60E, // 😎
+    0x1F60F, // 😏
+    0x1F618, // 😘
+    0x1F61B  // 😛
+).split('');
 
 // --- TEMEL UI FONKSİYONLARI ---
 
@@ -119,8 +131,8 @@ function drawBoard() {
         back.className = 'card-face back';
         const backContent = document.createElement('span');
         backContent.textContent = cardState.content;
-        backContent.style.fontSize = '2rem';
-        backContent.style.lineHeight = '1';
+        backContent.style.fontSize = '2rem'; // Emoji boyutunu büyüt
+        backContent.style.webkitTextStroke = '1px transparent'; // iOS için emoji görünürlüğünü artır
         back.appendChild(backContent);
 
         card.appendChild(front);
