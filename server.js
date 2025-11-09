@@ -18,8 +18,21 @@ const io = new Server(server, {
 
 const rooms = {}; 
 
-// Oyun için kullanılacak rastgele emojiler
-const EMOJIS = ['😀','😎','🦄','🐱','🍀','🍕','🌟','⚽','🎵','🚀','🎲','🥇'];
+// Oyun için kullanılacak rastgele emojiler (Unicode kod noktaları ile)
+const EMOJIS = String.fromCodePoint(
+    0x1F600, // 😀
+    0x1F60E, // 😎
+    0x1F984, // 🦄
+    0x1F431, // 🐱
+    0x1F340, // 🍀
+    0x1F355, // 🍕
+    0x2B50,  // ⭐
+    0x26BD,  // ⚽
+    0x1F3B5, // 🎵
+    0x1F680, // 🚀
+    0x1F3B2, // 🎲
+    0x1F947  // 🥇
+).split('');
 
 function generateRoomCode() {
     let code = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -186,6 +199,34 @@ io.on('connection', (socket) => {
             });
             
             console.log(`Hamle yapıldı - Oda: ${code}, Kart: ${idx}, Bomba: ${isBomb}, Emoji: ${emoji}, Yeni sıra: ${room.gameState.turn}`);
+        }
+    });
+
+    // Sohbet mesajı işleme
+    socket.on('chatMessage', (data) => {
+        try {
+            const { roomCode, message, sender } = data;
+            const room = rooms[roomCode];
+            
+            if (!room) {
+                console.log(`Oda bulunamadı: ${roomCode}`);
+                return;
+            }
+            
+            // Mesajın uzunluğunu kontrol et (maksimum 200 karakter)
+            const trimmedMessage = String(message).substring(0, 200).trim();
+            if (!trimmedMessage) return;
+            
+            console.log(`💬 Sohbet mesajı - Oda: ${roomCode}, Gönderen: ${sender}, Mesaj: ${trimmedMessage}`);
+            
+            // Mesajı oda içindeki tüm oyunculara ilet
+            io.to(roomCode).emit('chatMessage', {
+                message: trimmedMessage,
+                sender: sender,
+                timestamp: new Date().toISOString()
+            });
+        } catch (error) {
+            console.error('Sohbet mesajı işlenirken hata:', error);
         }
     });
 
