@@ -117,12 +117,16 @@ function drawBoard() {
         
         const back = document.createElement('div');
         back.className = 'card-face back';
-        const backContent = document.createElement('span');
+        const backContent = document.createElement('div');
         backContent.innerHTML = cardState.content;
         backContent.style.fontSize = '2rem';
         backContent.style.lineHeight = '1';
-        backContent.style.display = 'inline-block';
-        backContent.style.verticalAlign = 'middle';
+        backContent.style.display = 'flex';
+        backContent.style.alignItems = 'center';
+        backContent.style.justifyContent = 'center';
+        backContent.style.width = '100%';
+        backContent.style.height = '100%';
+        backContent.style.fontFamily = '"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif';
         back.appendChild(backContent);
 
         card.appendChild(front);
