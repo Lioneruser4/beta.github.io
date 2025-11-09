@@ -70,18 +70,7 @@ let gameData = {
     isGameOver: false
 };
 
-const EMOTICONS = [
-    { emoji: '🙂', code: '1f642' },
-    { emoji: '😂', code: '1f602' },
-    { emoji: '😍', code: '1f60d' },
-    { emoji: '😎', code: '1f60e' },
-    { emoji: '🤩', code: '1f929' },
-    { emoji: '👍', code: '1f44d' },
-    { emoji: '🎉', code: '1f389' },
-    { emoji: '🌟', code: '1f31f' },
-    { emoji: '🍕', code: '1f355' },
-    { emoji: '🐱', code: '1f431' }
-];
+const EMOTICONS = ['🙂', '😂', '😍', '😎', '🤩', '👍', '🎉', '🌟', '🍕', '🐱'];
 
 // --- TEMEL UI FONKSİYONLARI ---
 
@@ -129,20 +118,8 @@ function drawBoard() {
         const back = document.createElement('div');
         back.className = 'card-face back';
         const backContent = document.createElement('div');
-        const emojiCode = cardState.content.match(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu);
-        if (emojiCode && emojiCode[0]) {
-            // Emoji için SVG ikon kullan
-            const emoji = EMOTICONS.find(e => e.emoji === emojiCode[0]);
-            if (emoji) {
-                backContent.innerHTML = `<span class="emoji emoji-${emoji.code}" aria-label="${emoji.emoji}"></span>`;
-            } else {
-                backContent.textContent = emojiCode[0];
-                backContent.style.fontSize = '2rem';
-            }
-        } else {
-            backContent.textContent = cardState.content;
-            backContent.style.fontSize = '2rem';
-        }
+        backContent.textContent = cardState.content;
+        backContent.style.fontSize = '2rem';
         backContent.style.display = 'flex';
         backContent.style.alignItems = 'center';
         backContent.style.justifyContent = 'center';
