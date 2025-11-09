@@ -40,13 +40,13 @@ function initializeGame(boardSize) {
     
     // Seviyeye göre can ve bomba sayısını ayarla
     if (level === 1) {
-        // Level 1'de 4 bomba
-        gameData.hostLives = 4; 
-        gameData.guestLives = 4;
+        // Level 1'de 3 can ve 4 bomba
+        gameData.hostLives = 3; 
+        gameData.guestLives = 3;
     } else {
-        // Level 2 ve sonrası 6 bomba
-        gameData.hostLives = 6;
-        gameData.guestLives = 6;
+        // Level 2 ve sonrası 4 can ve 6 bomba
+        gameData.hostLives = 4;
+        gameData.guestLives = 4;
     }
     
     gameStage = 'WAITING';
