@@ -70,19 +70,19 @@ let gameData = {
     isGameOver: false
 };
 
-// iOS uyumlu emoji karakterleri
-const EMOTICONS = String.fromCodePoint(
-    0x1F600, // 😀
-    0x1F603, // 😃
-    0x1F604, // 😄
-    0x1F601, // 😁
-    0x1F60A, // 😊
-    0x1F60D, // 😍
-    0x1F60E, // 😎
-    0x1F60F, // 😏
-    0x1F618, // 😘
-    0x1F61B  // 😛
-).split('');
+// Tüm cihazlarda güvenle çalışacak emojiler
+const EMOTICONS = [
+    '😀', // Gülümseyen yüz
+    '😊', // Gözleri kapalı gülümseyen yüz
+    '😎', // Güneş gözlüklü yüz
+    '😍', // Kalp gözlü yüz
+    '😜', // Dil çıkaran yüz
+    '😇', // Halo melek yüzü
+    '😴', // Uyuyan yüz
+    '😷', // Maske takan yüz
+    '🤖', // Robot
+    '👻'  // Hayalet
+];
 
 // --- TEMEL UI FONKSİYONLARI ---
 
