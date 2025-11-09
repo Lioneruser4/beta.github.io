@@ -161,6 +161,8 @@ function updateStatusDisplay() {
     if (gameData.scores) {
         const myScore = isHost ? gameData.scores.host : gameData.scores.guest;
         const opponentScore = isHost ? gameData.scores.guest : gameData.scores.host;
+        
+        // Eğer isim bilgileri varsa onları kullan, yoksa varsayılan değerleri kullan
         const myName = isHost ? 'Sen' : (gameData.opponentName || 'Rakip');
         const opponentName = isHost ? (gameData.opponentName || 'Rakip') : 'Sen';
         
@@ -454,10 +456,21 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         // Oyun durumunu güncelle
         gameData.hostBombs = gameState.hostBombs || [];
         gameData.guestBombs = gameState.guestBombs || [];
-        // Server'dan gelen can değerlerini kullan (Canlar 0 gelirse default 3 yap, ama level 1'in 3 bomba olma ihtimali var)
-        gameData.hostLives = gameState.hostLives === undefined ? (level === 1 ? 3 : 4) : gameState.hostLives;
-        gameData.guestLives = gameState.guestLives === undefined ? (level === 1 ? 3 : 4) : gameState.guestLives;
+        // Server'dan gelen can değerlerini kullan (Tüm seviyelerde 4 can)
+        gameData.hostLives = 4;
+        gameData.guestLives = 4;
         gameData.turn = gameState.turn || 0;
+        
+        // Skor bilgilerini güncelle
+        if (gameState.scores) {
+            gameData.scores = gameState.scores;
+        }
+        if (gameState.hostName) {
+            gameData.hostName = gameState.hostName;
+        }
+        if (gameState.guestName) {
+            gameData.guestName = gameState.guestName;
+        }
         
         gameStage = 'PLAY';
         
@@ -489,6 +502,17 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         };
         
         gameStage = 'PLAY';
+        
+        // Skor ve isim bilgilerini güncelle
+        if (data.scores) {
+            gameData.scores = data.scores;
+        }
+        if (data.hostName) {
+            gameData.hostName = data.hostName;
+        }
+        if (data.guestName) {
+            gameData.guestName = data.guestName;
+        }
         
         // Yeni oyun tahtasını oluştur
         initializeGame(data.boardSize);
