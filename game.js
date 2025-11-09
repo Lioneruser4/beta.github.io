@@ -456,9 +456,9 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         // Oyun durumunu güncelle
         gameData.hostBombs = gameState.hostBombs || [];
         gameData.guestBombs = gameState.guestBombs || [];
-        // Server'dan gelen can değerlerini kullan (Tüm seviyelerde 4 can)
-        gameData.hostLives = 4;
-        gameData.guestLives = 4;
+        // Server'dan gelen can değerlerini kullan
+        gameData.hostLives = gameState.hostLives || (level === 1 ? 3 : 4);
+        gameData.guestLives = gameState.guestLives || (level === 1 ? 3 : 4);
         gameData.turn = gameState.turn || 0;
         
         // Skor bilgilerini güncelle
