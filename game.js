@@ -226,22 +226,24 @@ function stopVibration() {
 // --- HAREKET İŞLEYİCİLERİ ---
 
 function handleCardClick(event) {
-    // Tıklama olayını başlatan card-container'ı bul
-    const cardContainer = event.currentTarget; 
-    // İçindeki asıl .card elementini bul
-    const cardElement = cardContainer.querySelector('.card');
+    if (gameStage !== 'PLAY' || gameData.isGameOver) return;
     
-    // Eğer card elementi zaten açılmışsa veya bulunamazsa dur.
-    if (!cardElement || cardElement.classList.contains('flipped')) return; 
+    const cardEl = event.target.closest('.card');
+    if (!cardEl || cardEl.classList.contains('flipped')) return;
     
-    const cardIndex = parseInt(cardElement.dataset.index);
-
-    if (gameStage === 'PLAY') {
-        const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
-        if (!isMyTurn || gameData.isGameOver) return; 
-        
-        sendMove(cardIndex);
+    const index = parseInt(cardEl.dataset.index);
+    
+    // Sadece sırası olan oyuncu hamle yapabilir
+    if ((isHost && gameData.turn !== 0) || (!isHost && gameData.turn !== 1)) {
+        return;
     }
+    
+    // Kartı hemen çevir (geçici olarak)
+    cardEl.style.transition = 'none';
+    cardEl.classList.add('flipped');
+    
+    // Sunucuya hamleyi bildir
+    sendMove(index);
 }
 
 function sendMove(index) {
@@ -255,52 +257,41 @@ function sendMove(index) {
 }
 
 async function applyMove(index, emoji, isBomb) {
-    if (gameData.board[index].opened) return;
-
-    await triggerWaitAndVibrate();
-
-    gameData.board[index].opened = true;
-    gameData.cardsLeft -= 1;
+    if (gameStage !== 'PLAY' || gameData.isGameOver) return;
     
+    const cardEl = document.querySelector(`.card[data-index="${index}"]`);
+    if (!cardEl || cardEl.classList.contains('flipped')) return;
+
+    // Kartı hemen çevir (animasyonsuz)
+    cardEl.style.transition = 'none';
+    cardEl.classList.add('flipped');
+    
+    // Eğer bomba ise
     if (isBomb) {
-        gameData.board[index].content = '💣';
-        // Hamle yapan oyuncu can kaybeder
-        const currentPlayerIsHost = gameData.turn === 0;
-        if (currentPlayerIsHost) {
+        cardEl.classList.add('bomb');
+        playSound(audioBomb);
+        
+        // Can azalt
+        if (gameData.turn === 0) {
             gameData.hostLives--;
-        } else { 
+            myLivesEl.textContent = '❤️'.repeat(Math.max(0, gameData.hostLives));
+        } else {
             gameData.guestLives--;
+            opponentLivesEl.textContent = '❤️'.repeat(Math.max(0, gameData.guestLives));
         }
         
-        playSound(audioBomb);
-        showGlobalMessage(`BOOM! Bombaya bastınız!`, true);
-    } else {
-        gameData.board[index].content = emoji; // Server'dan gelen emoji
-        playSound(audioEmoji);
-    }
-    
-    drawBoard(); 
-    
-    // Oyun tahtasını güncelle
-    drawBoard();
-    
-    setTimeout(() => {
-        // Sırayı değiştir
+        // Hemen kırmızı yap ve sırayı değiştir
+        cardEl.classList.add('bomb-selected');
         gameData.turn = gameData.turn === 0 ? 1 : 0;
-        updateStatusDisplay();
         
-        // Tüm bombalar patladı mı kontrol et
-        const allBombsExploded = (gameData.hostLives <= 0 && gameData.guestLives <= 0);
+    } else {
+        // Emoji bulundu
+        playSound(audioEmoji);
+        gameData.cardsLeft--;
         
-        if (allBombsExploded) {
-            // Tüm bombalar patladı, bir sonraki seviyeye geç
-            const nextLevel = level + 1;
-            showGlobalMessage(`🎉 Tüm bombalar patladı! Seviye ${nextLevel}'e geçiliyor...`, false);
-            
-            // Sunucuya seviye tamamlandı bilgisini gönder
-            if (socket && socket.connected) {
-                socket.emit('levelComplete', { 
-                    roomCode: currentRoomCode,
+        // Eğer tüm kartlar açıldıysa seviyeyi tamamla
+        if (gameData.cardsLeft === 0) {
+            gameData.isGameOver = true;
                     level: level,
                     nextLevel: nextLevel
                 });
