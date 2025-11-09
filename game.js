@@ -104,30 +104,64 @@ function drawBoard() {
     gameData.board.forEach((cardState, index) => {
         const cardContainer = document.createElement('div');
         cardContainer.className = 'card-container aspect-square';
+        cardContainer.style.perspective = '1000px'; // Add 3D perspective for better flip
 
         const card = document.createElement('div');
         card.className = `card cursor-pointer`;
         card.dataset.index = index;
+        
+        // Add transform-style for better 3D rendering on iOS
+        card.style.transformStyle = 'preserve-3d';
+        card.style.transition = 'transform 0.5s';
+        card.style.width = '100%';
+        card.style.height = '100%';
+        card.style.position = 'relative';
 
         const front = document.createElement('div');
         front.className = 'card-face front';
-        const frontContent = document.createElement('span');
+        front.style.backfaceVisibility = 'hidden';
+        front.style.position = 'absolute';
+        front.style.width = '100%';
+        front.style.height = '100%';
+        front.style.display = 'flex';
+        front.style.justifyContent = 'center';
+        front.style.alignItems = 'center';
+        front.style.borderRadius = '8px';
+        front.style.backgroundColor = '#4a5568';
+        front.style.color = 'white';
+        front.style.fontSize = '2rem';
+        front.style.transform = 'rotateY(0deg)';
+        
+        const frontContent = document.createElement('div');
         frontContent.textContent = '?';
         front.appendChild(frontContent);
         
         const back = document.createElement('div');
         back.className = 'card-face back';
-        const backContent = document.createElement('div'); // Changed from span to div for better iOS support
+        back.style.backfaceVisibility = 'hidden';
+        back.style.position = 'absolute';
+        back.style.width = '100%';
+        back.style.height = '100%';
+        back.style.borderRadius = '8px';
+        back.style.backgroundColor = 'white';
+        back.style.display = 'flex';
+        back.style.justifyContent = 'center';
+        back.style.alignItems = 'center';
+        back.style.transform = 'rotateY(180deg)';
+        
+        const backContent = document.createElement('div');
         backContent.textContent = cardState.content;
-        backContent.style.fontSize = '2rem';
+        backContent.style.fontSize = '2.5rem';
         backContent.style.lineHeight = '1';
         backContent.style.display = 'flex';
         backContent.style.justifyContent = 'center';
         backContent.style.alignItems = 'center';
         backContent.style.height = '100%';
         backContent.style.width = '100%';
-        backContent.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI Emoji", "Segoe UI Symbol", "Apple Color Emoji", sans-serif';
+        backContent.style.fontFamily = 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"';
         backContent.style.webkitFontSmoothing = 'antialiased';
+        backContent.style.transform = 'translateZ(0)'; // Force GPU acceleration
+        
         back.appendChild(backContent);
 
         card.appendChild(front);
@@ -135,14 +169,13 @@ function drawBoard() {
         cardContainer.appendChild(card);
         
         if (cardState.opened) {
-            card.classList.add('flipped');
+            card.style.transform = 'rotateY(180deg)';
         } else {
             // SADECE SEÇEN KİŞİNİN GÖRMESİ İÇİN KIRMIZILIK
             if (gameStage === 'SELECTION' && selectedBombs.includes(index)) {
                 card.classList.add('bomb-selected'); 
             }
             
-            // KRİTİK DÜZELTME: TIKLAMA OLAYINI CARD-CONTAINER'A EKLE!
             cardContainer.addEventListener('click', handleCardClick);
         }
         
@@ -252,8 +285,10 @@ function sendMove(index) {
 async function applyMove(index, emoji, isBomb) {
     if (gameData.board[index].opened) return;
 
-    await triggerWaitAndVibrate();
-
+    // Wait for any previous animations to complete
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Mark the card as opened
     gameData.board[index].opened = true;
     gameData.cardsLeft -= 1;
     
@@ -274,35 +309,37 @@ async function applyMove(index, emoji, isBomb) {
         playSound(audioEmoji);
     }
     
-    drawBoard(); 
-    
-    // Oyun tahtasını güncelle
+    // First draw to show the card flip
     drawBoard();
     
-    setTimeout(() => {
-        // Sırayı değiştir
-        gameData.turn = gameData.turn === 0 ? 1 : 0;
-        updateStatusDisplay();
+    // Add a small delay to ensure the flip animation is visible
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Update status after the flip
+    updateStatusDisplay();
+    
+    // Sırayı değiştir
+    gameData.turn = gameData.turn === 0 ? 1 : 0;
+    
+    // Tüm bombalar patladı mı kontrol et
+    const allBombsExploded = (gameData.hostLives <= 0 && gameData.guestLives <= 0);
+    
+    if (allBombsExploded) {
+        // Tüm bombalar patladı, bir sonraki seviyeye geç
+        const nextLevel = level + 1;
+        showGlobalMessage(`🎉 Tüm bombalar patladı! Seviye ${nextLevel}'e geçiliyor...`, false);
         
-        // Tüm bombalar patladı mı kontrol et
-        const allBombsExploded = (gameData.hostLives <= 0 && gameData.guestLives <= 0);
-        
-        if (allBombsExploded) {
-            // Tüm bombalar patladı, bir sonraki seviyeye geç
-            const nextLevel = level + 1;
-            showGlobalMessage(`🎉 Tüm bombalar patladı! Seviye ${nextLevel}'e geçiliyor...`, false);
-            
-            // Sunucuya seviye tamamlandı bilgisini gönder
-            if (socket && socket.connected) {
-                socket.emit('levelComplete', { 
-                    roomCode: currentRoomCode,
-                    level: level,
-                    nextLevel: nextLevel
-                });
-            }
-        } else if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
-            // Normal oyun bitişi (bir oyuncu tüm canlarını kaybetti)
-            const winner = gameData.hostLives <= 0 ? 'Guest' : 'Host';
+        // Sunucuya seviye tamamlandı bilgisini gönder
+        if (socket && socket.connected) {
+            socket.emit('levelComplete', { 
+                roomCode: currentRoomCode,
+                level: level,
+                nextLevel: nextLevel
+            });
+        }
+    } else if (gameData.hostLives <= 0 || gameData.guestLives <= 0) {
+        // Normal oyun bitişi (bir oyuncu tüm canlarını kaybetti)
+        const winner = gameData.hostLives <= 0 ? 'Guest' : 'Host';
             endGame(winner);
         } else {
             // Oyun devam ediyor, sıradaki oyuncu
