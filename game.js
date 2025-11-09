@@ -17,6 +17,7 @@ const myLivesEl = document.getElementById('myLives');
 const opponentLivesEl = document.getElementById('opponentLives');
 const opponentNameEl = document.getElementById('opponentName');
 const roleStatusEl = document.getElementById('roleStatus');
+const scoreDisplayEl = document.getElementById('scoreDisplay'); // Skor göstergesi
 
 // SESLER
 const audioBomb = new Audio('sound1.mp3'); 
@@ -38,16 +39,9 @@ function initializeGame(boardSize) {
     gameData.turn = 0; // Host başlar
     gameData.isGameOver = false;
     
-    // Seviyeye göre can ve bomba sayısını ayarla
-    if (level === 1) {
-        // Level 1'de 3 can ve 4 bomba
-        gameData.hostLives = 3; 
-        gameData.guestLives = 3;
-    } else {
-        // Level 2 ve sonrası 4 can ve 6 bomba
-        gameData.hostLives = 4;
-        gameData.guestLives = 4;
-    }
+    // Tüm seviyelerde 4 can ve 4 bomba
+    gameData.hostLives = 4; 
+    gameData.guestLives = 4;
     
     gameStage = 'WAITING';
 }
@@ -162,6 +156,17 @@ function updateStatusDisplay() {
     
     myLivesEl.textContent = '❤️'.repeat(Math.max(0, myLives));
     opponentLivesEl.textContent = '❤️'.repeat(Math.max(0, opponentLives));
+    
+    // Skor göstergesini güncelle
+    if (gameData.scores) {
+        const myScore = isHost ? gameData.scores.host : gameData.scores.guest;
+        const opponentScore = isHost ? gameData.scores.guest : gameData.scores.host;
+        const myName = isHost ? 'Sen' : (gameData.opponentName || 'Rakip');
+        const opponentName = isHost ? (gameData.opponentName || 'Rakip') : 'Sen';
+        
+        scoreDisplayEl.textContent = `${myName} ${myScore} - ${opponentScore} ${opponentName}`;
+        scoreDisplayEl.style.display = 'block';
+    }
 
     const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
 
