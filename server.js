@@ -112,18 +112,18 @@ io.on('connection', (socket) => {
         room.gameState.hostBombs = [];
         room.gameState.guestBombs = [];
         
-        // Host için 3 bomba seç
+        // Host için bombaları seç
         for (let i = 0; i < bombCount; i++) {
             room.gameState.hostBombs.push(allIndices[i]);
         }
         
-        // Guest için farklı 3 bomba seç
+        // Guest için farklı bombalar seç
         for (let i = bombCount; i < bombCount * 2; i++) {
             room.gameState.guestBombs.push(allIndices[i]);
         }
         
-        // Can sayılarını ayarla (Tüm seviyelerde 4 can)
-        const lives = 4;
+        // Can sayılarını ayarla (Level 1'de 3, diğerlerinde 4 can)
+        const lives = room.gameState.level === 1 ? 3 : 4;
         room.gameState.hostLives = lives;
         room.gameState.guestLives = lives;
         
@@ -276,19 +276,6 @@ io.on('connection', (socket) => {
                 // İkisi de hayatta, canları aynı tut
                 hostLives = currentHostLives;
                 guestLives = currentGuestLives;
-            }
-            
-            room.gameState.hostLives = hostLives;
-            room.gameState.guestLives = guestLives;
-            
-            // Tüm seviyelerde 4 bomba
-            const bombCount = 4;
-            const boardSize = 20; // Tüm seviyelerde 20 kart
-            
-            console.log(`🔄 Yeni seviye başlatılıyor: ${nextLevel}, ${bombCount} bomba ile`);
-            
-            // Tüm olası kart indekslerini oluştur ve karıştır
-            const allIndices = Array.from({ length: boardSize }, (_, i) => i);
             allIndices.sort(() => Math.random() - 0.5);
             
             // Host ve Guest için benzersiz bombalar ayarla
@@ -364,9 +351,14 @@ io.on('connection', (socket) => {
         room.gameState.hostBombs = allIndices.slice(0, bombCount);
         room.gameState.guestBombs = allIndices.slice(bombCount, bombCount * 2);
         
-        // Can sayılarını güncelle
-        room.gameState.hostLives = bombCount;
-        room.gameState.guestLives = bombCount;
+        // Eğer bir oyuncu öldüyse canları sıfırla, değilse aynı tut
+        const hostLives = (room.gameState.hostLives <= 0 || room.gameState.guestLives <= 0) ? 
+            (newLevel === 1 ? 3 : 4) : room.gameState.hostLives;
+        const guestLives = (room.gameState.hostLives <= 0 || room.gameState.guestLives <= 0) ? 
+            (newLevel === 1 ? 3 : 4) : room.gameState.guestLives;
+            
+        room.gameState.hostLives = hostLives;
+        room.gameState.guestLives = guestLives;
         
         // Oyun durumunu sıfırla
         room.gameState.opened = [];
@@ -391,8 +383,11 @@ io.on('connection', (socket) => {
         io.to(roomCode).emit('newLevel', { 
             level: newLevel,
             boardSize: boardSize,
-            hostLives: bombCount,
-            guestLives: bombCount
+            hostLives: hostLives,
+            guestLives: guestLives,
+            scores: scores[roomCode] || { host: 0, guest: 0 },
+            hostName: room.hostUsername,
+            guestName: room.guestUsername
         });
         
         // Yeni bombaları kısa gecikme ile gönder
