@@ -93,58 +93,61 @@ export function showGlobalMessage(message, isError = true) {
 // --- OYUN MANTIĞI VE ÇİZİM ---
 
 function drawBoard() {
-    const boardSize = LEVELS[level - 1] || 20; // Default 20
+    const boardSize = LEVELS[level - 1] || 20;
     
-    // Grid düzenini sadece 4 sütun (4 aşağı inme) olarak ayarla
-    gameBoardEl.className = 'grid w-full max-w-sm mx-auto memory-board'; 
-    gameBoardEl.style.gridTemplateColumns = 'repeat(4, 1fr)'; // 4 sütun (4x3, 4x4, 4x5 için)
+    // Grid düzenini ayarla
+    gameBoardEl.className = 'grid w-full max-w-sm mx-auto memory-board gap-2 p-2';
+    gameBoardEl.style.gridTemplateColumns = 'repeat(4, 1fr)';
     
     gameBoardEl.innerHTML = '';
     
     gameData.board.forEach((cardState, index) => {
+        // Kart konteyneri
         const cardContainer = document.createElement('div');
-        cardContainer.className = 'card-container aspect-square';
-
+        cardContainer.className = 'card-container';
+        cardContainer.style.aspectRatio = '1';
+        
+        // Kartın kendisi
         const card = document.createElement('div');
-        card.className = `card cursor-pointer`;
+        card.className = 'card w-full h-full';
         card.dataset.index = index;
-
+        
+        // Kartın ön yüzü (soru işareti)
         const front = document.createElement('div');
         front.className = 'card-face front';
-        const frontContent = document.createElement('span');
-        frontContent.textContent = '?';
-        front.appendChild(frontContent);
+        front.textContent = '?';
         
+        // Kartın arka yüzü (emoji)
         const back = document.createElement('div');
         back.className = 'card-face back';
-        const backContent = document.createElement('div');
-        backContent.textContent = cardState.content;
-        backContent.style.fontSize = '2rem';
-        backContent.style.display = 'flex';
-        backContent.style.alignItems = 'center';
-        backContent.style.justifyContent = 'center';
-        backContent.style.width = '100%';
-        backContent.style.height = '100%';
-        back.appendChild(backContent);
-
+        
+        const emojiSpan = document.createElement('span');
+        emojiSpan.className = 'emoji-display';
+        emojiSpan.textContent = cardState.content;
+        back.appendChild(emojiSpan);
+        
+        // Kart yapısını oluştur
         card.appendChild(front);
         card.appendChild(back);
-        cardContainer.appendChild(card);
         
+        // Eğer kart açıksa flipped sınıfını ekle
         if (cardState.opened) {
             card.classList.add('flipped');
         } else {
-            // SADECE SEÇEN KİŞİNİN GÖRMESİ İÇİN KIRMIZILIK
+            // Seçili bombaları işaretle
             if (gameStage === 'SELECTION' && selectedBombs.includes(index)) {
-                card.classList.add('bomb-selected'); 
+                card.classList.add('bomb-selected');
             }
             
-            // KRİTİK DÜZELTME: TIKLAMA OLAYINI CARD-CONTAINER'A EKLE!
-            cardContainer.addEventListener('click', handleCardClick);
+            // Tıklama olayını ekle
+            card.addEventListener('click', handleCardClick);
         }
         
+        // Kartı tahtaya ekle
+        cardContainer.appendChild(card);
         gameBoardEl.appendChild(cardContainer);
     });
+    
     updateStatusDisplay();
 }
 
