@@ -240,6 +240,7 @@ function handleCardClick(event) {
         const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
         if (!isMyTurn || gameData.isGameOver) return; 
         
+        cardElement.classList.add('flipped');
         sendMove(cardIndex);
     }
 }
@@ -256,8 +257,6 @@ function sendMove(index) {
 
 async function applyMove(index, emoji, isBomb) {
     if (gameData.board[index].opened) return;
-
-    await triggerWaitAndVibrate();
 
     gameData.board[index].opened = true;
     gameData.cardsLeft -= 1;
