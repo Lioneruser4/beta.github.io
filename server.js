@@ -121,8 +121,8 @@ io.on('connection', (socket) => {
             room.gameState.guestBombs.push(allIndices[i]);
         }
         
-        // Can sayılarını ayarla (Level 1'de 3, diğerlerinde 4 can)
-        const lives = room.gameState.level === 1 ? 3 : 4;
+        // Can sayılarını ayarla (Tüm seviyelerde 4 can)
+        const lives = 4;
         room.gameState.hostLives = lives;
         room.gameState.guestLives = lives;
         
@@ -247,7 +247,19 @@ io.on('connection', (socket) => {
         // 1 saniye bekle ve yeni seviyeyi başlat
         setTimeout(() => {
             // Yeni seviyeyi başlat
-            const bombCount = nextLevel === 1 ? 4 : 6; // İlk seviyede 4, sonraki seviyelerde 6 bomba
+            // Canları koru (eğer her iki oyuncu da hayattaysa)
+            const currentHostLives = room.gameState.hostLives;
+            const currentGuestLives = room.gameState.guestLives;
+            
+            // Eğer bir oyuncu öldüyse canları sıfırla, değilse aynı tut
+            const hostLives = (currentHostLives <= 0 || currentGuestLives <= 0) ? 4 : currentHostLives;
+            const guestLives = (currentHostLives <= 0 || currentGuestLives <= 0) ? 4 : currentGuestLives;
+            
+            room.gameState.hostLives = hostLives;
+            room.gameState.guestLives = guestLives;
+            
+            // Tüm seviyelerde 4 bomba
+            const bombCount = 4;
             const boardSize = 20; // Tüm seviyelerde 20 kart
             
             console.log(`🔄 Yeni seviye başlatılıyor: ${nextLevel}, ${bombCount} bomba ile`);
@@ -287,8 +299,8 @@ io.on('connection', (socket) => {
             io.to(roomCode).emit('newLevel', { 
                 level: nextLevel,
                 boardSize: boardSize,
-                hostLives: bombCount,
-                guestLives: bombCount
+                hostLives: hostLives,
+                guestLives: guestLives
             });
             
             // Yeni bombaları kısa gecikme ile gönder
