@@ -279,16 +279,26 @@ io.on('connection', (socket) => {
         if (!room) return;
         
         console.log(`🏆 Seviye ${completedLevel} tamamlandı! Yeni seviye: ${nextLevel}`);
-
+        
+        // Mevcut canları al
+        const currentHostLives = room.gameState.hostLives;
+        const currentGuestLives = room.gameState.guestLives;
+        
+        // Yeni seviyede canları ayarla
+        const isFirstLevel = nextLevel === 1;
+        const someoneDied = currentHostLives <= 0 || currentGuestLives <= 0;
+        
+        // Eğer biri öldüyse veya ilk seviyedeysek canları sıfırla, yoksa aynı tut
         const hostLives = (someoneDied || isFirstLevel) ? (isFirstLevel ? 3 : 4) : currentHostLives;
         const guestLives = (someoneDied || isFirstLevel) ? (isFirstLevel ? 3 : 4) : currentGuestLives;
-
+        
         // Oyun durumunu güncelle
         room.gameState.hostLives = hostLives;
         room.gameState.guestLives = guestLives;
 
         // İlk seviyede 4, diğerlerinde 6 bomba
         const bombCount = nextLevel === 1 ? 4 : 6;
+        const boardSize = 20; // Tüm seviyelerde 20 kart
 
         // Tüm olası kart indekslerini oluştur ve karıştır
         const allIndices = Array.from({ length: boardSize }, (_, i) => i);
@@ -319,8 +329,8 @@ io.on('connection', (socket) => {
         
         // Her iki oyuncuya da yeni seviyeyi bildir
         io.to(roomCode).emit('newLevel', { 
-            level: newLevel,
-            boardSize: boardSize,
+            level: nextLevel,
+            boardSize: 20,
             hostLives: hostLives,
             guestLives: guestLives,
             scores: scores[roomCode] || { host: 0, guest: 0 },
