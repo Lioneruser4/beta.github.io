@@ -16,7 +16,8 @@ const io = new Server(server, {
     transports: ['websocket', 'polling'] 
 });
 
-const rooms = {}; 
+const rooms = {};
+const scores = {}; // Skor takibi için obje
 
 // Tüm cihazlarda güvenle çalışacak emojiler
 const EMOJIS = [
@@ -125,6 +126,14 @@ io.on('connection', (socket) => {
         const lives = 4;
         room.gameState.hostLives = lives;
         room.gameState.guestLives = lives;
+        
+        // Skorları başlat
+        if (!scores[code]) {
+            scores[code] = {
+                host: 0,
+                guest: 0
+            };
+        }
         
         // Oyun durumunu ayarla
         room.gameState.stage = 'PLAY';
@@ -251,9 +260,23 @@ io.on('connection', (socket) => {
             const currentHostLives = room.gameState.hostLives;
             const currentGuestLives = room.gameState.guestLives;
             
-            // Eğer bir oyuncu öldüyse canları sıfırla, değilse aynı tut
-            const hostLives = (currentHostLives <= 0 || currentGuestLives <= 0) ? 4 : currentHostLives;
-            const guestLives = (currentHostLives <= 0 || currentGuestLives <= 0) ? 4 : currentGuestLives;
+            // Eğer bir oyuncu öldüyse canları sıfırla ve skoru güncelle
+            let hostLives, guestLives;
+            if (currentHostLives <= 0) {
+                // Host kaybetti, guest kazandı
+                scores[roomCode].guest++;
+                hostLives = 4;
+                guestLives = 4;
+            } else if (currentGuestLives <= 0) {
+                // Guest kaybetti, host kazandı
+                scores[roomCode].host++;
+                hostLives = 4;
+                guestLives = 4;
+            } else {
+                // İkisi de hayatta, canları aynı tut
+                hostLives = currentHostLives;
+                guestLives = currentGuestLives;
+            }
             
             room.gameState.hostLives = hostLives;
             room.gameState.guestLives = guestLives;
@@ -300,7 +323,10 @@ io.on('connection', (socket) => {
                 level: nextLevel,
                 boardSize: boardSize,
                 hostLives: hostLives,
-                guestLives: guestLives
+                guestLives: guestLives,
+                scores: scores[roomCode] || { host: 0, guest: 0 },
+                hostName: room.hostUsername,
+                guestName: room.guestUsername
             });
             
             // Yeni bombaları kısa gecikme ile gönder
