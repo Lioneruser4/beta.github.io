@@ -59,8 +59,8 @@ io.on('connection', (socket) => {
                 turn: 0, // 0 = Host, 1 = Guest
                 hostBombs: [],
                 guestBombs: [],
-                hostLives: 4,  // İlk seviyede 4 bomba
-                guestLives: 4, // İlk seviyede 4 bomba
+                hostLives: 3,  // İlk seviyede 3 can
+                guestLives: 3, // İlk seviyede 3 can
                 hostBombsSelected: false,
                 guestBombsSelected: false,
                 level: 1,
@@ -101,7 +101,7 @@ io.on('connection', (socket) => {
         
         // Oyun tahtası ayarları
         const boardSize = 20; // Tüm seviyelerde 20 kart
-        const bombCount = 4; // İlk seviyede 4 bomba
+        const bombCount = room.gameState.level === 1 ? 4 : 6; // Level 1'de 4, diğerlerinde 6 bomba
         
         // Tüm olası kart indekslerini oluştur ve karıştır
         const allIndices = Array.from({ length: boardSize }, (_, i) => i);
@@ -121,9 +121,10 @@ io.on('connection', (socket) => {
             room.gameState.guestBombs.push(allIndices[i]);
         }
         
-        // Can sayılarını ayarla
-        room.gameState.hostLives = bombCount;
-        room.gameState.guestLives = bombCount;
+        // Can sayılarını ayarla (Level 1'de 3, diğerlerinde 4 can)
+        const lives = room.gameState.level === 1 ? 3 : 4;
+        room.gameState.hostLives = lives;
+        room.gameState.guestLives = lives;
         
         // Oyun durumunu ayarla
         room.gameState.stage = 'PLAY';
