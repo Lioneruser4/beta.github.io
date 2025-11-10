@@ -102,7 +102,7 @@ io.on('connection', (socket) => {
         
         // Oyun tahtası ayarları
         const boardSize = 20; // Tüm seviyelerde 20 kart
-        const bombCount = 4; // İlk seviyede 4 bomba
+        const bombCount = 5; // İlk seviyede 4 bomba
         
         // Tüm olası kart indekslerini oluştur ve karıştır
         const allIndices = Array.from({ length: boardSize }, (_, i) => i);
