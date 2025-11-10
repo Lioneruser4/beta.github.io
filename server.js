@@ -103,7 +103,7 @@ io.on('connection', (socket) => {
         
         // Oda kodunu da ilet ki her iki taraf da hamle gönderirken doğru kodu kullansın
         io.to(code).emit('gameStart', { players, roomCode: code });
-        console.log(`${username} odaya katıldı: ${code}`);
+        console.log(`${username} otağa Qoşuldu : ${code}`);
         
         // Oyun tahtası ayarları
         const boardSize = 20; // Tüm seviyelerde 20 kart
@@ -210,7 +210,7 @@ io.on('connection', (socket) => {
                                (!isHostTurn && socket.id === room.guestId);
 
         if (!isCorrectPlayer) {
-            socket.emit('error', 'Senin sıran değil!');
+            socket.emit('error', 'Sənin sıran deyil');
             console.log(`Yanlış sıra hareketi engellendi: ${code}`);
             return;
         }
@@ -246,7 +246,7 @@ io.on('connection', (socket) => {
                 roomCode: code
             });
             
-            console.log(`Hamle yapıldı - Oda: ${code}, Kart: ${idx}, Bomba: ${isBomb}, Emoji: ${emoji}, Yeni sıra: ${room.gameState.turn}`);
+            console.log(`Kart Açıldı - Oda: ${code}, Kart: ${idx}, Bomba: ${isBomb}, Emoji: ${emoji}, Yeni sıra: ${room.gameState.turn}`);
         }
     });
 
@@ -257,7 +257,7 @@ io.on('connection', (socket) => {
             const room = rooms[roomCode];
             
             if (!room) {
-                console.log(`Oda bulunamadı: ${roomCode}`);
+                console.log(`Otaq Tapılmadı : ${roomCode}`);
                 return;
             }
             
