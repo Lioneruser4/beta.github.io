@@ -286,7 +286,7 @@ async function applyMove(index, emoji, isBomb) {
         }
         
         playSound(audioBomb);
-        showGlobalMessage(`BOOM! Bombaya bastınız!`, true);
+        showGlobalMessage(`❗ BOOM ! Bombanı Partladı ❗`, true);
     } else {
         gameData.board[index].content = emoji; // Server'dan gelen emoji
         playSound(audioEmoji);
