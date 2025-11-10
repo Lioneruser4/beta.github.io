@@ -41,7 +41,7 @@ function initializeGame(boardSize) {
     
     // Tüm seviyelerde 4 can ve 4 bomba
     gameData.hostLives = 3; 
-    gameData.guestLives = 6;
+    gameData.guestLives = 3;
     
     gameStage = 'WAITING';
 }
@@ -179,13 +179,13 @@ function updateStatusDisplay() {
         turnStatusEl.classList.add('text-yellow-600');
     } else if (gameStage === 'PLAY') {
         if (isMyTurn) {
-            turnStatusEl.textContent = '✅ SIRA SENDE!';
+            turnStatusEl.textContent = '✅ SIRA SƏNDƏ !';
             actionMessageEl.textContent = "Bir kart aç! Rakibinizin bombalarından kaçınmaya çalışın.";
             turnStatusEl.classList.remove('text-red-600');
             turnStatusEl.classList.add('text-green-600');
         } else {
             turnStatusEl.textContent = '⏳ ONUN SIRASI';
-            actionMessageEl.textContent = "Rakibinizin hamlesini bekleyin...";
+            actionMessageEl.textContent = "RƏQİBİNİZİ GÖZLƏYİN...";
             turnStatusEl.classList.remove('text-green-600');
             turnStatusEl.classList.add('text-red-600');
         }
@@ -301,7 +301,7 @@ async function applyMove(index, emoji, isBomb) {
         if (allBombsExploded) {
             // Tüm bombalar patladı, bir sonraki seviyeye geç
             const nextLevel = level + 1;
-            showGlobalMessage(`🎉 Tüm bombalar patladı! Seviye ${nextLevel}'e geçiliyor...`, false);
+            showGlobalMessage(`🎉 Bütün bombalar partladı! Level ${nextLevel}'e geçilir...`, false);
             
             // Sunucuya seviye tamamlandı bilgisini gönder
             if (socket && socket.connected) {
@@ -332,7 +332,7 @@ function endGame(winnerRole) {
     const isDraw = (winnerRole === 'DRAW');
     
     if (isDraw) {
-        turnStatusEl.textContent = `🤝 BERABERLİK!`;
+        turnStatusEl.textContent = `🤝 BƏRABƏRLİK!`;
         actionMessageEl.textContent = `Her iki oyuncu da tüm canlarını kaybetti!`;
         showGlobalMessage('🤝 Beraberlik! Her ikiniz de harika oynadınız!', false);
     } else if (iWon) {
@@ -435,8 +435,8 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
             gameData.hostLives = 4;
             gameData.guestLives = 4;
         } else {
-            gameData.hostLives = 6;
-            gameData.guestLives = 6;
+            gameData.hostLives = 4;
+            gameData.guestLives = 4;
         }
         updateStatusDisplay();
     });
