@@ -75,7 +75,14 @@ const EMOTICONS = [
     '😴', // Uyuyan yüz
     '😷', // Maske takan yüz
     '🤖', // Robot
-    '👻'  // Hayalet
+    '👻', // Hayalet
+    '👽', // Uzaylı
+    '🤡', // Palyaço
+    '🔥',
+    '🌊',
+    '🌚',
+    '😺',
+    '🌼' 
 ];
 
 // --- TEMEL UI FONKSİYONLARI ---
