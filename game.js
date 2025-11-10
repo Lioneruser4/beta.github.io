@@ -40,8 +40,8 @@ function initializeGame(boardSize) {
     gameData.isGameOver = false;
     
     // Tüm seviyelerde 4 can ve 4 bomba
-    gameData.hostLives = 4; 
-    gameData.guestLives = 4;
+    gameData.hostLives = 3; 
+    gameData.guestLives = 6;
     
     gameStage = 'WAITING';
 }
