@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, height=device-height">
-    <title>💣 Emoji Kart Bomb 1v1</title>
+    <title>💣 KartBomBot 1v1</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
     <script src="https://cdn.tailwindcss.com"></script>
@@ -421,8 +421,8 @@
             <p class="font-bold text-sm mb-1 text-white">📋 Oyun Qaydaları:</p>
             <ul class="list-disc list-inside text-left text-xs space-y-1">
                 <li>Kartları açaraq rəqibinizin bombalarından qaçın</li>
-                <li>Hər kəsin 3 canı var</li>
                 <li>Canı bitən oyunu uduzur</li>
+                <li>Yeni Otaq yaratmaq üçün Otaq Kodu yerini Boş Buraxın</li>
             </ul>
         </div>
         
@@ -497,7 +497,7 @@
         </div>
         
         <div class="w-full text-center p-1">
-            <div id="turnStatus" class="text-sm font-bold text-yellow-400">SIRA SENDE</div>
+            <div id="turnStatus" class="text-sm font-bold text-yellow-400">SIRA SƏNDƏ </div>
             <div id="actionMessage" class="text-xs text-gray-300">Bir kart seç</div>
         </div>
         <p id="roleStatus" class="text-gray-300 text-xs bg-gray-700 p-2 rounded-lg"></p>
@@ -541,7 +541,7 @@
 
         function connectToServer() {
             try {
-                console.log('Sunucuya bağlanılıyor:', LIVE_SERVER_URL);
+                console.log('Servərə Bağlanır...🚀:', LIVE_SERVER_URL);
                 
                 socket = io(LIVE_SERVER_URL, {
                     transports: ['websocket', 'polling'],
@@ -554,20 +554,20 @@
                 });
 
                 socket.on('connect', () => {
-                    console.log('Sunucuya başarıyla bağlandı');
+                    console.log('Servərə Qoşuldu ✅');
                     reconnectAttempts = 0; // Bağlantı başarılı olursa yeniden deneme sayacını sıfırla
                     UIElements.showGlobalMessage('Sunucuya bağlandı. Eşleşmeye hazırsınız.', false);
                     showScreen('lobby');
                 });
                 
                 socket.on('connect_error', (err) => {
-                    console.error('Bağlantı Hatası:', err);
+                    console.error('Bağlantı Xətası:', err);
                     reconnectAttempts++;
                     
                     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-                        UIElements.showGlobalMessage('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edip sayfayı yenileyin.', true);
+                        UIElements.showGlobalMessage('Serverə Bağlanmadı. Səhifəni Yeniləyin 🔁.', true);
                     } else {
-                        UIElements.showGlobalMessage(`Bağlantı hatası. Tekrar deneniyor (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`, true);
+                        UIElements.showGlobalMessage(`Bağlantı Xətası. Təkrar Qoşulur (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`, true);
                     }
                     
                     showScreen('lobby');
