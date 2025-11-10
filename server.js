@@ -32,7 +32,12 @@ const EMOJIS = [
     '🤖', // Robot
     '👻', // Hayalet
     '👽', // Uzaylı
-    '🤡'  // Palyaço
+    '🤡', // Palyaço
+    '🔥',
+    '🌊',
+    '🌚',
+    '😺',
+    '🌼'
 ];
 
 function generateRoomCode() {
