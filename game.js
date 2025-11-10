@@ -388,8 +388,8 @@ function checkLevelCompletion() {
     if (openedCards === totalCards) {
         const nextLevel = level + 1;
         
-        console.log(`🎯 Tüm kartlar açıldı! Yeni seviye: ${nextLevel}`);
-        showGlobalMessage(`🎉 Seviye ${level} tamamlandı! Yeni seviye yükleniyor...`, false);
+        console.log(`🎯 Bütün Kartlar Açıldı ! Digər Level: ${nextLevel}`);
+        showGlobalMessage(`🎉 Level ${level} tamamlandı! Yeni level yüklənir...`, false);
         
         // Oyun durumunu güncelle (geçiş anında hamle yapılmasın)
         gameStage = 'WAITING';
@@ -439,8 +439,8 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     socket.once('gameReady', ({ hostBombs, guestBombs }) => {
         // Seviyeye göre can sayılarını ayarla
         if (level === 1) {
-            gameData.hostLives = 4;
-            gameData.guestLives = 4;
+            gameData.hostLives = 3;
+            gameData.guestLives = 3;
         } else {
             gameData.hostLives = 4;
             gameData.guestLives = 4;
@@ -486,12 +486,12 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         updateStatusDisplay();
         
         playSound(audioEmoji); // Başlama sesi
-        showGlobalMessage(`🚀 Seviye ${level} başlıyor! ${gameData.hostLives} bomba ile oynanıyor.`, false);
+        showGlobalMessage(`🚀 Level ${level} Başladı! ${gameData.hostLives} bomba ile oynanıyor.`, false);
     });
     
     // Yeni seviye başlatma
     socket.on('newLevel', (data) => {
-        console.log('🆕 Yeni seviye başlatılıyor:', data);
+        console.log('🆕 Digər Levelə Geçilir:', data);
         
         // Seviye bilgisini güncelle
         level = parseInt(data.level) || 1;
@@ -547,7 +547,7 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     
     // Rakip Ayrıldı
     socket.on('opponentLeft', (message) => {
-        showGlobalMessage(message || 'Rakibiniz ayrıldı. Lobiye dönülüyor.', true);
+        showGlobalMessage(message || 'Rəqibiniz Oyundan Çıxdı. Lobiye gedilir.', true);
         resetGame();
     });
 }
