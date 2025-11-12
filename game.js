@@ -39,9 +39,16 @@ function initializeGame(boardSize) {
     gameData.turn = 0; // Host başlar
     gameData.isGameOver = false;
     
-    // Tüm seviyelerde 4 can ve 4 bomba
-    gameData.hostLives = 3; 
-    gameData.guestLives = 3;
+    // Seviyeye göre can ve bomba sayılarını ayarla
+    if (level === 1) {
+        gameData.hostLives = 3;
+        gameData.guestLives = 3;
+        gameData.bombCount = 4; // İlk seviyede 4 bomba
+    } else {
+        gameData.hostLives = 3;
+        gameData.guestLives = 3;
+        gameData.bombCount = 6; // Diğer seviyelerde 6 bomba
+    }
     
     gameStage = 'WAITING';
 }
@@ -416,14 +423,80 @@ function checkLevelCompletion() {
 // --- SON ---
 
 
+// Bağlantı durumu yönetimi
+function updateConnectionStatus(status, message = '') {
+    const loadingScreen = document.getElementById('loadingScreen');
+    const statusElement = document.getElementById('connectionStatus') || createStatusElement();
+    
+    statusElement.className = `connection-status ${status}`;
+    
+    switch(status) {
+        case 'connecting':
+            statusElement.innerHTML = '<i class="icon fas fa-spinner fa-spin"></i> Sunucuya bağlanılıyor...';
+            loadingScreen.style.display = 'flex';
+            break;
+        case 'connected':
+            statusElement.innerHTML = '<i class="icon fas fa-check-circle"></i> Sunucuya bağlandı';
+            setTimeout(() => {
+                loadingScreen.style.opacity = '0';
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                    loadingScreen.style.opacity = '1';
+                }, 500);
+                
+                // Bağlantı başarılı olduğunda bildirimi otomatik kaldır
+                setTimeout(() => {
+                    statusElement.style.opacity = '0';
+                    setTimeout(() => statusElement.remove(), 300);
+                }, 3000);
+            }, 500);
+            break;
+        case 'error':
+            statusElement.innerHTML = `<i class="icon fas fa-exclamation-triangle"></i> ${message || 'Bağlantı hatası'}`;
+            loadingScreen.querySelector('p').textContent = 'Bağlantı hatası! Lütfen tekrar deneyin.';
+            break;
+        case 'disconnected':
+            statusElement.innerHTML = '<i class="icon fas fa-plug"></i> Sunucuyla bağlantı kesildi';
+            loadingScreen.querySelector('p').textContent = 'Sunucuyla bağlantı kesildi. Tekrar bağlanılıyor...';
+            break;
+    }
+}
+
+// Bağlantı durumu göstergesi oluştur
+function createStatusElement() {
+    const statusElement = document.createElement('div');
+    statusElement.id = 'connectionStatus';
+    document.body.appendChild(statusElement);
+    return statusElement;
+}
+
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
 export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     console.log('🎯 setupSocketHandlers ÇAĞRILDI!', { roomCode, isHost: host, opponent: opponentNameFromIndex });
+    
+    // Bağlantı durumunu güncelle
+    updateConnectionStatus('connecting');
     
     socket = s;
     currentRoomCode = roomCode;
     isHost = host;
     opponentName = opponentNameFromIndex;
+    
+    // Socket bağlantı olaylarını dinle
+    socket.on('connect', () => {
+        console.log('✅ Sunucuya bağlandı');
+        updateConnectionStatus('connected');
+    });
+    
+    socket.on('disconnect', (reason) => {
+        console.warn('❌ Sunucu bağlantısı kesildi:', reason);
+        updateConnectionStatus('disconnected');
+    });
+    
+    socket.on('connect_error', (error) => {
+        console.error('❌ Bağlantı hatası:', error);
+        updateConnectionStatus('error', 'Sunucuya bağlanılamadı');
+    });
     
     opponentNameEl.textContent = opponentName;
     roleStatusEl.textContent = isHost ? "🎮 Rol: HOST (Sen başla)" : "🎮 Rol: GUEST (Rakip başlar)";
@@ -437,14 +510,10 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     
     // Can sayılarını server'dan gelen bilgiyle güncelle
     socket.once('gameReady', ({ hostBombs, guestBombs }) => {
-        // Seviyeye göre can sayılarını ayarla
-        if (level === 1) {
-            gameData.hostLives = 3;
-            gameData.guestLives = 3;
-        } else {
-            gameData.hostLives = 4;
-            gameData.guestLives = 4;
-        }
+        // Tüm seviyelerde 3 can, seviyeye göre bomba sayısını ayarla
+        gameData.hostLives = 3;
+        gameData.guestLives = 3;
+        gameData.bombCount = level === 1 ? 4 : 6; // İlk seviyede 4, diğerlerinde 6 bomba
         updateStatusDisplay();
     });
     
@@ -463,9 +532,10 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         // Oyun durumunu güncelle
         gameData.hostBombs = gameState.hostBombs || [];
         gameData.guestBombs = gameState.guestBombs || [];
-        // Server'dan gelen can değerlerini kullan
-        gameData.hostLives = gameState.hostLives || (level === 1 ? 3 : 4);
-        gameData.guestLives = gameState.guestLives || (level === 1 ? 3 : 4);
+        // Server'dan gelen can değerlerini kullan, yoksa seviyeye göre ayarla
+        gameData.hostLives = gameState.hostLives || 3; // Tüm seviyelerde 3 can
+        gameData.guestLives = gameState.guestLives || 3; // Tüm seviyelerde 3 can
+        gameData.bombCount = gameState.bombCount || (level === 1 ? 4 : 6); // Seviyeye göre bomba sayısı
         gameData.turn = gameState.turn || 0;
         
         // Skor bilgilerini güncelle
