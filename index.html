@@ -75,7 +75,6 @@
             display: flex; 
         }
         
-        /* Language Selector */
         /* Utility */
         .btn {
             @apply px-8 py-4 rounded-xl font-bold text-xl transition-all duration-300 flex items-center justify-center;
@@ -577,18 +576,9 @@
         <button id="endGameBtn" class="btn bg-red-600 hover:bg-red-500 text-white text-sm py-3">🚪 Oyundan Çıx <i class="fas fa-door-open ml-2"></i></button>
     </div>
 
-    <script src="languages.js"></script>
-    
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
         
-        document.addEventListener('DOMContentLoaded', () => {
-            window.languageManager.initLanguage();
-        });
-        
-        window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
-        window.setLanguage = languageManager.setLanguage;
-
         // Socket.IO sunucu URL'si
         const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; // Render üzerindeki Socket.IO sunucusu
         let socket;
