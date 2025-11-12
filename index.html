@@ -5,22 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, height=device-height">
     <title>💣 KartBomBot 1v1</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
     
     <style>
-        /* === KENDİ OYUNUNUZDAN ALINAN CSS STİLLERİ VE MOBİL UYUM === */
-        
+        /* Ana Tema Değişkenleri */
         :root {
-            --primary-color: #3498db;
-            --secondary-color: #2980b9;
-            --success-color: #2ecc71;
-            --danger-color: #e74c3c;
-            --text-color: #2c3e50;
-            --bg-color: #ecf0f1;
-            --card-bg: white;
-            --shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            --primary-bg: #1a1a2e;
+            --secondary-bg: #16213e;
+            --card-bg: #0f3460;
+            --card-hover: #1e3a8a;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --accent: #3b82f6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --transition: all 0.3s ease;
         }
         
         * {
@@ -473,43 +476,105 @@
         </div>
     </div>
 
-    <div id="gameScreen" class="screen">
-        <!-- Skor göstergesi -->
-        <div id="scoreDisplay" class="w-full text-center text-lg font-bold text-yellow-300 py-1 bg-black bg-opacity-50 mb-1" style="display: none;">
-            Sen 0 - 0 Rakip
+    <div id="gameScreen" class="screen bg-gradient-to-br from-gray-900 to-gray-800 min-h-screen flex flex-col items-center justify-center p-4">
+        <!-- Üst Bilgi Çubuğu -->
+        <div class="w-full max-w-4xl bg-gray-800 bg-opacity-80 backdrop-blur-sm rounded-xl p-4 mb-6 shadow-2xl border border-gray-700">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center">
+                        <span class="text-yellow-400 font-bold">❤️</span>
+                        <span id="myLives" class="ml-1 text-white font-bold text-xl">3</span>
+                    </div>
+                    <div id="turnStatus" class="text-yellow-300 font-medium">Sıra Sizde</div>
+                </div>
+                
+                <div id="scoreDisplay" class="bg-gray-900 bg-opacity-70 px-4 py-2 rounded-full text-white font-bold">
+                    <span class="text-green-400">Sen</span> 0 - 0 <span class="text-red-400">Rakip</span>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <div class="text-white font-medium">
+                        <span id="opponentName">Rakip</span>
+                        <span id="opponentLives" class="ml-2 text-red-400">❤️❤️❤️</span>
+                    </div>
+                </div>
+            </div>
         </div>
         
-        <div class="w-full flex justify-between items-center p-1">
-            <div class="text-left pl-2">
-                <div id="myLives" class="text-xl">❤️❤️❤️</div>
-                <div class="text-xs text-blue-300">Sənin Canın</div>
-            </div>
-            
-            <div class="text-center">
-                <h1 class="text-xl font-bold m-0 p-0">💣</h1>
-                <div id="levelInfo" class="text-xs">Level 1</div>
-            </div>
-            
-            <div class="text-right pr-2">
-                <div id="opponentLives" class="text-xl">❤️❤️❤️</div>
-                <div id="opponentName" class="text-xs text-blue-300">Rəqibin Canı</div>
+        <!-- Aksiyon Mesajı -->
+        <div id="actionMessage" class="text-center text-yellow-300 font-medium mb-4 h-6"></div>
+        
+        <!-- Oyun Tahtası -->
+        <div id="gameBoard" class="grid grid-cols-4 gap-3 w-full max-w-md mx-auto mb-6">
+            <!-- Kartlar JavaScript ile eklenecek -->
+        </div>
+        
+        <!-- Oyun Bilgi Paneli -->
+        <div class="w-full max-w-md bg-gray-800 bg-opacity-70 backdrop-blur-sm rounded-xl p-4 mt-4 border border-gray-700">
+            <div class="flex justify-between items-center">
+                <div class="text-center">
+                    <div class="text-yellow-400 text-sm font-medium">Seviye</div>
+                    <div id="levelInfo" class="text-white text-xl font-bold">1</div>
+                </div>
+                
+                <div class="text-center">
+                    <div class="text-yellow-400 text-sm font-medium">Kalan Kart</div>
+                    <div id="remainingCards" class="text-white text-xl font-bold">16</div>
+                </div>
+                
+                <div class="text-center">
+                    <div class="text-yellow-400 text-sm font-medium">Bomba</div>
+                    <div id="bombCount" class="text-white text-xl font-bold">4</div>
+                </div>
             </div>
         </div>
         
-        <div class="w-full text-center p-1">
-            <div id="turnStatus" class="text-sm font-bold text-yellow-400">SIRA SƏNDƏ </div>
-            <div id="actionMessage" class="text-xs text-gray-300">Bir kart seç</div>
+        <!-- Oyun Kontrolleri -->
+        <div class="w-full max-w-md mt-4 flex justify-center space-x-4">
+            <button id="newGameBtn" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-all duration-300 transform hover:scale-105">
+                <i class="fas fa-redo mr-2"></i>Yeni Oyun
+            </button>
+            <button id="menuBtn" class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-all duration-300 transform hover:scale-105">
+                <i class="fas fa-home mr-2"></i>Menü
+            </button>
         </div>
-        <p id="roleStatus" class="text-gray-300 text-xs bg-gray-700 p-2 rounded-lg"></p>
-
-        <div id="gameContent" class="bg-gray-800 rounded-xl w-full space-y-4 p-4 shadow-xl">
-            <h3 id="turnStatus" class="text-2xl font-bold text-red-400"></h3>
-            
-            <div id="gameBoard" class="grid w-full mx-auto">
+        
+        <!-- Oyun Bitiş Ekranı (Gizli) -->
+        <div id="gameOverScreen" class="hidden fixed inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center z-50">
+            <div class="bg-gray-800 rounded-2xl p-8 max-w-sm w-full mx-4 text-center transform transition-all duration-500 scale-90 opacity-0" id="gameOverContent">
+                <h2 id="gameResult" class="text-3xl font-bold mb-4">Oyun Bitti!</h2>
+                <p id="gameMessage" class="text-gray-300 mb-6">Tebrikler kazandınız!</p>
+                <div class="flex justify-center space-x-4">
+                    <button id="playAgainBtn" class="px-6 py-2 bg-green-600 hover:bg-green-500 text-white font-medium rounded-lg transition-all">
+                        Tekrar Oyna
+                    </button>
+                    <button id="backToMenuBtn" class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-all">
+                        Menüye Dön
+                    </button>
+                </div>
             </div>
         </div>
         
         <button id="endGameBtn" class="btn bg-red-600 hover:bg-red-500 text-white text-sm py-3">🚪 Oyundan Çıx <i class="fas fa-door-open ml-2"></i></button>
+    </div>
+
+    <!-- Yükleme Ekranı -->
+    <div id="loadingScreen" class="fixed inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center z-50">
+        <div class="text-center p-8 bg-gray-900 bg-opacity-90 rounded-2xl max-w-md w-full mx-4">
+            <div class="loading-spinner mb-6">
+                <div class="spinner"></div>
+            </div>
+            <h2 class="text-2xl font-bold text-white mb-2">Sunucuya Bağlanılıyor</h2>
+            <p class="text-gray-300 mb-6">Zəhmət olmasa gözləyin...</p>
+            <div class="text-sm text-gray-400">
+                <p>Əgər bağlantı uzun çəkilərsə, zəhmət olmasa:</p>
+                <ul class="list-disc list-inside mt-2 text-left">
+                    <li>İnternet bağlantınızı yoxlayın</li>
+                    <li>Bir neçə saniyə sonra yenidən yoxlayın</li>
+                    <li>Problemin davam etdiyi halda dəstək ilə əlaqə saxlayın</li>
+                </ul>
+            </div>
+        </div>
     </div>
 
     <script src="languages.js"></script>
