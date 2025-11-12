@@ -844,11 +844,18 @@
             const emojiSound = document.getElementById('emojiSound');
             
             // Show/hide emoji button
-            function showEmojiButton(show = true) {
+            function showEmojiButton(show = false) {  // Varsayılan olarak false yapıldı
                 const emojiChat = document.getElementById('emojiChat');
+                const gameScreen = document.getElementById('gameScreen');
+                
+                // Sadece oyun ekranı aktifse ve show true ise göster
+                const shouldShow = show && gameScreen && window.getComputedStyle(gameScreen).display !== 'none';
+                
+                console.log('showEmojiButton called with:', {show, shouldShow});
+                
                 if (emojiChat) {
-                    emojiChat.style.display = show ? 'block' : 'none';
-                    // Always hide the emoji container when toggling button visibility
+                    emojiChat.style.display = shouldShow ? 'block' : 'none';
+                    // Emoji seçiciyi her zaman kapat
                     const emojiContainer = document.getElementById('emojiContainer');
                     if (emojiContainer) {
                         emojiContainer.style.display = 'none';
@@ -951,33 +958,38 @@
                     console.log('Updating emoji button visibility. Has cards:', hasCards);
                 }
                 
-                // Listen for game board changes to detect when cards are loaded
+                // Oyun başladığında emoji butonunu göster
+                window.socket.on('gameStart', () => {
+                    console.log('Oyun başladı, emoji butonu gösteriliyor...');
+                    showEmojiButton(true);
+                });
+                
+                // Oyun bittiğinde veya lobiye dönüldüğünde
+                window.socket.on('returnToLobby', () => {
+                    console.log('Lobiye dönüldü, emoji butonu gizleniyor...');
+                    showEmojiButton(false);
+                });
+                
+                // Oyun hazır olduğunda
+                window.socket.on('gameReady', () => {
+                    console.log('Oyun hazır, emoji butonu kontrol ediliyor...');
+                    showEmojiButton(true);
+                });
+                
+                // Oyun tahtası değişikliklerini izle
                 const gameBoard = document.getElementById('gameBoard');
                 if (gameBoard) {
                     const observer = new MutationObserver((mutations) => {
                         mutations.forEach((mutation) => {
                             if (mutation.type === 'childList') {
+                                console.log('Oyun tahtası değişti, emoji butonu güncelleniyor...');
                                 updateEmojiButtonVisibility();
                             }
                         });
                     });
                     
                     observer.observe(gameBoard, { childList: true, subtree: true });
-                    
-                    // Also check when game starts
-                    if (window.socket) {
-                        window.socket.on('gameStart', () => {
-                            console.log('Game started, checking for cards...');
-                            // Small delay to ensure cards are rendered
-                            setTimeout(updateEmojiButtonVisibility, 500);
-                        });
-                    }
                 }
-                
-                // Initial update (should be hidden initially)
-                showEmojiButton(false);
-                
-                // Update turn status messages with English translations when game starts
                 window.socket.on('gameReady', () => {
                     updateEmojiButtonVisibility();
                     
