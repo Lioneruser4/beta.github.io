@@ -1,16 +1,52 @@
-/* Modern Koyu Tema */
-:root {
-    --primary-bg: #1a1a2e;
-    --secondary-bg: #16213e;
-    --card-bg: #0f3460;
-    --card-hover: #1e3a8a;
-    --text-primary: #e2e8f0;
-    --text-secondary: #94a3b8;
-    --accent: #3b82f6;
-    --success: #10b981;
-    --danger: #ef4444;
-    --warning: #f59e0b;
-    --transition: all 0.3s ease;
+/* Bağlantı Durumu Stilleri */
+#loadingScreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    font-family: 'Inter', sans-serif;
+}
+
+.loading-content {
+    background: rgba(26, 32, 44, 0.95);
+    padding: 2rem;
+    border-radius: 1rem;
+    text-align: center;
+    max-width: 90%;
+    width: 400px;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    margin: 0 auto 1.5rem;
+    border: 5px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    border-top-color: #3b82f6;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-text {
+    color: #e2e8f0;
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.loading-subtext {
+    color: #94a3b8;
+    font-size: 0.875rem;
+    margin-top: 1rem;
 }
 
 /* Genel Stiller */
