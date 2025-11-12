@@ -171,12 +171,8 @@ function updateStatusDisplay() {
         const myScore = isHost ? gameData.scores.host : gameData.scores.guest;
         const opponentScore = isHost ? gameData.scores.guest : gameData.scores.host;
         
-        // Eğer isim bilgileri varsa onları kullan, yoksa varsayılan değerleri kullan
-        const myName = isHost ? 'Sen' : (gameData.opponentName || 'Rakip');
-        const opponentName = isHost ? (gameData.opponentName || 'Rakip') : 'Sen';
-        
-        scoreDisplayEl.textContent = `${myName} ${myScore} - ${opponentScore} ${opponentName}`;
-        scoreDisplayEl.style.display = 'block';
+        // Skor göstergesi kaldırıldı
+        scoreDisplayEl.style.display = 'none';
     }
 
     const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
