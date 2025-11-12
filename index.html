@@ -574,17 +574,11 @@
         window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
         window.setLanguage = languageManager.setLanguage;
 
-        // Socket.IO sunucu URL'leri (yedekli)
-        const SERVER_URLS = [
-            'https://beta-github-io.onrender.com',  // Ana sunucu
-            'https://kartbombot-socketio.onrender.com',  // Yedek sunucu 1
-            'https://kartbombot-1.onrender.com'     // Yedek sunucu 2
-        ];
-        
+        // Socket.IO sunucu URL'si
+        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; // Render üzerindeki Socket.IO sunucusu
         let socket;
-        let currentServerIndex = 0;
         let reconnectAttempts = 0;
-        const MAX_RECONNECT_ATTEMPTS = 3;
+        const MAX_RECONNECT_ATTEMPTS = 5;
         
         function validateInput() {
             if (isTelegramWebView && telegramUser) {
@@ -604,17 +598,10 @@
         }
 
         function connectToServer() {
-            if (currentServerIndex >= SERVER_URLS.length) {
-                console.error('Tüm sunucular deneniyor, bağlantı başarısız');
-                showGlobalMessage('Sunucuya bağlanılamadı. Lütfen daha sonra tekrar deneyin.');
-                return;
-            }
-            
-            const currentServer = SERVER_URLS[currentServerIndex];
-            console.log(`Sunucuya bağlanılıyor... (${currentServerIndex + 1}/${SERVER_URLS.length}):`, currentServer);
-            
             try {
-                socket = io(currentServer, {
+                console.log('Sunucuya bağlanılıyor...', LIVE_SERVER_URL);
+                
+                socket = io(LIVE_SERVER_URL, {
                     transports: ['websocket', 'polling'],
                     reconnection: true,
                     reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
@@ -684,10 +671,8 @@
                 });
 
             } catch (e) {
-                console.error('Sunucu bağlantı hatası:', e);
-                currentServerIndex++;
-                console.log('Bir sonraki sunucu deneniyor...');
-                setTimeout(connectToServer, 1000); // 1 saniye bekle ve bir sonraki sunucuya bağlan
+                console.error('Socket.IO genel hatası:', e);
+                showGlobalMessage('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.');
             }
         }
         
@@ -754,14 +739,8 @@
                 .catch(() => UIElements.showGlobalMessage('Kopyalama uğursuz oldu.', true));
         });
 
-        // Sunucu bağlantısı için otomatik yeniden deneme
-        setInterval(() => {
-            if (!socket || !socket.connected) {
-                console.log('Sunucu bağlantısı yok, yeniden deneniyor...');
-                currentServerIndex = 0; // Başa dön
-                connectToServer();
-            }
-        }, 10000); // Her 10 saniyede bir kontrol et
+        // Uygulama başladığında sunucuya bağlan
+        document.addEventListener('DOMContentLoaded', connectToServer);
     </script>
 </body>
 </html>
