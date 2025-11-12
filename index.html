@@ -514,61 +514,11 @@
 
     <script src="languages.js"></script>
     
-    <script>
-        // Telegram WebApp integration
-        const tg = window.Telegram?.WebApp;
-        let isTelegramWebView = false;
-        let telegramUser = null;
-
-        // Check if we're in Telegram WebView
-        if (tg) {
-            isTelegramWebView = true;
-            tg.expand(); // Expand the WebView to full screen
-            
-            // Get user data from Telegram
-            if (tg.initDataUnsafe?.user) {
-                const user = tg.initDataUnsafe.user;
-                telegramUser = {
-                    id: user.id,
-                    firstName: user.first_name || '',
-                    lastName: user.last_name || '',
-                    username: user.username || '',
-                    photoUrl: user.photo_url || ''
-                };
-                
-                // Pre-fill the username field with Telegram first name
-                const usernameInput = document.getElementById('username');
-                if (usernameInput) {
-                    usernameInput.value = telegramUser.firstName || 'Telegram User';
-                    usernameInput.readOnly = true; // Make it read-only for Telegram users
-                }
-            }
-        }
-
-        // Show/hide room code input based on WebView status
-        function toggleRoomCodeInput() {
-            const roomCodeSection = document.getElementById('roomCodeSection');
-            const joinRoomBtn = document.getElementById('joinRoomBtn');
-            
-            if (roomCodeSection && joinRoomBtn) {
-                if (isTelegramWebView) {
-                    roomCodeSection.classList.remove('hidden');
-                    joinRoomBtn.classList.remove('hidden');
-                } else {
-                    roomCodeSection.classList.add('hidden');
-                    joinRoomBtn.classList.add('hidden');
-                }
-            }
-        }
-
-        // Initialize the app
+    <script type="module">
+        import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
+        
         document.addEventListener('DOMContentLoaded', () => {
-            toggleRoomCodeInput();
             window.languageManager.initLanguage();
-            
-            // Sayfa yüklendiğinde sunucuya bağlan
-            console.log('Uygulama başlatılıyor...');
-            connectToServer();
         });
         
         window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
@@ -581,25 +531,17 @@
         const MAX_RECONNECT_ATTEMPTS = 5;
         
         function validateInput() {
-            if (isTelegramWebView && telegramUser) {
-                return telegramUser.firstName || 'Telegram User';
-            }
-            
-            const username = document.getElementById('username').value.trim();
-            if (!username) {
-                showGlobalMessage('İstifadəçi adı daxil edin!');
-                return '';
-            }
-            if (username.length < 3) {
-                showGlobalMessage('İstifadəçi adı ən azı 3 simvol olmalıdır!');
-                return '';
+            const username = UIElements.usernameInput.value.trim();
+            if (username.length < 2) {
+                UIElements.showGlobalMessage('Zəhmət olmasa etibarlı bir istifadəçi adı daxil edin.', true);
+                return false;
             }
             return username;
         }
 
         function connectToServer() {
             try {
-                console.log('Sunucuya bağlanılıyor...', LIVE_SERVER_URL);
+                console.log('Servərə Bağlanır...🚀:', LIVE_SERVER_URL);
                 
                 socket = io(LIVE_SERVER_URL, {
                     transports: ['websocket', 'polling'],
@@ -672,23 +614,14 @@
 
             } catch (e) {
                 console.error('Socket.IO genel hatası:', e);
-                showGlobalMessage('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.');
+                UIElements.showGlobalMessage('Kritik qoşulma xətası baş verdi.', true);
             }
         }
         
         // --- Olay Dinleyicileri ---
         document.getElementById('createRoomBtn').addEventListener('click', () => {
-            let username;
-            
-            if (isTelegramWebView && telegramUser) {
-                // Use Telegram user data for authentication
-                username = telegramUser.firstName || 'Telegram User';
-                username = `tg${telegramUser.id}_${username}`;
-            } else {
-                // Regular username validation for non-Telegram users
-                username = validateInput();
-                if (!username) return;
-            }
+            const username = validateInput();
+            if (!username) return;
             
             showScreen('wait');
             document.getElementById('waitTitle').textContent = 'Otaq Qurulur...';
@@ -698,17 +631,8 @@
         });
         
         document.getElementById('joinRoomBtn').addEventListener('click', () => {
-            let username;
-            
-            if (isTelegramWebView && telegramUser) {
-                // Use Telegram user data for authentication
-                username = telegramUser.firstName || 'Telegram User';
-                username = `tg${telegramUser.id}_${username}`;
-            } else {
-                // Regular username validation for non-Telegram users
-                username = validateInput();
-                if (!username) return;
-            }
+            const username = validateInput();
+            if (!username) return;
             
             const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
             if (!roomCode) {
@@ -739,7 +663,6 @@
                 .catch(() => UIElements.showGlobalMessage('Kopyalama uğursuz oldu.', true));
         });
 
-        // Uygulama başladığında sunucuya bağlan
         document.addEventListener('DOMContentLoaded', connectToServer);
     </script>
 </body>
