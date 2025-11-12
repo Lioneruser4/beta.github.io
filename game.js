@@ -1,27 +1,45 @@
 // Dosya Adı: game.js
-// Socket.io bağlantısını daha erken başlatıyoruz
-let socket = io({
-    reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 5000,
-    timeout: 20000,
-    transports: ['websocket']
-});
-
-// Bağlantı durumunu dinle
-socket.on('connect', () => {
-    console.log('Sunucuya bağlandı');
-});
-
-socket.on('disconnect', () => {
-    console.log('Sunucu bağlantısı kesildi');});
-
-socket.on('connect_error', (error) => {
-    console.error('Bağlantı hatası:', error);
-});
-
+// Socket.io bağlantısını başlat
+let socket;
 let currentRoomCode = '';
+
+// Sayfa yüklendiğinde bağlantıyı başlat
+document.addEventListener('DOMContentLoaded', () => {
+    // Socket.io bağlantısını oluştur
+    socket = io({
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
+        transports: ['websocket', 'polling']
+    });
+
+    // Bağlantı durumunu dinle
+    socket.on('connect', () => {
+        console.log('Sunucuya bağlandı');
+        // Bağlantı başarılı olduğunda gerekli işlemleri yap
+        if (typeof onSocketConnected === 'function') {
+            onSocketConnected();
+        }
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log('Sunucu bağlantısı kesildi:', reason);
+        if (reason === 'io server disconnect') {
+            // Sunucu bağlantıyı kestiğinde yeniden bağlanmayı dene
+            socket.connect();
+        }
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error('Bağlantı hatası:', error);
+        // Hata durumunda kullanıcıya bilgi ver
+        if (typeof showGlobalMessage === 'function') {
+            showGlobalMessage('Sunucuya bağlanılamadı. Tekrar deneniyor...', true);
+        }
+    });
+});
 let isHost = false;
 let opponentName = '';
 
