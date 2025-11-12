@@ -381,7 +381,7 @@
 
         /* Başlıklar ve Metinler */
         h1, h2 {
-            font-family: 'Poppins', sans-serif; /* Modern başlık fontu */
+            font-family: 'Chakra Petch', sans-serif; /* Modern başlık fontu */
             font-weight: 700;
             color: #f7fafc;
         }
@@ -390,6 +390,28 @@
             color: #cbd5e0;
         }
         
+        /* Yeni Animasyonlu Yazı Stilleri */
+        @keyframes glitch {
+            0% { text-shadow: 2px 2px #ff0000, -2px -2px #0000ff; transform: translate(0); }
+            20% { text-shadow: -2px -2px #ff0000, 2px 2px #0000ff; transform: translate(-2px, 2px); }
+            40% { text-shadow: 2px -2px #ff0000, -2px 2px #0000ff; transform: translate(2px, -2px); }
+            60% { text-shadow: -2px 2px #ff0000, 2px -2px #0000ff; transform: translate(-2px, -2px); }
+            80% { text-shadow: 2px 2px #ff0000, -2px -2px #0000ff; transform: translate(2px, 2px); }
+            100% { text-shadow: 2px 2px #ff0000, -2px -2px #0000ff; transform: translate(0); }
+        }
+        .animated-glitch {
+            animation: glitch 1.5s infinite alternate;
+            letter-spacing: 2px;
+        }
+
+        @keyframes pop-in {
+            0% { transform: scale(0.5); opacity: 0; }
+            80% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animated-pop-in {
+            animation: pop-in 0.6s ease-out forwards;
+        }
     </style>
     <style>
         /* Loading Message Styles */
@@ -411,18 +433,11 @@
             backdrop-filter: blur(5px);
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
             opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s ease, visibility 0.3s ease;
+            transition: opacity 0.3s ease;
             pointer-events: none;
         }
         #loadingMessage.show {
             opacity: 1;
-            visibility: visible;
-        }
-        #loadingMessage.hidden {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
         }
         #loadingMessage p {
             margin: 5px 0;
@@ -445,7 +460,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@700&family=Chakra+Petch:wght@700&display=swap" rel="stylesheet">
 </head>
 <body class="bg-gray-900 select-none">
-    <!-- Loading Message -->
     <div id="loadingMessage">
         <div class="spinner"></div>
         <p>Server qoşulur, zəhmət olmasa gözləyin...</p>
@@ -468,14 +482,14 @@
     </div>
 
     <div id="lobby" class="screen active space-y-6">
-        <h1 class="text-4xl font-black animated-lobby-item lobby-title mb-1">
-            💣 KartBombot
+        <h1 class="text-4xl font-black animated-lobby-item lobby-title mb-1 animated-glitch">
+            💣 KartBomBot
         </h1>
-        <p class="text-sm text-gray-400 animated-lobby-item lobby-subtitle mb-4">
+        <p class="text-sm text-gray-400 animated-lobby-item lobby-subtitle mb-4 animated-pop-in">
             1v1 online 
         </p>
         
-        <div class="bg-blue-800 bg-opacity-30 border-l-2 border-blue-500 text-blue-100 p-2 rounded-lg shadow-lg animated-lobby-item rules-box w-full max-w-md">
+        <div class="bg-blue-800 bg-opacity-30 border-l-2 border-blue-500 text-blue-100 p-2 rounded-lg shadow-lg animated-lobby-item rules-box w-full max-w-md animated-pop-in">
             <p class="font-bold text-sm mb-1 text-white">📋 Oyun Qaydaları:</p>
             <ul class="list-disc list-inside text-left text-xs space-y-1">
                 <li>Kartları açaraq rəqibinizin bombalarından qaçın</li>
@@ -484,14 +498,14 @@
             </ul>
         </div>
         
-        <div class="w-full animated-lobby-item input-username-container max-w-md">
+        <div class="w-full animated-lobby-item input-username-container max-w-md animated-pop-in">
             <p class="text-center text-lg font-bold mb-1 text-white">
                 👤 İstifadəçi Adı  / Username 
             </p>
             <input type="text" id="username" class="w-full p-3 text-lg text-center rounded-lg shadow-lg text-black" placeholder="Adınız" maxlength="15" style="color: #000000 !important;">
         </div>
         
-        <div class="w-full animated-lobby-item input-roomcode-container max-w-md">
+        <div class="w-full animated-lobby-item input-roomcode-container max-w-md animated-pop-in">
             <p class="text-center text-lg font-bold mb-1 text-white mt-4">
                 🚪 Otaq Kodu / Room Code
             </p>
@@ -499,10 +513,10 @@
         </div>
         
         <div class="flex flex-col space-y-3 w-full max-w-md mx-auto mt-6">
-            <button id="createRoomBtn" class="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg transform transition-all duration-200 active:scale-95">
+            <button id="createRoomBtn" class="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg transform transition-all duration-200 active:scale-95 animated-pop-in">
                 <i class="fas fa-plus-circle mr-2"></i> Otaq Qur / Create Room
             </button>
-            <button id="joinRoomBtn" class="w-full py-4 px-6 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg transform transition-all duration-200 active:scale-95">
+            <button id="joinRoomBtn" class="w-full py-4 px-6 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg transform transition-all duration-200 active:scale-95 animated-pop-in" style="animation-delay: 0.6s;">
                 <i class="fas fa-sign-in-alt mr-2"></i> Otağa Qoşul / Join Room
             </button>
         </div>
@@ -513,61 +527,60 @@
             <div class="wait-spinner mb-4">
                 <i class="fas fa-spinner fa-spin text-4xl text-blue-400"></i> 
             </div>
-            <h2 id="waitTitle" class="text-2xl font-bold mb-6">Otaq Hazırlanır...</h2>
+            <h2 id="waitTitle" class="text-2xl font-bold mb-6 animated-glitch">Otaq Hazırlanır...</h2>
             
             <div id="codeArea" class="w-full max-w-md mb-6">
-                <p class="text-sm text-gray-300 mb-2">🌟 Otaq kodunuzu dostunuzla paylaşın:</p>
-                <div id="roomCodeDisplay" class="text-3xl font-bold bg-gray-800 p-4 rounded-lg mb-4 text-center tracking-widest"></div>
-                <button id="copyCodeBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-lg">
+                <p class="text-sm text-gray-300 mb-2 animated-pop-in">🌟 Otaq kodunuzu dostunuzla paylaşın:</p>
+                <div id="roomCodeDisplay" class="text-3xl font-bold bg-gray-800 p-4 rounded-lg mb-4 text-center tracking-widest animated-glitch"></div>
+                <button id="copyCodeBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-lg animated-pop-in">
                     <i class="fas fa-copy mr-2"></i> Kodu Kopyala
                 </button>
             </div>
             
-            <p id="waitStatus" class="text-lg text-gray-300 mb-6">Rəqib qoşulması gözlənilir...</p>
+            <p id="waitStatus" class="text-lg text-gray-300 mb-6 animated-pop-in">Rəqib qoşulması gözlənilir...</p>
             
-            <button id="cancelBtn" class="w-full max-w-xs py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-lg">
+            <button id="cancelBtn" class="w-full max-w-xs py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-lg animated-pop-in">
                 <i class="fas fa-times-circle mr-2"></i> Ləğv Et / Lobiye Qayıt
             </button>
         </div>
     </div>
 
     <div id="gameScreen" class="screen">
-        <!-- Skor göstergesi -->
-        <div id="scoreDisplay" class="w-full text-center text-lg font-bold text-yellow-300 py-1 bg-black bg-opacity-50 mb-1" style="display: none;">
+        <div id="scoreDisplay" class="w-full text-center text-lg font-bold text-yellow-300 py-1 bg-black bg-opacity-50 mb-1 animated-pop-in" style="display: none;">
             Sen 0 - 0 Rakip
         </div>
         
         <div class="w-full flex justify-between items-center p-1">
             <div class="text-left pl-2">
-                <div id="myLives" class="text-xl">❤️❤️❤️</div>
-                <div class="text-xs text-blue-300">Sənin Canın</div>
+                <div id="myLives" class="text-xl animated-glitch">❤️❤️❤️</div>
+                <div class="text-xs text-blue-300 animated-pop-in">Sənin Canın</div>
             </div>
             
             <div class="text-center">
-                <h1 class="text-xl font-bold m-0 p-0">💣</h1>
-                <div id="levelInfo" class="text-xs">Level 1</div>
+                <h1 class="text-xl font-bold m-0 p-0 animated-glitch">💣</h1>
+                <div id="levelInfo" class="text-xs animated-pop-in">Level 1</div>
             </div>
             
             <div class="text-right pr-2">
-                <div id="opponentLives" class="text-xl">❤️❤️❤️</div>
-                <div id="opponentName" class="text-xs text-blue-300">Rəqibin Canı</div>
+                <div id="opponentLives" class="text-xl animated-glitch">❤️❤️❤️</div>
+                <div id="opponentName" class="text-xs text-blue-300 animated-pop-in">Rəqibin Canı</div>
             </div>
         </div>
         
         <div class="w-full text-center p-1">
-            <div id="turnStatus" class="text-sm font-bold text-yellow-400">SIRA SƏNDƏ </div>
-            <div id="actionMessage" class="text-xs text-gray-300">Bir kart seç</div>
+            <div id="turnStatus" class="text-sm font-bold text-yellow-400 animated-glitch">SIRA SƏNDƏ </div>
+            <div id="actionMessage" class="text-xs text-gray-300 animated-pop-in">Bir kart seç</div>
         </div>
-        <p id="roleStatus" class="text-gray-300 text-xs bg-gray-700 p-2 rounded-lg"></p>
+        <p id="roleStatus" class="text-gray-300 text-xs bg-gray-700 p-2 rounded-lg animated-pop-in"></p>
 
         <div id="gameContent" class="bg-gray-800 rounded-xl w-full space-y-4 p-4 shadow-xl">
-            <h3 id="turnStatus" class="text-2xl font-bold text-red-400"></h3>
+            <h3 id="turnStatus" class="text-2xl font-bold text-red-400 animated-glitch"></h3>
             
             <div id="gameBoard" class="grid w-full mx-auto">
             </div>
         </div>
         
-        <button id="endGameBtn" class="btn bg-red-600 hover:bg-red-500 text-white text-sm py-3">🚪 Oyundan Çıx <i class="fas fa-door-open ml-2"></i></button>
+        <button id="endGameBtn" class="btn bg-red-600 hover:bg-red-500 text-white text-sm py-3 animated-pop-in">🚪 Oyundan Çıx <i class="fas fa-door-open ml-2"></i></button>
     </div>
 
     <script src="languages.js"></script>
@@ -613,115 +626,4 @@
 
                 socket.on('connect', () => {
                     console.log('Servərə Qoşuldu ✅');
-                    reconnectAttempts = 0; // Bağlantı başarılı olursa yeniden deneme sayacını sıfırla
-                    UIElements.showGlobalMessage('Serverə Qoşuldu ✅ Oynaya Bilərsiniz', false);
-                    showScreen('lobby');
-                });
-                
-                socket.on('connect_error', (err) => {
-                    console.error('Bağlantı Xətası:', err);
-                    reconnectAttempts++;
-                    
-                    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-                        UIElements.showGlobalMessage('Serverə Bağlanmadı. Səhifəni Yeniləyin 🔁.', true);
-                    } else {
-                        UIElements.showGlobalMessage(`Bağlantı Xətası. Təkrar Qoşulur (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`, true);
-                    }
-                    
-                    showScreen('lobby');
-                });
-                
-                socket.on('disconnect', (reason) => {
-                    console.log('Bağlantı kesildi, sebep:', reason);
-                    if (reason === 'io server disconnect') {
-                        // Sunucu bağlantıyı kestiğinde yeniden bağlan
-                        socket.connect();
-                    }
-                    UIElements.showGlobalMessage('Bağlantı kesildi. Yeniden bağlanılıyor...', true);
-                });
-                
-                socket.on('reconnect', (attemptNumber) => {
-                    console.log(`Yeniden bağlantı başarılı (${attemptNumber}. deneme)`);
-                    UIElements.showGlobalMessage('Sunucuya yeniden bağlanıldı.', false);
-                });
-                
-                socket.on('reconnect_failed', () => {
-                    console.error('Yeniden bağlantı başarısız oldu');
-                    UIElements.showGlobalMessage('Sunucuya bağlanılamadı. Lütfen sayfayı yenileyin.', true);
-                });
-
-                // --- Eşleşme Olayları ---
-                socket.on('roomCreated', (code) => {
-                    document.getElementById('roomCodeDisplay').textContent = code;
-                    document.getElementById('waitTitle').textContent = 'Otağınız Quruldu! 🎉';
-                    document.getElementById('codeArea').classList.remove('hidden');
-                    document.getElementById('waitStatus').textContent = 'Otaq kodunu dostunuza göndərin və qoşulmasını gözləyin.';
-                });
-                
-                socket.on('joinFailed', (message) => {
-                    UIElements.showGlobalMessage(message, true);
-                    showScreen('lobby');
-                });
-                
-                socket.on('gameStart', ({ players, roomCode }) => {
-                    const opponent = players.find(p => p.id !== socket.id);
-                    const self = players.find(p => p.id === socket.id);
-                    
-                    setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
-                });
-
-            } catch (e) {
-                console.error('Socket.IO genel hatası:', e);
-                UIElements.showGlobalMessage('Kritik qoşulma xətası baş verdi.', true);
-            }
-        }
-        
-        // --- Olay Dinleyicileri ---
-        document.getElementById('createRoomBtn').addEventListener('click', () => {
-            const username = validateInput();
-            if (!username) return;
-            
-            showScreen('wait');
-            document.getElementById('waitTitle').textContent = 'Otaq Qurulur...';
-            document.getElementById('waitStatus').textContent = 'Zəhmət olmasa gözləyin...';
-            document.getElementById('codeArea').classList.add('hidden');
-            socket.emit('createRoom', { username });
-        });
-        
-        document.getElementById('joinRoomBtn').addEventListener('click', () => {
-            const username = validateInput();
-            if (!username) return;
-            
-            const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-            if (!roomCode) {
-                UIElements.showGlobalMessage('Xahiş olunur otaq kodunu daxil edin', true);
-                return;
-            }
-            
-            showScreen('wait');
-            document.getElementById('waitTitle').textContent = `Otağa Qoşulma: ${roomCode}`;
-            document.getElementById('waitStatus').textContent = 'Qoşulunur...';
-            document.getElementById('codeArea').classList.add('hidden');
-            socket.emit('joinRoom', { username, roomCode });
-        });
-
-        document.getElementById('cancelBtn').addEventListener('click', () => {
-            if (socket && socket.connected) {
-                socket.emit('leaveRoom', { roomCode: document.getElementById('roomCodeDisplay').textContent });
-            }
-            UIElements.resetGame();
-        });
-        
-        document.getElementById('endGameBtn').addEventListener('click', UIElements.resetGame);
-        
-        document.getElementById('copyCodeBtn').addEventListener('click', () => {
-            const textToCopy = document.getElementById('roomCodeDisplay').textContent;
-            navigator.clipboard.writeText(textToCopy)
-                .then(() => UIElements.showGlobalMessage('Otaq Kodu Kopyalandı!', false))
-                .catch(() => UIElements.showGlobalMessage('Kopyalama uğursuz oldu.', true));
-        });
-
-        document.addEventListener('DOMContentLoaded', connectToServer);
-    </script>
-</body>
-</html>
+                    re
