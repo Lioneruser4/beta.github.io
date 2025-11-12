@@ -1,4 +1,5 @@
 // Dosya Adı: server.js
+// Render'da yüklü olan kodunuzu bununla güncelleyin.
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -16,12 +17,27 @@ const io = new Server(server, {
 });
 
 const rooms = {};
-const scores = {}; 
+const scores = {}; // Skor takibi için obje
 
 // Tüm cihazlarda güvenle çalışacak emojiler
 const EMOJIS = [
-    '😀', '😊', '😎', '😍', '😜', '😇', '😴', '😷', '🤖', '👻', '👽', '🤡',
-    '🔥', '🌊', '🌚', '😺', '🌼', '⭐', '⚡', '👑'
+    '😀', // Gülümseyen yüz
+    '😊', // Gözleri kapalı gülümseyen yüz
+    '😎', // Güneş gözlüklü yüz
+    '😍', // Kalp gözlü yüz
+    '😜', // Dil çıkaran yüz
+    '😇', // Halo melek yüzü
+    '😴', // Uyuyan yüz
+    '😷', // Maske takan yüz
+    '🤖', // Robot
+    '👻', // Hayalet
+    '👽', // Uzaylı
+    '🤡', // Palyaço
+    '🔥',
+    '🌊',
+    '🌚',
+    '😺',
+    '🌼'
 ];
 
 function generateRoomCode() {
@@ -31,63 +47,6 @@ function generateRoomCode() {
     }
     return code;
 }
-
-// **YARDIMCI FONKSİYON: Yeni Seviye/Oyun Hazırlığı**
-function setupGameBoard(room, level = 1, isInitialSetup = false) {
-    const code = room.code;
-    const boardSize = 20; 
-    // Level 1: 4 bomba, Diğer: 6 bomba
-    const bombCount = level === 1 ? 4 : 6; 
-    
-    let hostLives = room.gameState.hostLives;
-    let guestLives = room.gameState.guestLives;
-
-    if (isInitialSetup || hostLives <= 0 || guestLives <= 0) {
-        // İlk kurulumda veya biri öldüyse canları seviyeye göre sıfırla
-        const initialLives = level === 1 ? 3 : 4;
-        hostLives = initialLives;
-        guestLives = initialLives;
-    }
-
-    const allIndices = Array.from({ length: boardSize }, (_, i) => i);
-    allIndices.sort(() => Math.random() - 0.5);
-
-    // Host ve Guest için benzersiz bombalar
-    room.gameState.hostBombs = allIndices.slice(0, bombCount);
-    room.gameState.guestBombs = allIndices.slice(bombCount, bombCount * 2);
-
-    room.gameState.hostLives = hostLives;
-    room.gameState.guestLives = guestLives;
-    room.gameState.opened = [];
-    room.gameState.turn = 0; // Host başlar
-    room.gameState.level = level;
-    room.gameState.stage = 'PLAY';
-
-    if (!scores[code]) {
-        scores[code] = { host: 0, guest: 0 };
-    }
-
-    console.log(`✅ ${code} Otağı - Level ${level} Kuruldu.`);
-
-    const gameState = {
-        hostBombs: room.gameState.hostBombs,
-        guestBombs: room.gameState.guestBombs,
-        hostLives: room.gameState.hostLives,
-        guestLives: room.gameState.guestLives,
-        turn: room.gameState.turn,
-        level: room.gameState.level,
-        scores: scores[code]
-    };
-
-    // Client'a güncel oyun durumunu gönder
-    setTimeout(() => {
-        io.to(code).emit('gameReady', gameState);
-        console.log(`🚀 ${code} Otağına gameReady sinyali gönderildi.`);
-    }, 500);
-
-    return gameState;
-}
-
 
 io.on('connection', (socket) => {
     console.log(`Yeni bağlantı: ${socket.id}`);
@@ -102,15 +61,17 @@ io.on('connection', (socket) => {
             guestId: null,
             guestUsername: null,
             gameState: {
-                stage: 'WAITING',
-                turn: 0, 
+                stage: 'WAITING', // WAITING, SELECTION, PLAY, ENDED
+                turn: 0, // 0 = Host, 1 = Guest
                 hostBombs: [],
                 guestBombs: [],
-                hostLives: 3,
-                guestLives: 3,
+                hostLives: 3,  // İlk seviyede 3 can
+                guestLives: 3, // İlk seviyede 3 can
+                hostBombsSelected: false,
+                guestBombsSelected: false,
                 level: 1,
-                opened: [],
-                boardSize: 20
+                opened: [], // Açılan kart indeksleri
+                boardSize: 20 // Tüm seviyelerde 20 kart
             }
         };
         socket.join(code);
@@ -130,7 +91,7 @@ io.on('connection', (socket) => {
         room.playerCount = 2;
         room.guestId = socket.id;
         room.guestUsername = username;
-        room.gameState.stage = 'PLAY'; 
+        room.gameState.stage = 'SELECTION';
         socket.join(code);
         
         socket.emit('roomJoined', code); 
@@ -140,11 +101,101 @@ io.on('connection', (socket) => {
             { id: room.guestId, username: room.guestUsername, isHost: false }
         ];
         
+        // Oda kodunu da ilet ki her iki taraf da hamle gönderirken doğru kodu kullansın
         io.to(code).emit('gameStart', { players, roomCode: code });
-        console.log(`${username} otağa qoşuldu : ${code}`);
+        console.log(`${username} otağa Qoşuldu : ${code}`);
         
-        // Oyun ayarlarını yap ve başlat
-        setupGameBoard(room, 1, true); 
+        // Oyun tahtası ayarları
+        const boardSize = 20; // Tüm seviyelerde 20 kart
+        const bombCount = 5; // İlk seviyede 4 bomba
+        
+        // Tüm olası kart indekslerini oluştur ve karıştır
+        const allIndices = Array.from({ length: boardSize }, (_, i) => i);
+        allIndices.sort(() => Math.random() - 0.5);
+        
+        // Host ve Guest için bombaları ayarla (her oyuncu için ayrı bombalar)
+        room.gameState.hostBombs = [];
+        room.gameState.guestBombs = [];
+        
+        // Host için bombaları seç
+        for (let i = 0; i < bombCount; i++) {
+            room.gameState.hostBombs.push(allIndices[i]);
+        }
+        
+        // Guest için farklı bombalar seç
+        for (let i = bombCount; i < bombCount * 2; i++) {
+            room.gameState.guestBombs.push(allIndices[i]);
+        }
+        
+        // İlk seviyede 3 can
+        room.gameState.hostLives = 3;
+        room.gameState.guestLives = 3;
+        room.gameState.level = 1;
+        
+        // Skorları başlat
+        if (!scores[code]) {
+            scores[code] = {
+                host: 0,
+                guest: 0
+            };
+        }
+        const boardSize = 20; // Tüm seviyelerde 20 kart
+        const bombCount = room.gameState.level === 1 ? 4 : 6; // Level 1'de 4, diğerlerinde 6 bomba
+        
+        // Tüm olası kart indekslerini oluştur ve karıştır
+        const allIndices = Array.from({ length: boardSize }, (_, i) => i);
+        allIndices.sort(() => Math.random() - 0.5);
+        
+        // Host ve Guest için bombaları ayarla (her oyuncu için ayrı bombalar)
+        room.gameState.hostBombs = [];
+        room.gameState.guestBombs = [];
+        
+        // Host için bombaları seç
+        for (let i = 0; i < bombCount; i++) {
+            room.gameState.hostBombs.push(allIndices[i]);
+        }
+        
+        // Guest için farklı bombalar seç
+        for (let i = bombCount; i < bombCount * 2; i++) {
+            room.gameState.guestBombs.push(allIndices[i]);
+        }
+        
+        // Can sayılarını ayarla (Level 1'de 3, diğerlerinde 4 can)
+        const lives = room.gameState.level === 1 ? 3 : 4;
+        room.gameState.hostLives = lives;
+        room.gameState.guestLives = lives;
+        
+        // Skorları başlat
+        if (!scores[code]) {
+            scores[code] = {
+                host: 0,
+                guest: 0
+            };
+        }
+        
+        // Oyun durumunu ayarla
+        room.gameState.stage = 'PLAY';
+        room.gameState.turn = 0; // Host başlar
+        room.gameState.level = 1;
+        room.gameState.opened = [];
+        
+        console.log(`🎲 Otomatik bombalar yerleştirildi - Host: ${room.gameState.hostBombs}, Guest: ${room.gameState.guestBombs}`);
+        
+        // Client'a güncel oyun durumunu gönder
+        const gameState = {
+            hostBombs: room.gameState.hostBombs,
+            guestBombs: room.gameState.guestBombs,
+            hostLives: room.gameState.hostLives,
+            guestLives: room.gameState.guestLives,
+            turn: room.gameState.turn,
+            level: room.gameState.level
+        };
+        
+        // Client'ın socket dinleyicilerini kurması için kısa bir gecikme
+        setTimeout(() => {
+            io.to(code).emit('gameReady', gameState);
+            console.log(`🚀 gameReady sinyali gönderildi:`, gameState);
+        }, 500);
     });
 
     // Oyun hamlesi
@@ -156,115 +207,70 @@ io.on('connection', (socket) => {
         // Sıra kontrolü
         const isHostTurn = room.gameState.turn === 0;
         const isCorrectPlayer = (isHostTurn && socket.id === room.hostId) || 
-                                (!isHostTurn && socket.id === room.guestId);
-        
+                               (!isHostTurn && socket.id === room.guestId);
+
         if (!isCorrectPlayer) {
             socket.emit('error', 'Sənin sıran deyil');
+            console.log(`Yanlış sıra hareketi engellendi: ${code}`);
             return;
         }
 
         if (data.type === 'MOVE') {
             const idx = data.cardIndex;
+            // Aynı karta ikinci kez tıklamayı engelle
             if (room.gameState.opened.includes(idx)) {
                 socket.emit('error', 'Bu kart zaten açıldı.');
                 return;
             }
 
-            const activePlayerRole = isHostTurn ? 'Host' : 'Guest';
-            const targetPlayerRole = isHostTurn ? 'Guest' : 'Host';
-            const targetBombs = isHostTurn ? room.gameState.guestBombs : room.gameState.hostBombs;
+            // Bombayı belirle: Host oynuyorsa Guest'in bombaları tehlikelidir, tersi de aynı
+            const isBomb = isHostTurn
+                ? room.gameState.guestBombs.includes(idx)
+                : room.gameState.hostBombs.includes(idx);
 
-            const isBomb = targetBombs.includes(idx);
-            
+            // Emoji seç (bomba değilse)
+            const emoji = isBomb ? '💣' : EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+
+            // Kartı açılmış olarak işaretle
             room.gameState.opened.push(idx);
-            
-            let gameResult = null; 
 
-            if (isBomb) {
-                // Vuran oyuncu (activePlayer) rakibinin canını (targetPlayer) düşürür.
-                const targetLivesKey = isHostTurn ? 'guestLives' : 'hostLives'; 
-                room.gameState[targetLivesKey]--;
-                
-                if (room.gameState[targetLivesKey] <= 0) {
-                    // Oyun BİTTİ
-                    room.gameState.stage = 'ENDED';
-                    const winnerRole = targetPlayerRole === 'Host' ? 'Guest' : 'Host';
-                    scores[code][winnerRole.toLowerCase()]++; 
-                    
-                    gameResult = {
-                        type: 'END',
-                        winner: winnerRole.toLowerCase(),
-                        hostScore: scores[code].host,
-                        guestScore: scores[code].guest,
-                        reason: `${targetPlayerRole === 'Host' ? room.hostUsername : room.guestUsername} canı tükendi.`,
-                    };
-                }
-            }
-            
+            // Sırayı değiştir
             room.gameState.turn = room.gameState.turn === 0 ? 1 : 0;
             
-            const emoji = isBomb ? '💣' : EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
-            
-            const moveData = {
+            // Hareketi her iki oyuncuya da gönder (emoji ve bomba bilgisi ile)
+            io.to(code).emit('gameData', {
                 type: 'MOVE',
                 cardIndex: idx,
                 emoji: emoji,
                 isBomb: isBomb,
-                newHostLives: room.gameState.hostLives,
-                newGuestLives: room.gameState.guestLives,
-                newTurn: room.gameState.turn,
-                roomCode: code,
-            };
-
-            io.to(code).emit('gameData', moveData);
+                roomCode: code
+            });
             
-            if (gameResult) {
-                io.to(code).emit('gameData', gameResult);
-            }
+            console.log(`Kart Açıldı - Oda: ${code}, Kart: ${idx}, Bomba: ${isBomb}, Emoji: ${emoji}, Yeni sıra: ${room.gameState.turn}`);
         }
     });
 
-    // Seviye tamamlama olayı (Tekrar oynama veya yeni level)
-    socket.on('levelComplete', ({ roomCode, nextLevel }) => {
-        const room = rooms[roomCode];
-        if (!room) return;
-        
-        setupGameBoard(room, nextLevel, false); 
-        
-        const gameState = {
-            level: room.gameState.level,
-            hostLives: room.gameState.hostLives,
-            guestLives: room.gameState.guestLives,
-            turn: room.gameState.turn,
-            scores: scores[roomCode] || { host: 0, guest: 0 },
-            hostName: room.hostUsername,
-            guestName: room.guestUsername
-        };
-        
-        io.to(roomCode).emit('newLevel', gameState);
-    });
-    
     // Sohbet mesajı işleme
     socket.on('chatMessage', (data) => {
         try {
-            const { roomCode, message } = data;
+            const { roomCode, message, sender } = data;
             const room = rooms[roomCode];
             
-            if (!room) return;
+            if (!room) {
+                console.log(`Otaq Tapılmadı : ${roomCode}`);
+                return;
+            }
             
-            const player = [
-                { id: room.hostId, username: room.hostUsername },
-                { id: room.guestId, username: room.guestUsername }
-            ].find(p => p.id === socket.id);
-            if (!player) return;
-
+            // Mesajın uzunluğunu kontrol et (maksimum 200 karakter)
             const trimmedMessage = String(message).substring(0, 200).trim();
             if (!trimmedMessage) return;
             
+            console.log(`💬 Sohbet mesajı - Oda: ${roomCode}, Gönderen: ${sender}, Mesaj: ${trimmedMessage}`);
+            
+            // Mesajı oda içindeki tüm oyunculara ilet
             io.to(roomCode).emit('chatMessage', {
-                senderId: socket.id,
-                username: player.username,
                 message: trimmedMessage,
+                sender: sender,
                 timestamp: new Date().toISOString()
             });
         } catch (error) {
@@ -272,37 +278,127 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Seviye tamamlama olayı
+    socket.on('levelComplete', ({ roomCode, level: completedLevel, nextLevel }) => {
+        const room = rooms[roomCode];
+        if (!room) return;
+        
+        console.log(`🏆 Seviye ${completedLevel} tamamlandı! Yeni seviye: ${nextLevel}`);
+        
+        // Mevcut canları al
+        const currentHostLives = room.gameState.hostLives;
+        const currentGuestLives = room.gameState.guestLives;
+        
+        // Yeni seviyede canları ayarla
+        const isFirstLevel = nextLevel === 1;
+        const someoneDied = currentHostLives <= 0 || currentGuestLives <= 0;
+        
+        // Eğer biri öldüyse veya ilk seviyedeysek canları sıfırla, yoksa aynı tut
+        const hostLives = (someoneDied || isFirstLevel) ? (isFirstLevel ? 3 : 4) : currentHostLives;
+        const guestLives = (someoneDied || isFirstLevel) ? (isFirstLevel ? 3 : 4) : currentGuestLives;
+        
+        // Oyun durumunu güncelle
+        room.gameState.hostLives = hostLives;
+        room.gameState.guestLives = guestLives;
+
+        // İlk seviyede 4, diğerlerinde 6 bomba
+        const bombCount = nextLevel === 1 ? 4 : 6;
+        const boardSize = 20; // Tüm seviyelerde 20 kart
+
+        // Tüm olası kart indekslerini oluştur ve karıştır
+        const allIndices = Array.from({ length: boardSize }, (_, i) => i);
+        allIndices.sort(() => Math.random() - 0.5);
+
+        // Host ve Guest için benzersiz bombalar ayarla
+        room.gameState.hostBombs = allIndices.slice(0, bombCount);
+        room.gameState.guestBombs = allIndices.slice(bombCount, bombCount * 2);
+
+        // Oyun durumunu sıfırla
+        room.gameState.opened = [];
+        room.gameState.turn = 0; // Host başlasın
+        room.gameState.level = nextLevel;
+        room.gameState.stage = 'PLAY';
+
+        console.log(`✅ Yeni seviye başlatıldı: ${nextLevel}, ${bombCount} bomba ile`);
+        console.log(`🔵 Host Bombaları: ${room.gameState.hostBombs}`);
+        console.log(`🔴 Guest Bombaları: ${room.gameState.guestBombs}`);
+        
+        // Oyun durumunu logla
+        console.log('Oyun Durumu:', {
+            level: room.gameState.level,
+            hostLives: room.gameState.hostLives,
+            guestLives: room.gameState.guestLives,
+            turn: room.gameState.turn,
+            stage: room.gameState.stage
+        });
+        
+        // Her iki oyuncuya da yeni seviyeyi bildir
+        io.to(roomCode).emit('newLevel', { 
+            level: nextLevel,
+            boardSize: 20,
+            hostLives: hostLives,
+            guestLives: guestLives,
+            scores: scores[roomCode] || { host: 0, guest: 0 },
+            hostName: room.hostUsername,
+            guestName: room.guestUsername
+        });
+        
+        // Yeni bombaları kısa gecikme ile gönder
+        setTimeout(() => {
+            io.to(roomCode).emit('gameReady', {
+                hostBombs: room.gameState.hostBombs,
+                guestBombs: room.gameState.guestBombs,
+                hostLives: room.gameState.hostLives,
+                guestLives: room.gameState.guestLives,
+                turn: room.gameState.turn
+            });
+            console.log(`🚀 Yeni seviye gameReady gönderildi: ${roomCode}`);
+        }, 500);
+    });
+
+    // Chat mesajlarını işle
+    socket.on('chatMessage', ({ roomCode, message }) => {
+        const room = rooms[roomCode];
+        if (!room) return;
+        
+        // Gönderen oyuncuyu bul
+        const player = [
+            { id: room.hostId, username: room.hostUsername },
+            { id: room.guestId, username: room.guestUsername }
+        ].find(p => p.id === socket.id);
+        if (!player) return;
+        
+        // Odaya mesajı yayınla
+        io.to(roomCode).emit('chatMessage', {
+            senderId: socket.id,
+            username: player.username,
+            message: message,
+            timestamp: new Date().toISOString()
+        });
+    });
+
     // Bağlantı kesildiğinde
     socket.on('disconnect', () => {
+        console.log(`Bağlantı kesildi: ${socket.id}`);
         for (const code in rooms) {
             const room = rooms[code];
             if (room.hostId === socket.id || room.guestId === socket.id) {
-                const isHost = room.hostId === socket.id;
-                const opponentId = isHost ? room.guestId : room.hostId;
+                const opponentId = (room.hostId === socket.id) ? room.guestId : room.hostId;
                 
                 if (opponentId) {
                     io.to(opponentId).emit('opponentLeft', 'Rakibiniz bağlantıyı kesti. Lobiye dönülüyor.');
                 }
                 
-                if (isHost && !room.guestId) {
+                // Oda tamamen temizlenir (her iki oyuncu da gittiğinde)
+                if (room.hostId === socket.id) {
                     delete rooms[code];
-                    delete scores[code];
-                } else if (isHost) {
-                     // Host gider, Guest yeni Host olur
-                    room.hostId = room.guestId;
-                    room.hostUsername = room.guestUsername;
-                    room.guestId = null;
-                    room.guestUsername = null;
-                    room.playerCount = 1;
-                    room.gameState.stage = 'WAITING';
-                    
-                    io.to(room.hostId).emit('hostChanged', 'Yeni Host sizsiniz. Yeni oyuncu bekleniyor.');
-                } else if (!isHost) {
-                    // Guest gider
+                    console.log(`Oda silindi (Host ayrıldı): ${code}`);
+                } else if (room.guestId === socket.id) {
                     room.playerCount = 1;
                     room.guestId = null;
                     room.guestUsername = null;
                     room.gameState.stage = 'WAITING';
+                    console.log(`Guest ayrıldı: ${code}`);
                 }
             }
         }
