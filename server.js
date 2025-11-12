@@ -107,7 +107,7 @@ io.on('connection', (socket) => {
         
         // Oyun tahtası ayarları
         const boardSize = 20; // Tüm seviyelerde 20 kart
-        const bombCount = 5; // İlk seviyede 4 bomba
+        const bombCount = 4; // Level 1'de 4 bomba
         
         // Tüm olası kart indekslerini oluştur ve karıştır
         const allIndices = Array.from({ length: boardSize }, (_, i) => i);
@@ -127,43 +127,10 @@ io.on('connection', (socket) => {
             room.gameState.guestBombs.push(allIndices[i]);
         }
         
-        // İlk seviyede 3 can
+        // Tüm seviyelerde 3 can
         room.gameState.hostLives = 3;
         room.gameState.guestLives = 3;
         room.gameState.level = 1;
-        
-        // Skorları başlat
-        if (!scores[code]) {
-            scores[code] = {
-                host: 0,
-                guest: 0
-            };
-        }
-        const boardSize = 20; // Tüm seviyelerde 20 kart
-        const bombCount = room.gameState.level === 1 ? 4 : 6; // Level 1'de 4, diğerlerinde 6 bomba
-        
-        // Tüm olası kart indekslerini oluştur ve karıştır
-        const allIndices = Array.from({ length: boardSize }, (_, i) => i);
-        allIndices.sort(() => Math.random() - 0.5);
-        
-        // Host ve Guest için bombaları ayarla (her oyuncu için ayrı bombalar)
-        room.gameState.hostBombs = [];
-        room.gameState.guestBombs = [];
-        
-        // Host için bombaları seç
-        for (let i = 0; i < bombCount; i++) {
-            room.gameState.hostBombs.push(allIndices[i]);
-        }
-        
-        // Guest için farklı bombalar seç
-        for (let i = bombCount; i < bombCount * 2; i++) {
-            room.gameState.guestBombs.push(allIndices[i]);
-        }
-        
-        // Can sayılarını ayarla (Level 1'de 3, diğerlerinde 4 can)
-        const lives = room.gameState.level === 1 ? 3 : 4;
-        room.gameState.hostLives = lives;
-        room.gameState.guestLives = lives;
         
         // Skorları başlat
         if (!scores[code]) {
