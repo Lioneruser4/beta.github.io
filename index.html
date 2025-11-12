@@ -585,20 +585,20 @@
             <div class="wait-spinner mb-4">
                 <i class="fas fa-spinner fa-spin text-4xl text-blue-400"></i> 
             </div>
-            <h2 id="waitTitle" class="text-2xl font-bold mb-6">Otaq Hazırlanır...</h2>
+            <h2 id="waitTitle" class="text-2xl font-bold mb-6">Otaq Hazırlanır... / Preparing Room...</h2>
             
             <div id="codeArea" class="w-full max-w-md mb-6">
-                <p class="text-sm text-gray-300 mb-2">🌟 Otaq kodunuzu dostunuzla paylaşın:</p>
+                <p class="text-sm text-gray-300 mb-2">🌟 Otaq kodunuzu dostunuzla paylaşın / Share your room code:</p>
                 <div id="roomCodeDisplay" class="text-3xl font-bold bg-gray-800 p-4 rounded-lg mb-4 text-center tracking-widest"></div>
                 <button id="copyCodeBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-lg">
-                    <i class="fas fa-copy mr-2"></i> Kodu Kopyala
+                    <i class="fas fa-copy mr-2"></i> Kodu Kopyala / Copy Code
                 </button>
             </div>
             
-            <p id="waitStatus" class="text-lg text-gray-300 mb-6">Rəqib qoşulması gözlənilir...</p>
+            <p id="waitStatus" class="text-lg text-gray-300 mb-6">Rəqib qoşulması gözlənilir... / Waiting for opponent...</p>
             
             <button id="cancelBtn" class="w-full max-w-xs py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-lg">
-                <i class="fas fa-times-circle mr-2"></i> Ləğv Et / Lobiye Qayıt
+                <i class="fas fa-times-circle mr-2"></i> Ləğv Et / Lobiye Qayıt<br>Cancel / Return to Lobby
             </button>
         </div>
     </div>
@@ -612,23 +612,23 @@
         <div class="w-full flex justify-between items-center p-1">
             <div class="text-left pl-2">
                 <div id="myLives" class="text-xl">❤️❤️❤️</div>
-                <div class="text-xs text-blue-300">Sənin Canın</div>
+                <div class="text-xs text-blue-300">Sənin Canın / Your Lives</div>
             </div>
             
             <div class="text-center">
                 <h1 class="text-xl font-bold m-0 p-0">💣</h1>
-                <div id="levelInfo" class="text-xs">Level 1</div>
+                <div id="levelInfo" class="text-xs">Səviyyə / Level 1</div>
             </div>
             
             <div class="text-right pr-2">
                 <div id="opponentLives" class="text-xl">❤️❤️❤️</div>
-                <div id="opponentName" class="text-xs text-blue-300">Rəqibin Canı</div>
+                <div id="opponentName" class="text-xs text-blue-300">Rəqibin Canı / Opponent's Lives</div>
             </div>
         </div>
         
         <div class="w-full text-center p-1">
-            <div id="turnStatus" class="text-sm font-bold text-yellow-400">SIRA SƏNDƏ </div>
-            <div id="actionMessage" class="text-xs text-gray-300">Bir kart seç</div>
+            <div id="turnStatus" class="text-sm font-bold text-yellow-400">SIRA SƏNDƏ / YOUR TURN</div>
+            <div id="actionMessage" class="text-xs text-gray-300">Bir kart seç / Select a card</div>
         </div>
         <p id="roleStatus" class="text-gray-300 text-xs bg-gray-700 p-2 rounded-lg"></p>
 
@@ -814,20 +814,23 @@
         document.addEventListener('DOMContentLoaded', connectToServer);
     </script>
     <!-- Emoji Chat -->
-    <div id="emojiChat" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000;">
-        <div id="emojiContainer">
-            <div class="emoji-option" data-emoji="😀">😀</div>
-            <div class="emoji-option" data-emoji="😂">😂</div>
-            <div class="emoji-option" data-emoji="😍">😍</div>
-            <div class="emoji-option" data-emoji="👍">👍</div>
-            <div class="emoji-option" data-emoji="👎">👎</div>
-            <div class="emoji-option" data-emoji="🎉">🎉</div>
-            <div class="emoji-option" data-emoji="😎">😎</div>
-            <div class="emoji-option" data-emoji="🤔">🤔</div>
-            <div class="emoji-option" data-emoji="💩">💩</div>
+    <div id="emojiChat" style="position: fixed; top: 10px; right: 10px; z-index: 1000;">
+        <button id="emojiButton" style="width: 60px; height: 60px; font-size: 30px; background: rgba(74, 85, 104, 0.8); border: 2px solid white; border-radius: 50%; color: white; cursor: pointer;">😊</button>
+        <div id="emojiContainer" style="display: none; position: absolute; top: 70px; right: 0; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 15px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; z-index: 1001;">
+            <div class="emoji-option" data-emoji="😀" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">😀</div>
+            <div class="emoji-option" data-emoji="😂" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">😂</div>
+            <div class="emoji-option" data-emoji="😍" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">😍</div>
+            <div class="emoji-option" data-emoji="👍" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">👍</div>
+            <div class="emoji-option" data-emoji="👎" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">👎</div>
+            <div class="emoji-option" data-emoji="🎉" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">🎉</div>
+            <div class="emoji-option" data-emoji="😎" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">😎</div>
+            <div class="emoji-option" data-emoji="🤔" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">🤔</div>
+            <div class="emoji-option" data-emoji="💩" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">💩</div>
         </div>
-        <button id="emojiButton">😊</button>
     </div>
+    
+    <!-- Emoji Display (shown in center of screen) -->
+    <div id="emojiDisplay" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 999; font-size: 80px; pointer-events: none; opacity: 0; transition: opacity 0.3s; text-shadow: 0 0 20px rgba(255,255,255,0.8);"></div>
 
     <audio id="emojiSound" preload="auto">
         <source src="sound4.mp3" type="audio/mpeg">
@@ -840,24 +843,24 @@
             const emojiContainer = document.getElementById('emojiContainer');
             const emojiSound = document.getElementById('emojiSound');
             
-            // Make sure emoji button is visible
-            const emojiChat = document.getElementById('emojiChat');
-            if (emojiChat) {
-                emojiChat.style.display = 'flex';
-                emojiChat.style.flexDirection = 'column';
-                emojiChat.style.alignItems = 'center';
+            // Show emoji button in game screen
+            function showEmojiButton() {
+                const emojiChat = document.getElementById('emojiChat');
+                if (emojiChat) {
+                    emojiChat.style.display = 'block';
+                }
             }
 
             // Toggle emoji picker
             emojiButton.addEventListener('click', (e) => {
                 e.stopPropagation();
-                emojiContainer.classList.toggle('visible');
+                emojiContainer.style.display = emojiContainer.style.display === 'grid' ? 'none' : 'grid';
             });
 
             // Close emoji picker when clicking outside
             document.addEventListener('click', (e) => {
-                if (!e.target.closest('#emojiContainer') && !e.target.closest('#emojiButton')) {
-                    emojiContainer.classList.remove('visible');
+                if (!e.target.closest('#emojiContainer') && e.target.id !== 'emojiButton') {
+                    emojiContainer.style.display = 'none';
                 }
             });
 
@@ -865,50 +868,50 @@
             document.querySelectorAll('.emoji-option').forEach(emoji => {
                 emoji.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const emoji = emoji.getAttribute('data-emoji');
+                    const emojiChar = emoji.getAttribute('data-emoji');
                     
                     // Play sound
                     if (emojiSound) {
                         emojiSound.currentTime = 0;
-                        emojiSound.play().catch(e => console.log('Ses çalınamadı:', e));
+                        emojiSound.play().catch(e => console.log('Sound play failed:', e));
                     }
                     
-                    // Show emoji locally
-                    showEmoji(emoji, true);
+                    // Show emoji on local screen
+                    showEmoji(emojiChar);
                     
-                    // Send to opponent if socket exists
-                    if (window.socket && window.socket.connected) {
-                        window.socket.emit('emojiMessage', { emoji });
+                    // Send emoji to opponent
+                    if (window.socket) {
+                        window.socket.emit('emojiMessage', { emoji: emojiChar });
                     }
                     
-                    // Close picker
-                    emojiContainer.classList.remove('visible');
+                    // Hide emoji picker
+                    emojiContainer.style.display = 'none';
+                });
+                
+                // Add hover effect
+                emoji.addEventListener('mouseover', () => {
+                    emoji.style.transform = 'scale(1.2)';
+                });
+                emoji.addEventListener('mouseout', () => {
+                    emoji.style.transform = 'scale(1)';
                 });
             });
-
-            // Listen for emoji messages
+            
+            // Listen for emoji messages from opponent
             if (window.socket) {
                 window.socket.on('emojiMessage', (data) => {
-                    showEmoji(data.emoji, false);
+                    showEmoji(data.emoji);
                 });
             }
-
-            // Function to display emoji
-            function showEmoji(emoji, isLocal) {
-                const emojiEl = document.createElement('div');
-                emojiEl.className = 'emoji-message';
-                emojiEl.textContent = emoji;
-                
-                // Position based on local or remote player
-                if (isLocal) {
-                    emojiEl.style.left = '80%';
-                    emojiEl.style.bottom = '100px';
-                } else {
-                    emojiEl.style.left = '20%';
-                    emojiEl.style.bottom = '100px';
-                }
-                
-                document.body.appendChild(emojiEl);
+            
+            // Show emoji button when game starts
+            if (window.socket) {
+                window.socket.on('gameReady', () => {
+                    showEmojiButton();
+                });
+            } else {
+                // For testing without socket
+                showEmojiButton();
                 
                 // Remove after animation
                 setTimeout(() => {
