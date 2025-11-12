@@ -11,21 +11,24 @@ const server = http.createServer(app);
 server.keepAliveTimeout = 60000; // 60 saniye
 server.headersTimeout = 65000; // 65 saniye
 
-// CORS DÜZELTME: Tüm kaynaklardan gelen bağlantılara izin verir
+// Basit ve etkili Socket.IO yapılandırması
 const io = new Server(server, {
     cors: {
-        origin: "*", 
+        origin: "*",
         methods: ["GET", "POST"]
     },
-    transports: ['websocket', 'polling'] // Hem WebSocket hem de polling kullan
+    // Daha basit ve güvenilir ayarlar
+    transports: ['websocket', 'polling'],
+    allowEIO3: true
 });
 
 // Bağlantı hatalarını dinle
 io.engine.on("connection_error", (err) => {
-    console.log('Bağlantı hatası:', err.req);      // the request object
-    console.log(err.code);     // the error code, for example 1
-    console.log(err.message);  // the error message, for example "Session ID unknown"
-    console.log(err.context);  // some additional error context
+    console.error('Bağlantı hatası:', {
+        code: err.code,
+        message: err.message,
+        context: err.context
+    });
 });
 
 // Bağlantı sınırlarını artırma
