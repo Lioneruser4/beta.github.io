@@ -19,6 +19,17 @@ const io = new Server(server, {
 const rooms = {};
 const scores = {}; // Skor takibi için obje
 
+// Odayı oyuncu ID'sine göre bulma fonksiyonu
+function getRoomByPlayerId(playerId) {
+    for (const code in rooms) {
+        const room = rooms[code];
+        if (room.hostId === playerId || room.guestId === playerId) {
+            return room;
+        }
+    }
+    return null;
+}
+
 // Tüm cihazlarda güvenle çalışacak emojiler
 const EMOJIS = [
     '😀', // Gülümseyen yüz
@@ -245,6 +256,20 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Emoji mesajlarını işle
+    socket.on('emojiMessage', (data) => {
+        try {
+            const room = getRoomByPlayerId(socket.id);
+            if (room) {
+                // Odaya emoji mesajını yayınla (gönderen hariç diğer oyuncuya)
+                socket.to(room.code).emit('emojiMessage', data);
+                console.log(`Emoji gönderildi: ${data.emoji} (Oda: ${room.code})`);
+            }
+        } catch (error) {
+            console.error('Emoji mesajı işlenirken hata:', error);
+        }
+    });
+
     // Seviye tamamlama olayı
     socket.on('levelComplete', ({ roomCode, level: completedLevel, nextLevel }) => {
         const room = rooms[roomCode];
@@ -323,33 +348,6 @@ io.on('connection', (socket) => {
         }, 500);
     });
 
-    // Chat mesajlarını işle
-    socket.on('chatMessage', ({ roomCode, message }) => {
-        const room = rooms[roomCode];
-        if (!room) return;
-        
-        // Gönderen oyuncuyu bul
-        const player = [
-            { id: room.hostId, username: room.hostUsername },
-            { id: room.guestId, username: room.guestUsername }
-        ].find(p => p.id === socket.id);
-        if (!player) return;
-        
-        // Odaya mesajı yayınla
-        io.to(roomCode).emit('chatMessage', {
-            senderId: socket.id,
-            username: player.username,
-            message: message,
-            timestamp: new Date().toISOString()
-        });
-    });
-
-    // Bağlantı kesildiğinde
-    socket.on('disconnect', () => {
-        console.log(`Bağlantı kesildi: ${socket.id}`);
-        for (const code in rooms) {
-            const room = rooms[code];
-            if (room.hostId === socket.id || room.guestId === socket.id) {
                 const opponentId = (room.hostId === socket.id) ? room.guestId : room.hostId;
                 
                 if (opponentId) {
