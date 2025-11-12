@@ -1,249 +1,669 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="az">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Emoji Bomba | Multiplayer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, height=device-height">
+    <title>💣 KartBomBot 1v1</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    
     <style>
-        /* Modern ve Temiz CSS Başlangıcı */
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f7f6;
-            color: #333;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+        /* === KENDİ OYUNUNUZDAN ALINAN CSS STİLLERİ VE MOBİL UYUM === */
+        
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2980b9;
+            --success-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --text-color: #2c3e50;
+            --bg-color: #ecf0f1;
+            --card-bg: white;
+            --shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        * {
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box; /* Tüm elementler için box-sizing */
+        }
+        html, body {
             margin: 0;
-            flex-direction: column;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* Tam ekran için kaydırmayı engelle */
+            font-family: 'Inter', sans-serif; /* Daha modern bir font */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
-        h1 {
-            color: #3f51b5;
-            margin-bottom: 20px;
+        body { 
+            background-color: #1a202c; /* Koyu arka plan */
+            color: #e2e8f0; /* Açık metin rengi */
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            transition: background-color 0.3s; 
         }
 
-        .container {
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            width: 90%;
-            max-width: 1000px;
-            display: flex;
-            gap: 20px;
+        /* Ana Ekran Düzeni */
+        .screen { 
+            width: 100%; 
+            height: 100vh;
+            max-width: 100%;
+            max-height: 100%;
+            display: none; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: flex-start;
+            padding: 0.25rem; 
+            box-sizing: border-box; 
+            text-align: center; 
+            background-color: #2d3748;
+            border-radius: 0;
+            box-shadow: none;
+            overflow: hidden;
+            -webkit-overflow-scrolling: touch;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+        .screen.active { 
+            display: flex; 
         }
         
-        .lobby-section, .game-section, .chat-section {
-            padding: 15px;
-            border-radius: 8px;
-            background-color: #fafafa;
+        /* Language Selector */
+        .language-selector {
+            position: fixed;
+            top: env(safe-area-inset-top, 15px); /* Güvenli alanları destekle */
+            right: env(safe-area-inset-right, 15px);
+            z-index: 100;
+        }
+        .language-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid #63b3ed;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #e2e8f0;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+            backdrop-filter: blur(5px);
+            padding: 0;
+        }
+        .language-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .language-options {
+            display: none;
+            position: absolute;
+            top: calc(100% + 5px);
+            right: 0;
+            background: #2d3748;
+            border: 1px solid #4a5568;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            overflow: hidden;
+            z-index: 101;
+            min-width: 150px;
+            color: #e2e8f0;
+        }
+        .language-option {
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background-color 0.2s;
+        }
+        .language-option:hover {
+            background-color: #4a5568;
+        }
+        .language-option:hover {
+            background: #4a5568;
+        }
+        
+        /* Utility */
+        .btn {
+            @apply px-8 py-4 rounded-xl font-bold text-xl transition-all duration-300 flex items-center justify-center;
+            min-width: 250px;
+            margin: 0.5rem 0;
+            height: auto;
+            min-height: 60px;
+        }
+        .btn-primary { 
+            @apply bg-blue-600 text-white hover:bg-blue-500 active:scale-98; 
+            background: linear-gradient(135deg, #4299e1, #63b3ed); /* Gradient */
+            border: none;
+        }
+        .btn-primary:hover {
+            box-shadow: 0 8px 20px rgba(66, 153, 225, 0.6);
+        }
+        .btn:active {
+            transform: translateY(0) scale(0.98);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
 
-        .lobby-section {
-            flex: 1;
+        /* Global Mesaj */
+        #globalMessage.show { 
+            display: block; 
+            position: fixed; 
+            top: env(safe-area-inset-top, 20px); 
+            left: 50%; 
+            transform: translateX(-50%); 
+            z-index: 50; 
+            animation: fadeInDown 0.3s ease-out; 
+            width: 90%;
+            max-width: 400px;
+            padding: 1rem;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translate(-50%, -20px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
         }
 
-        .game-section {
-            flex: 2;
-            display: none; /* Oyun başlayana kadar gizli */
+        /* --- ANİMASYONLAR: LOBİ GİRİŞİ VE BUTONLAR --- */
+        @keyframes screenFadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        #lobby.active, #waitScreen.active, #gameScreen.active {
+            animation: screenFadeIn 0.5s ease-out forwards;
         }
 
-        .chat-section {
-            flex: 1;
-            display: none; /* Oyun başlayana kadar gizli */
+        @keyframes slideInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animated-lobby-item {
+            opacity: 0;
+            animation: slideInUp 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        }
+        
+        .lobby-title { animation-delay: 0s; }
+        .lobby-subtitle { animation-delay: 0.1s; }
+        .rules-box { animation-delay: 0.2s; }
+        .input-username-container { animation-delay: 0.3s; }
+        .input-roomcode-container { animation-delay: 0.4s; }
+        #matchBtn { animation-delay: 0.5s; }
+        
+        .btn { transition: transform 0.2s, box-shadow 0.2s; }
+        .btn:hover {
+            transform: translateY(-3px) scale(1.01);
+            box-shadow: 0 8px 20px rgba(66, 153, 225, 0.6); 
+        }
+        .btn:active {
+            transform: translateY(0) scale(0.98);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Bekleme Ekranı (WaitScreen) için dönme animasyonu */
+        .wait-spinner {
+            font-size: 4rem; /* Büyük spinner */
+            color: #63b3ed;
+            animation: spin 1.5s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* OYUN TAHTASI VE MOBİL UYUMLULUK */
+        #gameScreen {
+            padding-top: env(safe-area-inset-top, 20px);
+            padding-bottom: env(safe-area-inset-bottom, 20px);
+            justify-content: flex-start; /* İçeriği üste hizala */
+        }
+        #gameContent {
+            flex-grow: 1; /* Board'ın mevcut alanı doldurmasını sağlar */
             display: flex;
             flex-direction: column;
-            height: 600px;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        input[type="text"], button {
+            justify-content: center; /* İçindeki öğeleri ortala */
+            align-items: center;
+            max-width: 100%; /* Mobil genişlik */
             width: 100%;
-            padding: 12px;
-            margin-top: 5px;
-            border-radius: 6px;
-            border: 1px solid #ddd;
-            box-sizing: border-box;
-            font-size: 16px;
         }
 
-        button {
-            cursor: pointer;
-            background-color: #3f51b5;
-            color: white;
-            border: none;
-            transition: background-color 0.3s ease;
-        }
-
-        button:hover:not(:disabled) {
-            background-color: #303f9f;
-        }
-
-        button:disabled {
-            background-color: #b0bec5;
-            cursor: not-allowed;
-        }
-
-        /* Bağlantı Durumu */
-        #connection-status {
-            margin-bottom: 20px;
-            padding: 8px 15px;
-            border-radius: 6px;
-            font-weight: bold;
-            font-size: 14px;
-        }
-
-        .status-connecting { background-color: #ff9800; color: white; }
-        .status-connected { background-color: #4caf50; color: white; }
-        .status-disconnected { background-color: #f44336; color: white; }
-
-        /* Oyun Tahtası */
-        #game-board {
+        .game-board {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 10px;
-            margin-top: 20px;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.25rem;
+            margin: 0 auto;
+            max-width: 100%;
+            width: 100%;
+            perspective: 1000px;
+            padding: 0.25rem;
+            box-sizing: border-box;
+            flex: 1;
+            overflow: hidden;
         }
-
+        .card-container {
+            perspective: 1000px; 
+            aspect-ratio: 1; 
+            width: 100%; /* Esneklik */
+        }
         .card {
-            background-color: #e0e0e0;
-            height: 80px;
+            aspect-ratio: 1;
+            background: #4a5568;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            cursor: pointer;
+            user-select: none;
+            -webkit-transform-style: preserve-3d;
+            transform-style: preserve-3d;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            position: relative;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            min-width: 0;
+            min-height: 0;
+            -webkit-transform: translate3d(0,0,0);
+            transform: translate3d(0,0,0);
+        }
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden; 
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 30px;
-            cursor: pointer;
+            border-radius: 12px;
+            font-size: 2rem; /* Büyük emoji */
+            font-weight: bold;
+        }
+        @media (min-width: 400px) {
+            .card-face { font-size: 2.5rem; }
+        }
+        .card-face.front {
+            background: linear-gradient(135deg, #4299e1, #63b3ed); /* Mavi gradient */
+            color: white;
+            border: 4px solid #364052; /* Koyu kenarlık */
+            transform: rotateY(0deg); 
+            z-index: 2;
+        }
+        .card-face.back {
+            background: #e2e8f0; /* Açık arka plan */
+            color: #2d3748; /* Koyu metin */
+            transform: rotateY(180deg);
+            z-index: 1;
+            -webkit-backface-visibility: visible !important;
+            backface-visibility: visible !important;
+            -webkit-transform: rotateY(180deg) translateZ(1px);
+            transform: rotateY(180deg) translateZ(1px);
+        }
+        .card.bomb-selected .card-face.front {
+            background: linear-gradient(135deg, #f56565, #e53e3e); /* Kırmızı gradient */
+            animation: pulse-red 0.5s infinite alternate;
+        }
+        @keyframes pulse-red {
+            from { opacity: 1; }
+            to { opacity: 0.8; }
+        }
+        @keyframes vibrate {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            20% { transform: translate(-1px, -2px) rotate(-1deg); }
+            40% { transform: translate(-3px, 0px) rotate(1deg); }
+            60% { transform: translate(3px, 2px) rotate(0deg); }
+            80% { transform: translate(1px, -1px) rotate(-1deg); }
+            100% { transform: translate(-1px, 2px) rotate(1deg); }
+        }
+        .vibrate {
+            animation: vibrate 0.1s linear infinite;
+        }
+
+        /* Oyun İçi Durum Ekranları */
+        #gameScreen h1 {
+            color: #f7fafc; /* Beyaz başlık */
+            margin-bottom: 1rem;
+        }
+        #gameScreen .status-panel {
+            background: rgba(45, 55, 72, 0.9);
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            margin: 0.25rem 0;
+            width: 100%;
+            max-width: 100%;
+            font-size: 0.9rem;
+        }
+        #turnStatus {
+            font-size: 1.8rem;
+            color: #f7fafc; /* Beyaz */
+            text-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        #actionMessage {
+            color: #a0aec0; /* Gri ton */
+            font-size: 1rem;
+            margin-top: 0.5rem;
+        }
+        #roleStatus {
+            color: #cbd5e0;
+            background-color: #4a5568;
+            padding: 0.5rem 1rem;
             border-radius: 8px;
-            transition: transform 0.2s ease, background-color 0.2s ease;
-            user-select: none;
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
         }
-
-        .card-opened {
-            background-color: #fff;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-            cursor: default;
-        }
-
-        .card:hover:not(.card-opened) {
-            transform: scale(1.05);
-        }
-
-        .card-bomb {
-            background-color: #f44336;
-        }
-        
-        /* Sohbet Alanı */
-        #chat-window {
+        #gameContent {
+            background-color: #2d3748; /* Koyu gri */
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+            padding: 1.5rem;
+            width: 100%; /* Tam genişlik */
+            max-width: 500px; /* Ortalama cihazlarda daha iyi görünüm */
             flex-grow: 1;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            padding: 10px;
-            margin-bottom: 10px;
-            background-color: #fff;
-            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* İçeriyi ortala */
         }
-        
-        .chat-message {
-            margin-bottom: 5px;
-            line-height: 1.4;
+        #endGameBtn {
+            margin-top: 1.5rem;
+            background-color: #e53e3e;
+            color: white;
+            width: 80%; /* Daha dar */
+            max-width: 250px; /* Max genişlik */
         }
 
-        .chat-sender {
-            font-weight: bold;
-            color: #3f51b5;
+        /* Başlıklar ve Metinler */
+        h1, h2 {
+            font-family: 'Poppins', sans-serif; /* Modern başlık fontu */
+            font-weight: 700;
+            color: #f7fafc;
+        }
+        p, label {
+            font-family: 'Inter', sans-serif;
+            color: #cbd5e0;
         }
         
-        .chat-input-container {
-            display: flex;
-            gap: 10px;
-        }
-
-        .chat-input-container input {
-            flex-grow: 1;
-        }
-        
-        /* Skor ve Durum */
-        #game-info {
-            display: flex;
-            justify-content: space-around;
-            margin-bottom: 10px;
-            font-size: 18px;
-            font-weight: bold;
-        }
-        
-        .player-status {
-            padding: 5px 10px;
-            border-radius: 6px;
-        }
-        
-        .turn-indicator {
-            border: 2px solid #ffc107;
-            background-color: #fffde7;
-        }
     </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@700&family=Chakra+Petch:wght@700&display=swap" rel="stylesheet">
 </head>
-<body>
-    <div id="connection-status" class="status-connecting">Sunucuya Bağlanılıyor...</div>
-    <h1>💣 Emoji Bomba Oyunu</h1>
-
-    <div class="container">
-        <div class="lobby-section" id="lobby">
-            <h2>Giriş / Lobi</h2>
-            <div class="form-group">
-                <label for="username">Kullanıcı Adı:</label>
-                <input type="text" id="username" placeholder="Adınızı girin" maxlength="15">
-            </div>
-
-            <div class="form-group">
-                <button id="create-room-btn" disabled>Yeni Oda Kur</button>
-            </div>
-
-            <div class="form-group">
-                <label for="room-code-input">Oda Kodu:</label>
-                <input type="text" id="room-code-input" placeholder="Oda Kodunu Girin (örn: ABCD)" maxlength="4">
-                <button id="join-room-btn" disabled>Odaya Katıl</button>
-            </div>
-            
-            <p id="room-message" style="color: red; font-weight: bold;"></p>
-
-            <div id="waiting-area" style="display: none; text-align: center;">
-                <h3>Oda Kodu: <span id="display-room-code" style="color: #3f51b5;"></span></h3>
-                <p>Rakip bekleniyor...</p>
-                <p id="player-status"></p>
-            </div>
+<body class="bg-gray-900 select-none">
+    <div class="language-selector">
+        <button id="language-button" class="language-button" onclick="toggleLanguageSelector()">
+            <span id="current-language">🇦🇿</span>
+        </button>
+        <div id="language-selector" class="language-options">
+            <div class="language-option" onclick="setLanguage('az')">🇦🇿 Azərbaycanca</div>
+            <div class="language-option" onclick="setLanguage('tr')">🇹🇷 Türkçe</div>
+            <div class="language-option" onclick="setLanguage('en')">🇬🇧 English</div>
         </div>
+    </div>
+    
+    <div id="globalMessage" class="hidden w-11/12 max-w-md p-4 bg-red-600 text-white rounded-lg shadow-lg">
+        <p id="globalMessageText"></p>
+    </div>
 
-        <div class="game-section" id="game-area">
-            <h2 id="level-display">Level 1</h2>
-            <div id="game-info">
-                </div>
-            
-            <div id="game-board">
-                </div>
-            
-            <div id="game-result" style="display: none; margin-top: 20px; text-align: center;">
-                <h3><span id="result-text"></span></h3>
-                <p>Mevcut Skor: Host <span id="result-host-score">0</span> - Guest <span id="result-guest-score">0</span></p>
-                <button id="next-level-btn">Yeni Seviyeye Geç</button>
-            </div>
+    <div id="lobby" class="screen active space-y-6">
+        <h1 class="text-4xl font-black animated-lobby-item lobby-title mb-1">
+            💣 KartBombot
+        </h1>
+        <p class="text-sm text-gray-400 animated-lobby-item lobby-subtitle mb-4">
+            1v1 online 
+        </p>
+        
+        <div class="bg-blue-800 bg-opacity-30 border-l-2 border-blue-500 text-blue-100 p-2 rounded-lg shadow-lg animated-lobby-item rules-box w-full max-w-md">
+            <p class="font-bold text-sm mb-1 text-white">📋 Oyun Qaydaları:</p>
+            <ul class="list-disc list-inside text-left text-xs space-y-1">
+                <li>Kartları açaraq rəqibinizin bombalarından qaçın</li>
+                <li>Canı bitən oyunu uduzur</li>
+                <li>Yeni Otaq yaratmaq üçün Otaq Kodu yerini Boş Buraxın</li>
+            </ul>
         </div>
-
-        <div class="chat-section" id="chat-container">
-            <h3>💬 Sohbet</h3>
-            <div id="chat-window">
-                </div>
-            <div class="chat-input-container">
-                <input type="text" id="chat-input" placeholder="Mesajınızı yazın...">
-                <button id="send-message-btn">Gönder</button>
+        
+        <div class="w-full animated-lobby-item input-username-container max-w-md">
+            <p class="text-center text-lg font-bold mb-1 text-white">
+                👤 İstifadəçi Adı  / Username 
+            </p>
+            <input type="text" id="username" class="w-full p-3 text-lg text-center rounded-lg shadow-lg text-black" placeholder="Adınız" maxlength="15" style="color: #000000 !important;">
+        </div>
+        
+        <div class="w-full animated-lobby-item input-roomcode-container max-w-md">
+            <p class="text-center text-lg font-bold mb-1 text-white mt-4">
+                🚪 Otaq Kodu / Room Code
+            </p>
+            <input type="text" id="roomCodeInput" class="w-full p-3 text-lg text-center rounded-lg shadow-lg text-black uppercase" placeholder="Otaq Kodu (Boşsa yeni otaq)" maxlength="6" style="color: #000000 !important;">
+        </div>
+        
+        <div class="flex flex-col space-y-3 w-full max-w-md mx-auto mt-6">
+            <button id="createRoomBtn" class="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg transform transition-all duration-200 active:scale-95">
+                <i class="fas fa-plus-circle mr-2"></i> Otaq Qur / Create Room
+            </button>
+            <button id="joinRoomBtn" class="w-full py-4 px-6 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg transform transition-all duration-200 active:scale-95">
+                <i class="fas fa-sign-in-alt mr-2"></i> Otağa Qoşul / Join Room
+            </button>
+        </div>
+    </div>
+    
+    <div id="waitScreen" class="screen p-4">
+        <div class="flex flex-col items-center justify-center h-full">
+            <div class="wait-spinner mb-4">
+                <i class="fas fa-spinner fa-spin text-4xl text-blue-400"></i> 
             </div>
+            <h2 id="waitTitle" class="text-2xl font-bold mb-6">Otaq Hazırlanır...</h2>
+            
+            <div id="codeArea" class="w-full max-w-md mb-6">
+                <p class="text-sm text-gray-300 mb-2">🌟 Otaq kodunuzu dostunuzla paylaşın:</p>
+                <div id="roomCodeDisplay" class="text-3xl font-bold bg-gray-800 p-4 rounded-lg mb-4 text-center tracking-widest"></div>
+                <button id="copyCodeBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-lg">
+                    <i class="fas fa-copy mr-2"></i> Kodu Kopyala
+                </button>
+            </div>
+            
+            <p id="waitStatus" class="text-lg text-gray-300 mb-6">Rəqib qoşulması gözlənilir...</p>
+            
+            <button id="cancelBtn" class="w-full max-w-xs py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-lg">
+                <i class="fas fa-times-circle mr-2"></i> Ləğv Et / Lobiye Qayıt
+            </button>
         </div>
     </div>
 
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="game.js"></script> 
+    <div id="gameScreen" class="screen">
+        <!-- Skor göstergesi -->
+        <div id="scoreDisplay" class="w-full text-center text-lg font-bold text-yellow-300 py-1 bg-black bg-opacity-50 mb-1" style="display: none;">
+            Sen 0 - 0 Rakip
+        </div>
+        
+        <div class="w-full flex justify-between items-center p-1">
+            <div class="text-left pl-2">
+                <div id="myLives" class="text-xl">❤️❤️❤️</div>
+                <div class="text-xs text-blue-300">Sənin Canın</div>
+            </div>
+            
+            <div class="text-center">
+                <h1 class="text-xl font-bold m-0 p-0">💣</h1>
+                <div id="levelInfo" class="text-xs">Level 1</div>
+            </div>
+            
+            <div class="text-right pr-2">
+                <div id="opponentLives" class="text-xl">❤️❤️❤️</div>
+                <div id="opponentName" class="text-xs text-blue-300">Rəqibin Canı</div>
+            </div>
+        </div>
+        
+        <div class="w-full text-center p-1">
+            <div id="turnStatus" class="text-sm font-bold text-yellow-400">SIRA SƏNDƏ </div>
+            <div id="actionMessage" class="text-xs text-gray-300">Bir kart seç</div>
+        </div>
+        <p id="roleStatus" class="text-gray-300 text-xs bg-gray-700 p-2 rounded-lg"></p>
+
+        <div id="gameContent" class="bg-gray-800 rounded-xl w-full space-y-4 p-4 shadow-xl">
+            <h3 id="turnStatus" class="text-2xl font-bold text-red-400"></h3>
+            
+            <div id="gameBoard" class="grid w-full mx-auto">
+            </div>
+        </div>
+        
+        <button id="endGameBtn" class="btn bg-red-600 hover:bg-red-500 text-white text-sm py-3">🚪 Oyundan Çıx <i class="fas fa-door-open ml-2"></i></button>
+    </div>
+
+    <script src="languages.js"></script>
+    
+    <script type="module">
+        import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            window.languageManager.initLanguage();
+        });
+        
+        window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
+        window.setLanguage = languageManager.setLanguage;
+
+        // Socket.IO sunucu URL'si
+        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; // Render üzerindeki Socket.IO sunucusu
+        let socket;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 5;
+        
+        function validateInput() {
+            const username = UIElements.usernameInput.value.trim();
+            if (username.length < 2) {
+                UIElements.showGlobalMessage('Zəhmət olmasa etibarlı bir istifadəçi adı daxil edin.', true);
+                return false;
+            }
+            return username;
+        }
+
+        function connectToServer() {
+            try {
+                console.log('Servərə Bağlanır...🚀:', LIVE_SERVER_URL);
+                
+                socket = io(LIVE_SERVER_URL, {
+                    transports: ['websocket', 'polling'],
+                    reconnection: true,
+                    reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
+                    reconnectionDelay: 1000,
+                    reconnectionDelayMax: 5000,
+                    timeout: 20000,
+                    forceNew: true
+                });
+
+                socket.on('connect', () => {
+                    console.log('Servərə Qoşuldu ✅');
+                    reconnectAttempts = 0; // Bağlantı başarılı olursa yeniden deneme sayacını sıfırla
+                    UIElements.showGlobalMessage('Serverə Qoşuldu ✅ Oynaya Bilərsiniz', false);
+                    showScreen('lobby');
+                });
+                
+                socket.on('connect_error', (err) => {
+                    console.error('Bağlantı Xətası:', err);
+                    reconnectAttempts++;
+                    
+                    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+                        UIElements.showGlobalMessage('Serverə Bağlanmadı. Səhifəni Yeniləyin 🔁.', true);
+                    } else {
+                        UIElements.showGlobalMessage(`Bağlantı Xətası. Təkrar Qoşulur (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`, true);
+                    }
+                    
+                    showScreen('lobby');
+                });
+                
+                socket.on('disconnect', (reason) => {
+                    console.log('Bağlantı kesildi, sebep:', reason);
+                    if (reason === 'io server disconnect') {
+                        // Sunucu bağlantıyı kestiğinde yeniden bağlan
+                        socket.connect();
+                    }
+                    UIElements.showGlobalMessage('Bağlantı kesildi. Yeniden bağlanılıyor...', true);
+                });
+                
+                socket.on('reconnect', (attemptNumber) => {
+                    console.log(`Yeniden bağlantı başarılı (${attemptNumber}. deneme)`);
+                    UIElements.showGlobalMessage('Sunucuya yeniden bağlanıldı.', false);
+                });
+                
+                socket.on('reconnect_failed', () => {
+                    console.error('Yeniden bağlantı başarısız oldu');
+                    UIElements.showGlobalMessage('Sunucuya bağlanılamadı. Lütfen sayfayı yenileyin.', true);
+                });
+
+                // --- Eşleşme Olayları ---
+                socket.on('roomCreated', (code) => {
+                    document.getElementById('roomCodeDisplay').textContent = code;
+                    document.getElementById('waitTitle').textContent = 'Otağınız Quruldu! 🎉';
+                    document.getElementById('codeArea').classList.remove('hidden');
+                    document.getElementById('waitStatus').textContent = 'Otaq kodunu dostunuza göndərin və qoşulmasını gözləyin.';
+                });
+                
+                socket.on('joinFailed', (message) => {
+                    UIElements.showGlobalMessage(message, true);
+                    showScreen('lobby');
+                });
+                
+                socket.on('gameStart', ({ players, roomCode }) => {
+                    const opponent = players.find(p => p.id !== socket.id);
+                    const self = players.find(p => p.id === socket.id);
+                    
+                    setupSocketHandlers(socket, roomCode, self.isHost, opponent.username);
+                });
+
+            } catch (e) {
+                console.error('Socket.IO genel hatası:', e);
+                UIElements.showGlobalMessage('Kritik qoşulma xətası baş verdi.', true);
+            }
+        }
+        
+        // --- Olay Dinleyicileri ---
+        document.getElementById('createRoomBtn').addEventListener('click', () => {
+            const username = validateInput();
+            if (!username) return;
+            
+            showScreen('wait');
+            document.getElementById('waitTitle').textContent = 'Otaq Qurulur...';
+            document.getElementById('waitStatus').textContent = 'Zəhmət olmasa gözləyin...';
+            document.getElementById('codeArea').classList.add('hidden');
+            socket.emit('createRoom', { username });
+        });
+        
+        document.getElementById('joinRoomBtn').addEventListener('click', () => {
+            const username = validateInput();
+            if (!username) return;
+            
+            const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            if (!roomCode) {
+                UIElements.showGlobalMessage('Xahiş olunur otaq kodunu daxil edin', true);
+                return;
+            }
+            
+            showScreen('wait');
+            document.getElementById('waitTitle').textContent = `Otağa Qoşulma: ${roomCode}`;
+            document.getElementById('waitStatus').textContent = 'Qoşulunur...';
+            document.getElementById('codeArea').classList.add('hidden');
+            socket.emit('joinRoom', { username, roomCode });
+        });
+
+        document.getElementById('cancelBtn').addEventListener('click', () => {
+            if (socket && socket.connected) {
+                socket.emit('leaveRoom', { roomCode: document.getElementById('roomCodeDisplay').textContent });
+            }
+            UIElements.resetGame();
+        });
+        
+        document.getElementById('endGameBtn').addEventListener('click', UIElements.resetGame);
+        
+        document.getElementById('copyCodeBtn').addEventListener('click', () => {
+            const textToCopy = document.getElementById('roomCodeDisplay').textContent;
+            navigator.clipboard.writeText(textToCopy)
+                .then(() => UIElements.showGlobalMessage('Otaq Kodu Kopyalandı!', false))
+                .catch(() => UIElements.showGlobalMessage('Kopyalama uğursuz oldu.', true));
+        });
+
+        document.addEventListener('DOMContentLoaded', connectToServer);
+    </script>
 </body>
 </html>
