@@ -35,7 +35,7 @@
             overflow: hidden; /* Tam ekran için kaydırmayı engelle */
             font-family: 'Inter', sans-serif; /* Daha modern bir font */
             -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale; 
+            -moz-osx-font-smoothing: grayscale;
         }
 
         body { 
@@ -391,9 +391,60 @@
         }
         
     </style>
+    <style>
+        /* Loading Message Styles */
+        #loadingMessage {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+        #loadingMessage.show {
+            opacity: 1;
+        }
+        #loadingMessage p {
+            margin: 5px 0;
+            font-size: 1.1rem;
+            line-height: 1.5;
+        }
+        .spinner {
+            width: 30px;
+            height: 30px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            margin-bottom: 15px;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@700&family=Chakra+Petch:wght@700&display=swap" rel="stylesheet">
 </head>
 <body class="bg-gray-900 select-none">
+    <!-- Loading Message -->
+    <div id="loadingMessage">
+        <div class="spinner"></div>
+        <p>Server qoşulur, zəhmət olmasa gözləyin...</p>
+        <p>Connecting to server, please wait...</p>
+    </div>
+    
     <div class="language-selector">
         <button id="language-button" class="language-button" onclick="toggleLanguageSelector()">
             <span id="current-language">🇦🇿</span>
