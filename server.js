@@ -15,17 +15,17 @@ server.headersTimeout = 65000; // 65 saniye
 const io = new Server(server, {
     cors: {
         origin: "*", 
-        methods: ["GET", "POST"],
-        credentials: true
+        methods: ["GET", "POST"]
     },
-    pingInterval: 10000,  // 10 saniyede bir ping at
-    pingTimeout: 5000,    // 5 saniye yanıt bekle
-    transports: ['websocket'], // Sadece WebSocket kullan
-    allowEIO3: true,      // Socket.io v2 uyumluluğu
-    maxHttpBufferSize: 1e8, // Maksimum buffer boyutu (100MB)
-    serveClient: false,   // Socket.io client dosyalarını sunma
-    cookie: false,        // Cookie kullanma
-    httpCompression: true // HTTP sıkıştırmayı etkinleştir
+    transports: ['websocket', 'polling'] // Hem WebSocket hem de polling kullan
+});
+
+// Bağlantı hatalarını dinle
+io.engine.on("connection_error", (err) => {
+    console.log('Bağlantı hatası:', err.req);      // the request object
+    console.log(err.code);     // the error code, for example 1
+    console.log(err.message);  // the error message, for example "Session ID unknown"
+    console.log(err.context);  // some additional error context
 });
 
 // Bağlantı sınırlarını artırma
