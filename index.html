@@ -7,20 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Socket.io kütüphanesini daha erken yüklüyoruz -->
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" integrity="sha384-2huaZvOR9iDzHqsl6Zm5W5F5K5U5z5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f" crossorigin="anonymous"></script>
-    <script>
-        // Sayfa yüklenirken önbellek kontrolü yapıyoruz
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').then(registration => {
-                    console.log('ServiceWorker kaydı başarılı:', registration.scope);
-                }).catch(error => {
-                    console.log('ServiceWorker kaydı başarısız:', error);
-                });
-            });
-        }
-    </script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     
     <style>
         /* === KENDİ OYUNUNUZDAN ALINAN CSS STİLLERİ VE MOBİL UYUM === */
@@ -407,11 +394,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@700&family=Chakra+Petch:wght@700&display=swap" rel="stylesheet">
 </head>
 <body class="bg-gray-900 select-none">
-    <!-- Bağlantı Durumu Göstergesi -->
-    <div id="connectionStatus" class="fixed top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold hidden">
-        Bağlantı yok
-    </div>
-    
     <div class="language-selector">
         <button id="language-button" class="language-button" onclick="toggleLanguageSelector()">
             <span id="current-language">🇦🇿</span>
