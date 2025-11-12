@@ -261,8 +261,8 @@ io.on('connection', (socket) => {
         try {
             const room = getRoomByPlayerId(socket.id);
             if (room) {
-                // Odaya emoji mesajını yayınla (gönderen hariç diğer oyuncuya)
-                socket.to(room.code).emit('emojiMessage', data);
+                // Odaya emoji mesajını tüm oyunculara yayınla (gönderen de dahil)
+                io.to(room.code).emit('emojiMessage', data);
                 console.log(`Emoji gönderildi: ${data.emoji} (Oda: ${room.code})`);
             }
         } catch (error) {
