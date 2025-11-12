@@ -684,9 +684,9 @@
                 });
 
                 socket.on('connect', () => {
-                    console.log('Servərə Qoşuldu ✅');
+                    console.log('Servərə Qoşuldu ✅ Connect Server ✅');
                     reconnectAttempts = 0; // Bağlantı başarılı olursa yeniden deneme sayacını sıfırla
-                    UIElements.showGlobalMessage('Serverə Qoşuldu ✅ Oynaya Bilərsiniz', false);
+                    UIElements.showGlobalMessage('Serverə Qoşuldu ✅ Connect Server ✅', false);
                     
                     // Hide loading message when connected - using direct style manipulation
                     const loadingMessage = document.getElementById('loadingMessage');
@@ -843,13 +843,16 @@
             const emojiContainer = document.getElementById('emojiContainer');
             const emojiSound = document.getElementById('emojiSound');
             
-            // Show emoji button in game screen
-            function showEmojiButton() {
+            // Show emoji button only in game screen
+            function showEmojiButton(show = true) {
                 const emojiChat = document.getElementById('emojiChat');
                 if (emojiChat) {
-                    emojiChat.style.display = 'block';
+                    emojiChat.style.display = show ? 'block' : 'none';
                 }
             }
+            
+            // Initially hide emoji button
+            showEmojiButton(false);
 
             // Toggle emoji picker
             emojiButton.addEventListener('click', (e) => {
@@ -884,7 +887,7 @@
                         window.socket.emit('emojiMessage', { emoji: emojiChar });
                     }
                     
-                    // Hide emoji picker
+                    // Only hide the emoji picker, keep the button visible
                     emojiContainer.style.display = 'none';
                 });
                 
@@ -926,11 +929,23 @@
                     showEmoji(data.emoji);
                 });
                 
-                // Show emoji button when game starts
+                // Show/hide emoji button based on screen
+                function updateEmojiButtonVisibility() {
+                    const gameScreen = document.getElementById('gameScreen');
+                    const isGameScreen = gameScreen && gameScreen.style.display !== 'none';
+                    showEmojiButton(isGameScreen);
+                }
+                
+                // Update button visibility when screen changes
+                window.addEventListener('screenChanged', updateEmojiButtonVisibility);
+                
+                // Initial update
+                updateEmojiButtonVisibility();
+                
+                // Update turn status messages with English translations when game starts
                 window.socket.on('gameReady', () => {
-                    showEmojiButton();
+                    updateEmojiButtonVisibility();
                     
-                    // Update turn status messages with English translations
                     const turnStatus = document.getElementById('turnStatus');
                     if (turnStatus) {
                         if (turnStatus.textContent.includes('SIRA SƏNDƏ')) {
