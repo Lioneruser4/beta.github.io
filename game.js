@@ -39,16 +39,9 @@ function initializeGame(boardSize) {
     gameData.turn = 0; // Host başlar
     gameData.isGameOver = false;
     
-    // Seviyeye göre can ve bomba sayılarını ayarla
-    if (level === 1) {
-        gameData.hostLives = 3;
-        gameData.guestLives = 3;
-        gameData.bombCount = 4; // İlk seviyede 4 bomba
-    } else {
-        gameData.hostLives = 3;
-        gameData.guestLives = 3;
-        gameData.bombCount = 6; // Diğer seviyelerde 6 bomba
-    }
+    // İlk seviyede 3 can, sonraki seviyelerde 3 can
+    gameData.hostLives = 3; 
+    gameData.guestLives = 3;
     
     gameStage = 'WAITING';
 }
@@ -63,11 +56,12 @@ let selectedBombs = []; // Kendi seçtiğimiz bombaların indexleri
 let gameData = {
     board: [], 
     turn: 0,  // 0 = Host, 1 = Guest
-    hostLives: 0,  // Server'dan gelen değerlerle güncellenecek
-    guestLives: 0, // Server'dan gelen değerlerle güncellenecek
+    hostLives: 3,  // Tüm seviyelerde 3 can
+    guestLives: 3, // Tüm seviyelerde 3 can
     cardsLeft: 0,
     hostBombs: [], 
     guestBombs: [],
+    maxBombs: 4, // İlk seviye için 4 bomba
     isGameOver: false
 };
 
@@ -386,6 +380,11 @@ function checkLevelCompletion() {
     if (gameStage !== 'PLAY' || gameData.isGameOver) return;
     if (!gameData.board || gameData.board.length === 0) return;
     
+    // Sonraki seviyede 6 bomba olacak şekilde ayarla
+    if (level >= 1) {
+        gameData.maxBombs = 6;
+    }
+    
     // Açılan kart sayısını kontrol et
     const openedCards = gameData.board.filter(card => card && card.opened).length;
     const totalCards = gameData.board.length;
@@ -422,68 +421,15 @@ function checkLevelCompletion() {
 }
 // --- SON ---
 
-// Bağlantı durumu yönetimi
-function updateConnectionStatus(status, message = '') {
-    const loadingScreen = document.getElementById('loadingScreen');
-    
-    if (!loadingScreen) {
-        console.warn('Yükleme ekranı bulunamadı!');
-        return;
-    }
-    
-    switch(status) {
-        case 'connecting':
-            loadingScreen.style.display = 'flex';
-            const loadingText = loadingScreen.querySelector('.loading-text');
-            if (loadingText) loadingText.textContent = 'Sunucuya bağlanılıyor...';
-            break;
-            
-        case 'connected':
-            setTimeout(() => {
-                loadingScreen.style.opacity = '0';
-                setTimeout(() => {
-                    loadingScreen.style.display = 'none';
-                    loadingScreen.style.opacity = '1';
-                }, 500);
-            }, 1000);
-            break;
-            
-        case 'error':
-            const errorText = loadingScreen.querySelector('.loading-text');
-            const subtext = loadingScreen.querySelector('.loading-subtext');
-            if (errorText) errorText.textContent = 'Bağlantı hatası! ' + (message || '');
-            if (subtext) subtext.textContent = 'Lütfen sayfayı yenileyin';
-            break;
-    }
-}
 
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
 export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     console.log('🎯 setupSocketHandlers ÇAĞRILDI!', { roomCode, isHost: host, opponent: opponentNameFromIndex });
     
-    // Bağlantı durumunu güncelle
-    updateConnectionStatus('connecting');
-    
     socket = s;
     currentRoomCode = roomCode;
     isHost = host;
     opponentName = opponentNameFromIndex;
-    
-    // Socket bağlantı olaylarını dinle
-    socket.on('connect', () => {
-        console.log('✅ Sunucuya bağlandı');
-        updateConnectionStatus('connected');
-    });
-    
-    socket.on('disconnect', (reason) => {
-        console.warn('❌ Sunucu bağlantısı kesildi:', reason);
-        updateConnectionStatus('error', 'Bağlantı kesildi');
-    });
-    
-    socket.on('connect_error', (error) => {
-        console.error('❌ Bağlantı hatası:', error);
-        updateConnectionStatus('error', 'Sunucuya bağlanılamadı');
-    });
     
     opponentNameEl.textContent = opponentName;
     roleStatusEl.textContent = isHost ? "🎮 Rol: HOST (Sen başla)" : "🎮 Rol: GUEST (Rakip başlar)";
@@ -497,10 +443,14 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     
     // Can sayılarını server'dan gelen bilgiyle güncelle
     socket.once('gameReady', ({ hostBombs, guestBombs }) => {
-        // Tüm seviyelerde 3 can, seviyeye göre bomba sayısını ayarla
-        gameData.hostLives = 3;
-        gameData.guestLives = 3;
-        gameData.bombCount = level === 1 ? 4 : 6; // İlk seviyede 4, diğerlerinde 6 bomba
+        // Seviyeye göre can sayılarını ayarla
+        if (level === 1) {
+            gameData.hostLives = 3;
+            gameData.guestLives = 3;
+        } else {
+            gameData.hostLives = 4;
+            gameData.guestLives = 4;
+        }
         updateStatusDisplay();
     });
     
@@ -519,10 +469,9 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
         // Oyun durumunu güncelle
         gameData.hostBombs = gameState.hostBombs || [];
         gameData.guestBombs = gameState.guestBombs || [];
-        // Server'dan gelen can değerlerini kullan, yoksa seviyeye göre ayarla
-        gameData.hostLives = gameState.hostLives || 3; // Tüm seviyelerde 3 can
-        gameData.guestLives = gameState.guestLives || 3; // Tüm seviyelerde 3 can
-        gameData.bombCount = gameState.bombCount || (level === 1 ? 4 : 6); // Seviyeye göre bomba sayısı
+        // Tüm seviyelerde 3 can
+        gameData.hostLives = 3;
+        gameData.guestLives = 3;
         gameData.turn = gameState.turn || 0;
         
         // Skor bilgilerini güncelle
