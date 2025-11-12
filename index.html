@@ -76,60 +76,6 @@
         }
         
         /* Language Selector */
-        .language-selector {
-            position: fixed;
-            top: env(safe-area-inset-top, 15px); /* Güvenli alanları destekle */
-            right: env(safe-area-inset-right, 15px);
-            z-index: 100;
-        }
-        .language-button {
-            background: rgba(255, 255, 255, 0.2);
-            border: 2px solid #63b3ed;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: #e2e8f0;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            transition: all 0.2s;
-            backdrop-filter: blur(5px);
-            padding: 0;
-        }
-        .language-button:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-        .language-options {
-            display: none;
-            position: absolute;
-            top: calc(100% + 5px);
-            right: 0;
-            background: #2d3748;
-            border: 1px solid #4a5568;
-            border-radius: 12px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
-            overflow: hidden;
-            z-index: 101;
-            min-width: 150px;
-            color: #e2e8f0;
-        }
-        .language-option {
-            padding: 10px 15px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            transition: background-color 0.2s;
-        }
-        .language-option:hover {
-            background-color: #4a5568;
-        }
-        .language-option:hover {
-            background: #4a5568;
-        }
-        
         /* Utility */
         .btn {
             @apply px-8 py-4 rounded-xl font-bold text-xl transition-all duration-300 flex items-center justify-center;
@@ -524,17 +470,6 @@
         <p>Connecting to server, please wait...</p>
     </div>
     
-    <div class="language-selector">
-        <button id="language-button" class="language-button" onclick="toggleLanguageSelector()">
-            <span id="current-language">🇦🇿</span>
-        </button>
-        <div id="language-selector" class="language-options">
-            <div class="language-option" onclick="setLanguage('az')">🇦🇿 Azərbaycanca</div>
-            <div class="language-option" onclick="setLanguage('tr')">🇹🇷 Türkçe</div>
-            <div class="language-option" onclick="setLanguage('en')">🇬🇧 English</div>
-        </div>
-    </div>
-    
     <div id="globalMessage" class="hidden w-11/12 max-w-md p-4 bg-red-600 text-white rounded-lg shadow-lg">
         <p id="globalMessageText"></p>
     </div>
@@ -844,17 +779,31 @@
             const emojiSound = document.getElementById('emojiSound');
             
             // Show/hide emoji button
-            function showEmojiButton(show = false) {  // Varsayılan olarak false yapıldı
+            function showEmojiButton(show = true) {  // Varsayılan olarak true yapıldı
                 const emojiChat = document.getElementById('emojiChat');
                 const gameScreen = document.getElementById('gameScreen');
                 
-                // Sadece oyun ekranı aktifse ve show true ise göster
-                const shouldShow = show && gameScreen && window.getComputedStyle(gameScreen).display !== 'none';
+                // Oyun ekranı kontrolü yapılıyor
+                const isGameScreen = gameScreen && window.getComputedStyle(gameScreen).display !== 'none';
                 
-                console.log('showEmojiButton called with:', {show, shouldShow});
+                // Debug için log
+                console.log('showEmojiButton called with:', {
+                    show,
+                    isGameScreen,
+                    gameScreenExists: !!gameScreen,
+                    currentDisplay: emojiChat ? window.getComputedStyle(emojiChat).display : 'emojiChat not found'
+                });
                 
                 if (emojiChat) {
-                    emojiChat.style.display = shouldShow ? 'block' : 'none';
+                    // Eğer oyun ekranındaysak ve show true ise göster
+                    if (isGameScreen && show) {
+                        emojiChat.style.display = 'block';
+                        console.log('Emoji butonu gösteriliyor');
+                    } else {
+                        emojiChat.style.display = 'none';
+                        console.log('Emoji butonu gizleniyor');
+                    }
+                    
                     // Emoji seçiciyi her zaman kapat
                     const emojiContainer = document.getElementById('emojiContainer');
                     if (emojiContainer) {
@@ -948,20 +897,15 @@
                     }
                 });
                 
-                // Show/hide emoji button only when game starts (cards are loaded)
-                function updateEmojiButtonVisibility() {
-                    const gameBoard = document.getElementById('gameBoard');
-                    const hasCards = gameBoard && gameBoard.children.length > 0;
-                    showEmojiButton(hasCards);
-                    
-                    // Debug log
-                    console.log('Updating emoji button visibility. Has cards:', hasCards);
-                }
-                
                 // Oyun başladığında emoji butonunu göster
                 window.socket.on('gameStart', () => {
                     console.log('Oyun başladı, emoji butonu gösteriliyor...');
-                    showEmojiButton(true);
+                    // 1 saniye bekle ve göster (oyun alanının yüklenmesi için)
+                    setTimeout(() => {
+                        showEmojiButton(true);
+                        // 2 saniye sonra tekrar kontrol et
+                        setTimeout(() => showEmojiButton(true), 2000);
+                    }, 1000);
                 });
                 
                 // Oyun bittiğinde veya lobiye dönüldüğünde
@@ -972,8 +916,21 @@
                 
                 // Oyun hazır olduğunda
                 window.socket.on('gameReady', () => {
-                    console.log('Oyun hazır, emoji butonu kontrol ediliyor...');
-                    showEmojiButton(true);
+                    console.log('Oyun hazır, emoji butonu gösteriliyor...');
+                    // 1 saniye bekle ve göster
+                    setTimeout(() => showEmojiButton(true), 1000);
+                });
+                
+                // Sayfa yüklendiğinde de kontrol et
+                window.addEventListener('load', () => {
+                    console.log('Sayfa yüklendi, emoji butonu kontrol ediliyor...');
+                    // 2 saniye bekle ve kontrol et
+                    setTimeout(() => {
+                        const gameScreen = document.getElementById('gameScreen');
+                        if (gameScreen && window.getComputedStyle(gameScreen).display !== 'none') {
+                            showEmojiButton(true);
+                        }
+                    }, 2000);
                 });
                 
                 // Oyun tahtası değişikliklerini izle
@@ -983,25 +940,26 @@
                         mutations.forEach((mutation) => {
                             if (mutation.type === 'childList') {
                                 console.log('Oyun tahtası değişti, emoji butonu güncelleniyor...');
-                                updateEmojiButtonVisibility();
+                                // Kartlar yüklendiyse butonu göster
+                                if (gameBoard.children.length > 0) {
+                                    showEmojiButton(true);
+                                }
                             }
                         });
                     });
                     
                     observer.observe(gameBoard, { childList: true, subtree: true });
                 }
-                window.socket.on('gameReady', () => {
-                    updateEmojiButtonVisibility();
-                    
-                    const turnStatus = document.getElementById('turnStatus');
-                    if (turnStatus) {
-                        if (turnStatus.textContent.includes('SIRA SƏNDƏ')) {
-                            turnStatus.textContent = 'SIRA SƏNDƏ / YOUR TURN';
-                        } else if (turnStatus.textContent.includes('SIRA RƏQİBDƏ')) {
-                            turnStatus.textContent = 'SIRA RƏQİBDƏ / OPPONENT\'S TURN';
-                        }
+                
+                // Sıra durumunu güncelle
+                const turnStatus = document.getElementById('turnStatus');
+                if (turnStatus) {
+                    if (turnStatus.textContent.includes('SIRA SƏNDƏ')) {
+                        turnStatus.textContent = 'SIRA SƏNDƏ / YOUR TURN';
+                    } else if (turnStatus.textContent.includes('SIRA RƏQİBDƏ')) {
+                        turnStatus.textContent = 'SIRA RƏQİBDƏ / OPPONENT'S TURN';
                     }
-                });
+                }
             } else {
                 // For testing without socket
                 showEmojiButton();
