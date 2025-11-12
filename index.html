@@ -819,7 +819,7 @@
         document.addEventListener('DOMContentLoaded', connectToServer);
     </script>
     <!-- Emoji Chat -->
-    <div id="emojiChat">
+    <div id="emojiChat" style="display: none;">
         <div id="emojiContainer">
             <div class="emoji-option" data-emoji="😀">😀</div>
             <div class="emoji-option" data-emoji="😂">😂</div>
@@ -829,6 +829,7 @@
             <div class="emoji-option" data-emoji="🎉">🎉</div>
             <div class="emoji-option" data-emoji="😎">😎</div>
             <div class="emoji-option" data-emoji="🤔">🤔</div>
+            <div class="emoji-option" data-emoji="💩">💩</div>
         </div>
         <button id="emojiButton">😊</button>
     </div>
@@ -844,6 +845,14 @@
             const emojiContainer = document.getElementById('emojiContainer');
             const emojiSound = document.getElementById('emojiSound');
             
+            // Show emoji button when game starts
+            if (window.socket) {
+                window.socket.on('gameReady', () => {
+                    const emojiChat = document.getElementById('emojiChat');
+                    if (emojiChat) emojiChat.style.display = 'flex';
+                });
+            }
+
             // Toggle emoji picker
             emojiButton.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -851,8 +860,10 @@
             });
 
             // Close emoji picker when clicking outside
-            document.addEventListener('click', () => {
-                emojiContainer.classList.remove('visible');
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#emojiContainer') && !e.target.closest('#emojiButton')) {
+                    emojiContainer.classList.remove('visible');
+                }
             });
 
             // Handle emoji selection
