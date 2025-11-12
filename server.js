@@ -7,14 +7,29 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
+// Performans optimizasyonu için HTTP Keep-Alive süresini artırıyoruz
+server.keepAliveTimeout = 60000; // 60 saniye
+server.headersTimeout = 65000; // 65 saniye
+
 // CORS DÜZELTME: Tüm kaynaklardan gelen bağlantılara izin verir
 const io = new Server(server, {
     cors: {
         origin: "*", 
-        methods: ["GET", "POST"]
+        methods: ["GET", "POST"],
+        credentials: true
     },
-    transports: ['websocket', 'polling'] 
+    pingInterval: 10000,  // 10 saniyede bir ping at
+    pingTimeout: 5000,    // 5 saniye yanıt bekle
+    transports: ['websocket'], // Sadece WebSocket kullan
+    allowEIO3: true,      // Socket.io v2 uyumluluğu
+    maxHttpBufferSize: 1e8, // Maksimum buffer boyutu (100MB)
+    serveClient: false,   // Socket.io client dosyalarını sunma
+    cookie: false,        // Cookie kullanma
+    httpCompression: true // HTTP sıkıştırmayı etkinleştir
 });
+
+// Bağlantı sınırlarını artırma
+server.maxConnections = 1000;
 
 const rooms = {};
 const scores = {}; // Skor takibi için obje
