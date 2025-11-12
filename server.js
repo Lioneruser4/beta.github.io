@@ -259,11 +259,24 @@ io.on('connection', (socket) => {
     // Emoji mesajlarını işle
     socket.on('emojiMessage', (data) => {
         try {
+            console.log('Emoji mesajı alındı:', data);
             const room = getRoomByPlayerId(socket.id);
+            
             if (room) {
+                console.log(`Oda bulundu: ${room.code}, Tüm oyunculara emoji gönderiliyor...`);
                 // Odaya emoji mesajını tüm oyunculara yayınla (gönderen de dahil)
                 io.to(room.code).emit('emojiMessage', data);
                 console.log(`Emoji gönderildi: ${data.emoji} (Oda: ${room.code})`);
+                
+                // Debug için oyuncu bilgilerini yazdır
+                console.log('Oda bilgileri:', {
+                    hostId: room.hostId,
+                    guestId: room.guestId,
+                    hostUsername: room.hostUsername,
+                    guestUsername: room.guestUsername
+                });
+            } else {
+                console.log('Oda bulunamadı veya oyuncu bir odada değil');
             }
         } catch (error) {
             console.error('Emoji mesajı işlenirken hata:', error);
