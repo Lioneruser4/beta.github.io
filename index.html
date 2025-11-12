@@ -897,26 +897,52 @@
                 });
             });
             
+            // Function to show emoji in center of screen
+            function showEmoji(emoji) {
+                const emojiDisplay = document.getElementById('emojiDisplay');
+                if (!emojiDisplay) return;
+                
+                // Clear any existing timeouts
+                if (window.emojiTimeout) {
+                    clearTimeout(window.emojiTimeout);
+                }
+                
+                emojiDisplay.textContent = emoji;
+                emojiDisplay.style.opacity = '1';
+                
+                // Hide after 2 seconds with fade out
+                window.emojiTimeout = setTimeout(() => {
+                    emojiDisplay.style.opacity = '0';
+                    // Clear the emoji after fade out completes
+                    setTimeout(() => {
+                        emojiDisplay.textContent = '';
+                    }, 300); // Match this with the CSS transition time
+                }, 2000);
+            }
+            
             // Listen for emoji messages from opponent
             if (window.socket) {
                 window.socket.on('emojiMessage', (data) => {
                     showEmoji(data.emoji);
                 });
-            }
-            
-            // Show emoji button when game starts
-            if (window.socket) {
+                
+                // Show emoji button when game starts
                 window.socket.on('gameReady', () => {
                     showEmojiButton();
+                    
+                    // Update turn status messages with English translations
+                    const turnStatus = document.getElementById('turnStatus');
+                    if (turnStatus) {
+                        if (turnStatus.textContent.includes('SIRA SƏNDƏ')) {
+                            turnStatus.textContent = 'SIRA SƏNDƏ / YOUR TURN';
+                        } else if (turnStatus.textContent.includes('SIRA RƏQİBDƏ')) {
+                            turnStatus.textContent = 'SIRA RƏQİBDƏ / OPPONENT\'S TURN';
+                        }
+                    }
                 });
             } else {
                 // For testing without socket
                 showEmojiButton();
-                
-                // Remove after animation
-                setTimeout(() => {
-                    emojiEl.remove();
-                }, 2000);
             }
         });
     </script>
