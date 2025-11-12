@@ -442,6 +442,9 @@ document.addEventListener('DOMContentLoaded', () => {
 export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     console.log('🎯 setupSocketHandlers ÇAĞRILDI!', { roomCode, isHost: host, opponent: opponentNameFromIndex });
     
+    // Show loading message when setting up socket handlers
+    showLoadingMessage();
+    
     socket = s;
     currentRoomCode = roomCode;
     isHost = host;
@@ -449,6 +452,11 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     
     opponentNameEl.textContent = opponentName;
     roleStatusEl.textContent = isHost ? "🎮 Rol: HOST (Sen başla)" : "🎮 Rol: GUEST (Rakip başlar)";
+    
+    // Hide loading message when connection is established
+    if (socket.connected) {
+        hideLoadingMessage();
+    }
 
     // Oyun başlatılıyor
     level = 1; // Yeni oyuna başlarken seviyeyi 1'e sıfırla
@@ -478,10 +486,10 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     
     // --- SOCKET.IO İŞLEYİCİLERİ ---
 
-    // Bağlantı kurulduğunda yükleme mesajını gizle
+    // Bağlantı durumunu dinle
     socket.on('connect', () => {
         console.log('✅ Sunucuya bağlandı');
-        hideLoadingMessage();
+        // Oyun hazır olduğunda gizlenecek
     });
 
     // Bağlantı hatası olduğunda
@@ -493,7 +501,10 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
 
     // Oyun Başlasın! (Bombalar otomatik seçildi)
     socket.on('gameReady', (gameState) => {
-        hideLoadingMessage(); // Oyun hazır olduğunda yükleme mesajını gizle
+        // Oyun hazır olduğunda yükleme mesajını gizle
+        setTimeout(() => {
+            hideLoadingMessage();
+        }, 500); // Küçük bir gecikme ile gizle
         console.log('🚀 gameReady EVENT ALINDI!', gameState);
         
         // Oyun durumunu güncelle
