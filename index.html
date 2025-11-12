@@ -442,6 +442,83 @@
             to { transform: rotate(360deg); }
         }
     </style>
+    <style>
+        /* Emoji Chat Styles */
+        #emojiChat {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #emojiButton {
+            background: #4a5568;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        #emojiButton:hover {
+            background: #2d3748;
+        }
+
+        #emojiContainer {
+            display: none;
+            background: white;
+            border-radius: 15px;
+            padding: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            flex-wrap: wrap;
+            gap: 8px;
+            max-width: 300px;
+            justify-content: center;
+        }
+
+        #emojiContainer.visible {
+            display: flex;
+        }
+
+        .emoji-option {
+            font-size: 28px;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 8px;
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        .emoji-option:hover {
+            background: #f0f0f0;
+            transform: scale(1.2);
+        }
+
+        .emoji-message {
+            position: fixed;
+            font-size: 48px;
+            z-index: 2000;
+            pointer-events: none;
+            animation: emojiFloat 2s forwards;
+            opacity: 0;
+        }
+
+        @keyframes emojiFloat {
+            0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
+            10% { opacity: 1; transform: translate(-50%, 0) scale(1.2); }
+            90% { opacity: 1; }
+            100% { transform: translate(-50%, -100px) scale(0.8); opacity: 0; }
+        }
+    </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@700&family=Chakra+Petch:wght@700&display=swap" rel="stylesheet">
 </head>
 <body class="bg-gray-900 select-none">
@@ -741,5 +818,98 @@
 
         document.addEventListener('DOMContentLoaded', connectToServer);
     </script>
-</body>
+    <!-- Emoji Chat -->
+    <div id="emojiChat">
+        <div id="emojiContainer">
+            <div class="emoji-option" data-emoji="😀">😀</div>
+            <div class="emoji-option" data-emoji="😂">😂</div>
+            <div class="emoji-option" data-emoji="😍">😍</div>
+            <div class="emoji-option" data-emoji="👍">👍</div>
+            <div class="emoji-option" data-emoji="👎">👎</div>
+            <div class="emoji-option" data-emoji="🎉">🎉</div>
+            <div class="emoji-option" data-emoji="😎">😎</div>
+            <div class="emoji-option" data-emoji="🤔">🤔</div>
+        </div>
+        <button id="emojiButton">😊</button>
+    </div>
+
+    <audio id="emojiSound" preload="auto">
+        <source src="sound4.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        // Emoji Chat Functionality
+        document.addEventListener('DOMContentLoaded', () => {
+            const emojiButton = document.getElementById('emojiButton');
+            const emojiContainer = document.getElementById('emojiContainer');
+            const emojiSound = document.getElementById('emojiSound');
+            
+            // Toggle emoji picker
+            emojiButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                emojiContainer.classList.toggle('visible');
+            });
+
+            // Close emoji picker when clicking outside
+            document.addEventListener('click', () => {
+                emojiContainer.classList.remove('visible');
+            });
+
+            // Handle emoji selection
+            document.querySelectorAll('.emoji-option').forEach(emoji => {
+                emoji.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const emoji = emoji.getAttribute('data-emoji');
+                    
+                    // Play sound
+                    if (emojiSound) {
+                        emojiSound.currentTime = 0;
+                        emojiSound.play().catch(e => console.log('Ses çalınamadı:', e));
+                    }
+                    
+                    // Show emoji locally
+                    showEmoji(emoji, true);
+                    
+                    // Send to opponent if socket exists
+                    if (window.socket && window.socket.connected) {
+                        window.socket.emit('emojiMessage', { emoji });
+                    }
+                    
+                    // Close picker
+                    emojiContainer.classList.remove('visible');
+                });
+            });
+
+            // Listen for emoji messages
+            if (window.socket) {
+                window.socket.on('emojiMessage', (data) => {
+                    showEmoji(data.emoji, false);
+                });
+            }
+
+            // Function to display emoji
+            function showEmoji(emoji, isLocal) {
+                const emojiEl = document.createElement('div');
+                emojiEl.className = 'emoji-message';
+                emojiEl.textContent = emoji;
+                
+                // Position based on local or remote player
+                if (isLocal) {
+                    emojiEl.style.left = '80%';
+                    emojiEl.style.bottom = '100px';
+                } else {
+                    emojiEl.style.left = '20%';
+                    emojiEl.style.bottom = '100px';
+                }
+                
+                document.body.appendChild(emojiEl);
+                
+                // Remove after animation
+                setTimeout(() => {
+                    emojiEl.remove();
+                }, 2000);
+            }
+        });
+    </script>
+    </body>
 </html>
