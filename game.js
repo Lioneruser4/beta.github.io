@@ -422,52 +422,39 @@ function checkLevelCompletion() {
 }
 // --- SON ---
 
-
 // Bağlantı durumu yönetimi
 function updateConnectionStatus(status, message = '') {
     const loadingScreen = document.getElementById('loadingScreen');
-    const statusElement = document.getElementById('connectionStatus') || createStatusElement();
     
-    statusElement.className = `connection-status ${status}`;
+    if (!loadingScreen) {
+        console.warn('Yükleme ekranı bulunamadı!');
+        return;
+    }
     
     switch(status) {
         case 'connecting':
-            statusElement.innerHTML = '<i class="icon fas fa-spinner fa-spin"></i> Sunucuya bağlanılıyor...';
             loadingScreen.style.display = 'flex';
+            const loadingText = loadingScreen.querySelector('.loading-text');
+            if (loadingText) loadingText.textContent = 'Sunucuya bağlanılıyor...';
             break;
+            
         case 'connected':
-            statusElement.innerHTML = '<i class="icon fas fa-check-circle"></i> Sunucuya bağlandı';
             setTimeout(() => {
                 loadingScreen.style.opacity = '0';
                 setTimeout(() => {
                     loadingScreen.style.display = 'none';
                     loadingScreen.style.opacity = '1';
                 }, 500);
-                
-                // Bağlantı başarılı olduğunda bildirimi otomatik kaldır
-                setTimeout(() => {
-                    statusElement.style.opacity = '0';
-                    setTimeout(() => statusElement.remove(), 300);
-                }, 3000);
-            }, 500);
+            }, 1000);
             break;
+            
         case 'error':
-            statusElement.innerHTML = `<i class="icon fas fa-exclamation-triangle"></i> ${message || 'Bağlantı hatası'}`;
-            loadingScreen.querySelector('p').textContent = 'Bağlantı hatası! Lütfen tekrar deneyin.';
-            break;
-        case 'disconnected':
-            statusElement.innerHTML = '<i class="icon fas fa-plug"></i> Sunucuyla bağlantı kesildi';
-            loadingScreen.querySelector('p').textContent = 'Sunucuyla bağlantı kesildi. Tekrar bağlanılıyor...';
+            const errorText = loadingScreen.querySelector('.loading-text');
+            const subtext = loadingScreen.querySelector('.loading-subtext');
+            if (errorText) errorText.textContent = 'Bağlantı hatası! ' + (message || '');
+            if (subtext) subtext.textContent = 'Lütfen sayfayı yenileyin';
             break;
     }
-}
-
-// Bağlantı durumu göstergesi oluştur
-function createStatusElement() {
-    const statusElement = document.createElement('div');
-    statusElement.id = 'connectionStatus';
-    document.body.appendChild(statusElement);
-    return statusElement;
 }
 
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
@@ -490,7 +477,7 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     
     socket.on('disconnect', (reason) => {
         console.warn('❌ Sunucu bağlantısı kesildi:', reason);
-        updateConnectionStatus('disconnected');
+        updateConnectionStatus('error', 'Bağlantı kesildi');
     });
     
     socket.on('connect_error', (error) => {
