@@ -7,32 +7,14 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// Performans optimizasyonu için HTTP Keep-Alive süresini artırıyoruz
-server.keepAliveTimeout = 60000; // 60 saniye
-server.headersTimeout = 65000; // 65 saniye
-
-// Basit ve etkili Socket.IO yapılandırması
+// CORS DÜZELTME: Tüm kaynaklardan gelen bağlantılara izin verir
 const io = new Server(server, {
     cors: {
-        origin: "*",
+        origin: "*", 
         methods: ["GET", "POST"]
     },
-    // Daha basit ve güvenilir ayarlar
-    transports: ['websocket', 'polling'],
-    allowEIO3: true
+    transports: ['websocket', 'polling'] 
 });
-
-// Bağlantı hatalarını dinle
-io.engine.on("connection_error", (err) => {
-    console.error('Bağlantı hatası:', {
-        code: err.code,
-        message: err.message,
-        context: err.context
-    });
-});
-
-// Bağlantı sınırlarını artırma
-server.maxConnections = 1000;
 
 const rooms = {};
 const scores = {}; // Skor takibi için obje
