@@ -1,5 +1,26 @@
 // Dosya Adı: game.js
-let socket;
+// Socket.io bağlantısını daha erken başlatıyoruz
+let socket = io({
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 20000,
+    transports: ['websocket']
+});
+
+// Bağlantı durumunu dinle
+socket.on('connect', () => {
+    console.log('Sunucuya bağlandı');
+});
+
+socket.on('disconnect', () => {
+    console.log('Sunucu bağlantısı kesildi');});
+
+socket.on('connect_error', (error) => {
+    console.error('Bağlantı hatası:', error);
+});
+
 let currentRoomCode = '';
 let isHost = false;
 let opponentName = '';
