@@ -830,7 +830,7 @@
     </div>
     
     <!-- Emoji Display (shown in center of screen) -->
-    <div id="emojiDisplay" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 999; font-size: 80px; pointer-events: none; opacity: 0; transition: opacity 0.3s; text-shadow: 0 0 20px rgba(255,255,255,0.8);"></div>
+    <div id="emojiDisplay" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 999; font-size: 80px; pointer-events: none; opacity: 0; transition: opacity 0.3s; text-shadow: 0 0 10px rgba(0,0,0,0.5); background-color: transparent;"></div>
 
     <audio id="emojiSound" preload="auto">
         <source src="sound4.mp3" type="audio/mpeg">
@@ -843,11 +843,16 @@
             const emojiContainer = document.getElementById('emojiContainer');
             const emojiSound = document.getElementById('emojiSound');
             
-            // Show emoji button only in game screen
+            // Show/hide emoji button
             function showEmojiButton(show = true) {
                 const emojiChat = document.getElementById('emojiChat');
                 if (emojiChat) {
                     emojiChat.style.display = show ? 'block' : 'none';
+                    // Always hide the emoji container when toggling button visibility
+                    const emojiContainer = document.getElementById('emojiContainer');
+                    if (emojiContainer) {
+                        emojiContainer.style.display = 'none';
+                    }
                 }
             }
             
@@ -926,21 +931,51 @@
             // Listen for emoji messages from opponent
             if (window.socket) {
                 window.socket.on('emojiMessage', (data) => {
+                    console.log('Emoji received:', data.emoji);
                     showEmoji(data.emoji);
+                    
+                    // Play sound for received emoji
+                    if (emojiSound) {
+                        emojiSound.currentTime = 0;
+                        emojiSound.play().catch(e => console.log('Sound play failed:', e));
+                    }
                 });
                 
-                // Show/hide emoji button based on screen
+                // Show/hide emoji button only when game starts (cards are loaded)
                 function updateEmojiButtonVisibility() {
-                    const gameScreen = document.getElementById('gameScreen');
-                    const isGameScreen = gameScreen && gameScreen.style.display !== 'none';
-                    showEmojiButton(isGameScreen);
+                    const gameBoard = document.getElementById('gameBoard');
+                    const hasCards = gameBoard && gameBoard.children.length > 0;
+                    showEmojiButton(hasCards);
+                    
+                    // Debug log
+                    console.log('Updating emoji button visibility. Has cards:', hasCards);
                 }
                 
-                // Update button visibility when screen changes
-                window.addEventListener('screenChanged', updateEmojiButtonVisibility);
+                // Listen for game board changes to detect when cards are loaded
+                const gameBoard = document.getElementById('gameBoard');
+                if (gameBoard) {
+                    const observer = new MutationObserver((mutations) => {
+                        mutations.forEach((mutation) => {
+                            if (mutation.type === 'childList') {
+                                updateEmojiButtonVisibility();
+                            }
+                        });
+                    });
+                    
+                    observer.observe(gameBoard, { childList: true, subtree: true });
+                    
+                    // Also check when game starts
+                    if (window.socket) {
+                        window.socket.on('gameStart', () => {
+                            console.log('Game started, checking for cards...');
+                            // Small delay to ensure cards are rendered
+                            setTimeout(updateEmojiButtonVisibility, 500);
+                        });
+                    }
+                }
                 
-                // Initial update
-                updateEmojiButtonVisibility();
+                // Initial update (should be hidden initially)
+                showEmojiButton(false);
                 
                 // Update turn status messages with English translations when game starts
                 window.socket.on('gameReady', () => {
