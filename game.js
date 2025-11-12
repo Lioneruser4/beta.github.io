@@ -39,9 +39,11 @@ function initializeGame(boardSize) {
     gameData.turn = 0; // Host başlar
     gameData.isGameOver = false;
     
-    // İlk seviyede 3 can, sonraki seviyelerde 3 can
-    gameData.hostLives = 3; 
+    // İlk seviyede 3 can 4 bomba, diğer seviyelerde 3 can 6 bomba
+    gameData.hostLives = 3;
     gameData.guestLives = 3;
+    gameData.hostBombs = [];
+    gameData.guestBombs = [];
     
     gameStage = 'WAITING';
 }
@@ -56,12 +58,11 @@ let selectedBombs = []; // Kendi seçtiğimiz bombaların indexleri
 let gameData = {
     board: [], 
     turn: 0,  // 0 = Host, 1 = Guest
-    hostLives: 3,  // Tüm seviyelerde 3 can
-    guestLives: 3, // Tüm seviyelerde 3 can
+    hostLives: 0,  // Server'dan gelen değerlerle güncellenecek
+    guestLives: 0, // Server'dan gelen değerlerle güncellenecek
     cardsLeft: 0,
     hostBombs: [], 
     guestBombs: [],
-    maxBombs: 4, // İlk seviye için 4 bomba
     isGameOver: false
 };
 
@@ -380,11 +381,6 @@ function checkLevelCompletion() {
     if (gameStage !== 'PLAY' || gameData.isGameOver) return;
     if (!gameData.board || gameData.board.length === 0) return;
     
-    // Sonraki seviyede 6 bomba olacak şekilde ayarla
-    if (level >= 1) {
-        gameData.maxBombs = 6;
-    }
-    
     // Açılan kart sayısını kontrol et
     const openedCards = gameData.board.filter(card => card && card.opened).length;
     const totalCards = gameData.board.length;
@@ -421,6 +417,26 @@ function checkLevelCompletion() {
 }
 // --- SON ---
 
+
+// Yükleme mesajını göster/gizle fonksiyonları
+function showLoadingMessage() {
+    const loadingMessage = document.getElementById('loadingMessage');
+    if (loadingMessage) {
+        loadingMessage.classList.add('show');
+    }
+}
+
+function hideLoadingMessage() {
+    const loadingMessage = document.getElementById('loadingMessage');
+    if (loadingMessage) {
+        loadingMessage.classList.remove('show');
+    }
+}
+
+// Sayfa yüklendiğinde yükleme mesajını göster
+document.addEventListener('DOMContentLoaded', () => {
+    showLoadingMessage();
+});
 
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
 export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
@@ -462,16 +478,30 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     
     // --- SOCKET.IO İŞLEYİCİLERİ ---
 
+    // Bağlantı kurulduğunda yükleme mesajını gizle
+    socket.on('connect', () => {
+        console.log('✅ Sunucuya bağlandı');
+        hideLoadingMessage();
+    });
+
+    // Bağlantı hatası olduğunda
+    socket.on('connect_error', (error) => {
+        console.error('❌ Sunucu bağlantı hatası:', error);
+        showGlobalMessage('Sunucuya bağlanılamadı. Lütfen tekrar deneyin.', true);
+        hideLoadingMessage();
+    });
+
     // Oyun Başlasın! (Bombalar otomatik seçildi)
     socket.on('gameReady', (gameState) => {
+        hideLoadingMessage(); // Oyun hazır olduğunda yükleme mesajını gizle
         console.log('🚀 gameReady EVENT ALINDI!', gameState);
         
         // Oyun durumunu güncelle
         gameData.hostBombs = gameState.hostBombs || [];
         gameData.guestBombs = gameState.guestBombs || [];
-        // Tüm seviyelerde 3 can
-        gameData.hostLives = 3;
-        gameData.guestLives = 3;
+        // Server'dan gelen can değerlerini kullan
+        gameData.hostLives = gameState.hostLives || (level === 1 ? 3 : 4);
+        gameData.guestLives = gameState.guestLives || (level === 1 ? 3 : 4);
         gameData.turn = gameState.turn || 0;
         
         // Skor bilgilerini güncelle
