@@ -565,16 +565,26 @@
         document.addEventListener('DOMContentLoaded', () => {
             toggleRoomCodeInput();
             window.languageManager.initLanguage();
+            
+            // Sayfa yüklendiğinde sunucuya bağlan
+            console.log('Uygulama başlatılıyor...');
+            connectToServer();
         });
         
         window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
         window.setLanguage = languageManager.setLanguage;
 
-        // Socket.IO sunucu URL'si
-        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; // Render üzerindeki Socket.IO sunucusu
+        // Socket.IO sunucu URL'leri (yedekli)
+        const SERVER_URLS = [
+            'https://beta-github-io.onrender.com',  // Ana sunucu
+            'https://kartbombot-socketio.onrender.com',  // Yedek sunucu 1
+            'https://kartbombot-1.onrender.com'     // Yedek sunucu 2
+        ];
+        
         let socket;
+        let currentServerIndex = 0;
         let reconnectAttempts = 0;
-        const MAX_RECONNECT_ATTEMPTS = 5;
+        const MAX_RECONNECT_ATTEMPTS = 3;
         
         function validateInput() {
             if (isTelegramWebView && telegramUser) {
@@ -594,10 +604,17 @@
         }
 
         function connectToServer() {
+            if (currentServerIndex >= SERVER_URLS.length) {
+                console.error('Tüm sunucular deneniyor, bağlantı başarısız');
+                showGlobalMessage('Sunucuya bağlanılamadı. Lütfen daha sonra tekrar deneyin.');
+                return;
+            }
+            
+            const currentServer = SERVER_URLS[currentServerIndex];
+            console.log(`Sunucuya bağlanılıyor... (${currentServerIndex + 1}/${SERVER_URLS.length}):`, currentServer);
+            
             try {
-                console.log('Servərə Bağlanır...🚀:', LIVE_SERVER_URL);
-                
-                socket = io(LIVE_SERVER_URL, {
+                socket = io(currentServer, {
                     transports: ['websocket', 'polling'],
                     reconnection: true,
                     reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
@@ -667,8 +684,10 @@
                 });
 
             } catch (e) {
-                console.error('Socket.IO genel hatası:', e);
-                UIElements.showGlobalMessage('Kritik qoşulma xətası baş verdi.', true);
+                console.error('Sunucu bağlantı hatası:', e);
+                currentServerIndex++;
+                console.log('Bir sonraki sunucu deneniyor...');
+                setTimeout(connectToServer, 1000); // 1 saniye bekle ve bir sonraki sunucuya bağlan
             }
         }
         
@@ -735,7 +754,14 @@
                 .catch(() => UIElements.showGlobalMessage('Kopyalama uğursuz oldu.', true));
         });
 
-        document.addEventListener('DOMContentLoaded', connectToServer);
+        // Sunucu bağlantısı için otomatik yeniden deneme
+        setInterval(() => {
+            if (!socket || !socket.connected) {
+                console.log('Sunucu bağlantısı yok, yeniden deneniyor...');
+                currentServerIndex = 0; // Başa dön
+                connectToServer();
+            }
+        }, 10000); // Her 10 saniyede bir kontrol et
     </script>
 </body>
 </html>
