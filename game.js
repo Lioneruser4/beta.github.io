@@ -422,14 +422,23 @@ function checkLevelCompletion() {
 function showLoadingMessage() {
     const loadingMessage = document.getElementById('loadingMessage');
     if (loadingMessage) {
+        console.log('🔵 Yükleme mesajı gösteriliyor');
+        loadingMessage.classList.remove('hidden');
         loadingMessage.classList.add('show');
+        loadingMessage.style.display = 'flex';
     }
 }
 
 function hideLoadingMessage() {
     const loadingMessage = document.getElementById('loadingMessage');
     if (loadingMessage) {
+        console.log('🔴 Yükleme mesajı gizleniyor');
         loadingMessage.classList.remove('show');
+        loadingMessage.classList.add('hidden');
+        // 300ms sonra tamamen gizle (CSS geçişi için süre)
+        setTimeout(() => {
+            loadingMessage.style.display = 'none';
+        }, 300);
     }
 }
 
@@ -443,6 +452,7 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     console.log('🎯 setupSocketHandlers ÇAĞRILDI!', { roomCode, isHost: host, opponent: opponentNameFromIndex });
     
     // Show loading message when setting up socket handlers
+    console.log('📡 Yükleme mesajı gösteriliyor...');
     showLoadingMessage();
     
     socket = s;
@@ -452,11 +462,6 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     
     opponentNameEl.textContent = opponentName;
     roleStatusEl.textContent = isHost ? "🎮 Rol: HOST (Sen başla)" : "🎮 Rol: GUEST (Rakip başlar)";
-    
-    // Hide loading message when connection is established
-    if (socket.connected) {
-        hideLoadingMessage();
-    }
 
     // Oyun başlatılıyor
     level = 1; // Yeni oyuna başlarken seviyeyi 1'e sıfırla
@@ -501,10 +506,19 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
 
     // Oyun Başlasın! (Bombalar otomatik seçildi)
     socket.on('gameReady', (gameState) => {
+        console.log('🎮 Oyun hazır, yükleme mesajı kaldırılıyor...');
         // Oyun hazır olduğunda yükleme mesajını gizle
+        hideLoadingMessage();
+        
+        // Ekstra güvenlik için 2 saniye sonra tekrar kontrol et
         setTimeout(() => {
-            hideLoadingMessage();
-        }, 500); // Küçük bir gecikme ile gizle
+            const loadingMessage = document.getElementById('loadingMessage');
+            if (loadingMessage && !loadingMessage.classList.contains('hidden')) {
+                console.log('🔄 Yükleme mesajı hala görünür, tekrar kaldırılıyor...');
+                loadingMessage.classList.add('hidden');
+                loadingMessage.style.display = 'none';
+            }
+        }, 2000);
         console.log('🚀 gameReady EVENT ALINDI!', gameState);
         
         // Oyun durumunu güncelle
