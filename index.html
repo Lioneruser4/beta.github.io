@@ -445,12 +445,7 @@
     <style>
         /* Emoji Chat Styles */
         #emojiChat {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            display: flex;
+            display: none; /* Will be shown via JavaScript */
             gap: 10px;
             align-items: center;
         }
@@ -611,7 +606,7 @@
     <div id="gameScreen" class="screen">
         <!-- Skor göstergesi -->
         <div id="scoreDisplay" class="w-full text-center text-lg font-bold text-yellow-300 py-1 bg-black bg-opacity-50 mb-1" style="display: none;">
-            Sen 0 - 0 Rakip
+          Bot beta versiyadadır - Bot is in beta version
         </div>
         
         <div class="w-full flex justify-between items-center p-1">
@@ -819,7 +814,7 @@
         document.addEventListener('DOMContentLoaded', connectToServer);
     </script>
     <!-- Emoji Chat -->
-    <div id="emojiChat" style="display: none;">
+    <div id="emojiChat" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000;">
         <div id="emojiContainer">
             <div class="emoji-option" data-emoji="😀">😀</div>
             <div class="emoji-option" data-emoji="😂">😂</div>
@@ -845,12 +840,12 @@
             const emojiContainer = document.getElementById('emojiContainer');
             const emojiSound = document.getElementById('emojiSound');
             
-            // Show emoji button when game starts
-            if (window.socket) {
-                window.socket.on('gameReady', () => {
-                    const emojiChat = document.getElementById('emojiChat');
-                    if (emojiChat) emojiChat.style.display = 'flex';
-                });
+            // Make sure emoji button is visible
+            const emojiChat = document.getElementById('emojiChat');
+            if (emojiChat) {
+                emojiChat.style.display = 'flex';
+                emojiChat.style.flexDirection = 'column';
+                emojiChat.style.alignItems = 'center';
             }
 
             // Toggle emoji picker
