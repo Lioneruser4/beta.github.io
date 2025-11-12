@@ -1,45 +1,58 @@
 // Dosya Adı: game.js
-// Socket.io bağlantısını başlat
-let socket;
+// Socket bağlantısını başlat
+let socket = io({
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
+    timeout: 20000,
+    transports: ['websocket', 'polling'],
+    upgrade: true,
+    forceNew: true
+});
+
 let currentRoomCode = '';
 
-// Sayfa yüklendiğinde bağlantıyı başlat
-document.addEventListener('DOMContentLoaded', () => {
-    // Socket.io bağlantısını oluştur
-    socket = io({
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 20000,
-        transports: ['websocket', 'polling']
-    });
-
-    // Bağlantı durumunu dinle
-    socket.on('connect', () => {
-        console.log('Sunucuya bağlandı');
-        // Bağlantı başarılı olduğunda gerekli işlemleri yap
-        if (typeof onSocketConnected === 'function') {
-            onSocketConnected();
-        }
-    });
-
-    socket.on('disconnect', (reason) => {
-        console.log('Sunucu bağlantısı kesildi:', reason);
-        if (reason === 'io server disconnect') {
-            // Sunucu bağlantıyı kestiğinde yeniden bağlanmayı dene
-            socket.connect();
-        }
-    });
-
-    socket.on('connect_error', (error) => {
-        console.error('Bağlantı hatası:', error);
-        // Hata durumunda kullanıcıya bilgi ver
-        if (typeof showGlobalMessage === 'function') {
-            showGlobalMessage('Sunucuya bağlanılamadı. Tekrar deneniyor...', true);
-        }
-    });
+// Bağlantı durumunu dinle
+socket.on('connect', () => {
+    console.log('✅ Sunucuya bağlantı başarılı');
+    if (typeof showGlobalMessage === 'function') {
+        showGlobalMessage('Sunucuya bağlandı', false);
+    }
+    
+    // Eğer daha önce bir odaya katıldıysan, yeniden katıl
+    if (currentRoomCode) {
+        const username = localStorage.getItem('username') || 'Oyuncu';
+        socket.emit('joinRoom', { username, roomCode: currentRoomCode });
+    }
 });
+
+socket.on('disconnect', (reason) => {
+    console.log('❌ Sunucu bağlantısı kesildi:', reason);
+    if (reason === 'io server disconnect') {
+        // Sunucu bağlantıyı kestiğinde yeniden bağlan
+        setTimeout(() => socket.connect(), 1000);
+    }
+});
+
+socket.on('connect_error', (error) => {
+    console.error('❌ Bağlantı hatası:', error.message);
+    if (typeof showGlobalMessage === 'function') {
+        showGlobalMessage('Sunucuya bağlanılamadı. Tekrar deneniyor...', true);
+    }
+    // 5 saniye sonra tekrar bağlanmayı dene
+    setTimeout(() => socket.connect(), 5000);
+});
+
+// Oda bilgilerini güncelle
+function updateRoomStatus(room) {
+    if (!room) return;
+    
+    const statusElement = document.getElementById('roomStatus');
+    if (statusElement) {
+        statusElement.textContent = `Oda: ${room.code} | Oyuncular: ${room.playerCount}/2`;
+    }
+}
 let isHost = false;
 let opponentName = '';
 
