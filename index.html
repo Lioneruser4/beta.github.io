@@ -517,9 +517,32 @@
             </div>
             <div class="or-divider">VEYA</div>
             <button id="matchmakingBtn" class="btn btn-secondary w-full">
-                <i class="fas fa-random mr-2"></i> Online Eşleştirme
+                <i class="fas fa-random mr-2"></i> Onlayn Oyunçu Tap / Find Player
             </button>
-            <div id="matchmakingStatus" class="text-sm text-gray-400 mt-2 hidden"></div>
+            <div id="matchmakingPanel" class="hidden mt-4 p-4 bg-gray-800 rounded-lg">
+                <div class="flex flex-col items-center">
+                    <div class="animate-pulse mb-4">
+                        <i class="fas fa-search fa-2x text-blue-400"></i>
+                    </div>
+                    <p id="matchmakingMessage" class="text-center mb-4">Oyunçu axtarılır... / Searching for opponent...</p>
+                    <div class="flex space-x-4">
+                        <button id="cancelMatchmakingBtn" class="btn btn-red">
+                            <i class="fas fa-times mr-2"></i> Ləğv et / Cancel
+                        </button>
+                    </div>
+                    <div id="matchFoundSection" class="hidden mt-4 text-center">
+                        <p id="opponentName" class="text-lg font-bold text-green-400"></p>
+                        <div class="flex justify-center space-x-4 mt-4">
+                            <button id="playNowBtn" class="btn btn-primary">
+                                <i class="fas fa-play mr-2"></i> Oyna / Play
+                            </button>
+                            <button id="declineMatchBtn" class="btn btn-secondary">
+                                <i class="fas fa-times mr-2"></i> Rədd et / Decline
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     
@@ -753,56 +776,135 @@
             socket.emit('createRoom', { username });
         });
         
-        // Eşleştirme durumu değişkenleri
+        // Matchmaking variables
         let isInMatchmaking = false;
         let matchmakingInterval = null;
+        let matchStartTime = null;
+        let matchFound = false;
+        let opponentName = '';
         
-        // Eşleştirme durumunu güncelle
+        // Update matchmaking status message
         function updateMatchmakingStatus(message, isError = false) {
-            const statusEl = document.getElementById('matchmakingStatus');
-            if (statusEl) {
-                statusEl.textContent = message;
-                statusEl.className = `text-sm mt-2 ${isError ? 'text-red-400' : 'text-blue-400'}`;
-                statusEl.classList.remove('hidden');
+            const messageEl = document.getElementById('matchmakingMessage');
+            if (messageEl) {
+                messageEl.textContent = message;
+                messageEl.className = `text-center mb-4 ${isError ? 'text-red-400' : 'text-white'}`;
             }
         }
         
-        // Eşleştirme butonu
+        // Format time (mm:ss)
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        // Update matchmaking timer
+        function updateMatchmakingTimer() {
+            if (!isInMatchmaking || matchFound) return;
+            
+            const now = Math.floor(Date.now() / 1000);
+            const elapsed = now - matchStartTime;
+            
+            updateMatchmakingStatus(`Oyunçu axtarılır... / Searching for opponent... (${formatTime(elapsed)})`);
+        }
+        
+        // Show match found UI
+        function showMatchFound(opponent) {
+            matchFound = true;
+            opponentName = opponent;
+            
+            document.getElementById('opponentName').textContent = 
+                `Oyunçu tapıldı: ${opponent} / Player found: ${opponent}`;
+            document.getElementById('matchFoundSection').classList.remove('hidden');
+            document.getElementById('cancelMatchmakingBtn').classList.add('hidden');
+            
+            // Auto-accept match after 10 seconds
+            setTimeout(() => {
+                if (matchFound) {
+                    startGameWithOpponent();
+                }
+            }, 10000);
+        }
+        
+        // Start game with matched opponent
+        function startGameWithOpponent() {
+            if (window.socket) {
+                window.socket.emit('acceptMatch');
+                document.getElementById('matchmakingPanel').classList.add('hidden');
+                document.getElementById('matchmakingBtn').innerHTML = 
+                    '<i class="fas fa-random mr-2"></i> Onlayn Oyunçu Tap / Find Player';
+                isInMatchmaking = false;
+                matchFound = false;
+            }
+        }
+        
+        // Cancel matchmaking
+        function cancelMatchmaking() {
+            if (window.socket) {
+                window.socket.emit('cancelMatchmaking');
+            }
+            
+            document.getElementById('matchmakingPanel').classList.add('hidden');
+            document.getElementById('matchFoundSection').classList.add('hidden');
+            document.getElementById('cancelMatchmakingBtn').classList.remove('hidden');
+            document.getElementById('matchmakingBtn').innerHTML = 
+                '<i class="fas fa-random mr-2"></i> Onlayn Oyunçu Tap / Find Player';
+            
+            isInMatchmaking = false;
+            matchFound = false;
+            
+            if (matchmakingInterval) {
+                clearInterval(matchmakingInterval);
+                matchmakingInterval = null;
+            }
+        }
+        
+        // Matchmaking button click handler
         document.getElementById('matchmakingBtn').addEventListener('click', () => {
             const username = UIElements.usernameInput.value.trim();
             if (!username) {
-                UIElements.showGlobalMessage('Lütfen bir kullanıcı adı girin.', true);
+                UIElements.showGlobalMessage('İstifadəçi adı daxil edin / Please enter a username', true);
                 return;
             }
             
             if (isInMatchmaking) {
-                // Eşleşmeyi iptal et
-                if (window.socket) {
-                    window.socket.emit('cancelMatchmaking');
-                }
-                isInMatchmaking = false;
-                document.getElementById('matchmakingBtn').innerHTML = '<i class="fas fa-random mr-2"></i> Online Eşleştirme';
-                updateMatchmakingStatus('Eşleşme iptal edildi.');
-                if (matchmakingInterval) {
-                    clearInterval(matchmakingInterval);
-                    matchmakingInterval = null;
-                }
-            } else {
-                // Eşleşme başlat
-                if (window.socket) {
-                    window.socket.emit('joinMatchmaking', { username });
-                    isInMatchmaking = true;
-                    document.getElementById('matchmakingBtn').innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Eşleşme Aranıyor...';
-                    updateMatchmakingStatus('Eşleşme aranıyor...');
-                    
-                    // Eşleşme durumunu kontrol et
-                    matchmakingInterval = setInterval(() => {
-                        if (window.socket) {
-                            window.socket.emit('getMatchmakingStatus');
-                        }
-                    }, 5000);
-                }
+                // Show matchmaking panel if already in matchmaking
+                document.getElementById('matchmakingPanel').classList.toggle('hidden');
+                return;
             }
+            
+            // Start matchmaking
+            if (window.socket) {
+                window.socket.emit('joinMatchmaking', { username });
+                isInMatchmaking = true;
+                matchFound = false;
+                matchStartTime = Math.floor(Date.now() / 1000);
+                
+                // Show matchmaking panel
+                const panel = document.getElementById('matchmakingPanel');
+                panel.classList.remove('hidden');
+                document.getElementById('matchFoundSection').classList.add('hidden');
+                document.getElementById('cancelMatchmakingBtn').classList.remove('hidden');
+                
+                // Start timer
+                updateMatchmakingTimer();
+                matchmakingInterval = setInterval(updateMatchmakingTimer, 1000);
+            }
+        });
+        
+        // Cancel matchmaking button
+        document.getElementById('cancelMatchmakingBtn').addEventListener('click', cancelMatchmaking);
+        
+        // Play now button
+        document.getElementById('playNowBtn').addEventListener('click', startGameWithOpponent);
+        
+        // Decline match button
+        document.getElementById('declineMatchBtn').addEventListener('click', () => {
+            if (window.socket) {
+                window.socket.emit('declineMatch');
+            }
+            cancelMatchmaking();
         });
         
         // Odaya katıl butonu
