@@ -184,12 +184,12 @@ function updateStatusDisplay() {
         turnStatusEl.classList.add('text-yellow-600');
     } else if (gameStage === 'PLAY') {
         if (isMyTurn) {
-            turnStatusEl.textContent = '✅ SIRA SƏNDƏ !';
+            turnStatusEl.textContent = '✅ SIRA SƏNDƏ / ✅ It's your turn ';
             actionMessageEl.textContent = "Bir kart aç! Rakibinizin bombalarından kaçınmaya çalışın.";
             turnStatusEl.classList.remove('text-red-600');
             turnStatusEl.classList.add('text-green-600');
         } else {
-            turnStatusEl.textContent = '⏳ ONUN SIRASI';
+            turnStatusEl.textContent = '⏳ ONUN SIRASI / ⏳ IT'S HIS TURN ';
             actionMessageEl.textContent = "RƏQİBİNİZİ GÖZLƏYİN...";
             turnStatusEl.classList.remove('text-green-600');
             turnStatusEl.classList.add('text-red-600');
@@ -197,7 +197,7 @@ function updateStatusDisplay() {
     }
     
     if (gameData.isGameOver && gameStage === 'ENDED') {
-        turnStatusEl.textContent = "✅ OYUN BİTDİ!";
+        turnStatusEl.textContent = "✅ OYUN BİTDİ! / GAME OVER!";
         actionMessageEl.textContent = "Sonuçlar hesaplanıyor...";
     }
 }
