@@ -18,30 +18,25 @@ const io = new Server(server, {
 });
 
 const rooms = {};
-const scores = {}; // Skor takibi için obje
-const users = new Map(); // Kullanıcı bilgilerini saklamak için
-const userSockets = new Map(); // Kullanıcı ID'lerini socket ID'lere eşleştirmek için
+const users = new Map();
+const userSockets = new Map();
 
-// Tüm cihazlarda güvenle çalışacak emojiler
-const EMOJIS = [
-    '😀', // Gülümseyen yüz
-    '😊', // Gözleri kapalı gülümseyen yüz
-    '😎', // Güneş gözlüklü yüz
-    '😍', // Kalp gözlü yüz
-    '😜', // Dil çıkaran yüz
-    '😇', // Halo melek yüzü
-    '😴', // Uyuyan yüz
-    '😷', // Maske takan yüz
-    '🤖', // Robot
-    '👻', // Hayalet
-    '👽', // Uzaylı
-    '🤡', // Palyaço
-    '🔥',
-    '🌊',
-    '🌚',
-    '😺',
-    '🌼'
-];
+// Oyun ayarları
+const GAME_SETTINGS = {
+    PLAYER_SPEED: 10,
+    BULLET_SPEED: 15,
+    PLAYER_HEALTH: 100,
+    BULLET_DAMAGE: 25,
+    GAME_DURATION: 120000 // 2 dakika (milisaniye cinsinden)
+};
+
+// Oyun durumları
+const GAME_STATES = {
+    WAITING: 'waiting',
+    COUNTDOWN: 'countdown',
+    PLAYING: 'playing',
+    FINISHED: 'finished'
+};
 
 function generateRoomCode() {
     let code = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -73,66 +68,140 @@ io.on('connection', (socket) => {
     console.log(`Yeni bağlantı: ${socket.id}`);
     
     // Kullanıcı bilgilerini ayarla
-    socket.on('setUserInfo', (userData) => {
-        const { userId, username, isTelegramUser, roomCode } = userData;
+    // Oyun olaylarını dinle
+    socket.on('joinGame', ({ username }) => {
+        // Mevcut bir odaya katıl veya yeni oda oluştur
+        let room = null;
+        let roomCode = '';
+        let isHost = false;
         
-        // Kullanıcıyı kaydet
-        users.set(userId, {
-            id: userId,
-            username,
-            isTelegramUser,
-            socketId: socket.id,
-            roomCode,
-            lastSeen: new Date()
-        });
-        
-        // Socket ID'yi kullanıcı ID'sine eşle
-        userSockets.set(socket.id, userId);
-        
-        console.log(`Kullanıcı bilgisi güncellendi: ${userId} (${username})`);
-        
-        // Kullanıcı bir odaya bağlanmaya çalışıyorsa, odaya ekle
-        socket.on('joinRoom', ({ code, username }) => {
-            const room = rooms[code];
-            if (!room) {
-                socket.emit('error', { message: 'Oda bulunamadı!' });
-                return;
+        // Boş oda ara
+        for (const [code, r] of Object.entries(rooms)) {
+            if (r.playerCount < 2) {
+                room = r;
+                roomCode = code;
+                break;
             }
-            
-            if (room.playerCount >= 2) {
-                socket.emit('error', { message: 'Oda dolu!' });
-                return;
-            }
-            
-            // Kullanıcı bilgilerini güncelle
-            const userId = userSockets.get(socket.id);
-            if (userId) {
-                const user = users.get(userId);
-                if (user) {
-                    user.roomCode = code;
-                    users.set(userId, user);
+        }
+        
+        if (!room) {
+            // Yeni oda oluştur
+            roomCode = generateRoomCode();
+            isHost = true;
+            room = {
+                code: roomCode,
+                playerCount: 1,
+                hostId: socket.id,
+                hostUsername: username,
+                hostUserId: userSockets.get(socket.id),
+                guestId: null,
+                guestUsername: null,
+                gameState: {
+                    status: GAME_STATES.WAITING,
+                    countdown: 3,
+                    players: {
+                        [socket.id]: {
+                            id: socket.id,
+                            username,
+                            x: 0,
+                            y: isHost ? 100 : window.innerHeight - 100,
+                            health: GAME_SETTINGS.PLAYER_HEALTH,
+                            score: 0,
+                            isHost: true
+                        }
+                    },
+                    bullets: [],
+                    startTime: null,
+                    endTime: null
                 }
-            }
-            
+            };
+            rooms[roomCode] = room;
+        } else {
+            // Mevcut odaya katıl
             room.playerCount++;
             room.guestId = socket.id;
             room.guestUsername = username;
-            room.guestUserId = userId;
+            room.guestUserId = userSockets.get(socket.id);
+            room.gameState.players[socket.id] = {
+                id: socket.id,
+                username,
+                x: 0,
+                y: window.innerHeight - 100,
+                health: GAME_SETTINGS.PLAYER_HEALTH,
+                score: 0,
+                isHost: false
+            };
             
-            socket.join(code);
-            socket.emit('joinedRoom', { 
-                code, 
-                isHost: false, 
-                opponentName: room.hostUsername 
-            });
+            // Oyunu başlat
+            room.gameState.status = GAME_STATES.COUNTDOWN;
+            room.gameState.startTime = Date.now() + 3000; // 3 saniye geri sayım
             
-            // Odaya ikinci oyuncu katıldı, oyunu başlat
-            io.to(room.hostId).emit('gameStart', { 
-                isHost: true, 
-                opponentName: room.guestUsername 
-            });
-            
-            console.log(`Oyun başladı: ${code} (${room.hostUsername} vs ${room.guestUsername})`);
+            // Geri sayım başlat
+            const countdownInterval = setInterval(() => {
+                room.gameState.countdown--;
+                io.to(roomCode).emit('gameUpdate', room.gameState);
+                
+                if (room.gameState.countdown <= 0) {
+                    clearInterval(countdownInterval);
+                    room.gameState.status = GAME_STATES.PLAYING;
+                    room.gameState.startTime = Date.now();
+                    room.gameState.endTime = room.gameState.startTime + GAME_SETTINGS.GAME_DURATION;
+                    io.to(roomCode).emit('gameStart', room.gameState);
+                }
+            }, 1000);
+        }
+        
+        socket.join(roomCode);
+        socket.emit('joinedGame', {
+            roomCode,
+            isHost,
+            gameState: room.gameState
+        });
+        
+        // Oyun güncellemelerini dinle
+        socket.on('playerMove', (data) => {
+            if (room && room.gameState.players[socket.id]) {
+                const player = room.gameState.players[socket.id];
+                player.x = data.x;
+                io.to(roomCode).emit('gameUpdate', room.gameState);
+            }
+        });
+        
+        socket.on('playerShoot', (data) => {
+            if (room && room.gameState.status === GAME_STATES.PLAYING) {
+                const bullet = {
+                    id: Date.now(),
+                    x: data.x,
+                    y: data.y,
+                    direction: data.direction,
+                    owner: socket.id
+                };
+                room.gameState.bullets.push(bullet);
+                io.to(roomCode).emit('bulletFired', bullet);
+            }
+        });
+        
+        socket.on('playerHit', (data) => {
+            if (room && room.gameState.status === GAME_STATES.PLAYING) {
+                const player = Object.values(room.gameState.players).find(p => p.id === data.playerId);
+                if (player) {
+                    player.health -= GAME_SETTINGS.BULLET_DAMAGE;
+                    
+                    // Skoru güncelle
+                    const shooter = room.gameState.players[data.shooterId];
+                    if (shooter) {
+                        shooter.score += 10;
+                    }
+                    
+                    // Oyun bitiş kontrolü
+                    if (player.health <= 0) {
+                        room.gameState.status = GAME_STATES.FINISHED;
+                        room.gameState.winner = shooter.username;
+                    }
+                    
+                    io.to(roomCode).emit('gameUpdate', room.gameState);
+                }
+            }
         });
     });
     
@@ -162,41 +231,35 @@ io.on('connection', (socket) => {
         }
     });
     
-    socket.on('createRoom', ({ username }) => {
-        const code = generateRoomCode();
-        rooms[code] = {
-            code,
-            playerCount: 1,
-            hostId: socket.id,
-            hostUsername: username,
-            hostUserId: userSockets.get(socket.id),
-            guestId: null,
-            guestUsername: null,
-            gameState: {
-                stage: 'WAITING', // WAITING, SELECTION, PLAY, ENDED
-                turn: 0, // 0 = Host, 1 = Guest
-                hostBombs: [],
-                guestBombs: [],
-                hostLives: 3,  // İlk seviyede 3 can
-                guestLives: 3, // İlk seviyede 3 can
-                hostBombsSelected: false,
-                guestBombsSelected: false,
-                level: 1,
-                opened: [], // Açılan kart indeksleri
-                boardSize: 20 // Tüm seviyelerde 20 kart
+    // Oyun döngüsü - sürekli çalışacak
+    setInterval(() => {
+        Object.values(rooms).forEach(room => {
+            if (room.gameState.status === GAME_STATES.PLAYING) {
+                // Mermileri güncelle
+                room.gameState.bullets = room.gameState.bullets.filter(bullet => {
+                    // Merminin yeni pozisyonunu hesapla
+                    bullet.y += bullet.direction === 'up' ? -GAME_SETTINGS.BULLET_SPEED : GAME_SETTINGS.BULLET_SPEED;
+                    
+                    // Ekran dışına çıkan mermileri kaldır
+                    return bullet.y > 0 && bullet.y < window.innerHeight;
+                });
+                
+                // Oyun süresi kontrolü
+                if (Date.now() >= room.gameState.endTime) {
+                    room.gameState.status = GAME_STATES.FINISHED;
+                    // En yüksek skorlu oyuncuyu belirle
+                    const players = Object.values(room.gameState.players);
+                    const winner = players.reduce((prev, current) => 
+                        (prev.score > current.score) ? prev : current
+                    );
+                    room.gameState.winner = winner.username;
+                }
+                
+                // Oyun durumunu tüm oyunculara gönder
+                io.to(room.code).emit('gameUpdate', room.gameState);
             }
-        };
-        socket.join(code);
-        
-        // Kullanıcı bilgilerini güncelle
-        const userId = userSockets.get(socket.id);
-        if (userId) {
-            const user = users.get(userId);
-            if (user) {
-                user.roomCode = code;
-                users.set(userId, user);
-            }
-        }
+        });
+    }, 1000 / 60); // Saniyede 60 kare
         
         socket.emit('roomCreated', { code });
         console.log(`Oda oluşturuldu: ${code} (${username})`);
