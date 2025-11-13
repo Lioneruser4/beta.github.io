@@ -75,7 +75,6 @@
             display: flex; 
         }
         
-        /* Language Selector */
         /* Utility */
         .btn {
             @apply px-8 py-4 rounded-xl font-bold text-xl transition-all duration-300 flex items-center justify-center;
@@ -577,18 +576,9 @@
         <button id="endGameBtn" class="btn bg-red-600 hover:bg-red-500 text-white text-sm py-3">🚪 Oyundan Çıx <i class="fas fa-door-open ml-2"></i></button>
     </div>
 
-    <script src="languages.js"></script>
-    
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
         
-        document.addEventListener('DOMContentLoaded', () => {
-            window.languageManager.initLanguage();
-        });
-        
-        window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
-        window.setLanguage = languageManager.setLanguage;
-
         // Socket.IO sunucu URL'si
         const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; // Render üzerindeki Socket.IO sunucusu
         let socket;
@@ -604,9 +594,42 @@
             return username;
         }
 
+        function showConnectionStatus(message, isError = false) {
+            console.log(isError ? '❌ ' + message : '✅ ' + message);
+            const statusElement = document.getElementById('connectionStatus');
+            if (statusElement) {
+                statusElement.textContent = message;
+                statusElement.style.color = isError ? '#ef4444' : '#10b981';
+                statusElement.style.display = 'block';
+            }
+            
+            // Hata durumunda loading mesajını güncelle
+            if (isError) {
+                const loadingMessage = document.getElementById('loadingMessage');
+                if (loadingMessage) {
+                    const messageText = loadingMessage.querySelector('p');
+                    if (messageText) {
+                        messageText.textContent = 'Bağlantı hatası: ' + message;
+                    }
+                }
+            }
+        }
+
         function connectToServer() {
             try {
-                console.log('Servərə Bağlanır...🚀:', LIVE_SERVER_URL);
+                const loadingMessage = document.getElementById('loadingMessage');
+                if (loadingMessage) {
+                    loadingMessage.style.display = 'flex';
+                    loadingMessage.style.visibility = 'visible';
+                }
+                
+                showConnectionStatus('Sunucuya bağlanılıyor...', false);
+                console.log('Sunucuya bağlanılıyor...', LIVE_SERVER_URL);
+                
+                // Önceki bağlantıyı temizle
+                if (socket) {
+                    socket.disconnect();
+                }
                 
                 socket = io(LIVE_SERVER_URL, {
                     transports: ['websocket', 'polling'],
@@ -614,37 +637,45 @@
                     reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
                     reconnectionDelay: 1000,
                     reconnectionDelayMax: 5000,
-                    timeout: 20000,
-                    forceNew: true
+                    timeout: 10000,
+                    forceNew: true,
+                    withCredentials: true
                 });
 
                 socket.on('connect', () => {
-                    console.log('Servərə Qoşuldu ✅ Connect Server ✅');
-                    reconnectAttempts = 0; // Bağlantı başarılı olursa yeniden deneme sayacını sıfırla
-                    UIElements.showGlobalMessage('Serverə Qoşuldu ✅ Connect Server ✅', false);
+                    showConnectionStatus('Sunucuya bağlandı!', false);
+                    console.log('✅ Sunucuya bağlandı!');
+                    reconnectAttempts = 0;
                     
-                    // Hide loading message when connected - using direct style manipulation
-                    const loadingMessage = document.getElementById('loadingMessage');
+                    // Yükleme mesajını gizle
                     if (loadingMessage) {
-                        loadingMessage.style.display = 'none';
-                        loadingMessage.style.visibility = 'hidden';
                         loadingMessage.style.opacity = '0';
-                        loadingMessage.remove(); // Remove from DOM completely
+                        setTimeout(() => {
+                            loadingMessage.style.display = 'none';
+                            loadingMessage.style.visibility = 'hidden';
+                            loadingMessage.remove(); // Remove from DOM completely
+                        }, 500);
                     }
                     
                     showScreen('lobby');
                 });
                 
                 socket.on('connect_error', (err) => {
-                    console.error('Bağlantı Xətası:', err);
+                    const errorMessage = `Bağlantı hatası: ${err.message || 'Bilinmeyen hata'}`;
+                    console.error('❌ ' + errorMessage, err);
+                    showConnectionStatus(errorMessage, true);
+                    
                     reconnectAttempts++;
                     
-                    // Hide loading message on error
+                    // Hata durumunda yükleme mesajını güncelle
                     const loadingMessage = document.getElementById('loadingMessage');
                     if (loadingMessage) {
-                        loadingMessage.classList.remove('show');
-                        loadingMessage.classList.add('hidden');
-                        loadingMessage.style.display = 'none';
+                        const messageText = loadingMessage.querySelector('p');
+                        if (messageText) {
+                            messageText.textContent = errorMessage;
+                        }
+                        loadingMessage.style.display = 'flex';
+                        loadingMessage.style.visibility = 'visible';
                     }
                     
                     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
@@ -957,7 +988,7 @@
                     if (turnStatus.textContent.includes('SIRA SƏNDƏ')) {
                         turnStatus.textContent = 'SIRA SƏNDƏ / YOUR TURN';
                     } else if (turnStatus.textContent.includes('SIRA RƏQİBDƏ')) {
-                        turnStatus.textContent = 'SIRA RƏQİBDƏ / OPPONENT'S TURN';
+                        turnStatus.textContent = 'SIRA RƏQİBDƏ / OPPONENT S TURN';
                     }
                 }
             } else {
