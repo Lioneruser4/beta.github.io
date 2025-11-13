@@ -860,6 +860,90 @@
             }
         }
         
+        // Matchmaking variables
+        let isInMatchmaking = false;
+        let matchmakingInterval = null;
+        let matchStartTime = null;
+        let matchFound = false;
+        let opponentName = '';
+        
+        // Update matchmaking status message
+        function updateMatchmakingStatus(message, isError = false) {
+            const messageEl = document.getElementById('matchmakingMessage');
+            if (messageEl) {
+                messageEl.textContent = message;
+                messageEl.className = `text-center mb-4 ${isError ? 'text-red-400' : 'text-white'}`;
+            }
+        }
+        
+        // Format time (mm:ss)
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        // Update matchmaking timer
+        function updateMatchmakingTimer() {
+            if (!isInMatchmaking || matchFound) return;
+            
+            const now = Math.floor(Date.now() / 1000);
+            const elapsed = now - matchStartTime;
+            
+            updateMatchmakingStatus(`Oyunçu axtarılır... / Searching for opponent... (${formatTime(elapsed)})`);
+        }
+        
+        // Show match found UI
+        function showMatchFound(opponent) {
+            matchFound = true;
+            opponentName = opponent;
+            
+            document.getElementById('opponentName').textContent = 
+                `Oyunçu tapıldı: ${opponent} / Player found: ${opponent}`;
+            document.getElementById('matchFoundSection').classList.remove('hidden');
+            document.getElementById('cancelMatchmakingBtn').classList.add('hidden');
+            
+            // Auto-accept match after 10 seconds
+            setTimeout(() => {
+                if (matchFound) {
+                    startGameWithOpponent();
+                }
+            }, 10000);
+        }
+        
+        // Start game with matched opponent
+        function startGameWithOpponent() {
+            if (window.socket) {
+                window.socket.emit('acceptMatch');
+                document.getElementById('matchmakingPanel').classList.add('hidden');
+                document.getElementById('matchmakingBtn').innerHTML = 
+                    '<i class="fas fa-random mr-2"></i> Onlayn Oyunçu Tap / Find Player';
+                isInMatchmaking = false;
+                matchFound = false;
+            }
+        }
+        
+        // Cancel matchmaking
+        function cancelMatchmaking() {
+            if (window.socket) {
+                window.socket.emit('cancelMatchmaking');
+            }
+            
+            document.getElementById('matchmakingPanel').classList.add('hidden');
+            document.getElementById('matchFoundSection').classList.add('hidden');
+            document.getElementById('cancelMatchmakingBtn').classList.remove('hidden');
+            document.getElementById('matchmakingBtn').innerHTML = 
+                '<i class="fas fa-random mr-2"></i> Onlayn Oyunçu Tap / Find Player';
+            
+            isInMatchmaking = false;
+            matchFound = false;
+            
+            if (matchmakingInterval) {
+                clearInterval(matchmakingInterval);
+                matchmakingInterval = null;
+            }
+        }
+        
         // Matchmaking button click handler
         document.getElementById('matchmakingBtn').addEventListener('click', () => {
             const username = UIElements.usernameInput.value.trim();
@@ -869,7 +953,7 @@
             }
             
             if (isInMatchmaking) {
-                // Show matchmaking panel if already in matchmaking
+                // Show/hide matchmaking panel if already in matchmaking
                 document.getElementById('matchmakingPanel').classList.toggle('hidden');
                 return;
             }
@@ -888,16 +972,51 @@
                 document.getElementById('cancelMatchmakingBtn').classList.remove('hidden');
                 
                 // Start timer
+                updateMatchmakingStatus('Oyunçu axtarılır... / Searching for opponent...');
                 updateMatchmakingTimer();
                 matchmakingInterval = setInterval(updateMatchmakingTimer, 1000);
+                
+                // Listen for match found event
+                window.socket.off('matchFound').on('matchFound', (data) => {
+                    showMatchFound(data.opponentName);
+                });
+                
+                // Listen for matchmaking status updates
+                window.socket.off('matchmakingStatus').on('matchmakingStatus', (data) => {
+                    if (data.message) {
+                        updateMatchmakingStatus(data.message, data.isError);
+                    }
+                    if (data.inQueue === false) {
+                        cancelMatchmaking();
+                    }
+                });
+                
+                // Listen for opponent accepted event
+                window.socket.off('opponentAccepted').on('opponentAccepted', () => {
+                    updateMatchmakingStatus('Rakibiniz kabul etti! / Your opponent accepted!');
+                });
+                
+                // Listen for matched event (when both players accept)
+                window.socket.off('matched').on('matched', (data) => {
+                    console.log('Matched with opponent:', data);
+                    // The game will be started by the server
+                });
             }
         });
         
         // Cancel matchmaking button
         document.getElementById('cancelMatchmakingBtn').addEventListener('click', cancelMatchmaking);
         
-        // Play now button
+        // Play now button (accept match)
         document.getElementById('playNowBtn').addEventListener('click', startGameWithOpponent);
+        
+        // Decline match button
+        document.getElementById('declineMatchBtn').addEventListener('click', () => {
+            if (window.socket) {
+                window.socket.emit('declineMatch');
+            }
+            cancelMatchmaking();
+        });
         
         // Decline match button
         document.getElementById('declineMatchBtn').addEventListener('click', () => {
