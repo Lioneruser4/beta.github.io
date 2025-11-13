@@ -184,20 +184,20 @@ function updateStatusDisplay() {
         turnStatusEl.classList.add('text-yellow-600');
     } else if (gameStage === 'PLAY') {
         if (isMyTurn) {
-            turnStatusEl.textContent = '✅ SIRA SƏNDƏ / ✅ It's your turn ';
+            turnStatusEl.textContent = '✅ SIRA SƏNDƏ / You Play';
             actionMessageEl.textContent = "Bir kart aç! Rakibinizin bombalarından kaçınmaya çalışın.";
             turnStatusEl.classList.remove('text-red-600');
             turnStatusEl.classList.add('text-green-600');
         } else {
-            turnStatusEl.textContent = '⏳ ONUN SIRASI / ⏳ IT'S HIS TURN ';
-            actionMessageEl.textContent = "RƏQİBİNİZİ GÖZLƏYİN...";
+            turnStatusEl.textContent = '⏳ ONUN SIRASI / HIS TURN';
+            actionMessageEl.textContent = "RƏQİBİNİZİ GÖZLƏYİN / WAIT FOR YOUR OPPONENT";
             turnStatusEl.classList.remove('text-green-600');
             turnStatusEl.classList.add('text-red-600');
         }
     }
     
     if (gameData.isGameOver && gameStage === 'ENDED') {
-        turnStatusEl.textContent = "✅ OYUN BİTDİ! / GAME OVER!";
+        turnStatusEl.textContent = "✅ OYUN BİTDİ! ";
         actionMessageEl.textContent = "Sonuçlar hesaplanıyor...";
     }
 }
