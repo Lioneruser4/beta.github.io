@@ -8,6 +8,8 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
     <style>
         /* === KENDİ OYUNUNUZDAN ALINAN CSS STİLLERİ VE MOBİL UYUM === */
@@ -445,8 +447,26 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@700&family=Chakra+Petch:wght@700&display=swap" rel="stylesheet">
 </head>
 <body class="bg-gray-900 select-none">
+    <!-- Telegram Login Screen -->
+    <div id="telegramLoginScreen" class="screen flex items-center justify-center p-4">
+        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full text-center">
+            <div class="mb-6">
+                <i class="fab fa-telegram text-5xl text-blue-400 mb-4"></i>
+                <h1 class="text-2xl font-bold text-white mb-2">Telegram ile Giriş Yap</h1>
+                <p class="text-gray-300 mb-6">Oyunu oynamak için Telegram hesabınızla giriş yapın.</p>
+            </div>
+            <button id="telegramLoginBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center space-x-2">
+                <i class="fab fa-telegram text-xl"></i>
+                <span>Telegram ile Giriş Yap</span>
+            </button>
+            <div class="mt-4">
+                <button id="guestLoginBtn" class="text-blue-400 hover:text-blue-300 text-sm">Misafir olarak devam et</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Loading Message -->
-    <div id="loadingMessage">
+    <div id="loadingMessage" style="display: none;">
         <div class="spinner"></div>
         <p>Server qoşulur, zəhmət olmasa gözləyin...</p>
         <p>Connecting to server, please wait...</p>
