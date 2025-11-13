@@ -66,53 +66,218 @@ function matchPlayers() {
         const player1 = matchmakingQueue.shift();
         const player2 = matchmakingQueue.shift();
         
-        // Yeni oda oluştur
-        const code = generateRoomCode();
-        rooms[code] = {
-            code,
-            playerCount: 2,
-            hostId: player1.id,
-            hostUsername: player1.username,
-            guestId: player2.id,
-            guestUsername: player2.username,
-            gameState: {
-                stage: 'PLAY',
-                turn: 0,
-                hostBombs: [],
-                guestBombs: [],
-                hostLives: 3,
-                guestLives: 3,
-                hostBombsSelected: false,
-                guestBombsSelected: false,
-                level: 1,
-                opened: [],
-                boardSize: 20
+        // Check if players are still connected
+        if (!player1.socket.connected || !player2.socket.connected) {
+            if (player1.socket.connected) {
+                player1.socket.emit('matchmakingStatus', {
+                    inQueue: true,
+                    message: 'Bağlantı xətası, yenidən axtarılır... / Connection error, searching again...'
+                });
+                matchmakingQueue.push(player1);
+            }
+            if (player2.socket.connected) {
+                player2.socket.emit('matchmakingStatus', {
+                    inQueue: true,
+                    message: 'Bağlantı xətası, yenidən axtarılır... / Connection error, searching again...'
+                });
+                matchmakingQueue.push(player2);
+            }
+            continue;
+        }
+        
+        // Notify players that a match is found
+        player1.socket.emit('matchFound', { opponentName: player2.username });
+        player2.socket.emit('matchFound', { opponentName: player1.username });
+        
+        // Store match info for acceptance
+        const matchId = `match_${Date.now()}`;
+        
+        // Set timeout for match acceptance (10 seconds)
+        const timeout = setTimeout(() => {
+            // If still in queue (not accepted yet), remove from queue
+            if (matchmakingQueue.some(p => p.id === player1.id || p.id === player2.id)) {
+                if (player1.socket.connected) {
+                    player1.socket.emit('matchmakingStatus', {
+                        inQueue: false,
+                        message: 'Oyunçu qəbul etmədi / Player did not accept',
+                        isError: true
+                    });
+                }
+                if (player2.socket.connected) {
+                    player2.socket.emit('matchmakingStatus', {
+                        inQueue: false,
+                        message: 'Oyunçu qəbul etmədi / Player did not accept',
+                        isError: true
+                    });
+                }
+            }
+        }, 10000);
+        
+        // Store accept handlers
+        const acceptMatch = (socket, isPlayer1) => {
+            if (socket.id !== (isPlayer1 ? player1.id : player2.id)) return;
+            
+            clearTimeout(timeout);
+            
+            const otherPlayer = isPlayer1 ? player2 : player1;
+            
+            // If both players accepted, create room
+            if (player1.accepted && player2.accepted) {
+                const code = generateRoomCode();
+                rooms[code] = {
+                    code,
+                    playerCount: 2,
+                    hostId: player1.id,
+                    hostUsername: player1.username,
+                    guestId: player2.id,
+                    guestUsername: player2.username,
+                    gameState: {
+                        stage: 'PLAY',
+                        turn: 0,
+                        hostBombs: [],
+                        guestBombs: [],
+                        hostLives: 3,
+                        guestLives: 3,
+                        hostBombsSelected: false,
+                        guestBombsSelected: false,
+                        level: 1,
+                        opened: [],
+                        boardSize: 20
+                    }
+                };
+                
+                // Add players to room
+                player1.socket.join(code);
+                player2.socket.join(code);
+                
+                // Notify players
+                player1.socket.emit('matched', { 
+                    roomCode: code, 
+                    isHost: true, 
+                    opponentName: player2.username 
+                });
+                
+                player2.socket.emit('matched', { 
+                    roomCode: code, 
+                    isHost: false, 
+                    opponentName: player1.username 
+                });
+                
+                console.log(`Eşleştirme yapıldı: ${player1.username} ve ${player2.username} oyuna başlıyor (Oda: ${code})`);
+            } else {
+                // Notify other player that opponent accepted
+                if (otherPlayer.socket.connected) {
+                    otherPlayer.socket.emit('opponentAccepted');
+                }
             }
         };
         
-        // Oyuncuları odaya al
-        player1.socket.join(code);
-        player2.socket.join(code);
+        // Set up accept/decline handlers for both players
+        player1.accepted = false;
+        player2.accepted = false;
         
-        // Her iki oyuncuya da oyunun başladığını bildir
-        player1.socket.emit('matched', { 
-            roomCode: code, 
-            isHost: true, 
-            opponentName: player2.username 
-        });
+        const acceptHandler1 = () => {
+            player1.accepted = true;
+            acceptMatch(player1.socket, true);
+            player1.socket.off('acceptMatch', acceptHandler1);
+        };
         
-        player2.socket.emit('matched', { 
-            roomCode: code, 
-            isHost: false, 
-            opponentName: player1.username 
-        });
+        const acceptHandler2 = () => {
+            player2.accepted = true;
+            acceptMatch(player2.socket, false);
+            player2.socket.off('acceptMatch', acceptHandler2);
+        };
         
-        console.log(`Eşleştirme yapıldı: ${player1.username} ve ${player2.username} oyuna başlıyor (Oda: ${code})`);
+        const declineHandler1 = () => {
+            clearTimeout(timeout);
+            if (player2.socket.connected) {
+                player2.socket.emit('matchmakingStatus', {
+                    inQueue: false,
+                    message: 'Oyunçu oyunu rədd etdi / Player declined the match',
+                    isError: true
+                });
+            }
+            player1.socket.off('declineMatch', declineHandler1);
+            player2.socket.off('declineMatch', declineHandler2);
+        };
+        
+        const declineHandler2 = () => {
+            clearTimeout(timeout);
+            if (player1.socket.connected) {
+                player1.socket.emit('matchmakingStatus', {
+                    inQueue: false,
+                    message: 'Oyunçu oyunu rədd etdi / Player declined the match',
+                    isError: true
+                });
+            }
+            player1.socket.off('declineMatch', declineHandler1);
+            player2.socket.off('declineMatch', declineHandler2);
+        };
+        
+        player1.socket.once('acceptMatch', acceptHandler1);
+        player2.socket.once('acceptMatch', acceptHandler2);
+        player1.socket.once('declineMatch', declineHandler1);
+        player2.socket.once('declineMatch', declineHandler2);
     }
 }
 
 io.on('connection', (socket) => {
     console.log(`Yeni bağlantı: ${socket.id}`);
+    
+    // Eşleştirme kuyruğuna katılma
+    socket.on('joinMatchmaking', ({ username }) => {
+        console.log(`Eşleştirme isteği: ${username} (${socket.id})`);
+        
+        // Eğer zaten kuyruktaysa çık
+        const existingIndex = matchmakingQueue.findIndex(p => p.id === socket.id);
+        if (existingIndex !== -1) {
+            console.log(`Zaten eşleşme kuyruğunda: ${username}`);
+            return;
+        }
+        
+        // Kullanıcıyı kuyruğa ekle
+        const player = {
+            id: socket.id,
+            username,
+            socket: socket,
+            accepted: false
+        };
+        
+        matchmakingQueue.push(player);
+        console.log(`Eşleşme kuyruğuna eklendi: ${username}. Kuyruk uzunluğu: ${matchmakingQueue.length}`);
+        
+        // Kullanıcıya kuyruk bilgisini gönder
+        socket.emit('matchmakingStatus', {
+            inQueue: true,
+            queuePosition: matchmakingQueue.length,
+            message: 'Oyunçu axtarılır... / Searching for opponent...'
+        });
+        
+        // Eşleştirme kontrolü yap
+        matchPlayers();
+    });
+    
+    // Eşleştirmeyi iptal et
+    socket.on('cancelMatchmaking', () => {
+        const index = matchmakingQueue.findIndex(p => p.id === socket.id);
+        if (index !== -1) {
+            const player = matchmakingQueue.splice(index, 1)[0];
+            console.log(`Eşleşme iptal edildi: ${player.username}`);
+            socket.emit('matchmakingStatus', {
+                inQueue: false,
+                message: 'Eşleşme iptal edildi. / Matchmaking cancelled.'
+            });
+        }
+    });
+    
+    // Bağlantı kesildiğinde kuyruktan çıkar
+    socket.on('disconnect', () => {
+        const index = matchmakingQueue.findIndex(p => p.id === socket.id);
+        if (index !== -1) {
+            const player = matchmakingQueue.splice(index, 1)[0];
+            console.log(`Bağlantı kesildi, eşleşme kuyruğundan çıkarıldı: ${player.username}`);
+        }
+    });
     
     socket.on('createRoom', ({ username }) => {
         const code = generateRoomCode();
