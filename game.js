@@ -1,8 +1,143 @@
 // Dosya Adı: game.js
+// Telegram WebApp Integration
+class TelegramAuth {
+    constructor() {
+        this.isTelegramWebApp = typeof window.Telegram !== 'undefined' && 
+                              typeof window.Telegram.WebApp !== 'undefined';
+        this.user = null;
+        this.tg = this.isTelegramWebApp ? window.Telegram.WebApp : null;
+    }
+
+    init() {
+        // Check for existing session first
+        const savedUser = localStorage.getItem('gameUser');
+        if (savedUser) {
+            this.user = JSON.parse(savedUser);
+            return true;
+        }
+
+        // Try to initialize Telegram WebApp
+        if (this.isTelegramWebApp) {
+            try {
+                this.tg.expand();
+                
+                const userData = this.tg.initDataUnsafe?.user;
+                if (userData) {
+                    this.user = {
+                        id: userData.id,
+                        username: userData.username || `user_${userData.id}`,
+                        firstName: userData.first_name,
+                        lastName: userData.last_name || '',
+                        isTelegramUser: true
+                    };
+                    this.saveUser();
+                    return true;
+                }
+            } catch (error) {
+                console.error('Telegram auth error:', error);
+            }
+        }
+        return false;
+    }
+
+    loginAsGuest() {
+        const guestName = `Misafir_${Math.floor(1000 + Math.random() * 9000)}`;
+        this.user = {
+            id: `guest_${Date.now()}`,
+            username: guestName,
+            firstName: 'Misafir',
+            lastName: '',
+            isTelegramUser: false
+        };
+        this.saveUser();
+        return this.user;
+    }
+
+    getUser() {
+        if (this.user) return this.user;
+        
+        const savedUser = localStorage.getItem('gameUser');
+        if (savedUser) {
+            this.user = JSON.parse(savedUser);
+            return this.user;
+        }
+        return this.loginAsGuest();
+    }
+
+    isAuthenticated() {
+        return this.getUser() !== null;
+    }
+
+    getUsername() {
+        const user = this.getUser();
+        return user ? user.username : 'Guest';
+    }
+
+    saveUser() {
+        if (this.user) {
+            localStorage.setItem('gameUser', JSON.stringify(this.user));
+        }
+    }
+
+    // Close the WebApp (only works in Telegram)
+    closeApp() {
+        if (this.tg && this.tg.close) {
+            this.tg.close();
+        }
+    }
+
+    // Show a simple alert in Telegram WebApp
+    showAlert(message) {
+        if (this.tg && this.tg.showAlert) {
+            this.tg.showAlert(message);
+        } else {
+            alert(message);
+        }
+    }
+
+    // Get the current theme (light/dark)
+    getTheme() {
+        if (this.tg && this.tg.colorScheme) {
+            return this.tg.colorScheme;
+        }
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches 
+            ? 'dark' 
+            : 'light';
+    }
+
+    // Handle back button in Telegram
+    setupBackButton(handler) {
+        if (this.tg && this.tg.BackButton) {
+            this.tg.BackButton.show();
+            this.tg.BackButton.onClick(handler);
+        }
+    }
+
+    logout() {
+        this.user = null;
+        localStorage.removeItem('gameUser');
+        
+        // If in Telegram, close the WebApp, otherwise reload
+        if (this.tg && this.tg.close) {
+            this.tg.close();
+        } else {
+            window.location.reload();
+        }
+    }
+}
+
+// Initialize Telegram auth
+const telegramAuth = new TelegramAuth();
+
 let socket;
 let currentRoomCode = '';
 let isHost = false;
 let opponentName = '';
+let currentUser = telegramAuth.getUser() || {
+    id: null,
+    name: 'Guest',
+    isTelegramUser: false
+};
 
 // --- DOM Referansları ---
 const screens = { 
@@ -171,8 +306,12 @@ function updateStatusDisplay() {
         const myScore = isHost ? gameData.scores.host : gameData.scores.guest;
         const opponentScore = isHost ? gameData.scores.guest : gameData.scores.host;
         
-        // Skor göstergesi kaldırıldı
-        scoreDisplayEl.style.display = 'none';
+        // Eğer isim bilgileri varsa onları kullan, yoksa varsayılan değerleri kullan
+        const myName = isHost ? 'Sen' : (gameData.opponentName || 'Rakip');
+        const opponentName = isHost ? (gameData.opponentName || 'Rakip') : 'Sen';
+        
+        scoreDisplayEl.textContent = `${myName} ${myScore} - ${opponentScore} ${opponentName}`;
+        scoreDisplayEl.style.display = 'block';
     }
 
     const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
@@ -184,20 +323,20 @@ function updateStatusDisplay() {
         turnStatusEl.classList.add('text-yellow-600');
     } else if (gameStage === 'PLAY') {
         if (isMyTurn) {
-            turnStatusEl.textContent = '✅ SIRA SƏNDƏ / You Play';
+            turnStatusEl.textContent = '✅ SIRA SƏNDƏ !';
             actionMessageEl.textContent = "Bir kart aç! Rakibinizin bombalarından kaçınmaya çalışın.";
             turnStatusEl.classList.remove('text-red-600');
             turnStatusEl.classList.add('text-green-600');
         } else {
-            turnStatusEl.textContent = '⏳ ONUN SIRASI / HIS TURN';
-            actionMessageEl.textContent = "RƏQİBİNİZİ GÖZLƏYİN / WAIT FOR YOUR OPPONENT";
+            turnStatusEl.textContent = '⏳ ONUN SIRASI';
+            actionMessageEl.textContent = "RƏQİBİNİZİ GÖZLƏYİN...";
             turnStatusEl.classList.remove('text-green-600');
             turnStatusEl.classList.add('text-red-600');
         }
     }
     
     if (gameData.isGameOver && gameStage === 'ENDED') {
-        turnStatusEl.textContent = "✅ OYUN BİTDİ! ";
+        turnStatusEl.textContent = "✅ OYUN BİTDİ!";
         actionMessageEl.textContent = "Sonuçlar hesaplanıyor...";
     }
 }
@@ -438,14 +577,81 @@ function hideLoadingMessage() {
     }
 }
 
-// Sayfa yüklendiğinde yükleme mesajını göster
+// Handle login screen
 document.addEventListener('DOMContentLoaded', () => {
-    showLoadingMessage();
+    const user = telegramAuth.getUser();
+    const loginScreen = document.getElementById('telegramLoginScreen');
+    const userProfile = document.getElementById('userProfile');
+    const userDisplayName = document.getElementById('userDisplayName');
+
+    // If user is already logged in, hide login screen
+    if (user) {
+        loginScreen.style.display = 'none';
+        userProfile.style.display = 'flex';
+        userDisplayName.textContent = user.firstName || user.username;
+        showLoadingMessage();
+    } else {
+        // Show login screen
+        loginScreen.style.display = 'flex';
+        
+        // Setup login button
+        document.getElementById('telegramLoginBtn').addEventListener('click', () => {
+            if (telegramAuth.init()) {
+                window.location.reload();
+            } else {
+                alert('Telegram girişi başarısız. Lütfen tekrar deneyin.');
+            }
+        });
+        
+        // Setup guest login
+        document.getElementById('guestLoginBtn').addEventListener('click', () => {
+            telegramAuth.loginAsGuest();
+            window.location.reload();
+        });
+    }
 });
 
+// Make logout function globally available
+window.logout = function() {
+    telegramAuth.logout();
+};
+
+// Kullanıcı bilgilerini güncelle
+function updateUserInfo() {
+    if (telegramAuth.isAuthenticated()) {
+        currentUser = {
+            id: telegramAuth.getUserId(),
+            name: telegramAuth.getUsername(),
+            isTelegramUser: true
+        };
+    } else {
+        // Guest user
+        const guestId = 'guest_' + Math.random().toString(36).substr(2, 9);
+        currentUser = {
+            id: guestId,
+            name: document.getElementById('usernameInput')?.value || `Guest_${Math.floor(Math.random() * 1000)}`,
+            isTelegramUser: false
+        };
+    }
+    return currentUser;
+}
+
+// Kullanıcı adı doğrulama
+function validateUsername(username) {
+    if (!username || username.trim() === '') {
+        showGlobalMessage('Lütfen geçerli bir kullanıcı adı girin.');
+        return false;
+    }
+    if (username.length > 20) {
+        showGlobalMessage('Kullanıcı adı çok uzun (maksimum 20 karakter)');
+        return false;
+    }
+    return true;
+}
+
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
-export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
-    console.log('🎯 setupSocketHandlers ÇAĞRILDI!', { roomCode, isHost: host, opponent: opponentNameFromIndex });
+export function setupSocketHandlers(s, roomCode, isHostParam, username) {
+    console.log('🎯 setupSocketHandlers ÇAĞRILDI!', { roomCode, isHost: isHostParam, opponent: username });
     
     // Show loading message when setting up socket handlers
     console.log('📡 Yükleme mesajı gösteriliyor...');
@@ -453,9 +659,21 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     
     socket = s;
     currentRoomCode = roomCode;
-    isHost = host;
-    opponentName = opponentNameFromIndex;
+    isHost = isHostParam;
     
+    // Kullanıcı bilgilerini güncelle
+    const user = updateUserInfo();
+    
+    // Sunucuya kullanıcı bilgilerini gönder
+    socket.emit('setUserInfo', {
+        userId: user.id,
+        username: user.name,
+        isTelegramUser: user.isTelegramUser,
+        roomCode: roomCode
+    });
+    
+    // Rakip adını ayarla
+    opponentName = username || (isHost ? 'Guest' : 'Host');
     opponentNameEl.textContent = opponentName;
     roleStatusEl.textContent = isHost ? "🎮 Rol: HOST (Sen başla)" : "🎮 Rol: GUEST (Rakip başlar)";
 
