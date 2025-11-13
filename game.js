@@ -1,349 +1,16 @@
-// Uçak Savaşı Oyunu
-const GAME_SETTINGS = {
-    PLAYER_SPEED: 10,
-    BULLET_SPEED: 15,
-    PLAYER_HEALTH: 100,
-    BULLET_DAMAGE: 25,
-    GAME_DURATION: 120000 // 2 dakika
-};
-
-const GAME_STATES = {
-    WAITING: 'waiting',
-    COUNTDOWN: 'countdown',
-    PLAYING: 'playing',
-    FINISHED: 'finished'
-};
-class TelegramAuth {
-    constructor() {
-        this.isTelegramWebApp = typeof window.Telegram !== 'undefined' && 
-                              typeof window.Telegram.WebApp !== 'undefined';
-        this.user = null;
-        this.tg = this.isTelegramWebApp ? window.Telegram.WebApp : null;
-    }
-
-    init() {
-        // Check for existing session first
-        const savedUser = localStorage.getItem('gameUser');
-        if (savedUser) {
-            this.user = JSON.parse(savedUser);
-            return true;
-        }
-
-        // Try to initialize Telegram WebApp
-        if (this.isTelegramWebApp) {
-            try {
-                this.tg.expand();
-                
-                const userData = this.tg.initDataUnsafe?.user;
-                if (userData) {
-                    this.user = {
-                        id: userData.id,
-                        username: userData.username || `user_${userData.id}`,
-                        firstName: userData.first_name,
-                        lastName: userData.last_name || '',
-                        isTelegramUser: true
-                    };
-                    this.saveUser();
-                    return true;
-                }
-            } catch (error) {
-                console.error('Telegram auth error:', error);
-            }
-        }
-        return false;
-    }
-
-    loginAsGuest() {
-        const guestName = `Misafir_${Math.floor(1000 + Math.random() * 9000)}`;
-        this.user = {
-            id: `guest_${Date.now()}`,
-            username: guestName,
-            firstName: 'Misafir',
-            lastName: '',
-            isTelegramUser: false
-        };
-        this.saveUser();
-        return this.user;
-    }
-
-    getUser() {
-        if (this.user) return this.user;
-        
-        const savedUser = localStorage.getItem('gameUser');
-        if (savedUser) {
-            this.user = JSON.parse(savedUser);
-            return this.user;
-        }
-        return this.loginAsGuest();
-    }
-
-    isAuthenticated() {
-        return this.getUser() !== null;
-    }
-
-    getUsername() {
-        const user = this.getUser();
-        return user ? user.username : 'Guest';
-    }
-
-    saveUser() {
-        if (this.user) {
-            localStorage.setItem('gameUser', JSON.stringify(this.user));
-        }
-    }
-
-    // Close the WebApp (only works in Telegram)
-    closeApp() {
-        if (this.tg && this.tg.close) {
-            this.tg.close();
-        }
-    }
-
-    // Show a simple alert in Telegram WebApp
-    showAlert(message) {
-        if (this.tg && this.tg.showAlert) {
-            this.tg.showAlert(message);
-        } else {
-            alert(message);
-        }
-    }
-
-    // Get the current theme (light/dark)
-    getTheme() {
-        if (this.tg && this.tg.colorScheme) {
-            return this.tg.colorScheme;
-        }
-        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches 
-            ? 'dark' 
-            : 'light';
-    }
-
-    // Handle back button in Telegram
-    setupBackButton(handler) {
-        if (this.tg && this.tg.BackButton) {
-            this.tg.BackButton.show();
-            this.tg.BackButton.onClick(handler);
-        }
-    }
-
-    logout() {
-        this.user = null;
-        localStorage.removeItem('gameUser');
-        
-        // If in Telegram, close the WebApp, otherwise reload
-        if (this.tg && this.tg.close) {
-            this.tg.close();
-        } else {
-            window.location.reload();
-        }
-    }
-}
-
-// Initialize Telegram auth
-const telegramAuth = new TelegramAuth();
-
+// Dosya Adı: game.js
 let socket;
 let currentRoomCode = '';
 let isHost = false;
-let gameState = {
-    status: GAME_STATES.WAITING,
-    players: {},
-    bullets: [],
-    countdown: 3,
-    startTime: null,
-    endTime: null,
-    winner: null
+let opponentName = '';
+
+// --- DOM Referansları ---
+const screens = { 
+    lobby: document.getElementById('lobby'), 
+    wait: document.getElementById('waitScreen'), 
+    game: document.getElementById('gameScreen') 
 };
-
-// Oyun öğeleri
-const gameContainer = document.getElementById('gameContainer');
-const gameCanvas = document.createElement('canvas');
-const ctx = gameCanvas.getContext('2d');
-gameContainer.appendChild(gameCanvas);
-
-// Tuş durumları
-const keys = {};
-document.addEventListener('keydown', (e) => keys[e.code] = true);
-document.addEventListener('keyup', (e) => keys[e.code] = false);
-
-// Ekran boyutlarını ayarla
-function resizeCanvas() {
-    gameCanvas.width = window.innerWidth;
-    gameCanvas.height = window.innerHeight;
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
-
-// Oyun döngüsü
-function gameLoop() {
-    update();
-    render();
-    requestAnimationFrame(gameLoop);
-}
-
-// Oyun güncellemeleri
-function update() {
-    const player = gameState.players[socket?.id];
-    if (!player) return;
-
-    // Oyuncu hareketi
-    if (keys['ArrowLeft'] || keys['KeyA']) {
-        player.x = Math.max(0, player.x - GAME_SETTINGS.PLAYER_SPEED);
-    }
-    if (keys['ArrowRight'] || keys['KeyD']) {
-        player.x = Math.min(gameCanvas.width - 50, player.x + GAME_SETTINGS.PLAYER_SPEED);
-    }
-
-    // Sunucuya hareket bilgisini gönder
-    if (socket) {
-        socket.emit('playerMove', { x: player.x });
-    }
-}
-
-// Oyun çizimleri
-function render() {
-    // Arkaplanı temizle
-    ctx.fillStyle = '#1a1a2e';
-    ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
-
-    // Oyuncuları çiz
-    Object.values(gameState.players).forEach(player => {
-        const isCurrentPlayer = player.id === socket?.id;
-        
-        // Uçak çiz
-        ctx.save();
-        ctx.translate(player.x, player.y);
-        
-        // Uçağın yönünü ayarla
-        if (!isCurrentPlayer) ctx.rotate(Math.PI);
-        
-        // Uçak gövdesi
-        ctx.fillStyle = isCurrentPlayer ? '#4cc9f0' : '#f72585';
-        ctx.beginPath();
-        ctx.moveTo(0, -20);
-        ctx.lineTo(15, 15);
-        ctx.lineTo(-15, 15);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Kanatlar
-        ctx.fillStyle = isCurrentPlayer ? '#4895ef' : '#b5179e';
-        ctx.fillRect(-20, 0, 40, 10);
-        
-        ctx.restore();
-        
-        // İsim ve can göster
-        ctx.fillStyle = '#fff';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(player.username, player.x, isCurrentPlayer ? player.y - 30 : player.y + 40);
-        
-        // Can çubuğu
-        const healthPercent = player.health / GAME_SETTINGS.PLAYER_HEALTH;
-        ctx.fillStyle = healthPercent > 0.6 ? '#4ade80' : healthPercent > 0.3 ? '#fbbf24' : '#ef4444';
-        ctx.fillRect(player.x - 25, isCurrentPlayer ? player.y - 45 : player.y + 45, 50 * healthPercent, 5);
-    });
-    
-    // Mermileri çiz
-    gameState.bullets.forEach(bullet => {
-        ctx.fillStyle = bullet.direction === 'up' ? '#4cc9f0' : '#f72585';
-        ctx.fillRect(bullet.x - 2, bullet.y - 5, 4, 10);
-    });
-    
-    // Oyun durumuna göre arayüz göster
-    if (gameState.status === GAME_STATES.WAITING) {
-        showMessage('Rakip bekleniyor...');
-    } else if (gameState.status === GAME_STATES.COUNTDOWN) {
-        showMessage(gameState.countdown > 0 ? gameState.countdown : 'BAŞLA!');
-    } else if (gameState.status === GAME_STATES.FINISHED && gameState.winner) {
-        showMessage(`KAZANAN: ${gameState.winner}`);
-    }
-    
-    // Skor tablosu
-    ctx.fillStyle = '#fff';
-    ctx.font = '16px Arial';
-    ctx.textAlign = 'left';
-    Object.values(gameState.players).forEach((player, index) => {
-        ctx.fillText(`${player.username}: ${player.score}`, 10, 30 + (index * 25));
-    });
-    
-    // Kalan süre
-    if (gameState.endTime) {
-        const timeLeft = Math.max(0, Math.ceil((gameState.endTime - Date.now()) / 1000));
-        ctx.textAlign = 'right';
-        ctx.fillText(`Süre: ${timeLeft}s`, gameCanvas.width - 10, 30);
-    }
-}
-
-// Mesaj göster
-function showMessage(text) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    const textWidth = ctx.measureText(text).width;
-    const padding = 20;
-    const x = (gameCanvas.width - textWidth) / 2 - padding;
-    const y = gameCanvas.height / 2 - 30;
-    
-    ctx.fillRect(x, y, textWidth + padding * 2, 60);
-    ctx.fillStyle = '#fff';
-    ctx.font = '24px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(text, gameCanvas.width / 2, gameCanvas.height / 2);
-}
-
-// Ateş et
-function fireBullet() {
-    const player = gameState.players[socket?.id];
-    if (!player || gameState.status !== GAME_STATES.PLAYING) return;
-    
-    socket.emit('playerShoot', {
-        x: player.x,
-        y: player.y,
-        direction: 'up' // Yukarı doğru ateş et
-    });
-}
-
-// Oyun başlat
-function startGame() {
-    const username = document.getElementById('usernameInput')?.value || 'Oyuncu' + Math.floor(Math.random() * 1000);
-    
-    // Socket bağlantısı
-    socket = io('http://localhost:3000'); // Sunucu adresini güncelleyin
-    
-    // Oyun güncellemelerini dinle
-    socket.on('gameUpdate', (state) => {
-        gameState = state;
-    });
-    
-    // Oyun başladığında
-    socket.on('gameStart', (state) => {
-        gameState = state;
-        document.getElementById('lobby').style.display = 'none';
-        gameCanvas.style.display = 'block';
-    });
-    
-    // Yeni mermi eklendiğinde
-    socket.on('bulletFired', (bullet) => {
-        gameState.bullets.push(bullet);
-    });
-    
-    // Oyun bitişi
-    socket.on('gameOver', (winner) => {
-        gameState.status = GAME_STATES.FINISHED;
-        gameState.winner = winner;
-    });
-    
-    // Odaya katıl
-    socket.emit('joinGame', { username });
-}
-
-// Ateş butonu
-document.getElementById('fireButton')?.addEventListener('click', fireBullet);
-
-// Oyun döngüsünü başlat
-gameLoop();
-
-// Oyun başlatma butonu
-document.getElementById('startGameBtn')?.addEventListener('click', startGame);
+const gameBoardEl = document.getElementById('gameBoard');
 const turnStatusEl = document.getElementById('turnStatus');
 const actionMessageEl = document.getElementById('actionMessage');
 const myLivesEl = document.getElementById('myLives');
@@ -375,8 +42,8 @@ function initializeGame(boardSize) {
     // İlk seviyede 3 can 4 bomba, diğer seviyelerde 3 can 6 bomba
     gameData.hostLives = 3;
     gameData.guestLives = 3;
-    gameData.hostBombs = [];
-    gameData.guestBombs = [];
+    gameData.hostBombs = level === 1 ? Array(4).fill(0) : Array(6).fill(0);
+    gameData.guestBombs = level === 1 ? Array(4).fill(0) : Array(6).fill(0);
     
     gameStage = 'WAITING';
 }
@@ -775,81 +442,14 @@ function hideLoadingMessage() {
     }
 }
 
-// Handle login screen
+// Sayfa yüklendiğinde yükleme mesajını göster
 document.addEventListener('DOMContentLoaded', () => {
-    const user = telegramAuth.getUser();
-    const loginScreen = document.getElementById('telegramLoginScreen');
-    const userProfile = document.getElementById('userProfile');
-    const userDisplayName = document.getElementById('userDisplayName');
-
-    // If user is already logged in, hide login screen
-    if (user) {
-        loginScreen.style.display = 'none';
-        userProfile.style.display = 'flex';
-        userDisplayName.textContent = user.firstName || user.username;
-        showLoadingMessage();
-    } else {
-        // Show login screen
-        loginScreen.style.display = 'flex';
-        
-        // Setup login button
-        document.getElementById('telegramLoginBtn').addEventListener('click', () => {
-            if (telegramAuth.init()) {
-                window.location.reload();
-            } else {
-                alert('Telegram girişi başarısız. Lütfen tekrar deneyin.');
-            }
-        });
-        
-        // Setup guest login
-        document.getElementById('guestLoginBtn').addEventListener('click', () => {
-            telegramAuth.loginAsGuest();
-            window.location.reload();
-        });
-    }
+    showLoadingMessage();
 });
 
-// Make logout function globally available
-window.logout = function() {
-    telegramAuth.logout();
-};
-
-// Kullanıcı bilgilerini güncelle
-function updateUserInfo() {
-    if (telegramAuth.isAuthenticated()) {
-        currentUser = {
-            id: telegramAuth.getUserId(),
-            name: telegramAuth.getUsername(),
-            isTelegramUser: true
-        };
-    } else {
-        // Guest user
-        const guestId = 'guest_' + Math.random().toString(36).substr(2, 9);
-        currentUser = {
-            id: guestId,
-            name: document.getElementById('usernameInput')?.value || `Guest_${Math.floor(Math.random() * 1000)}`,
-            isTelegramUser: false
-        };
-    }
-    return currentUser;
-}
-
-// Kullanıcı adı doğrulama
-function validateUsername(username) {
-    if (!username || username.trim() === '') {
-        showGlobalMessage('Lütfen geçerli bir kullanıcı adı girin.');
-        return false;
-    }
-    if (username.length > 20) {
-        showGlobalMessage('Kullanıcı adı çok uzun (maksimum 20 karakter)');
-        return false;
-    }
-    return true;
-}
-
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
-export function setupSocketHandlers(s, roomCode, isHostParam, username) {
-    console.log('🎯 setupSocketHandlers ÇAĞRILDI!', { roomCode, isHost: isHostParam, opponent: username });
+export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
+    console.log('🎯 setupSocketHandlers ÇAĞRILDI!', { roomCode, isHost: host, opponent: opponentNameFromIndex });
     
     // Show loading message when setting up socket handlers
     console.log('📡 Yükleme mesajı gösteriliyor...');
@@ -857,21 +457,9 @@ export function setupSocketHandlers(s, roomCode, isHostParam, username) {
     
     socket = s;
     currentRoomCode = roomCode;
-    isHost = isHostParam;
+    isHost = host;
+    opponentName = opponentNameFromIndex;
     
-    // Kullanıcı bilgilerini güncelle
-    const user = updateUserInfo();
-    
-    // Sunucuya kullanıcı bilgilerini gönder
-    socket.emit('setUserInfo', {
-        userId: user.id,
-        username: user.name,
-        isTelegramUser: user.isTelegramUser,
-        roomCode: roomCode
-    });
-    
-    // Rakip adını ayarla
-    opponentName = username || (isHost ? 'Guest' : 'Host');
     opponentNameEl.textContent = opponentName;
     roleStatusEl.textContent = isHost ? "🎮 Rol: HOST (Sen başla)" : "🎮 Rol: GUEST (Rakip başlar)";
 
