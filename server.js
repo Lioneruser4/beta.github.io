@@ -18,6 +18,7 @@ const io = new Server(server, {
 
 const rooms = {};
 const scores = {}; // Skor takibi için obje
+const matchmakingQueue = []; // Eşleştirme kuyruğu
 
 // Odayı oyuncu ID'sine göre bulma fonksiyonu
 function getRoomByPlayerId(playerId) {
@@ -57,6 +58,57 @@ function generateRoomCode() {
         code = Math.random().toString(36).substring(2, 6).toUpperCase();
     }
     return code;
+}
+
+// Eşleştirme kuyruğundan oyuncu eşleştir
+function matchPlayers() {
+    while (matchmakingQueue.length >= 2) {
+        const player1 = matchmakingQueue.shift();
+        const player2 = matchmakingQueue.shift();
+        
+        // Yeni oda oluştur
+        const code = generateRoomCode();
+        rooms[code] = {
+            code,
+            playerCount: 2,
+            hostId: player1.id,
+            hostUsername: player1.username,
+            guestId: player2.id,
+            guestUsername: player2.username,
+            gameState: {
+                stage: 'PLAY',
+                turn: 0,
+                hostBombs: [],
+                guestBombs: [],
+                hostLives: 3,
+                guestLives: 3,
+                hostBombsSelected: false,
+                guestBombsSelected: false,
+                level: 1,
+                opened: [],
+                boardSize: 20
+            }
+        };
+        
+        // Oyuncuları odaya al
+        player1.socket.join(code);
+        player2.socket.join(code);
+        
+        // Her iki oyuncuya da oyunun başladığını bildir
+        player1.socket.emit('matched', { 
+            roomCode: code, 
+            isHost: true, 
+            opponentName: player2.username 
+        });
+        
+        player2.socket.emit('matched', { 
+            roomCode: code, 
+            isHost: false, 
+            opponentName: player1.username 
+        });
+        
+        console.log(`Eşleştirme yapıldı: ${player1.username} ve ${player2.username} oyuna başlıyor (Oda: ${code})`);
+    }
 }
 
 io.on('connection', (socket) => {
@@ -174,6 +226,59 @@ io.on('connection', (socket) => {
             io.to(code).emit('gameReady', gameState);
             console.log(`🚀 gameReady sinyali gönderildi:`, gameState);
         }, 500);
+    });
+
+    // Eşleştirme isteği
+    socket.on('joinMatchmaking', ({ username }) => {
+        console.log(`Eşleştirme isteği: ${username} (${socket.id})`);
+        
+        // Eğer zaten eşleşme kuyruğundaysa çık
+        const alreadyInQueue = matchmakingQueue.some(p => p.id === socket.id);
+        if (alreadyInQueue) {
+            console.log(`Zaten eşleşme kuyruğunda: ${username}`);
+            return;
+        }
+        
+        // Kullanıcıyı eşleşme kuyruğuna ekle
+        matchmakingQueue.push({
+            id: socket.id,
+            username,
+            socket: socket
+        });
+        
+        console.log(`Eşleşme kuyruğuna eklendi: ${username}. Kuyruk uzunluğu: ${matchmakingQueue.length}`);
+        
+        // Eşleşme durumunu kullanıcıya bildir
+        socket.emit('matchmakingStatus', {
+            inQueue: true,
+            queuePosition: matchmakingQueue.length,
+            message: 'Eşleşme aranıyor...'
+        });
+        
+        // Eşleşme kontrolü yap
+        matchPlayers();
+    });
+    
+    // Eşleşmeyi iptal et
+    socket.on('cancelMatchmaking', () => {
+        const index = matchmakingQueue.findIndex(p => p.id === socket.id);
+        if (index !== -1) {
+            const player = matchmakingQueue.splice(index, 1)[0];
+            console.log(`Eşleşme iptal edildi: ${player.username}`);
+            socket.emit('matchmakingStatus', {
+                inQueue: false,
+                message: 'Eşleşme iptal edildi.'
+            });
+        }
+    });
+    
+    // Bağlantı kesildiğinde eşleşme kuyruğundan çıkar
+    socket.on('disconnect', () => {
+        const index = matchmakingQueue.findIndex(p => p.id === socket.id);
+        if (index !== -1) {
+            const player = matchmakingQueue.splice(index, 1)[0];
+            console.log(`Bağlantı kesildi, eşleşme kuyruğundan çıkarıldı: ${player.username}`);
+        }
     });
 
     // Oyun hamlesi
