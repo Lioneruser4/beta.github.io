@@ -75,6 +75,61 @@
             display: flex; 
         }
         
+        /* Language Selector */
+        .language-selector {
+            position: fixed;
+            top: env(safe-area-inset-top, 15px); /* Güvenli alanları destekle */
+            right: env(safe-area-inset-right, 15px);
+            z-index: 100;
+        }
+        .language-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid #63b3ed;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #e2e8f0;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+            backdrop-filter: blur(5px);
+            padding: 0;
+        }
+        .language-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .language-options {
+            display: none;
+            position: absolute;
+            top: calc(100% + 5px);
+            right: 0;
+            background: #2d3748;
+            border: 1px solid #4a5568;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            overflow: hidden;
+            z-index: 101;
+            min-width: 150px;
+            color: #e2e8f0;
+        }
+        .language-option {
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background-color 0.2s;
+        }
+        .language-option:hover {
+            background-color: #4a5568;
+        }
+        .language-option:hover {
+            background: #4a5568;
+        }
+        
         /* Utility */
         .btn {
             @apply px-8 py-4 rounded-xl font-bold text-xl transition-all duration-300 flex items-center justify-center;
@@ -387,78 +442,6 @@
             to { transform: rotate(360deg); }
         }
     </style>
-    <style>
-        /* Emoji Chat Styles */
-        #emojiChat {
-            display: none; /* Will be shown via JavaScript */
-            gap: 10px;
-            align-items: center;
-        }
-
-        #emojiButton {
-            background: #4a5568;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            font-size: 24px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        }
-
-        #emojiButton:hover {
-            background: #2d3748;
-        }
-
-        #emojiContainer {
-            display: none;
-            background: white;
-            border-radius: 15px;
-            padding: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            flex-wrap: wrap;
-            gap: 8px;
-            max-width: 300px;
-            justify-content: center;
-        }
-
-        #emojiContainer.visible {
-            display: flex;
-        }
-
-        .emoji-option {
-            font-size: 28px;
-            cursor: pointer;
-            padding: 5px;
-            border-radius: 8px;
-            transition: transform 0.2s, background 0.2s;
-        }
-
-        .emoji-option:hover {
-            background: #f0f0f0;
-            transform: scale(1.2);
-        }
-
-        .emoji-message {
-            position: fixed;
-            font-size: 48px;
-            z-index: 2000;
-            pointer-events: none;
-            animation: emojiFloat 2s forwards;
-            opacity: 0;
-        }
-
-        @keyframes emojiFloat {
-            0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
-            10% { opacity: 1; transform: translate(-50%, 0) scale(1.2); }
-            90% { opacity: 1; }
-            100% { transform: translate(-50%, -100px) scale(0.8); opacity: 0; }
-        }
-    </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@700&family=Chakra+Petch:wght@700&display=swap" rel="stylesheet">
 </head>
 <body class="bg-gray-900 select-none">
@@ -467,6 +450,17 @@
         <div class="spinner"></div>
         <p>Server qoşulur, zəhmət olmasa gözləyin...</p>
         <p>Connecting to server, please wait...</p>
+    </div>
+    
+    <div class="language-selector">
+        <button id="language-button" class="language-button" onclick="toggleLanguageSelector()">
+            <span id="current-language">🇦🇿</span>
+        </button>
+        <div id="language-selector" class="language-options">
+            <div class="language-option" onclick="setLanguage('az')">🇦🇿 Azərbaycanca</div>
+            <div class="language-option" onclick="setLanguage('tr')">🇹🇷 Türkçe</div>
+            <div class="language-option" onclick="setLanguage('en')">🇬🇧 English</div>
+        </div>
     </div>
     
     <div id="globalMessage" class="hidden w-11/12 max-w-md p-4 bg-red-600 text-white rounded-lg shadow-lg">
@@ -505,44 +499,12 @@
         </div>
         
         <div class="flex flex-col space-y-3 w-full max-w-md mx-auto mt-6">
-            <button id="createRoomBtn" class="btn btn-primary mb-4">
-                <i class="fas fa-plus-circle mr-2"></i> Oda Oluştur
+            <button id="createRoomBtn" class="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg transform transition-all duration-200 active:scale-95">
+                <i class="fas fa-plus-circle mr-2"></i> Otaq Qur / Create Room
             </button>
-            <div class="or-divider">VEYA</div>
-            <div class="join-section mb-4">
-                <input type="text" id="roomCodeInput" placeholder="Oda Kodunu Girin" class="input-field">
-                <button id="joinRoomBtn" class="btn btn-primary">
-                    <i class="fas fa-sign-in-alt mr-2"></i> Odaya Katıl
-                </button>
-            </div>
-            <div class="or-divider">VEYA</div>
-            <button id="matchmakingBtn" class="btn btn-secondary w-full">
-                <i class="fas fa-random mr-2"></i> Onlayn Oyunçu Tap / Find Player
+            <button id="joinRoomBtn" class="w-full py-4 px-6 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg transform transition-all duration-200 active:scale-95">
+                <i class="fas fa-sign-in-alt mr-2"></i> Otağa Qoşul / Join Room
             </button>
-            <div id="matchmakingPanel" class="hidden mt-4 p-4 bg-gray-800 rounded-lg">
-                <div class="flex flex-col items-center">
-                    <div class="animate-pulse mb-4">
-                        <i class="fas fa-search fa-2x text-blue-400"></i>
-                    </div>
-                    <p id="matchmakingMessage" class="text-center mb-4">Oyunçu axtarılır... / Searching for opponent...</p>
-                    <div class="flex space-x-4">
-                        <button id="cancelMatchmakingBtn" class="btn btn-red">
-                            <i class="fas fa-times mr-2"></i> Ləğv et / Cancel
-                        </button>
-                    </div>
-                    <div id="matchFoundSection" class="hidden mt-4 text-center">
-                        <p id="opponentName" class="text-lg font-bold text-green-400"></p>
-                        <div class="flex justify-center space-x-4 mt-4">
-                            <button id="playNowBtn" class="btn btn-primary">
-                                <i class="fas fa-play mr-2"></i> Oyna / Play
-                            </button>
-                            <button id="declineMatchBtn" class="btn btn-secondary">
-                                <i class="fas fa-times mr-2"></i> Rədd et / Decline
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
     
@@ -551,20 +513,20 @@
             <div class="wait-spinner mb-4">
                 <i class="fas fa-spinner fa-spin text-4xl text-blue-400"></i> 
             </div>
-            <h2 id="waitTitle" class="text-2xl font-bold mb-6">Otaq Hazırlanır... / Preparing Room...</h2>
+            <h2 id="waitTitle" class="text-2xl font-bold mb-6">Otaq Hazırlanır...</h2>
             
             <div id="codeArea" class="w-full max-w-md mb-6">
-                <p class="text-sm text-gray-300 mb-2">🌟 Otaq kodunuzu dostunuzla paylaşın / Share your room code:</p>
+                <p class="text-sm text-gray-300 mb-2">🌟 Otaq kodunuzu dostunuzla paylaşın:</p>
                 <div id="roomCodeDisplay" class="text-3xl font-bold bg-gray-800 p-4 rounded-lg mb-4 text-center tracking-widest"></div>
                 <button id="copyCodeBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-lg">
-                    <i class="fas fa-copy mr-2"></i> Kodu Kopyala / Copy Code
+                    <i class="fas fa-copy mr-2"></i> Kodu Kopyala
                 </button>
             </div>
             
-            <p id="waitStatus" class="text-lg text-gray-300 mb-6">Rəqib qoşulması gözlənilir... / Waiting for opponent...</p>
+            <p id="waitStatus" class="text-lg text-gray-300 mb-6">Rəqib qoşulması gözlənilir...</p>
             
             <button id="cancelBtn" class="w-full max-w-xs py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-lg">
-                <i class="fas fa-times-circle mr-2"></i> Ləğv Et / Lobiye Qayıt<br>Cancel / Return to Lobby
+                <i class="fas fa-times-circle mr-2"></i> Ləğv Et / Lobiye Qayıt
             </button>
         </div>
     </div>
@@ -572,29 +534,29 @@
     <div id="gameScreen" class="screen">
         <!-- Skor göstergesi -->
         <div id="scoreDisplay" class="w-full text-center text-lg font-bold text-yellow-300 py-1 bg-black bg-opacity-50 mb-1" style="display: none;">
-          Bot beta versiyadadır - Bot is in beta version
+            Sen 0 - 0 Rakip
         </div>
         
         <div class="w-full flex justify-between items-center p-1">
             <div class="text-left pl-2">
                 <div id="myLives" class="text-xl">❤️❤️❤️</div>
-                <div class="text-xs text-blue-300">Sənin Canın / Your Lives</div>
+                <div class="text-xs text-blue-300">Sənin Canın</div>
             </div>
             
             <div class="text-center">
                 <h1 class="text-xl font-bold m-0 p-0">💣</h1>
-                <div id="levelInfo" class="text-xs">Səviyyə / Level 1</div>
+                <div id="levelInfo" class="text-xs">Level 1</div>
             </div>
             
             <div class="text-right pr-2">
                 <div id="opponentLives" class="text-xl">❤️❤️❤️</div>
-                <div id="opponentName" class="text-xs text-blue-300">Rəqibin Canı / Opponent's Lives</div>
+                <div id="opponentName" class="text-xs text-blue-300">Rəqibin Canı</div>
             </div>
         </div>
         
         <div class="w-full text-center p-1">
-            <div id="turnStatus" class="text-sm font-bold text-yellow-400">SIRA SƏNDƏ / YOUR TURN</div>
-            <div id="actionMessage" class="text-xs text-gray-300">Bir kart seç / Select a card</div>
+            <div id="turnStatus" class="text-sm font-bold text-yellow-400">SIRA SƏNDƏ </div>
+            <div id="actionMessage" class="text-xs text-gray-300">Bir kart seç</div>
         </div>
         <p id="roleStatus" class="text-gray-300 text-xs bg-gray-700 p-2 rounded-lg"></p>
 
@@ -608,9 +570,18 @@
         <button id="endGameBtn" class="btn bg-red-600 hover:bg-red-500 text-white text-sm py-3">🚪 Oyundan Çıx <i class="fas fa-door-open ml-2"></i></button>
     </div>
 
+    <script src="languages.js"></script>
+    
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
         
+        document.addEventListener('DOMContentLoaded', () => {
+            window.languageManager.initLanguage();
+        });
+        
+        window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
+        window.setLanguage = languageManager.setLanguage;
+
         // Socket.IO sunucu URL'si
         const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; // Render üzerindeki Socket.IO sunucusu
         let socket;
@@ -626,42 +597,9 @@
             return username;
         }
 
-        function showConnectionStatus(message, isError = false) {
-            console.log(isError ? '❌ ' + message : '✅ ' + message);
-            const statusElement = document.getElementById('connectionStatus');
-            if (statusElement) {
-                statusElement.textContent = message;
-                statusElement.style.color = isError ? '#ef4444' : '#10b981';
-                statusElement.style.display = 'block';
-            }
-            
-            // Hata durumunda loading mesajını güncelle
-            if (isError) {
-                const loadingMessage = document.getElementById('loadingMessage');
-                if (loadingMessage) {
-                    const messageText = loadingMessage.querySelector('p');
-                    if (messageText) {
-                        messageText.textContent = 'Bağlantı hatası: ' + message;
-                    }
-                }
-            }
-        }
-
         function connectToServer() {
             try {
-                const loadingMessage = document.getElementById('loadingMessage');
-                if (loadingMessage) {
-                    loadingMessage.style.display = 'flex';
-                    loadingMessage.style.visibility = 'visible';
-                }
-                
-                showConnectionStatus('Sunucuya bağlanılıyor...', false);
-                console.log('Sunucuya bağlanılıyor...', LIVE_SERVER_URL);
-                
-                // Önceki bağlantıyı temizle
-                if (socket) {
-                    socket.disconnect();
-                }
+                console.log('Servərə Bağlanır...🚀:', LIVE_SERVER_URL);
                 
                 socket = io(LIVE_SERVER_URL, {
                     transports: ['websocket', 'polling'],
@@ -669,45 +607,37 @@
                     reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
                     reconnectionDelay: 1000,
                     reconnectionDelayMax: 5000,
-                    timeout: 10000,
-                    forceNew: true,
-                    withCredentials: true
+                    timeout: 20000,
+                    forceNew: true
                 });
 
                 socket.on('connect', () => {
-                    showConnectionStatus('Sunucuya bağlandı!', false);
-                    console.log('✅ Sunucuya bağlandı!');
-                    reconnectAttempts = 0;
+                    console.log('Servərə Qoşuldu ✅');
+                    reconnectAttempts = 0; // Bağlantı başarılı olursa yeniden deneme sayacını sıfırla
+                    UIElements.showGlobalMessage('Serverə Qoşuldu ✅ Oynaya Bilərsiniz', false);
                     
-                    // Yükleme mesajını gizle
+                    // Hide loading message when connected - using direct style manipulation
+                    const loadingMessage = document.getElementById('loadingMessage');
                     if (loadingMessage) {
+                        loadingMessage.style.display = 'none';
+                        loadingMessage.style.visibility = 'hidden';
                         loadingMessage.style.opacity = '0';
-                        setTimeout(() => {
-                            loadingMessage.style.display = 'none';
-                            loadingMessage.style.visibility = 'hidden';
-                            loadingMessage.remove(); // Remove from DOM completely
-                        }, 500);
+                        loadingMessage.remove(); // Remove from DOM completely
                     }
                     
                     showScreen('lobby');
                 });
                 
                 socket.on('connect_error', (err) => {
-                    const errorMessage = `Bağlantı hatası: ${err.message || 'Bilinmeyen hata'}`;
-                    console.error('❌ ' + errorMessage, err);
-                    showConnectionStatus(errorMessage, true);
-                    
+                    console.error('Bağlantı Xətası:', err);
                     reconnectAttempts++;
                     
-                    // Hata durumunda yükleme mesajını güncelle
+                    // Hide loading message on error
                     const loadingMessage = document.getElementById('loadingMessage');
                     if (loadingMessage) {
-                        const messageText = loadingMessage.querySelector('p');
-                        if (messageText) {
-                            messageText.textContent = errorMessage;
-                        }
-                        loadingMessage.style.display = 'flex';
-                        loadingMessage.style.visibility = 'visible';
+                        loadingMessage.classList.remove('show');
+                        loadingMessage.classList.add('hidden');
+                        loadingMessage.style.display = 'none';
                     }
                     
                     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
@@ -776,180 +706,23 @@
             socket.emit('createRoom', { username });
         });
         
-        // Matchmaking variables
-        let isInMatchmaking = false;
-        let matchmakingInterval = null;
-        let matchStartTime = null;
-        let matchFound = false;
-        let opponentName = '';
-        
-        // Update matchmaking status message
-        function updateMatchmakingStatus(message, isError = false) {
-            const messageEl = document.getElementById('matchmakingMessage');
-            if (messageEl) {
-                messageEl.textContent = message;
-                messageEl.className = `text-center mb-4 ${isError ? 'text-red-400' : 'text-white'}`;
-            }
-        }
-        
-        // Format time (mm:ss)
-        function formatTime(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
-        
-        // Update matchmaking timer
-        function updateMatchmakingTimer() {
-            if (!isInMatchmaking || matchFound) return;
-            
-            const now = Math.floor(Date.now() / 1000);
-            const elapsed = now - matchStartTime;
-            
-            updateMatchmakingStatus(`Oyunçu axtarılır... / Searching for opponent... (${formatTime(elapsed)})`);
-        }
-        
-        // Show match found UI
-        function showMatchFound(opponent) {
-            matchFound = true;
-            opponentName = opponent;
-            
-            document.getElementById('opponentName').textContent = 
-                `Oyunçu tapıldı: ${opponent} / Player found: ${opponent}`;
-            document.getElementById('matchFoundSection').classList.remove('hidden');
-            document.getElementById('cancelMatchmakingBtn').classList.add('hidden');
-            
-            // Auto-accept match after 10 seconds
-            setTimeout(() => {
-                if (matchFound) {
-                    startGameWithOpponent();
-                }
-            }, 10000);
-        }
-        
-        // Start game with matched opponent
-        function startGameWithOpponent() {
-            if (window.socket) {
-                window.socket.emit('acceptMatch');
-                document.getElementById('matchmakingPanel').classList.add('hidden');
-                document.getElementById('matchmakingBtn').innerHTML = 
-                    '<i class="fas fa-random mr-2"></i> Onlayn Oyunçu Tap / Find Player';
-                isInMatchmaking = false;
-                matchFound = false;
-            }
-        }
-        
-        // Cancel matchmaking
-        function cancelMatchmaking() {
-            if (window.socket) {
-                window.socket.emit('cancelMatchmaking');
-            }
-            
-            document.getElementById('matchmakingPanel').classList.add('hidden');
-            document.getElementById('matchFoundSection').classList.add('hidden');
-            document.getElementById('cancelMatchmakingBtn').classList.remove('hidden');
-            document.getElementById('matchmakingBtn').innerHTML = 
-                '<i class="fas fa-random mr-2"></i> Onlayn Oyunçu Tap / Find Player';
-            
-            isInMatchmaking = false;
-            matchFound = false;
-            
-            if (matchmakingInterval) {
-                clearInterval(matchmakingInterval);
-                matchmakingInterval = null;
-            }
-        }
-        
-        // Matchmaking button click handler
-        document.getElementById('matchmakingBtn').addEventListener('click', () => {
-            const username = UIElements.usernameInput.value.trim();
-            if (!username) {
-                UIElements.showGlobalMessage('İstifadəçi adı daxil edin / Please enter a username', true);
-                return;
-            }
-            
-            if (isInMatchmaking) {
-                // Show matchmaking panel if already in matchmaking
-                document.getElementById('matchmakingPanel').classList.toggle('hidden');
-                return;
-            }
-            
-            // Start matchmaking
-            if (window.socket) {
-                window.socket.emit('joinMatchmaking', { username });
-                isInMatchmaking = true;
-                matchFound = false;
-                matchStartTime = Math.floor(Date.now() / 1000);
-                
-                // Show matchmaking panel
-                const panel = document.getElementById('matchmakingPanel');
-                panel.classList.remove('hidden');
-                document.getElementById('matchFoundSection').classList.add('hidden');
-                document.getElementById('cancelMatchmakingBtn').classList.remove('hidden');
-                
-                // Start timer
-                updateMatchmakingTimer();
-                matchmakingInterval = setInterval(updateMatchmakingTimer, 1000);
-            }
-        });
-        
-        // Cancel matchmaking button
-        document.getElementById('cancelMatchmakingBtn').addEventListener('click', cancelMatchmaking);
-        
-        // Play now button
-        document.getElementById('playNowBtn').addEventListener('click', startGameWithOpponent);
-        
-        // Decline match button
-        document.getElementById('declineMatchBtn').addEventListener('click', () => {
-            if (window.socket) {
-                window.socket.emit('declineMatch');
-            }
-            cancelMatchmaking();
-        });
-        
-        // Odaya katıl butonu
         document.getElementById('joinRoomBtn').addEventListener('click', () => {
-            const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-            const username = UIElements.usernameInput.value.trim();
+            const username = validateInput();
+            if (!username) return;
             
-            if (!username) {
-                UIElements.showGlobalMessage('Lütfen bir kullanıcı adı girin.', true);
+            const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            if (!roomCode) {
+                UIElements.showGlobalMessage('Xahiş olunur otaq kodunu daxil edin', true);
                 return;
             }
             
-            if (window.socket) {
-                showScreen('wait');
-                window.socket.emit('joinRoom', { username, roomCode });
-            }
+            showScreen('wait');
+            document.getElementById('waitTitle').textContent = `Otağa Qoşulma: ${roomCode}`;
+            document.getElementById('waitStatus').textContent = 'Qoşulunur...';
+            document.getElementById('codeArea').classList.add('hidden');
+            socket.emit('joinRoom', { username, roomCode });
         });
-        
-        // Eşleştirme durumu güncellemelerini dinle
-        if (window.socket) {
-            window.socket.on('matchmakingStatus', (data) => {
-                if (data.inQueue) {
-                    updateMatchmakingStatus(`Eşleşme aranıyor... (Sırada: ${data.queuePosition || 1})`);
-                } else if (data.message) {
-                    updateMatchmakingStatus(data.message, data.isError);
-                }
-            });
-            
-            // Eşleşme bulunduğunda
-            window.socket.on('matched', (data) => {
-                isInMatchmaking = false;
-                if (matchmakingInterval) {
-                    clearInterval(matchmakingInterval);
-                    matchmakingInterval = null;
-                }
-                
-                // Oyun ekranına geç
-                setupSocketHandlers(window.socket, data.roomCode, data.isHost, data.opponentName);
-                showScreen('game');
-                
-                // Eşleşme bildirimi
-                UIElements.showGlobalMessage(`${data.opponentName} ile eşleştiniz! Oyun başlıyor...`, false);
-            });
-        }
-        
+
         document.getElementById('cancelBtn').addEventListener('click', () => {
             if (socket && socket.connected) {
                 socket.emit('leaveRoom', { roomCode: document.getElementById('roomCodeDisplay').textContent });
@@ -968,223 +741,5 @@
 
         document.addEventListener('DOMContentLoaded', connectToServer);
     </script>
-    <!-- Emoji Chat -->
-    <div id="emojiChat" style="position: fixed; top: 10px; right: 10px; z-index: 1000;">
-        <button id="emojiButton" style="width: 60px; height: 60px; font-size: 30px; background: rgba(74, 85, 104, 0.8); border: 2px solid white; border-radius: 50%; color: white; cursor: pointer;">😊</button>
-        <div id="emojiContainer" style="display: none; position: absolute; top: 70px; right: 0; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 15px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; z-index: 1001;">
-            <div class="emoji-option" data-emoji="😀" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">😀</div>
-            <div class="emoji-option" data-emoji="😂" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">😂</div>
-            <div class="emoji-option" data-emoji="😍" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">😍</div>
-            <div class="emoji-option" data-emoji="👍" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">👍</div>
-            <div class="emoji-option" data-emoji="👎" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">👎</div>
-            <div class="emoji-option" data-emoji="🎉" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">🎉</div>
-            <div class="emoji-option" data-emoji="😎" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">😎</div>
-            <div class="emoji-option" data-emoji="🤔" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">🤔</div>
-            <div class="emoji-option" data-emoji="💩" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">💩</div>
-        </div>
-    </div>
-    
-    <!-- Emoji Display (shown in center of screen) -->
-    <div id="emojiDisplay" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 999; font-size: 80px; pointer-events: none; opacity: 0; transition: opacity 0.3s; text-shadow: 0 0 10px rgba(0,0,0,0.5); background-color: transparent;"></div>
-
-    <audio id="emojiSound" preload="auto">
-        <source src="sound4.mp3" type="audio/mpeg">
-    </audio>
-
-    <script>
-        // Emoji Chat Functionality
-        document.addEventListener('DOMContentLoaded', () => {
-            const emojiButton = document.getElementById('emojiButton');
-            const emojiContainer = document.getElementById('emojiContainer');
-            const emojiSound = document.getElementById('emojiSound');
-            
-            // Show/hide emoji button
-            function showEmojiButton(show = true) {  // Varsayılan olarak true yapıldı
-                const emojiChat = document.getElementById('emojiChat');
-                const gameScreen = document.getElementById('gameScreen');
-                
-                // Oyun ekranı kontrolü yapılıyor
-                const isGameScreen = gameScreen && window.getComputedStyle(gameScreen).display !== 'none';
-                
-                // Debug için log
-                console.log('showEmojiButton called with:', {
-                    show,
-                    isGameScreen,
-                    gameScreenExists: !!gameScreen,
-                    currentDisplay: emojiChat ? window.getComputedStyle(emojiChat).display : 'emojiChat not found'
-                });
-                
-                if (emojiChat) {
-                    // Eğer oyun ekranındaysak ve show true ise göster
-                    if (isGameScreen && show) {
-                        emojiChat.style.display = 'block';
-                        console.log('Emoji butonu gösteriliyor');
-                    } else {
-                        emojiChat.style.display = 'none';
-                        console.log('Emoji butonu gizleniyor');
-                    }
-                    
-                    // Emoji seçiciyi her zaman kapat
-                    const emojiContainer = document.getElementById('emojiContainer');
-                    if (emojiContainer) {
-                        emojiContainer.style.display = 'none';
-                    }
-                }
-            }
-            
-            // Initially hide emoji button
-            showEmojiButton(false);
-
-            // Toggle emoji picker
-            emojiButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                emojiContainer.style.display = emojiContainer.style.display === 'grid' ? 'none' : 'grid';
-            });
-
-            // Close emoji picker when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!e.target.closest('#emojiContainer') && e.target.id !== 'emojiButton') {
-                    emojiContainer.style.display = 'none';
-                }
-            });
-
-            // Handle emoji selection
-            document.querySelectorAll('.emoji-option').forEach(emoji => {
-                emoji.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const emojiChar = emoji.getAttribute('data-emoji');
-                    
-                    // Play sound
-                    if (emojiSound) {
-                        emojiSound.currentTime = 0;
-                        emojiSound.play().catch(e => console.log('Sound play failed:', e));
-                    }
-                    
-                    // Show emoji on local screen
-                    showEmoji(emojiChar);
-                    
-                    // Send emoji to opponent
-                    if (window.socket) {
-                        window.socket.emit('emojiMessage', { emoji: emojiChar });
-                    }
-                    
-                    // Only hide the emoji picker, keep the button visible
-                    emojiContainer.style.display = 'none';
-                });
-                
-                // Add hover effect
-                emoji.addEventListener('mouseover', () => {
-                    emoji.style.transform = 'scale(1.2)';
-                });
-                emoji.addEventListener('mouseout', () => {
-                    emoji.style.transform = 'scale(1)';
-                });
-            });
-            
-            // Function to show emoji in center of screen
-            function showEmoji(emoji) {
-                const emojiDisplay = document.getElementById('emojiDisplay');
-                if (!emojiDisplay) return;
-                
-                // Clear any existing timeouts
-                if (window.emojiTimeout) {
-                    clearTimeout(window.emojiTimeout);
-                }
-                
-                emojiDisplay.textContent = emoji;
-                emojiDisplay.style.opacity = '1';
-                
-                // Hide after 2 seconds with fade out
-                window.emojiTimeout = setTimeout(() => {
-                    emojiDisplay.style.opacity = '0';
-                    // Clear the emoji after fade out completes
-                    setTimeout(() => {
-                        emojiDisplay.textContent = '';
-                    }, 300); // Match this with the CSS transition time
-                }, 2000);
-            }
-            
-            // Listen for emoji messages from opponent
-            if (window.socket) {
-                window.socket.on('emojiMessage', (data) => {
-                    console.log('Emoji received:', data.emoji);
-                    showEmoji(data.emoji);
-                    
-                    // Play sound for received emoji
-                    if (emojiSound) {
-                        emojiSound.currentTime = 0;
-                        emojiSound.play().catch(e => console.log('Sound play failed:', e));
-                    }
-                });
-                
-                // Oyun başladığında emoji butonunu göster
-                window.socket.on('gameStart', () => {
-                    console.log('Oyun başladı, emoji butonu gösteriliyor...');
-                    // 1 saniye bekle ve göster (oyun alanının yüklenmesi için)
-                    setTimeout(() => {
-                        showEmojiButton(true);
-                        // 2 saniye sonra tekrar kontrol et
-                        setTimeout(() => showEmojiButton(true), 2000);
-                    }, 1000);
-                });
-                
-                // Oyun bittiğinde veya lobiye dönüldüğünde
-                window.socket.on('returnToLobby', () => {
-                    console.log('Lobiye dönüldü, emoji butonu gizleniyor...');
-                    showEmojiButton(false);
-                });
-                
-                // Oyun hazır olduğunda
-                window.socket.on('gameReady', () => {
-                    console.log('Oyun hazır, emoji butonu gösteriliyor...');
-                    // 1 saniye bekle ve göster
-                    setTimeout(() => showEmojiButton(true), 1000);
-                });
-                
-                // Sayfa yüklendiğinde de kontrol et
-                window.addEventListener('load', () => {
-                    console.log('Sayfa yüklendi, emoji butonu kontrol ediliyor...');
-                    // 2 saniye bekle ve kontrol et
-                    setTimeout(() => {
-                        const gameScreen = document.getElementById('gameScreen');
-                        if (gameScreen && window.getComputedStyle(gameScreen).display !== 'none') {
-                            showEmojiButton(true);
-                        }
-                    }, 2000);
-                });
-                
-                // Oyun tahtası değişikliklerini izle
-                const gameBoard = document.getElementById('gameBoard');
-                if (gameBoard) {
-                    const observer = new MutationObserver((mutations) => {
-                        mutations.forEach((mutation) => {
-                            if (mutation.type === 'childList') {
-                                console.log('Oyun tahtası değişti, emoji butonu güncelleniyor...');
-                                // Kartlar yüklendiyse butonu göster
-                                if (gameBoard.children.length > 0) {
-                                    showEmojiButton(true);
-                                }
-                            }
-                        });
-                    });
-                    
-                    observer.observe(gameBoard, { childList: true, subtree: true });
-                }
-                
-                // Sıra durumunu güncelle
-                const turnStatus = document.getElementById('turnStatus');
-                if (turnStatus) {
-                    if (turnStatus.textContent.includes('SIRA SƏNDƏ')) {
-                        turnStatus.textContent = 'SIRA SƏNDƏ / YOUR TURN';
-                    } else if (turnStatus.textContent.includes('SIRA RƏQİBDƏ')) {
-                        turnStatus.textContent = 'SIRA RƏQİBDƏ / OPPONENT S TURN';
-                    }
-                }
-            } else {
-                // For testing without socket
-                showEmojiButton();
-            }
-        });
-    </script>
-    </body>
+</body>
 </html>
