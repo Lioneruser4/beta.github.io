@@ -8,11 +8,6 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Telegram WebApp SDK -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Telegram WebApp SDK -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
     <style>
         /* === KENDİ OYUNUNUZDAN ALINAN CSS STİLLERİ VE MOBİL UYUM === */
@@ -41,24 +36,92 @@
             font-family: 'Inter', sans-serif; /* Daha modern bir font */
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+        }
+
+        body { 
+            background-color: #1a202c; /* Koyu arka plan */
+            color: #e2e8f0; /* Açık metin rengi */
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            transition: background-color 0.3s; 
+        }
+
+        /* Ana Ekran Düzeni */
+        .screen { 
+            width: 100%; 
+            height: 100vh;
+            max-width: 100%;
+            max-height: 100%;
+            display: none; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: flex-start;
+            padding: 0.25rem; 
+            box-sizing: border-box; 
+            text-align: center; 
+            background-color: #2d3748;
+            border-radius: 0;
+            box-shadow: none;
             overflow: hidden;
+            -webkit-overflow-scrolling: touch;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+        .screen.active { 
+            display: flex; 
         }
         
-        #lobby {
+        /* Language Selector */
+        .language-selector {
+            position: fixed;
+            top: env(safe-area-inset-top, 15px); /* Güvenli alanları destekle */
+            right: env(safe-area-inset-right, 15px);
+            z-index: 100;
+        }
+        .language-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid #63b3ed;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            text-align: center;
+            cursor: pointer;
+            color: #e2e8f0;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+            backdrop-filter: blur(5px);
+            padding: 0;
         }
-        
-        #gameContainer {
+        .language-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .language-options {
             display: none;
-            position: relative;
-            width: 100%;
-            height: 100vh;
+            position: absolute;
+            top: calc(100% + 5px);
+            right: 0;
+            background: #2d3748;
+            border: 1px solid #4a5568;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            overflow: hidden;
+            z-index: 101;
+            min-width: 150px;
+            color: #e2e8f0;
         }
+        .language-option {
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background-color 0.2s;
         }
         .language-option:hover {
             background-color: #4a5568;
@@ -382,26 +445,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@700&family=Chakra+Petch:wght@700&display=swap" rel="stylesheet">
 </head>
 <body class="bg-gray-900 select-none">
-    <!-- Telegram Login Screen -->
-    <div id="telegramLoginScreen" class="screen" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 1000; color: white; flex-direction: column; padding: 20px;">
-        <div style="background: #1e1e2e; padding: 2rem; border-radius: 10px; text-align: center; max-width: 400px; width: 90%;">
-            <h2 style="color: #00bcd4; margin-bottom: 1.5rem;">Oyun Başlıyor!</h2>
-            <p style="margin-bottom: 2rem;">Telegram hesabınızla giriş yapın veya misafir olarak oyuna başlayın</p>
-            <button id="telegramLoginBtn" style="background: #0088cc; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 1rem; cursor: pointer; margin: 8px 0; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                <i class="fab fa-telegram"></i>
-            </div>
-            <button id="telegramLoginBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center space-x-2">
-                <i class="fab fa-telegram text-xl"></i>
-                <span>Telegram ile Giriş Yap</span>
-            </button>
-            <div class="mt-4">
-                <button id="guestLoginBtn" class="text-blue-400 hover:text-blue-300 text-sm">Misafir olarak devam et</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Loading Message -->
-    <div id="loadingMessage" style="display: none;">
+    <div id="loadingMessage">
         <div class="spinner"></div>
         <p>Server qoşulur, zəhmət olmasa gözləyin...</p>
         <p>Connecting to server, please wait...</p>
