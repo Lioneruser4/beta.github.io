@@ -1,5 +1,18 @@
-// Dosya Adı: game.js
-// Telegram WebApp Integration
+// Uçak Savaşı Oyunu
+const GAME_SETTINGS = {
+    PLAYER_SPEED: 10,
+    BULLET_SPEED: 15,
+    PLAYER_HEALTH: 100,
+    BULLET_DAMAGE: 25,
+    GAME_DURATION: 120000 // 2 dakika
+};
+
+const GAME_STATES = {
+    WAITING: 'waiting',
+    COUNTDOWN: 'countdown',
+    PLAYING: 'playing',
+    FINISHED: 'finished'
+};
 class TelegramAuth {
     constructor() {
         this.isTelegramWebApp = typeof window.Telegram !== 'undefined' && 
@@ -132,20 +145,205 @@ const telegramAuth = new TelegramAuth();
 let socket;
 let currentRoomCode = '';
 let isHost = false;
-let opponentName = '';
-let currentUser = telegramAuth.getUser() || {
-    id: null,
-    name: 'Guest',
-    isTelegramUser: false
+let gameState = {
+    status: GAME_STATES.WAITING,
+    players: {},
+    bullets: [],
+    countdown: 3,
+    startTime: null,
+    endTime: null,
+    winner: null
 };
 
-// --- DOM Referansları ---
-const screens = { 
-    lobby: document.getElementById('lobby'), 
-    wait: document.getElementById('waitScreen'), 
-    game: document.getElementById('gameScreen') 
-};
-const gameBoardEl = document.getElementById('gameBoard');
+// Oyun öğeleri
+const gameContainer = document.getElementById('gameContainer');
+const gameCanvas = document.createElement('canvas');
+const ctx = gameCanvas.getContext('2d');
+gameContainer.appendChild(gameCanvas);
+
+// Tuş durumları
+const keys = {};
+document.addEventListener('keydown', (e) => keys[e.code] = true);
+document.addEventListener('keyup', (e) => keys[e.code] = false);
+
+// Ekran boyutlarını ayarla
+function resizeCanvas() {
+    gameCanvas.width = window.innerWidth;
+    gameCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// Oyun döngüsü
+function gameLoop() {
+    update();
+    render();
+    requestAnimationFrame(gameLoop);
+}
+
+// Oyun güncellemeleri
+function update() {
+    const player = gameState.players[socket?.id];
+    if (!player) return;
+
+    // Oyuncu hareketi
+    if (keys['ArrowLeft'] || keys['KeyA']) {
+        player.x = Math.max(0, player.x - GAME_SETTINGS.PLAYER_SPEED);
+    }
+    if (keys['ArrowRight'] || keys['KeyD']) {
+        player.x = Math.min(gameCanvas.width - 50, player.x + GAME_SETTINGS.PLAYER_SPEED);
+    }
+
+    // Sunucuya hareket bilgisini gönder
+    if (socket) {
+        socket.emit('playerMove', { x: player.x });
+    }
+}
+
+// Oyun çizimleri
+function render() {
+    // Arkaplanı temizle
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+
+    // Oyuncuları çiz
+    Object.values(gameState.players).forEach(player => {
+        const isCurrentPlayer = player.id === socket?.id;
+        
+        // Uçak çiz
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        
+        // Uçağın yönünü ayarla
+        if (!isCurrentPlayer) ctx.rotate(Math.PI);
+        
+        // Uçak gövdesi
+        ctx.fillStyle = isCurrentPlayer ? '#4cc9f0' : '#f72585';
+        ctx.beginPath();
+        ctx.moveTo(0, -20);
+        ctx.lineTo(15, 15);
+        ctx.lineTo(-15, 15);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Kanatlar
+        ctx.fillStyle = isCurrentPlayer ? '#4895ef' : '#b5179e';
+        ctx.fillRect(-20, 0, 40, 10);
+        
+        ctx.restore();
+        
+        // İsim ve can göster
+        ctx.fillStyle = '#fff';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(player.username, player.x, isCurrentPlayer ? player.y - 30 : player.y + 40);
+        
+        // Can çubuğu
+        const healthPercent = player.health / GAME_SETTINGS.PLAYER_HEALTH;
+        ctx.fillStyle = healthPercent > 0.6 ? '#4ade80' : healthPercent > 0.3 ? '#fbbf24' : '#ef4444';
+        ctx.fillRect(player.x - 25, isCurrentPlayer ? player.y - 45 : player.y + 45, 50 * healthPercent, 5);
+    });
+    
+    // Mermileri çiz
+    gameState.bullets.forEach(bullet => {
+        ctx.fillStyle = bullet.direction === 'up' ? '#4cc9f0' : '#f72585';
+        ctx.fillRect(bullet.x - 2, bullet.y - 5, 4, 10);
+    });
+    
+    // Oyun durumuna göre arayüz göster
+    if (gameState.status === GAME_STATES.WAITING) {
+        showMessage('Rakip bekleniyor...');
+    } else if (gameState.status === GAME_STATES.COUNTDOWN) {
+        showMessage(gameState.countdown > 0 ? gameState.countdown : 'BAŞLA!');
+    } else if (gameState.status === GAME_STATES.FINISHED && gameState.winner) {
+        showMessage(`KAZANAN: ${gameState.winner}`);
+    }
+    
+    // Skor tablosu
+    ctx.fillStyle = '#fff';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'left';
+    Object.values(gameState.players).forEach((player, index) => {
+        ctx.fillText(`${player.username}: ${player.score}`, 10, 30 + (index * 25));
+    });
+    
+    // Kalan süre
+    if (gameState.endTime) {
+        const timeLeft = Math.max(0, Math.ceil((gameState.endTime - Date.now()) / 1000));
+        ctx.textAlign = 'right';
+        ctx.fillText(`Süre: ${timeLeft}s`, gameCanvas.width - 10, 30);
+    }
+}
+
+// Mesaj göster
+function showMessage(text) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    const textWidth = ctx.measureText(text).width;
+    const padding = 20;
+    const x = (gameCanvas.width - textWidth) / 2 - padding;
+    const y = gameCanvas.height / 2 - 30;
+    
+    ctx.fillRect(x, y, textWidth + padding * 2, 60);
+    ctx.fillStyle = '#fff';
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(text, gameCanvas.width / 2, gameCanvas.height / 2);
+}
+
+// Ateş et
+function fireBullet() {
+    const player = gameState.players[socket?.id];
+    if (!player || gameState.status !== GAME_STATES.PLAYING) return;
+    
+    socket.emit('playerShoot', {
+        x: player.x,
+        y: player.y,
+        direction: 'up' // Yukarı doğru ateş et
+    });
+}
+
+// Oyun başlat
+function startGame() {
+    const username = document.getElementById('usernameInput')?.value || 'Oyuncu' + Math.floor(Math.random() * 1000);
+    
+    // Socket bağlantısı
+    socket = io('http://localhost:3000'); // Sunucu adresini güncelleyin
+    
+    // Oyun güncellemelerini dinle
+    socket.on('gameUpdate', (state) => {
+        gameState = state;
+    });
+    
+    // Oyun başladığında
+    socket.on('gameStart', (state) => {
+        gameState = state;
+        document.getElementById('lobby').style.display = 'none';
+        gameCanvas.style.display = 'block';
+    });
+    
+    // Yeni mermi eklendiğinde
+    socket.on('bulletFired', (bullet) => {
+        gameState.bullets.push(bullet);
+    });
+    
+    // Oyun bitişi
+    socket.on('gameOver', (winner) => {
+        gameState.status = GAME_STATES.FINISHED;
+        gameState.winner = winner;
+    });
+    
+    // Odaya katıl
+    socket.emit('joinGame', { username });
+}
+
+// Ateş butonu
+document.getElementById('fireButton')?.addEventListener('click', fireBullet);
+
+// Oyun döngüsünü başlat
+gameLoop();
+
+// Oyun başlatma butonu
+document.getElementById('startGameBtn')?.addEventListener('click', startGame);
 const turnStatusEl = document.getElementById('turnStatus');
 const actionMessageEl = document.getElementById('actionMessage');
 const myLivesEl = document.getElementById('myLives');
