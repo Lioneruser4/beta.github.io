@@ -224,6 +224,15 @@ function matchPlayers() {
 io.on('connection', (socket) => {
     console.log(`Yeni bağlantı: ${socket.id}`);
     
+    // Bağlantı kesildiğinde kuyruktan çıkar
+    socket.on('disconnect', () => {
+        const index = matchmakingQueue.findIndex(p => p.id === socket.id);
+        if (index !== -1) {
+            const player = matchmakingQueue.splice(index, 1)[0];
+            console.log(`Bağlantı kesildi, eşleşme kuyruğundan çıkarıldı: ${player.username}`);
+        }
+    });
+    
     // Eşleştirme kuyruğuna katılma
     socket.on('joinMatchmaking', ({ username }) => {
         console.log(`Eşleştirme isteği: ${username} (${socket.id})`);
@@ -240,7 +249,8 @@ io.on('connection', (socket) => {
             id: socket.id,
             username,
             socket: socket,
-            accepted: false
+            accepted: false,
+            matched: false
         };
         
         matchmakingQueue.push(player);
@@ -250,12 +260,124 @@ io.on('connection', (socket) => {
         socket.emit('matchmakingStatus', {
             inQueue: true,
             queuePosition: matchmakingQueue.length,
-            message: 'Oyunçu axtarılır... / Searching for opponent...'
+            message: 'Oyunçu axtarılır... / Searching for opponent...',
+            isError: false
         });
         
-        // Eşleştirme kontrolü yap
-        matchPlayers();
+        // Eğer en az 2 kişi varsa eşleştir
+        if (matchmakingQueue.length >= 2) {
+            matchPlayers();
+        }
     });
+    
+    // Eşleştirmeyi iptal et
+    socket.on('cancelMatchmaking', () => {
+        const index = matchmakingQueue.findIndex(p => p.id === socket.id);
+        if (index !== -1) {
+            const player = matchmakingQueue.splice(index, 1)[0];
+            console.log(`Eşleşme iptal edildi: ${player.username}`);
+            socket.emit('matchmakingStatus', {
+                inQueue: false,
+                message: 'Eşleşme iptal edildi. / Matchmaking cancelled.'
+            });
+        }
+    });
+    
+    // Eşleşmeyi kabul et
+    socket.on('acceptMatch', () => {
+        const player = matchmakingQueue.find(p => p.id === socket.id);
+        if (player) {
+            player.accepted = true;
+            console.log(`${player.username} eşleşmeyi kabul etti`);
+            
+            // Karşı oyuncuya bildir
+            const opponent = matchmakingQueue.find(p => p.id !== socket.id && p.matchedWith === player.id);
+            if (opponent) {
+                opponent.socket.emit('opponentAccepted');
+            }
+            
+            // Eğer her iki oyuncu da kabul ettiyse oyunu başlat
+            if (opponent && opponent.accepted) {
+                startGame(player, opponent);
+            }
+        }
+    });
+    
+    // Eşleşmeyi reddet
+    socket.on('declineMatch', () => {
+        const index = matchmakingQueue.findIndex(p => p.id === socket.id);
+        if (index !== -1) {
+            const player = matchmakingQueue[index];
+            console.log(`${player.username} eşleşmeyi reddetti`);
+            
+            // Karşı oyuncuya bildir
+            const opponent = matchmakingQueue.find(p => p.id !== socket.id && p.matchedWith === player.id);
+            if (opponent) {
+                opponent.socket.emit('matchmakingStatus', {
+                    inQueue: false,
+                    message: 'Rakibiniz eşleşmeyi reddetti. / Your opponent declined the match.',
+                    isError: true
+                });
+                // Rakibi tekrar kuyruğa al
+                opponent.matchedWith = null;
+                opponent.accepted = false;
+            }
+            
+            // Kullanıcıyı kuyruktan çıkar
+            matchmakingQueue.splice(index, 1);
+            
+            socket.emit('matchmakingStatus', {
+                inQueue: false,
+                message: 'Eşleşme reddedildi. / Match declined.'
+            });
+        }
+    });
+    
+    // Oyun başlatma fonksiyonu
+    function startGame(player1, player2) {
+        const roomCode = generateRoomCode();
+        
+        // Odayı oluştur
+        rooms[roomCode] = {
+            code: roomCode,
+            playerCount: 2,
+            hostId: player1.id,
+            hostUsername: player1.username,
+            guestId: player2.id,
+            guestUsername: player2.username,
+            gameState: {
+                stage: 'PLAY',
+                turn: 0,
+                hostBombs: [],
+                guestBombs: [],
+                hostLives: 3,
+                guestLives: 3,
+                hostBombsSelected: false,
+                guestBombsSelected: false,
+                level: 1,
+                opened: [],
+                boardSize: 20
+            }
+        };
+        
+        // Oyunculara oda bilgisini gönder
+        player1.socket.emit('matched', {
+            roomCode: roomCode,
+            isHost: true,
+            opponentName: player2.username
+        });
+        
+        player2.socket.emit('matched', {
+            roomCode: roomCode,
+            isHost: false,
+            opponentName: player1.username
+        });
+        
+        // Kuyruktan çıkar
+        matchmakingQueue = matchmakingQueue.filter(p => p.id !== player1.id && p.id !== player2.id);
+        
+        console.log(`Eşleştirme başarılı: ${player1.username} ve ${player2.username} oyuna başlıyor (Oda: ${roomCode})`);
+    }
     
     // Eşleştirmeyi iptal et
     socket.on('cancelMatchmaking', () => {
