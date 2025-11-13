@@ -505,12 +505,21 @@
         </div>
         
         <div class="flex flex-col space-y-3 w-full max-w-md mx-auto mt-6">
-            <button id="createRoomBtn" class="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg transform transition-all duration-200 active:scale-95">
-                <i class="fas fa-plus-circle mr-2"></i> Otaq Qur / Create Room
+            <button id="createRoomBtn" class="btn btn-primary mb-4">
+                <i class="fas fa-plus-circle mr-2"></i> Oda Oluştur
             </button>
-            <button id="joinRoomBtn" class="w-full py-4 px-6 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg transform transition-all duration-200 active:scale-95">
-                <i class="fas fa-sign-in-alt mr-2"></i> Otağa Qoşul / Join Room
+            <div class="or-divider">VEYA</div>
+            <div class="join-section mb-4">
+                <input type="text" id="roomCodeInput" placeholder="Oda Kodunu Girin" class="input-field">
+                <button id="joinRoomBtn" class="btn btn-primary">
+                    <i class="fas fa-sign-in-alt mr-2"></i> Odaya Katıl
+                </button>
+            </div>
+            <div class="or-divider">VEYA</div>
+            <button id="matchmakingBtn" class="btn btn-secondary w-full">
+                <i class="fas fa-random mr-2"></i> Online Eşleştirme
             </button>
+            <div id="matchmakingStatus" class="text-sm text-gray-400 mt-2 hidden"></div>
         </div>
     </div>
     
@@ -744,23 +753,101 @@
             socket.emit('createRoom', { username });
         });
         
-        document.getElementById('joinRoomBtn').addEventListener('click', () => {
-            const username = validateInput();
-            if (!username) return;
-            
-            const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-            if (!roomCode) {
-                UIElements.showGlobalMessage('Xahiş olunur otaq kodunu daxil edin', true);
+        // Eşleştirme durumu değişkenleri
+        let isInMatchmaking = false;
+        let matchmakingInterval = null;
+        
+        // Eşleştirme durumunu güncelle
+        function updateMatchmakingStatus(message, isError = false) {
+            const statusEl = document.getElementById('matchmakingStatus');
+            if (statusEl) {
+                statusEl.textContent = message;
+                statusEl.className = `text-sm mt-2 ${isError ? 'text-red-400' : 'text-blue-400'}`;
+                statusEl.classList.remove('hidden');
+            }
+        }
+        
+        // Eşleştirme butonu
+        document.getElementById('matchmakingBtn').addEventListener('click', () => {
+            const username = UIElements.usernameInput.value.trim();
+            if (!username) {
+                UIElements.showGlobalMessage('Lütfen bir kullanıcı adı girin.', true);
                 return;
             }
             
-            showScreen('wait');
-            document.getElementById('waitTitle').textContent = `Otağa Qoşulma: ${roomCode}`;
-            document.getElementById('waitStatus').textContent = 'Qoşulunur...';
-            document.getElementById('codeArea').classList.add('hidden');
-            socket.emit('joinRoom', { username, roomCode });
+            if (isInMatchmaking) {
+                // Eşleşmeyi iptal et
+                if (window.socket) {
+                    window.socket.emit('cancelMatchmaking');
+                }
+                isInMatchmaking = false;
+                document.getElementById('matchmakingBtn').innerHTML = '<i class="fas fa-random mr-2"></i> Online Eşleştirme';
+                updateMatchmakingStatus('Eşleşme iptal edildi.');
+                if (matchmakingInterval) {
+                    clearInterval(matchmakingInterval);
+                    matchmakingInterval = null;
+                }
+            } else {
+                // Eşleşme başlat
+                if (window.socket) {
+                    window.socket.emit('joinMatchmaking', { username });
+                    isInMatchmaking = true;
+                    document.getElementById('matchmakingBtn').innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Eşleşme Aranıyor...';
+                    updateMatchmakingStatus('Eşleşme aranıyor...');
+                    
+                    // Eşleşme durumunu kontrol et
+                    matchmakingInterval = setInterval(() => {
+                        if (window.socket) {
+                            window.socket.emit('getMatchmakingStatus');
+                        }
+                    }, 5000);
+                }
+            }
         });
-
+        
+        // Odaya katıl butonu
+        document.getElementById('joinRoomBtn').addEventListener('click', () => {
+            const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            const username = UIElements.usernameInput.value.trim();
+            
+            if (!username) {
+                UIElements.showGlobalMessage('Lütfen bir kullanıcı adı girin.', true);
+                return;
+            }
+            
+            if (window.socket) {
+                showScreen('wait');
+                window.socket.emit('joinRoom', { username, roomCode });
+            }
+        });
+        
+        // Eşleştirme durumu güncellemelerini dinle
+        if (window.socket) {
+            window.socket.on('matchmakingStatus', (data) => {
+                if (data.inQueue) {
+                    updateMatchmakingStatus(`Eşleşme aranıyor... (Sırada: ${data.queuePosition || 1})`);
+                } else if (data.message) {
+                    updateMatchmakingStatus(data.message, data.isError);
+                }
+            });
+            
+            // Eşleşme bulunduğunda
+            window.socket.on('matched', (data) => {
+                isInMatchmaking = false;
+                if (matchmakingInterval) {
+                    clearInterval(matchmakingInterval);
+                    matchmakingInterval = null;
+                }
+                
+                // Oyun ekranına geç
+                setupSocketHandlers(window.socket, data.roomCode, data.isHost, data.opponentName);
+                showScreen('game');
+                
+                // Eşleşme bildirimi
+                UIElements.showGlobalMessage(`${data.opponentName} ile eşleştiniz! Oyun başlıyor...`, false);
+            });
+        }
+        
         document.getElementById('cancelBtn').addEventListener('click', () => {
             if (socket && socket.connected) {
                 socket.emit('leaveRoom', { roomCode: document.getElementById('roomCodeDisplay').textContent });
