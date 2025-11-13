@@ -8,6 +8,9 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
@@ -448,12 +451,12 @@
 </head>
 <body class="bg-gray-900 select-none">
     <!-- Telegram Login Screen -->
-    <div id="telegramLoginScreen" class="screen flex items-center justify-center p-4">
-        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full text-center">
-            <div class="mb-6">
-                <i class="fab fa-telegram text-5xl text-blue-400 mb-4"></i>
-                <h1 class="text-2xl font-bold text-white mb-2">Telegram ile Giriş Yap</h1>
-                <p class="text-gray-300 mb-6">Oyunu oynamak için Telegram hesabınızla giriş yapın.</p>
+    <div id="telegramLoginScreen" class="screen" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 1000; color: white; flex-direction: column; padding: 20px;">
+        <div style="background: #1e1e2e; padding: 2rem; border-radius: 10px; text-align: center; max-width: 400px; width: 90%;">
+            <h2 style="color: #00bcd4; margin-bottom: 1.5rem;">Oyun Başlıyor!</h2>
+            <p style="margin-bottom: 2rem;">Telegram hesabınızla giriş yapın veya misafir olarak oyuna başlayın</p>
+            <button id="telegramLoginBtn" style="background: #0088cc; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 1rem; cursor: pointer; margin: 8px 0; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <i class="fab fa-telegram"></i>
             </div>
             <button id="telegramLoginBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center space-x-2">
                 <i class="fab fa-telegram text-xl"></i>
