@@ -3,6 +3,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
@@ -18,6 +19,8 @@ const io = new Server(server, {
 
 const rooms = {};
 const scores = {}; // Skor takibi için obje
+const users = new Map(); // Kullanıcı bilgilerini saklamak için
+const userSockets = new Map(); // Kullanıcı ID'lerini socket ID'lere eşleştirmek için
 
 // Tüm cihazlarda güvenle çalışacak emojiler
 const EMOJIS = [
@@ -48,8 +51,116 @@ function generateRoomCode() {
     return code;
 }
 
+// Telegram WebApp doğrulama fonksiyonu
+function verifyTelegramData(authData) {
+    const botToken = ''; // Bot token'ınızı buraya ekleyin
+    const dataCheckString = Object.keys(authData)
+        .filter(key => key !== 'hash')
+        .sort()
+        .map(key => `${key}=${authData[key]}`)
+        .join('\n');
+
+    const secretKey = crypto.createHash('sha256').update(botToken).digest();
+    const hash = crypto
+        .createHmac('sha256', secretKey)
+        .update(dataCheckString)
+        .digest('hex');
+
+    return hash === authData.hash;
+}
+
 io.on('connection', (socket) => {
     console.log(`Yeni bağlantı: ${socket.id}`);
+    
+    // Kullanıcı bilgilerini ayarla
+    socket.on('setUserInfo', (userData) => {
+        const { userId, username, isTelegramUser, roomCode } = userData;
+        
+        // Kullanıcıyı kaydet
+        users.set(userId, {
+            id: userId,
+            username,
+            isTelegramUser,
+            socketId: socket.id,
+            roomCode,
+            lastSeen: new Date()
+        });
+        
+        // Socket ID'yi kullanıcı ID'sine eşle
+        userSockets.set(socket.id, userId);
+        
+        console.log(`Kullanıcı bilgisi güncellendi: ${userId} (${username})`);
+        
+        // Kullanıcı bir odaya bağlanmaya çalışıyorsa, odaya ekle
+        socket.on('joinRoom', ({ code, username }) => {
+            const room = rooms[code];
+            if (!room) {
+                socket.emit('error', { message: 'Oda bulunamadı!' });
+                return;
+            }
+            
+            if (room.playerCount >= 2) {
+                socket.emit('error', { message: 'Oda dolu!' });
+                return;
+            }
+            
+            // Kullanıcı bilgilerini güncelle
+            const userId = userSockets.get(socket.id);
+            if (userId) {
+                const user = users.get(userId);
+                if (user) {
+                    user.roomCode = code;
+                    users.set(userId, user);
+                }
+            }
+            
+            room.playerCount++;
+            room.guestId = socket.id;
+            room.guestUsername = username;
+            room.guestUserId = userId;
+            
+            socket.join(code);
+            socket.emit('joinedRoom', { 
+                code, 
+                isHost: false, 
+                opponentName: room.hostUsername 
+            });
+            
+            // Odaya ikinci oyuncu katıldı, oyunu başlat
+            io.to(room.hostId).emit('gameStart', { 
+                isHost: true, 
+                opponentName: room.guestUsername 
+            });
+            
+            console.log(`Oyun başladı: ${code} (${room.hostUsername} vs ${room.guestUsername})`);
+        });
+    });
+    
+    // Kullanıcı bağlantısı koptuğunda
+    socket.on('disconnect', () => {
+        const userId = userSockets.get(socket.id);
+        if (userId) {
+            users.delete(userId);
+            userSockets.delete(socket.id);
+            console.log(`Kullanıcı ayrıldı: ${userId}`);
+        }
+        
+        // Eğer bu kullanıcı bir odanın sahibiyse, odayı kaldır
+        for (const [code, room] of Object.entries(rooms)) {
+            if (room.hostId === socket.id || room.guestId === socket.id) {
+                // Diğer oyuncuya bağlantının koptuğunu bildir
+                const otherPlayerId = room.hostId === socket.id ? room.guestId : room.hostId;
+                if (otherPlayerId) {
+                    io.to(otherPlayerId).emit('opponentDisconnected');
+                }
+                
+                // Odayı kaldır
+                delete rooms[code];
+                console.log(`Oda kaldırıldı: ${code}`);
+                break;
+            }
+        }
+    });
     
     socket.on('createRoom', ({ username }) => {
         const code = generateRoomCode();
@@ -58,6 +169,7 @@ io.on('connection', (socket) => {
             playerCount: 1,
             hostId: socket.id,
             hostUsername: username,
+            hostUserId: userSockets.get(socket.id),
             guestId: null,
             guestUsername: null,
             gameState: {
@@ -75,13 +187,26 @@ io.on('connection', (socket) => {
             }
         };
         socket.join(code);
-        socket.emit('roomCreated', code);
-        console.log(`Oda oluşturuldu: ${code} - Host: ${username}`);
+        
+        // Kullanıcı bilgilerini güncelle
+        const userId = userSockets.get(socket.id);
+        if (userId) {
+            const user = users.get(userId);
+            if (user) {
+                user.roomCode = code;
+                users.set(userId, user);
+            }
+        }
+        
+        socket.emit('roomCreated', { code });
+        console.log(`Oda oluşturuldu: ${code} (${username})`);
     });
 
     socket.on('joinRoom', ({ username, roomCode }) => {
         const code = roomCode.toUpperCase();
         const room = rooms[code];
+        if (!room) {
+            socket.emit('error', { message: 'Oda bulunamadı!' });
 
         if (!room || room.playerCount >= 2) {
             socket.emit('joinFailed', 'Oda bulunamadı veya dolu.');
