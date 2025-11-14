@@ -852,10 +852,41 @@ function hideLoadingMessage() {
     }
 }
 
-// Oyun seçim ekranını başlat
+// Oyun başlatma işlemleri
 document.addEventListener('DOMContentLoaded', () => {
+    // Kullanıcı girişini kontrol et
     const user = telegramAuth.getUser();
     const loginScreen = document.getElementById('telegramLoginScreen');
+    const gameSelectScreen = document.getElementById('gameSelectScreen');
+    const lobbyScreen = document.getElementById('lobby');
+    const usernameInput = document.getElementById('username');
+    
+    // Giriş ekranını gizle
+    if (loginScreen) loginScreen.style.display = 'none';
+    
+    // Kullanıcı adını ayarla
+    if (usernameInput && !usernameInput.value) {
+        usernameInput.value = user?.firstName || user?.username || `Misafir_${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+    
+    // Varsayılan olarak oyun seçim ekranını göster
+    if (gameSelectScreen) gameSelectScreen.classList.add('active');
+    if (lobbyScreen) lobbyScreen.classList.remove('active');
+    
+    // Kullanıcı giriş yapmışsa kullanıcı adını güncelle
+    if (user && usernameInput) {
+        usernameInput.value = user.firstName || user.username || `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
+    } else {
+        // Misafir kullanıcı için rastgele isim oluştur
+        const usernameInput = document.getElementById('username');
+        if (usernameInput && !usernameInput.value) {
+            usernameInput.value = `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
+        }
+        
+        // Doğrudan oyun seçim ekranını göster
+        loginScreen.style.display = 'none';
+        gameSelectScreen.classList.add('active');
+    }
     
     // Oyun seçim kartlarına tıklama olaylarını ekle
     document.querySelectorAll('.game-card').forEach(card => {
@@ -886,7 +917,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 } else {
                     // Mevcut oyunu başlat
-                    document.getElementById('lobby')?.classList.add('active');
+                    lobbyScreen.classList.add('active');
                 }
             }
         });
@@ -896,33 +927,41 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.back-to-menu').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
-            document.getElementById('gameSelectScreen')?.classList.add('active');
+            if (gameSelectScreen) gameSelectScreen.classList.add('active');
         });
     });
-    const userProfile = document.getElementById('userProfile');
-    const userDisplayName = document.getElementById('userDisplayName');
-
-    // If user is already logged in, hide login screen
-    if (user) {
-        loginScreen.style.display = 'none';
-        userProfile.style.display = 'flex';
-        userDisplayName.textContent = user.firstName || user.username;
-        showLoadingMessage();
-    } else {
-        // Show login screen
-        loginScreen.style.display = 'flex';
-        
-        // Setup login button
-        document.getElementById('telegramLoginBtn').addEventListener('click', () => {
+    
+    // Kullanıcı adını güncelle
+    const updateUsername = () => {
+        const user = telegramAuth.getUser();
+        const usernameDisplay = document.getElementById('userDisplayName');
+        if (usernameDisplay) {
+            usernameDisplay.textContent = user?.firstName || user?.username || 'Misafir';
+        }
+    };
+    
+    // Sayfa yüklendiğinde kullanıcı adını güncelle
+    updateUsername();
+    
+    // Initialize game with username
+    const username = user?.username || user?.firstName || usernameInput?.value || `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
+    
+    // Giriş butonlarını ayarla
+    const telegramLoginBtn = document.getElementById('telegramLoginBtn');
+    const guestLoginBtn = document.getElementById('guestLoginBtn');
+    
+    if (telegramLoginBtn) {
+        telegramLoginBtn.addEventListener('click', () => {
             if (telegramAuth.init()) {
                 window.location.reload();
             } else {
                 alert('Telegram girişi başarısız. Lütfen tekrar deneyin.');
             }
         });
-        
-        // Setup guest login
-        document.getElementById('guestLoginBtn').addEventListener('click', () => {
+    }
+    
+    if (guestLoginBtn) {
+        guestLoginBtn.addEventListener('click', () => {
             telegramAuth.loginAsGuest();
             window.location.reload();
         });
