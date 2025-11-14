@@ -39,16 +39,65 @@ function initializeGame(boardSize) {
     gameData.turn = 0; // Host başlar
     gameData.isGameOver = false;
     
-    // İlk seviyede 3 can 4 bomba, diğer seviyelerde 3 can 6 bomba
-    gameData.hostLives = 3;
-    gameData.guestLives = 3;
-    gameData.hostBombs = [];
-    gameData.guestBombs = [];
+    // Can ve bomba ayarları
+    if (level === 1) {
+        // İlk seviyede 3 can 3 bomba
+        gameData.hostLives = gameData.hostLives || 3;  // Eğer can varsa koru, yoksa 3 yap
+        gameData.guestLives = gameData.guestLives || 3;
+        const bombCount = 3;
+        
+        // Bombaları sıfırla ve yeni bombalar ata
+        gameData.hostBombs = [];
+        gameData.guestBombs = [];
+        
+        // Rastgele bombalı kartları seç
+        const totalCards = boardSize;
+        const allIndices = Array.from({length: totalCards}, (_, i) => i);
+        
+        // Karıştır
+        for (let i = allIndices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [allIndices[i], allIndices[j]] = [allIndices[j], allIndices[i]];
+        }
+        
+        // İlk bombaları ata (3 tane)
+        gameData.hostBombs = allIndices.slice(0, bombCount);
+        gameData.guestBombs = allIndices.slice(bombCount, bombCount * 2);
+        
+    } else if (level === 2) {
+        // İkinci seviyede 4 can 5 bomba (eğer can 0 değilse bir önceki canları koru)
+        gameData.hostLives = gameData.hostLives > 0 ? Math.min(gameData.hostLives + 1, 4) : 4;
+        gameData.guestLives = gameData.guestLives > 0 ? Math.min(gameData.guestLives + 1, 4) : 4;
+        
+        // Yeni bombalar ata (5 tane)
+        const bombCount = 5;
+        const totalCards = boardSize;
+        const allIndices = Array.from({length: totalCards}, (_, i) => i);
+        
+        // Karıştır
+        for (let i = allIndices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [allIndices[i], allIndices[j]] = [allIndices[j], allIndices[i]];
+        }
+        
+        // Yeni bombaları ata (5 tane)
+        gameData.hostBombs = allIndices.slice(0, bombCount);
+        gameData.guestBombs = allIndices.slice(bombCount, bombCount * 2);
+    }
     
-    // Skor tablosunu göster
+    // Skor tablosunu güncelle
     updateScoreDisplay();
     
+    // Oyun durumunu güncelle
     gameStage = 'WAITING';
+    
+    // Oyun tahtasını çiz
+    drawBoard();
+    
+    // Oyun bilgilerini konsola yazdır (hata ayıklama için)
+    console.log(`Level ${level} başladı. Canlar: Host=${gameData.hostLives}, Guest=${gameData.guestLives}`);
+    console.log('Host Bombaları:', gameData.hostBombs);
+    console.log('Guest Bombaları:', gameData.guestBombs);
 }
 
 // --- OYUN DURUMU ---
@@ -107,7 +156,12 @@ export function showScreen(screenId) {
 export function showGlobalMessage(message, isError = true) {
     const globalMessage = document.getElementById('globalMessage');
     const globalMessageText = document.getElementById('globalMessageText');
-    globalMessageText.textContent = message;
+    
+    // Eğer message bir dize ise doğrudan kullan, değilse çeviri fonksiyonunu kullan
+    const displayMessage = typeof message === 'string' ? message : 
+        (window.languageManager ? window.languageManager.t(message) : message);
+    
+    globalMessageText.textContent = displayMessage;
     globalMessage.classList.remove('bg-red-600', 'bg-green-600');
     globalMessage.classList.add(isError ? 'bg-red-600' : 'bg-green-600');
     globalMessage.classList.remove('hidden');
@@ -122,16 +176,30 @@ function updateScoreDisplay() {
     const opponentName = document.getElementById('opponentName')?.textContent || 'RAKİP';
     
     if (scoreDisplay) {
+        // Can durumunu göster
+        const playerLives = isHost ? gameData.hostLives : gameData.guestLives;
+        const opponentLives = isHost ? gameData.guestLives : gameData.hostLives;
+        
+        // Seviye bilgisini hazırla
+        const levelText = window.languageManager ? 
+            `${window.languageManager.t('level')} ${level}` : 
+            `Səviyyə ${level} / Level ${level}`;
+        
         scoreDisplay.innerHTML = `
-            <div class="flex justify-center items-center gap-4">
-                <div class="text-center min-w-[100px]">
-                    <div class="font-bold text-xs text-gray-300 truncate">${isHost ? playerName : opponentName}</div>
-                    <div class="text-2xl font-bold ${isHost ? 'text-green-400' : 'text-white'}">${isHost ? scores.host : scores.guest}</div>
-                </div>
-                <div class="text-xl font-bold">-</div>
-                <div class="text-center min-w-[100px]">
-                    <div class="font-bold text-xs text-gray-300 truncate">${!isHost ? playerName : opponentName}</div>
-                    <div class="text-2xl font-bold ${!isHost ? 'text-green-400' : 'text-white'}">${!isHost ? scores.host : scores.guest}</div>
+            <div class="w-full flex flex-col items-center mb-2">
+                <div class="text-lg font-bold text-yellow-300 mb-1">${levelText}</div>
+                <div class="flex justify-center items-center gap-6 w-full">
+                    <div class="text-center">
+                        <div class="font-bold text-sm text-white truncate">${isHost ? playerName : opponentName}</div>
+                        <div class="text-2xl font-bold text-green-400">${isHost ? scores.host : scores.guest}</div>
+                        <div class="text-sm text-gray-300">${'❤️'.repeat(playerLives)}</div>
+                    </div>
+                    <div class="text-2xl font-bold">-</div>
+                    <div class="text-center">
+                        <div class="font-bold text-sm text-white truncate">${!isHost ? playerName : opponentName}</div>
+                        <div class="text-2xl font-bold text-red-400">${!isHost ? scores.host : scores.guest}</div>
+                        <div class="text-sm text-gray-300">${'❤️'.repeat(opponentLives)}</div>
+                    </div>
                 </div>
             </div>
         `;
@@ -197,7 +265,23 @@ function updateStatusDisplay() {
     const myLives = isHost ? gameData.hostLives : gameData.guestLives;
     const opponentLives = isHost ? gameData.guestLives : gameData.hostLives;
     
+    // Can göstergelerini güncelle
     myLivesEl.textContent = '❤️'.repeat(Math.max(0, myLives));
+    opponentLivesEl.textContent = '❤️'.repeat(Math.max(0, opponentLives));
+    
+    // Sıra bilgisini güncelle
+    if (gameData.turn === (isHost ? 0 : 1)) {
+        turnStatusEl.textContent = window.languageManager ? window.languageManager.t('yourTurn') : 'Sizin növbəniz / Your turn';
+    } else {
+        turnStatusEl.textContent = window.languageManager ? window.languageManager.t('opponentTurn') : 'Rəqibin növbəsi / Opponent\'s turn';
+    }
+    
+    // Rol bilgisini güncelle
+    if (isHost) {
+        roleStatusEl.textContent = window.languageManager ? window.languageManager.t('roleHost') : '🎮 Rol: HOST (Siz başlayırsınız) / 🎮 Role: HOST (You start)';
+    } else {
+        roleStatusEl.textContent = window.languageManager ? window.languageManager.t('roleGuest') : '🎮 Rol: QONAQ (Rəqib başlayır) / 🎮 Role: GUEST (Opponent starts)';
+    }
     opponentLivesEl.textContent = '❤️'.repeat(Math.max(0, opponentLives));
     
     // Skor göstergesini güncelle
@@ -509,6 +593,9 @@ export function setupPingEndpoint(app) {
 
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
 export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
+    // Oyun başladığında mesaj göster
+    showGlobalMessage(window.languageManager ? 
+        window.languageManager.t('gameStarting') : 'Oyun başlayır / Game starting', false);
     console.log('🎯 setupSocketHandlers ÇAĞRILDI!', { roomCode, isHost: host, opponent: opponentNameFromIndex });
     
     // Show loading message when setting up socket handlers
@@ -674,9 +761,55 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
 }
 
 export function resetGame() {
-    // Tüm oyun ayarlarını sıfırlar ve lobiye döner (En güvenli yol: Sayfayı yenilemek)
-    window.location.reload(); 
+    // Tüm oyun ayarlarını sıfırlar ve lobiye döner
+    const message = window.languageManager ? 
+        window.languageManager.t('playerLeft') : 'Oyunçu ayrıldı / Player left';
+    showGlobalMessage(message, true);
+    
+    // 2 saniye sonra sayfayı yenile
+    setTimeout(() => {
+        window.location.reload();
+    }, 2000);
 }
+
+// Oda yönetim butonuna tıklama olayını ekleyelim
+document.addEventListener('DOMContentLoaded', () => {
+    const roomActionBtn = document.getElementById('roomActionBtn');
+    const roomCodeInput = document.getElementById('roomCodeInput');
+    
+    if (roomActionBtn) {
+        roomActionBtn.addEventListener('click', () => {
+            const roomCode = roomCodeInput.value.trim().toUpperCase();
+            const username = document.getElementById('usernameInput')?.value.trim() || 'Player';
+            
+            if (!username) {
+                showGlobalMessage('İstifadəçi adı daxil edin / Please enter a username', true);
+                return;
+            }
+            
+            if (roomCode) {
+                // Odaya bağlan
+                if (socket) {
+                    socket.emit('joinRoom', { room: roomCode, username });
+                    showScreen('wait');
+                }
+            } else {
+                // Yeni oda oluştur
+                if (socket) {
+                    socket.emit('createRoom', { username });
+                    showScreen('wait');
+                }
+            }
+        });
+        
+        // Enter tuşu ile de göndermeyi etkinleştir
+        roomCodeInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                roomActionBtn.click();
+            }
+        });
+    }
+});
 
 // Lobi Butonlarını dışarıdan erişilebilir yapıyoruz (index.html'in kullanması için)
 export const UIElements = {
