@@ -8,6 +8,7 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="gameManager.js"></script>
     
     <style>
         /* === KENDİ OYUNUNUZDAN ALINAN CSS STİLLERİ VE MOBİL UYUM === */
@@ -473,23 +474,56 @@
         <p id="globalMessageText"></p>
     </div>
 
-    <div id="lobby" class="screen active space-y-6">
-        <h1 class="text-4xl font-black animated-lobby-item lobby-title mb-1">
-            💣 KartBombot
-        </h1>
-        <p class="text-sm text-gray-400 animated-lobby-item lobby-subtitle mb-4">
-            Telegram üzərindən 1v1 oyna
-        </p>
-        
-        <div class="bg-blue-800 bg-opacity-30 border-l-2 border-blue-500 text-blue-100 p-2 rounded-lg shadow-lg animated-lobby-item rules-box w-full max-w-md">
-            <p class="font-bold text-sm mb-1 text-white">📋 Oyun Qaydaları:</p>
-            <ul class="list-disc list-inside text-left text-xs space-y-1">
-                <li>Kartları açaraq rəqibinizin bombalarından qaçının</li>
-                <li>Canı bitən oyunu uduzur</li>
-                <li>Yeni otaq yaratmaq üçün otaq kodunu boş buraxın</li>
-                <li>Odaya qoşulmaq üçün otaq kodunu daxil edin</li>
-            </ul>
+    <!-- Ana Menü -->
+    <div id="mainMenu" class="screen active">
+        <div class="w-full max-w-md mx-auto text-center">
+            <h1 class="text-4xl font-bold text-white mb-8">🎮 Oyun Seçin</h1>
+            
+            <div class="space-y-6">
+                <!-- Bomba Oyunu Kartı -->
+                <div class="game-card" data-game="bomb">
+                    <div class="game-card-inner">
+                        <div class="game-card-front">
+                            <div class="text-5xl mb-4">💣</div>
+                            <h2 class="text-2xl font-bold mb-2">Bomba Oyunu</h2>
+                            <p class="text-gray-300 text-sm">Bombalardan kaçın ve rakibin bombalarını bulun!</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Dama Oyunu Kartı -->
+                <div class="game-card" data-game="checkers">
+                    <div class="game-card-inner">
+                        <div class="game-card-front">
+                            <div class="text-5xl mb-4">♟️</div>
+                            <h2 class="text-2xl font-bold mb-2">Dama Oyunu</h2>
+                            <p class="text-gray-300 text-sm">Stratejinizi kullanın ve rakip taşları ele geçirin!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
+    </div>
+    
+    <!-- Oyun Lobi Ekranı -->
+    <div id="lobby" class="screen">
+        <div class="w-full max-w-md mx-auto text-center">
+            <button id="backToMenu" class="absolute top-4 left-4 text-white text-2xl">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            
+            <h1 class="text-4xl font-bold text-white mb-2 game-title">💣 KartBomBot 1v1</h1>
+            <p class="text-gray-300 mb-6 game-description">Dostunuzla oynayın ve bombalardan kaçının!</p>
+            
+            <div class="game-rules bg-blue-800 bg-opacity-30 border-l-2 border-blue-500 text-blue-100 p-2 rounded-lg shadow-lg animated-lobby-item w-full max-w-md">
+                <p class="font-bold text-sm mb-1 text-white">📋 Oyun Qaydaları:</p>
+                <ul class="rules-list list-disc list-inside text-left text-xs space-y-1">
+                    <li>Kartları açaraq rəqibinizin bombalarından qaçının</li>
+                    <li>Canı bitən oyunu uduzur</li>
+                    <li>Yeni otaq yaratmaq üçün otaq kodunu boş buraxın</li>
+                    <li>Odaya qoşulmaq üçün otaq kodunu daxil edin</li>
+                </ul>
+            </div>
         
         <div id="userInfo" class="w-full bg-gray-800 p-3 rounded-lg shadow-lg text-center">
             <p class="text-white font-bold">👤 Xoş gəlmisiniz, <span id="telegramUsername">İstifadəçi</span>!</p>
@@ -712,27 +746,38 @@
         keepServerAlive();
     });
     </script>
+    <!-- Socket.IO kütüphanesi -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    
+    <!-- Socket yöneticisi -->
+    <script src="socketManager.js"></script>
+    
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
+        
+        // Oyun yöneticisini global yap
+        window.gameManager = window.gameManager || {};
+        
+        // Socket yöneticisini başlat
+        const socketManager = new SocketManager();
+        window.socketManager = socketManager; // Global erişim için
+        
+        // Kullanıcı bilgileri
+        let username = 'Player';
+        let userId = Math.floor(Math.random() * 1000000);
         
         // Telegram WebApp başlatma
         const tg = window.Telegram?.WebApp;
         
-        // Kullanıcı bilgilerini al
-        let username = 'Player';
-        let userId = Math.floor(Math.random() * 1000000);
-        
         // Eğer Telegram WebApp içindeysek kullanıcı bilgilerini al
         if (tg) {
             tg.expand(); // Ekranı tam boyuta çıkar
-            const user = tg.initDataUnsafe?.user;
             
+            // Kullanıcı bilgilerini al
+            const user = tg.initDataUnsafe?.user;
             if (user) {
-                // Kullanıcı adını oluştur (ad + soyad)
-                const firstName = user.first_name || '';
-                const lastName = user.last_name || '';
-                username = `${firstName} ${lastName}`.trim() || `User${user.id || userId}`;
-                userId = user.id || userId;
+                username = user.first_name || `User_${Math.floor(Math.random() * 1000)}`;
+                userId = user.id;
                 
                 // Kullanıcı adını arayüzde göster
                 const usernameElement = document.getElementById('telegramUsername');
@@ -740,41 +785,144 @@
                     usernameElement.textContent = username;
                 }
             }
+            
+            // Telegram buton stillerini ayarla
+            tg.MainButton.text = 'Ana Menü';
+            tg.MainButton.show();
+            
+            // Geri butonu işleyicisi
+            tg.BackButton.show();
+            tg.BackButton.onClick(() => {
+                window.history.back();
+            });
+        } else {
+            // Telegram dışı tarayıcılar için
+            const usernameElement = document.getElementById('telegramUsername');
+            if (usernameElement) {
+                usernameElement.textContent = username;
+            }
         }
         
-        // Socket.IO sunucu URL'si
-        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; // Render üzerindeki Socket.IO sunucusu
-        let socket;
-        let reconnectAttempts = 0;
-        const MAX_RECONNECT_ATTEMPTS = 5;
+        // Sayfa yüklendiğinde socket bağlantısını başlat
+        document.addEventListener('DOMContentLoaded', () => {
+            // Socket bağlantısını başlat
+            socketManager.initialize();
+            
+            // Oda oluşturma ve katılma işlemlerini ayarla
+            setupRoomHandlers();
+        });
         
-        // Kullanıcı adı doğrulamasını kaldır, Telegram'dan alıyoruz
-        function validateInput() {
-            return username;
-        }
-
-        function showConnectionStatus(message, isError = false) {
-            console.log(isError ? '❌ ' + message : '✅ ' + message);
-            const statusElement = document.getElementById('connectionStatus');
-            if (statusElement) {
-                statusElement.textContent = message;
-                statusElement.style.color = isError ? '#ef4444' : '#10b981';
-                statusElement.style.display = 'block';
+        // Oda işlemlerini yönet
+        function setupRoomHandlers() {
+            // Oda oluştur butonu
+            const createRoomBtn = document.getElementById('createRoomBtn');
+            if (createRoomBtn) {
+                createRoomBtn.addEventListener('click', () => {
+                    const username = document.getElementById('usernameInput')?.value.trim() || 'Player';
+                    if (!username) {
+                        showGlobalMessage('Lütfen bir kullanıcı adı girin', true);
+                        return;
+                    }
+                    
+                    socketManager.createRoom(username);
+                    showScreen('wait');
+                });
             }
             
-            // Hata durumunda loading mesajını güncelle
-            if (isError) {
-                const loadingMessage = document.getElementById('loadingMessage');
-                if (loadingMessage) {
-                    const messageText = loadingMessage.querySelector('p');
-                    if (messageText) {
-                        messageText.textContent = 'Bağlantı hatası: ' + message;
+            // Odaya katıl butonu
+            const joinRoomBtn = document.getElementById('joinRoomBtn');
+            if (joinRoomBtn) {
+                joinRoomBtn.addEventListener('click', () => {
+                    const roomCode = document.getElementById('roomCodeInput')?.value.trim().toUpperCase();
+                    const username = document.getElementById('usernameInput')?.value.trim() || 'Player';
+                    
+                    if (!roomCode) {
+                        showGlobalMessage('Lütfen bir oda kodu girin', true);
+                        return;
                     }
-                }
+                    
+                    if (!username) {
+                        showGlobalMessage('Lütfen bir kullanıcı adı girin', true);
+                        return;
+                    }
+                    
+                    socketManager.joinRoom(roomCode, username);
+                    showScreen('wait');
+                });
+            }
+            
+            // Tek butonlu oda yönetimi (hem oluştur hem katıl)
+            const roomActionBtn = document.getElementById('roomActionBtn');
+            const roomCodeInput = document.getElementById('roomCodeInput');
+            
+            if (roomActionBtn && roomCodeInput) {
+                roomActionBtn.addEventListener('click', () => {
+                    const roomCode = roomCodeInput.value.trim().toUpperCase();
+                    const username = document.getElementById('usernameInput')?.value.trim() || 'Player';
+                    
+                    if (!username) {
+                        showGlobalMessage('Lütfen bir kullanıcı adı girin', true);
+                        return;
+                    }
+                    
+                    if (roomCode) {
+                        // Odaya katıl
+                        socketManager.joinRoom(roomCode, username);
+                    } else {
+                        // Yeni oda oluştur
+                        socketManager.createRoom(username);
+                    }
+                    
+                    showScreen('wait');
+                });
+                
+                // Enter tuşu ile de göndermeyi etkinleştir
+                roomCodeInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        roomActionBtn.click();
+                    }
+                });
             }
         }
-
-        function connectToServer() {
+        
+        // Global fonksiyonlar
+        window.showGlobalMessage = showGlobalMessage;
+        window.showScreen = showScreen;
+        
+        // Socket olay dinleyicilerini ayarla
+        if (window.socketManager && window.socketManager.socket) {
+            const socket = window.socketManager.socket;
+            
+            // Oyun başladığında
+            socket.on('gameStart', (data) => {
+                console.log('Oyun başladı:', data);
+                showScreen('game');
+                setupSocketHandlers(socket, data.room, data.isHost, data.opponentName);
+            });
+            
+            // Odaya katılma başarısız olduğunda
+            socket.on('joinFailed', (message) => {
+                showGlobalMessage(message, true);
+                showScreen('lobby');
+            });
+            
+            // Oda bulunamadığında
+            socket.on('roomNotFound', (message) => {
+                showGlobalMessage(message, true);
+                showScreen('lobby');
+            });
+            
+            // Oyun sona erdiğinde
+            socket.on('gameOver', (data) => {
+                showGlobalMessage(`Oyun bitti! Kazanan: ${data.winner}`, false);
+                setTimeout(() => {
+                    showScreen('lobby');
+                }, 3000);
+            });
+        }
+        
+        // Eski bağlantı fonksiyonunu kaldır
+        window.connectToServer = function() {
             try {
                 const loadingMessage = document.getElementById('loadingMessage');
                 if (loadingMessage) {
