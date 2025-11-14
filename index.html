@@ -1,6 +1,270 @@
 <!DOCTYPE html>
-<html lang="az">
+<html lang="tr">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oyun Dünyası</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Genel Stiller */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a2e;
+            color: white;
+            line-height: 1.6;
+        }
+        
+        .screen {
+            display: none;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .screen.active {
+            display: block;
+        }
+        
+        /* Oyun Seçim Ekranı */
+        #gameSelectScreen {
+            text-align: center;
+            padding-top: 50px;
+        }
+        
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+            padding: 0 20px;
+        }
+        
+        .game-card {
+            background: linear-gradient(145deg, #16213e, #1a1a2e);
+            border-radius: 15px;
+            padding: 20px;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+            height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .game-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+        }
+        
+        .game-card i {
+            font-size: 50px;
+            margin-bottom: 15px;
+            color: #4cc9f0;
+        }
+        
+        .game-card h2 {
+            margin-bottom: 10px;
+            color: #fff;
+        }
+        
+        .game-card p {
+            color: #a8dadc;
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            background: #4cc9f0;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            text-decoration: none;
+            transition: background 0.3s;
+        }
+        
+        .btn:hover {
+            background: #3aa8c9;
+        }
+        
+        /* Dama Tahtası Stilleri */
+        #checkersBoard {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            width: 90vmin;
+            height: 90vmin;
+            max-width: 500px;
+            max-height: 500px;
+            margin: 20px auto;
+            border: 8px solid #5d4037;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        
+        .checkers-square {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .checkers-square.dark {
+            background-color: #5d4037;
+        }
+        
+        .checkers-square.light {
+            background-color: #d7ccc8;
+        }
+        
+        .checkers-piece {
+            width: 80%;
+            height: 80%;
+            border-radius: 50%;
+            border: 2px solid rgba(0,0,0,0.3);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .checkers-piece.player1 {
+            background: linear-gradient(145deg, #e74c3c, #c0392b);
+            color: white;
+        }
+        
+        .checkers-piece.player2 {
+            background: linear-gradient(145deg, #3498db, #2980b9);
+            color: white;
+        }
+        
+        .checkers-piece.king {
+            box-shadow: 0 0 15px gold;
+        }
+        
+        .checkers-piece.king::after {
+            content: '👑';
+            position: absolute;
+            font-size: 0.8em;
+            bottom: -5px;
+            right: -5px;
+        }
+        
+        .checkers-piece.selected {
+            transform: scale(1.1);
+            box-shadow: 0 0 15px #f1c40f;
+        }
+        
+        .checkers-possible-move {
+            position: absolute;
+            width: 30%;
+            height: 30%;
+            background-color: rgba(46, 204, 113, 0.7);
+            border-radius: 50%;
+            z-index: 1;
+        }
+        
+        /* Oyun Bilgi Paneli */
+        #checkersInfo {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem auto;
+            max-width: 500px;
+            text-align: center;
+        }
+        
+        #checkersTurn {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            color: #4cc9f0;
+        }
+        
+        #checkersStatus {
+            font-size: 1rem;
+            color: #ecf0f1;
+        }
+        
+        /* Oyun Kontrolleri */
+        .game-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .game-controls button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+        
+        #checkersUndoBtn {
+            background-color: #f39c12;
+            color: white;
+        }
+        
+        #checkersRestartBtn {
+            background-color: #e74c3c;
+            color: white;
+        }
+        
+        #checkersBackBtn {
+            background-color: #7f8c8d;
+            color: white;
+        }
+        
+        .game-controls button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        /* Responsive Tasarım */
+        @media (max-width: 600px) {
+            .game-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            #checkersBoard {
+                width: 95vmin;
+                height: 95vmin;
+            }
+            
+            .game-controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .game-controls button {
+                width: 80%;
+                justify-content: center;
+            }
+        }
+    </style>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, height=device-height">
     <title>💣 KartBomBot 1v1</title>
@@ -8,7 +272,11 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <script src="gameManager.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
     <style>
         /* === KENDİ OYUNUNUZDAN ALINAN CSS STİLLERİ VE MOBİL UYUM === */
@@ -37,43 +305,30 @@
             font-family: 'Inter', sans-serif; /* Daha modern bir font */
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
-        }
-
-        body { 
-            background-color: #1a202c; /* Koyu arka plan */
-            color: #e2e8f0; /* Açık metin rengi */
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            transition: background-color 0.3s; 
-        }
-
-        /* Ana Ekran Düzeni */
-        .screen { 
-            width: 100%; 
-            height: 100vh;
-            max-width: 100%;
-            max-height: 100%;
-            display: none; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: flex-start;
-            padding: 0.25rem; 
-            box-sizing: border-box; 
-            text-align: center; 
-            background-color: #2d3748;
-            border-radius: 0;
-            box-shadow: none;
             overflow: hidden;
-            -webkit-overflow-scrolling: touch;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
         }
-        .screen.active { 
-            display: flex; 
+        
+        #lobby {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+        }
+        
+        #gameContainer {
+            display: none;
+            position: relative;
+            width: 100%;
+            height: 100vh;
+        }
+        }
+        .language-option:hover {
+            background-color: #4a5568;
+        }
+        .language-option:hover {
+            background: #4a5568;
         }
         
         /* Utility */
@@ -388,168 +643,117 @@
             to { transform: rotate(360deg); }
         }
     </style>
-    <style>
-        /* Emoji Chat Styles */
-        #emojiChat {
-            display: none; /* Will be shown via JavaScript */
-            gap: 10px;
-            align-items: center;
-        }
-
-        #emojiButton {
-            background: #4a5568;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            font-size: 24px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        }
-
-        #emojiButton:hover {
-            background: #2d3748;
-        }
-
-        #emojiContainer {
-            display: none;
-            background: white;
-            border-radius: 15px;
-            padding: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            flex-wrap: wrap;
-            gap: 8px;
-            max-width: 300px;
-            justify-content: center;
-        }
-
-        #emojiContainer.visible {
-            display: flex;
-        }
-
-        .emoji-option {
-            font-size: 28px;
-            cursor: pointer;
-            padding: 5px;
-            border-radius: 8px;
-            transition: transform 0.2s, background 0.2s;
-        }
-
-        .emoji-option:hover {
-            background: #f0f0f0;
-            transform: scale(1.2);
-        }
-
-        .emoji-message {
-            position: fixed;
-            font-size: 48px;
-            z-index: 2000;
-            pointer-events: none;
-            animation: emojiFloat 2s forwards;
-            opacity: 0;
-        }
-
-        @keyframes emojiFloat {
-            0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
-            10% { opacity: 1; transform: translate(-50%, 0) scale(1.2); }
-            90% { opacity: 1; }
-            100% { transform: translate(-50%, -100px) scale(0.8); opacity: 0; }
-        }
-    </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@700&family=Chakra+Petch:wght@700&display=swap" rel="stylesheet">
 </head>
 <body class="bg-gray-900 select-none">
+    <!-- Oyun Seçim Ekranı -->
+    <div id="gameSelectScreen" class="screen active flex flex-col items-center justify-center">
+        <h1 class="text-4xl font-bold text-white mb-8">Oyun Seçin</h1>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl px-4">
+            <div class="game-card" data-game="bomb">
+                <div class="game-card-inner">
+                    <div class="game-card-front bg-blue-600">
+                        <i class="fas fa-bomb text-6xl mb-4"></i>
+                        <h3 class="text-xl font-bold">Bomba Oyunu</h3>
+                    </div>
+                    <div class="game-card-back bg-blue-700">
+                        <p>Bombalara dikkat et, kartları aç ve kazan!</p>
+                        <button class="mt-4 px-6 py-2 bg-white text-blue-700 rounded-full font-bold">Oyna</button>
+                    </div>
+                </div>
+            </div>
+            <div class="game-card" data-game="checkers">
+                <div class="game-card-inner">
+                    <div class="game-card-front bg-green-600">
+                        <i class="fas fa-chess-board text-6xl mb-4"></i>
+                        <h3 class="text-xl font-bold">Dama Oyunu</h3>
+                    </div>
+                    <div class="game-card-back bg-green-700">
+                        <p>Stratejini kullan, rakip taşları ye!</p>
+                        <button class="mt-4 px-6 py-2 bg-white text-green-700 rounded-full font-bold">Oyna</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Telegram Login Screen -->
+    <div id="telegramLoginScreen" class="screen" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 1000; color: white; flex-direction: column; padding: 20px;">
+        <div style="background: #1e1e2e; padding: 2rem; border-radius: 10px; text-align: center; max-width: 400px; width: 90%;">
+            <h2 style="color: #00bcd4; margin-bottom: 1.5rem;">Oyun Başlıyor!</h2>
+            <p style="margin-bottom: 2rem;">Telegram hesabınızla giriş yapın veya misafir olarak oyuna başlayın</p>
+            <button id="telegramLoginBtn" style="background: #0088cc; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 1rem; cursor: pointer; margin: 8px 0; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <i class="fab fa-telegram"></i>
+            </div>
+            <button id="telegramLoginBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center space-x-2">
+                <i class="fab fa-telegram text-xl"></i>
+                <span>Telegram ile Giriş Yap</span>
+            </button>
+            <div class="mt-4">
+                <button id="guestLoginBtn" class="text-blue-400 hover:text-blue-300 text-sm">Misafir olarak devam et</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Loading Message -->
-    <div id="loadingMessage">
+    <div id="loadingMessage" style="display: none;">
         <div class="spinner"></div>
         <p>Server qoşulur, zəhmət olmasa gözləyin...</p>
         <p>Connecting to server, please wait...</p>
+    </div>
+    
+    <div class="language-selector">
+        <button id="language-button" class="language-button" onclick="toggleLanguageSelector()">
+            <span id="current-language">🇦🇿</span>
+        </button>
+        <div id="language-selector" class="language-options">
+            <div class="language-option" onclick="setLanguage('az')">🇦🇿 Azərbaycanca</div>
+            <div class="language-option" onclick="setLanguage('tr')">🇹🇷 Türkçe</div>
+            <div class="language-option" onclick="setLanguage('en')">🇬🇧 English</div>
+        </div>
     </div>
     
     <div id="globalMessage" class="hidden w-11/12 max-w-md p-4 bg-red-600 text-white rounded-lg shadow-lg">
         <p id="globalMessageText"></p>
     </div>
 
-    <!-- Ana Menü -->
-    <div id="mainMenu" class="screen active">
-        <div class="w-full max-w-md mx-auto text-center">
-            <h1 class="text-4xl font-bold text-white mb-8">🎮 Oyun Seçin</h1>
-            
-            <div class="space-y-6">
-                <!-- Bomba Oyunu Kartı -->
-                <div class="game-card" data-game="bomb">
-                    <div class="game-card-inner">
-                        <div class="game-card-front">
-                            <div class="text-5xl mb-4">💣</div>
-                            <h2 class="text-2xl font-bold mb-2">Bomba Oyunu</h2>
-                            <p class="text-gray-300 text-sm">Bombalardan kaçın ve rakibin bombalarını bulun!</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Dama Oyunu Kartı -->
-                <div class="game-card" data-game="checkers">
-                    <div class="game-card-inner">
-                        <div class="game-card-front">
-                            <div class="text-5xl mb-4">♟️</div>
-                            <h2 class="text-2xl font-bold mb-2">Dama Oyunu</h2>
-                            <p class="text-gray-300 text-sm">Stratejinizi kullanın ve rakip taşları ele geçirin!</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <div id="lobby" class="screen active space-y-6">
+        <h1 class="text-4xl font-black animated-lobby-item lobby-title mb-1">
+            💣 KartBombot
+        </h1>
+        <p class="text-sm text-gray-400 animated-lobby-item lobby-subtitle mb-4">
+            1v1 online 
+        </p>
+        
+        <div class="bg-blue-800 bg-opacity-30 border-l-2 border-blue-500 text-blue-100 p-2 rounded-lg shadow-lg animated-lobby-item rules-box w-full max-w-md">
+            <p class="font-bold text-sm mb-1 text-white">📋 Oyun Qaydaları:</p>
+            <ul class="list-disc list-inside text-left text-xs space-y-1">
+                <li>Kartları açaraq rəqibinizin bombalarından qaçın</li>
+                <li>Canı bitən oyunu uduzur</li>
+                <li>Yeni Otaq yaratmaq üçün Otaq Kodu yerini Boş Buraxın</li>
+            </ul>
         </div>
-    </div>
-    
-    <!-- Oyun Lobi Ekranı -->
-    <div id="lobby" class="screen">
-        <div class="w-full max-w-md mx-auto p-6">
-            <h1 id="lobbyTitle" class="text-2xl font-bold text-white mb-8 text-center">Oyun Lobi</h1>
-            
-            <!-- Oda Kodu Girişi -->
-            <div id="roomCodeContainer" class="mb-8">
-                <!-- GameManager tarafından dinamik olarak oluşturulacak -->
-            </div>
-            
-            <div class="bg-gray-800/50 rounded-xl p-5 mb-6 border border-gray-700">
-                <h2 class="text-lg font-semibold text-white mb-3 flex items-center justify-center">
-                    <i class="fas fa-info-circle mr-2 text-blue-400"></i> Nasıl Oynanır?
-                </h2>
-                <ul class="text-gray-300 text-sm space-y-2">
-                    <li class="flex items-start">
-                        <span class="text-blue-400 mr-2">•</span>
-                        <span>Oda oluşturup arkadaşlarınızı davet edebilirsiniz</span>
-                    </li>
-                    <li class="flex items-start">
-                        <span class="text-blue-400 mr-2">•</span>
-                        <span>Veya bir odaya katılmak için oda kodunu girin</span>
-                    </li>
-                    <li class="flex items-start">
-                        <span class="text-blue-400 mr-2">•</span>
-                        <span>Her oyun 2 kişiliktir</span>
-                    </li>
-                </ul>
-            </div>
-            
-            <button id="backToMenu" class="w-full bg-gray-700 hover:bg-gray-600 text-white py-3 px-4 rounded-lg transition-colors flex items-center justify-center">
-                <i class="fas fa-arrow-left mr-2"></i>
-                Ana Menüye Dön
+        
+        <div class="w-full animated-lobby-item input-username-container max-w-md">
+            <p class="text-center text-lg font-bold mb-1 text-white">
+                👤 İstifadəçi Adı  / Username 
+            </p>
+            <input type="text" id="username" class="w-full p-3 text-lg text-center rounded-lg shadow-lg text-black" placeholder="Adınız" maxlength="15" style="color: #000000 !important;">
+        </div>
+        
+        <div class="w-full animated-lobby-item input-roomcode-container max-w-md">
+            <p class="text-center text-lg font-bold mb-1 text-white mt-4">
+                🚪 Otaq Kodu / Room Code
+            </p>
+            <input type="text" id="roomCodeInput" class="w-full p-3 text-lg text-center rounded-lg shadow-lg text-black uppercase" placeholder="Otaq Kodu (Boşsa yeni otaq)" maxlength="6" style="color: #000000 !important;">
+        </div>
+        
+        <div class="flex flex-col space-y-3 w-full max-w-md mx-auto mt-6">
+            <button id="createRoomBtn" class="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg transform transition-all duration-200 active:scale-95">
+                <i class="fas fa-plus-circle mr-2"></i> Otaq Qur / Create Room
             </button>
-            
-            <!-- Bağlantı Durumu -->
-            <div id="connectionStatus" class="mt-4 text-center text-sm text-gray-400"></div>
-        </div>
-                        <span class="inline-block">
-                            <span class="block">Yarat & Giriş</span>
-                            <span class="block text-sm opacity-80">Create & Join</span>
-                        </span>
-                    </span>
-                </button>
-            </div>
+            <button id="joinRoomBtn" class="w-full py-4 px-6 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg transform transition-all duration-200 active:scale-95">
+                <i class="fas fa-sign-in-alt mr-2"></i> Otağa Qoşul / Join Room
+            </button>
         </div>
     </div>
     
@@ -558,50 +762,70 @@
             <div class="wait-spinner mb-4">
                 <i class="fas fa-spinner fa-spin text-4xl text-blue-400"></i> 
             </div>
-            <h2 id="waitTitle" class="text-2xl font-bold mb-6">Otaq Hazırlanır... / Preparing Room...</h2>
+            <h2 id="waitTitle" class="text-2xl font-bold mb-6">Otaq Hazırlanır...</h2>
             
             <div id="codeArea" class="w-full max-w-md mb-6">
-                <p class="text-sm text-gray-300 mb-2">🌟 Otaq kodunuzu dostunuzla paylaşın / Share your room code:</p>
+                <p class="text-sm text-gray-300 mb-2">🌟 Otaq kodunuzu dostunuzla paylaşın:</p>
                 <div id="roomCodeDisplay" class="text-3xl font-bold bg-gray-800 p-4 rounded-lg mb-4 text-center tracking-widest"></div>
                 <button id="copyCodeBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-lg">
-                    <i class="fas fa-copy mr-2"></i> Kodu Kopyala / Copy Code
+                    <i class="fas fa-copy mr-2"></i> Kodu Kopyala
                 </button>
             </div>
             
-            <p id="waitStatus" class="text-lg text-gray-300 mb-6">Rəqib qoşulması gözlənilir... / Waiting for opponent...</p>
+            <p id="waitStatus" class="text-lg text-gray-300 mb-6">Rəqib qoşulması gözlənilir...</p>
             
             <button id="cancelBtn" class="w-full max-w-xs py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-lg">
-                <i class="fas fa-times-circle mr-2"></i> Ləğv Et / Lobiye Qayıt<br>Cancel / Return to Lobby
+                <i class="fas fa-times-circle mr-2"></i> Ləğv Et / Lobiye Qayıt
             </button>
         </div>
     </div>
 
+    <!-- Dama Oyunu Ekranı -->
+    <div id="checkersScreen" class="screen">
+        <div id="checkersInfo" class="bg-gray-800 text-white p-4 rounded-lg shadow-lg mb-4">
+            <div id="checkersTurn" class="text-xl font-bold">Sıra: Sen (Kırmızı)</div>
+            <div id="checkersStatus">Hamle yapmak için bir taş seçin</div>
+        </div>
+        <div id="checkersBoard"></div>
+        <div class="mt-4 flex justify-center space-x-4">
+            <button id="checkersUndoBtn" class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">
+                <i class="fas fa-undo mr-2"></i>Geri Al
+            </button>
+            <button id="checkersRestartBtn" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
+                <i class="fas fa-redo mr-2"></i>Yeniden Başlat
+            </button>
+            <button id="checkersBackBtn" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+                <i class="fas fa-arrow-left mr-2"></i>Menüye Dön
+            </button>
+        </div>
+    </div>
+    
     <div id="gameScreen" class="screen">
         <!-- Skor göstergesi -->
         <div id="scoreDisplay" class="w-full text-center text-lg font-bold text-yellow-300 py-1 bg-black bg-opacity-50 mb-1" style="display: none;">
-          Bot beta versiyadadır - Bot is in beta version
+            Sen 0 - 0 Rakip
         </div>
         
         <div class="w-full flex justify-between items-center p-1">
             <div class="text-left pl-2">
                 <div id="myLives" class="text-xl">❤️❤️❤️</div>
-                <div class="text-xs text-blue-300">Sənin Canın / Your Lives</div>
+                <div class="text-xs text-blue-300">Sənin Canın</div>
             </div>
             
             <div class="text-center">
                 <h1 class="text-xl font-bold m-0 p-0">💣</h1>
-                <div id="levelInfo" class="text-xs">Səviyyə / Level 1</div>
+                <div id="levelInfo" class="text-xs">Level 1</div>
             </div>
             
             <div class="text-right pr-2">
                 <div id="opponentLives" class="text-xl">❤️❤️❤️</div>
-                <div id="opponentName" class="text-xs text-blue-300">Rəqibin Canı / Opponent's Lives</div>
+                <div id="opponentName" class="text-xs text-blue-300">Rəqibin Canı</div>
             </div>
         </div>
         
         <div class="w-full text-center p-1">
-            <div id="turnStatus" class="text-sm font-bold text-yellow-400">SIRA SƏNDƏ / YOUR TURN</div>
-            <div id="actionMessage" class="text-xs text-gray-300">Bir kart seç / Select a card</div>
+            <div id="turnStatus" class="text-sm font-bold text-yellow-400">SIRA SƏNDƏ </div>
+            <div id="actionMessage" class="text-xs text-gray-300">Bir kart seç</div>
         </div>
         <p id="roleStatus" class="text-gray-300 text-xs bg-gray-700 p-2 rounded-lg"></p>
 
@@ -615,355 +839,36 @@
         <button id="endGameBtn" class="btn bg-red-600 hover:bg-red-500 text-white text-sm py-3">🚪 Oyundan Çıx <i class="fas fa-door-open ml-2"></i></button>
     </div>
 
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        #pingStatus {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            padding: 5px 10px;
-            border-radius: 15px;
-            font-size: 12px;
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-        }
-        .ping-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-        }
-        .ping-online { background-color: #4CAF50; }
-        .ping-offline { background-color: #f44336; }
-        .ping-connecting { background-color: #ff9800; }
-    </style>
-    <script>
-    // Sunucu durumunu takip et
-    let serverStatus = {
-        lastPing: null,
-        isOnline: false,
-        retryCount: 0,
-        maxRetries: 3
-    };
-
-    // Durum göstergesini oluştur
-    function createStatusIndicator() {
-        const indicator = document.createElement('div');
-        indicator.id = 'pingStatus';
-        indicator.innerHTML = `
-            <span class="ping-dot ping-connecting"></span>
-            <span>Sunucu bağlantısı kontrol ediliyor...</span>
-        `;
-        document.body.appendChild(indicator);
-        return indicator;
-    }
-
-    // Durum göstergesini güncelle
-    function updateStatusIndicator(online, message = '') {
-        let indicator = document.getElementById('pingStatus') || createStatusIndicator();
-        const dot = indicator.querySelector('.ping-dot');
-        const text = indicator.querySelector('span:last-child');
-        
-        dot.className = 'ping-dot ' + (online ? 'ping-online' : 'ping-offline');
-        text.textContent = message || (online ? 'Sunucu çevrimiçi' : 'Sunucuya bağlanılamıyor');
-        
-        // 3 saniye sonra mesajı temizle
-        if (message) {
-            setTimeout(() => {
-                if (text) {
-                    text.textContent = online ? 'Sunucu çevrimiçi' : 'Sunucuya bağlanılamıyor';
-                }
-            }, 3000);
-        }
-    }
-
-    // Sunucuya ping at
-    async function pingServer() {
-        const timestamp = new Date().toISOString();
-        const startTime = Date.now();
-        
-        try {
-            const response = await fetch('https://beta-github-io.onrender.com/ping', {
-                method: 'GET',
-                cache: 'no-store',
-                headers: {
-                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                    'Pragma': 'no-cache',
-                    'Expires': '0'
-                }
-            });
-            
-            const latency = Date.now() - startTime;
-            const data = await response.json();
-            
-            serverStatus.lastPing = new Date();
-            serverStatus.isOnline = true;
-            serverStatus.retryCount = 0;
-            
-            updateStatusIndicator(true, `Ping: ${latency}ms`);
-            console.log(`[${timestamp}] Ping başarılı (${latency}ms)`, data);
-            
-            return true;
-        } catch (error) {
-            serverStatus.retryCount++;
-            serverStatus.isOnline = false;
-            
-            const errorMsg = `Ping hatası (${serverStatus.retryCount}/${serverStatus.maxRetries})`;
-            updateStatusIndicator(false, errorMsg);
-            console.error(`[${timestamp}] ${errorMsg}:`, error);
-            
-            // Max deneme sayısına ulaşıldıysa uyarı göster
-            if (serverStatus.retryCount >= serverStatus.maxRetries) {
-                showGlobalMessage('Sunucuya bağlanılamıyor. Lütfen sayfayı yenileyin.', true);
-            }
-            
-            return false;
-        }
-    }
-
-    // Sunucuyu canlı tut
-    function keepServerAlive() {
-        // İlk ping hemen atılsın
-        pingServer();
-        
-        // Sonra her 40 saniyede bir ping at (50 saniyelik timeout'tan önce)
-        setInterval(pingServer, 40 * 1000);
-        
-        // Sayfa görünür olduğunda da ping at (kullanıcı geri döndüğünde)
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) {
-                pingServer();
-            }
-        });
-    }
-
-    // Sayfa yüklendiğinde ping sistemini başlat
-    document.addEventListener('DOMContentLoaded', () => {
-        createStatusIndicator();
-        keepServerAlive();
-    });
-    </script>
-    <!-- Socket.IO kütüphanesi -->
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    
-    <!-- Socket yöneticisi -->
-    <script src="socketManager.js"></script>
+    <script src="languages.js"></script>
     
     <script type="module">
         import { setupSocketHandlers, showScreen, UIElements, showGlobalMessage } from './game.js';
         
-        // Oyun yöneticisini global yap
-        window.gameManager = window.gameManager || {};
-        
-        // Socket yöneticisini başlat
-        const socketManager = new SocketManager();
-        window.socketManager = socketManager; // Global erişim için
-        
-        // Hata yönetimi
-        socketManager.onError((error) => {
-            console.error('Socket hatası:', error);
-            showGlobalMessage(error, true);
-        });
-        
-        // Bağlantı durumu değişikliklerini dinle
-        socketManager.onConnectionChange((isConnected) => {
-            console.log('Bağlantı durumu değişti:', isConnected ? 'Bağlandı' : 'Bağlantı kesildi');
-            
-            // Bağlantı durumuna göre arayüzü güncelle
-            const connectionStatus = document.getElementById('connectionStatus');
-            if (connectionStatus) {
-                connectionStatus.textContent = isConnected ? 'Sunucuya bağlandı' : 'Sunucuya bağlanılıyor...';
-                connectionStatus.style.color = isConnected ? '#4CAF50' : '#F44336';
-            }
-            
-            // Bağlantı başarılıysa oyun yöneticisini başlat
-            if (isConnected && window.gameManager) {
-                window.gameManager.initialize();
-            }
-        });
-        
-        // Kullanıcı bilgileri
-        let username = 'Player';
-        let userId = Math.floor(Math.random() * 1000000);
-        
-        // Telegram WebApp başlatma
-        const tg = window.Telegram?.WebApp;
-        
-        // Eğer Telegram WebApp içindeysek kullanıcı bilgilerini al
-        if (tg) {
-            tg.expand(); // Ekranı tam boyuta çıkar
-            
-            // Kullanıcı bilgilerini al
-            const user = tg.initDataUnsafe?.user;
-            if (user) {
-                username = user.first_name || `User_${Math.floor(Math.random() * 1000)}`;
-                userId = user.id;
-                
-                // Kullanıcı adını arayüzde göster
-                const usernameElement = document.getElementById('telegramUsername');
-                if (usernameElement) {
-                    usernameElement.textContent = username;
-                }
-            }
-            
-            // Telegram buton stillerini ayarla
-            tg.MainButton.text = 'Ana Menü';
-            tg.MainButton.show();
-            
-            // Geri butonu işleyicisi
-            tg.BackButton.show();
-            tg.BackButton.onClick(() => {
-                window.history.back();
-            });
-        } else {
-            // Telegram dışı tarayıcılar için
-            const usernameElement = document.getElementById('telegramUsername');
-            if (usernameElement) {
-                usernameElement.textContent = username;
-            }
-        }
-        
-        // Sayfa yüklendiğinde socket bağlantısını başlat
         document.addEventListener('DOMContentLoaded', () => {
-            // Socket bağlantısını başlat
-            socketManager.initialize();
-            
-            // Oda oluşturma ve katılma işlemlerini ayarla
-            setupRoomHandlers();
+            window.languageManager.initLanguage();
         });
         
-        // Oda işlemlerini yönet
-        function setupRoomHandlers() {
-            // Odaya katıl butonu
-            const joinRoomBtn = document.getElementById('joinRoomBtn');
-            if (joinRoomBtn) {
-                joinRoomBtn.addEventListener('click', () => {
-                    const roomCode = document.getElementById('roomCodeInput')?.value.trim().toUpperCase();
-                    const username = document.getElementById('telegramUsername')?.textContent || 'Oyuncu';
-                    
-                    if (!roomCode) {
-                        showGlobalMessage('Lütfen bir oda kodu girin', true);
-                        return;
-                    }
-                    
-                    socketManager.joinRoom(roomCode, username);
-                    showScreen('wait');
-                });
-                
-                // Oda kodu giriş alanında Enter tuşu desteği
-                const roomCodeInput = document.getElementById('roomCodeInput');
-                if (roomCodeInput) {
-                    roomCodeInput.addEventListener('keypress', (e) => {
-                        if (e.key === 'Enter') {
-                            joinRoomBtn.click();
-                        }
-                    });
-                }
+        window.toggleLanguageSelector = languageManager.toggleLanguageSelector;
+        window.setLanguage = languageManager.setLanguage;
+
+        // Socket.IO sunucu URL'si
+        const LIVE_SERVER_URL = 'https://beta-github-io.onrender.com'; // Render üzerindeki Socket.IO sunucusu
+        let socket;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 5;
+        
+        function validateInput() {
+            const username = UIElements.usernameInput.value.trim();
+            if (username.length < 2) {
+                UIElements.showGlobalMessage('Zəhmət olmasa etibarlı bir istifadəçi adı daxil edin.', true);
+                return false;
             }
-            
-            // Oda oluştur butonu
-            const createRoomBtn = document.getElementById('createRoomBtn');
-            if (createRoomBtn) {
-                createRoomBtn.addEventListener('click', () => {
-                    const username = document.getElementById('telegramUsername')?.textContent || 'Oyuncu';
-                    socketManager.createRoom(username);
-                    showScreen('wait');
-                });
-            }
-            
-                });
-            }
-            
-            // Tek butonlu oda yönetimi (hem oluştur hem katıl)
-            const roomActionBtn = document.getElementById('roomActionBtn');
-            const roomCodeInput = document.getElementById('roomCodeInput');
-            
-            if (roomActionBtn && roomCodeInput) {
-                roomActionBtn.addEventListener('click', () => {
-                    const roomCode = roomCodeInput.value.trim().toUpperCase();
-                    const username = document.getElementById('usernameInput')?.value.trim() || 'Player';
-                    
-                    if (!username) {
-                        showGlobalMessage('Lütfen bir kullanıcı adı girin', true);
-                        return;
-                    }
-                    
-                    if (roomCode) {
-                        // Odaya katıl
-                        socketManager.joinRoom(roomCode, username);
-                    } else {
-                        // Yeni oda oluştur
-                        socketManager.createRoom(username);
-                    }
-                    
-                    showScreen('wait');
-                });
-                
-                // Enter tuşu ile de göndermeyi etkinleştir
-                roomCodeInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
-                        roomActionBtn.click();
-                    }
-                });
-            }
+            return username;
         }
-        
-        // Global fonksiyonlar
-        window.showGlobalMessage = showGlobalMessage;
-        window.showScreen = showScreen;
-        
-        // Socket olay dinleyicilerini ayarla
-        if (window.socketManager && window.socketManager.socket) {
-            const socket = window.socketManager.socket;
-            
-            // Oyun başladığında
-            socket.on('gameStart', (data) => {
-                console.log('Oyun başladı:', data);
-                showScreen('game');
-                setupSocketHandlers(socket, data.room, data.isHost, data.opponentName);
-            });
-            
-            // Odaya katılma başarısız olduğunda
-            socket.on('joinFailed', (message) => {
-                showGlobalMessage(message, true);
-                showScreen('lobby');
-            });
-            
-            // Oda bulunamadığında
-            socket.on('roomNotFound', (message) => {
-                showGlobalMessage(message, true);
-                showScreen('lobby');
-            });
-            
-            // Oyun sona erdiğinde
-            socket.on('gameOver', (data) => {
-                showGlobalMessage(`Oyun bitti! Kazanan: ${data.winner}`, false);
-                setTimeout(() => {
-                    showScreen('lobby');
-                }, 3000);
-            });
-        }
-        
-        // Eski bağlantı fonksiyonunu kaldır
-        window.connectToServer = function() {
+
+        function connectToServer() {
             try {
-                const loadingMessage = document.getElementById('loadingMessage');
-                if (loadingMessage) {
-                    loadingMessage.style.display = 'flex';
-                    loadingMessage.style.visibility = 'visible';
-                }
-                
-                showConnectionStatus('Sunucuya bağlanılıyor...', false);
-                console.log('Sunucuya bağlanılıyor...', LIVE_SERVER_URL);
-                
-                // Önceki bağlantıyı temizle
-                if (socket) {
-                    socket.disconnect();
-                }
+                console.log('Servərə Bağlanır...🚀:', LIVE_SERVER_URL);
                 
                 socket = io(LIVE_SERVER_URL, {
                     transports: ['websocket', 'polling'],
@@ -971,45 +876,37 @@
                     reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
                     reconnectionDelay: 1000,
                     reconnectionDelayMax: 5000,
-                    timeout: 10000,
-                    forceNew: true,
-                    withCredentials: true
+                    timeout: 20000,
+                    forceNew: true
                 });
 
                 socket.on('connect', () => {
-                    showConnectionStatus('Sunucuya bağlandı!', false);
-                    console.log('✅ Sunucuya bağlandı!');
-                    reconnectAttempts = 0;
+                    console.log('Servərə Qoşuldu ✅');
+                    reconnectAttempts = 0; // Bağlantı başarılı olursa yeniden deneme sayacını sıfırla
+                    UIElements.showGlobalMessage('Serverə Qoşuldu ✅ Oynaya Bilərsiniz', false);
                     
-                    // Yükleme mesajını gizle
+                    // Hide loading message when connected - using direct style manipulation
+                    const loadingMessage = document.getElementById('loadingMessage');
                     if (loadingMessage) {
+                        loadingMessage.style.display = 'none';
+                        loadingMessage.style.visibility = 'hidden';
                         loadingMessage.style.opacity = '0';
-                        setTimeout(() => {
-                            loadingMessage.style.display = 'none';
-                            loadingMessage.style.visibility = 'hidden';
-                            loadingMessage.remove(); // Remove from DOM completely
-                        }, 500);
+                        loadingMessage.remove(); // Remove from DOM completely
                     }
                     
                     showScreen('lobby');
                 });
                 
                 socket.on('connect_error', (err) => {
-                    const errorMessage = `Bağlantı hatası: ${err.message || 'Bilinmeyen hata'}`;
-                    console.error('❌ ' + errorMessage, err);
-                    showConnectionStatus(errorMessage, true);
-                    
+                    console.error('Bağlantı Xətası:', err);
                     reconnectAttempts++;
                     
-                    // Hata durumunda yükleme mesajını güncelle
+                    // Hide loading message on error
                     const loadingMessage = document.getElementById('loadingMessage');
                     if (loadingMessage) {
-                        const messageText = loadingMessage.querySelector('p');
-                        if (messageText) {
-                            messageText.textContent = errorMessage;
-                        }
-                        loadingMessage.style.display = 'flex';
-                        loadingMessage.style.visibility = 'visible';
+                        loadingMessage.classList.remove('show');
+                        loadingMessage.classList.add('hidden');
+                        loadingMessage.style.display = 'none';
                     }
                     
                     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
@@ -1067,36 +964,24 @@
         }
         
         // --- Olay Dinleyicileri ---
-        // Oda oluşturma butonu
         document.getElementById('createRoomBtn').addEventListener('click', () => {
-            const roomCode = document.getElementById('roomCode').value.trim().toUpperCase();
+            const username = validateInput();
+            if (!username) return;
             
             showScreen('wait');
             document.getElementById('waitTitle').textContent = 'Otaq Qurulur...';
             document.getElementById('waitStatus').textContent = 'Zəhmət olmasa gözləyin...';
             document.getElementById('codeArea').classList.add('hidden');
-            
-            // Kullanıcı bilgilerini Telegram'dan al
-            const userData = {
-                username: username,
-                userId: userId,
-                isBot: false
-            };
-            
-            if (roomCode) {
-                // Eğer oda kodu verilmişse, o odaya katıl
-                socket.emit('joinRoom', { ...userData, roomCode });
-            } else {
-                // Yoksa yeni oda oluştur
-                socket.emit('createRoom', userData);
-            }
+            socket.emit('createRoom', { username });
         });
         
-        // Odaya katılma butonu
         document.getElementById('joinRoomBtn').addEventListener('click', () => {
-            const roomCode = document.getElementById('roomCode').value.trim().toUpperCase();
+            const username = validateInput();
+            if (!username) return;
+            
+            const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
             if (!roomCode) {
-                UIElements.showGlobalMessage('Xahiş edirik otaq kodunu daxil edin', true);
+                UIElements.showGlobalMessage('Xahiş olunur otaq kodunu daxil edin', true);
                 return;
             }
             
@@ -1104,14 +989,7 @@
             document.getElementById('waitTitle').textContent = `Otağa Qoşulma: ${roomCode}`;
             document.getElementById('waitStatus').textContent = 'Qoşulunur...';
             document.getElementById('codeArea').classList.add('hidden');
-            
-            // Kullanıcı bilgilerini Telegram'dan al
-            socket.emit('joinRoom', {
-                username: username,
-                userId: userId,
-                roomCode: roomCode,
-                isBot: false
-            });
+            socket.emit('joinRoom', { username, roomCode });
         });
 
         document.getElementById('cancelBtn').addEventListener('click', () => {
@@ -1132,223 +1010,5 @@
 
         document.addEventListener('DOMContentLoaded', connectToServer);
     </script>
-    <!-- Emoji Chat -->
-    <div id="emojiChat" style="position: fixed; top: 10px; right: 10px; z-index: 1000;">
-        <button id="emojiButton" style="width: 60px; height: 60px; font-size: 30px; background: rgba(74, 85, 104, 0.8); border: 2px solid white; border-radius: 50%; color: white; cursor: pointer;">😊</button>
-        <div id="emojiContainer" style="display: none; position: absolute; top: 70px; right: 0; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 15px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; z-index: 1001;">
-            <div class="emoji-option" data-emoji="😀" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">😀</div>
-            <div class="emoji-option" data-emoji="😂" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">😂</div>
-            <div class="emoji-option" data-emoji="😍" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">😍</div>
-            <div class="emoji-option" data-emoji="👍" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">👍</div>
-            <div class="emoji-option" data-emoji="👎" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">👎</div>
-            <div class="emoji-option" data-emoji="🎉" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">🎉</div>
-            <div class="emoji-option" data-emoji="😎" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">😎</div>
-            <div class="emoji-option" data-emoji="🤔" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">🤔</div>
-            <div class="emoji-option" data-emoji="💩" style="font-size: 30px; cursor: pointer; padding: 5px; border-radius: 50%; transition: transform 0.2s;">💩</div>
-        </div>
-    </div>
-    
-    <!-- Emoji Display (shown in center of screen) -->
-    <div id="emojiDisplay" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 999; font-size: 80px; pointer-events: none; opacity: 0; transition: opacity 0.3s; text-shadow: 0 0 10px rgba(0,0,0,0.5); background-color: transparent;"></div>
-
-    <audio id="emojiSound" preload="auto">
-        <source src="sound4.mp3" type="audio/mpeg">
-    </audio>
-
-    <script>
-        // Emoji Chat Functionality
-        document.addEventListener('DOMContentLoaded', () => {
-            const emojiButton = document.getElementById('emojiButton');
-            const emojiContainer = document.getElementById('emojiContainer');
-            const emojiSound = document.getElementById('emojiSound');
-            
-            // Show/hide emoji button
-            function showEmojiButton(show = true) {  // Varsayılan olarak true yapıldı
-                const emojiChat = document.getElementById('emojiChat');
-                const gameScreen = document.getElementById('gameScreen');
-                
-                // Oyun ekranı kontrolü yapılıyor
-                const isGameScreen = gameScreen && window.getComputedStyle(gameScreen).display !== 'none';
-                
-                // Debug için log
-                console.log('showEmojiButton called with:', {
-                    show,
-                    isGameScreen,
-                    gameScreenExists: !!gameScreen,
-                    currentDisplay: emojiChat ? window.getComputedStyle(emojiChat).display : 'emojiChat not found'
-                });
-                
-                if (emojiChat) {
-                    // Eğer oyun ekranındaysak ve show true ise göster
-                    if (isGameScreen && show) {
-                        emojiChat.style.display = 'block';
-                        console.log('Emoji butonu gösteriliyor');
-                    } else {
-                        emojiChat.style.display = 'none';
-                        console.log('Emoji butonu gizleniyor');
-                    }
-                    
-                    // Emoji seçiciyi her zaman kapat
-                    const emojiContainer = document.getElementById('emojiContainer');
-                    if (emojiContainer) {
-                        emojiContainer.style.display = 'none';
-                    }
-                }
-            }
-            
-            // Initially hide emoji button
-            showEmojiButton(false);
-
-            // Toggle emoji picker
-            emojiButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                emojiContainer.style.display = emojiContainer.style.display === 'grid' ? 'none' : 'grid';
-            });
-
-            // Close emoji picker when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!e.target.closest('#emojiContainer') && e.target.id !== 'emojiButton') {
-                    emojiContainer.style.display = 'none';
-                }
-            });
-
-            // Handle emoji selection
-            document.querySelectorAll('.emoji-option').forEach(emoji => {
-                emoji.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const emojiChar = emoji.getAttribute('data-emoji');
-                    
-                    // Play sound
-                    if (emojiSound) {
-                        emojiSound.currentTime = 0;
-                        emojiSound.play().catch(e => console.log('Sound play failed:', e));
-                    }
-                    
-                    // Show emoji on local screen
-                    showEmoji(emojiChar);
-                    
-                    // Send emoji to opponent
-                    if (window.socket) {
-                        window.socket.emit('emojiMessage', { emoji: emojiChar });
-                    }
-                    
-                    // Only hide the emoji picker, keep the button visible
-                    emojiContainer.style.display = 'none';
-                });
-                
-                // Add hover effect
-                emoji.addEventListener('mouseover', () => {
-                    emoji.style.transform = 'scale(1.2)';
-                });
-                emoji.addEventListener('mouseout', () => {
-                    emoji.style.transform = 'scale(1)';
-                });
-            });
-            
-            // Function to show emoji in center of screen
-            function showEmoji(emoji) {
-                const emojiDisplay = document.getElementById('emojiDisplay');
-                if (!emojiDisplay) return;
-                
-                // Clear any existing timeouts
-                if (window.emojiTimeout) {
-                    clearTimeout(window.emojiTimeout);
-                }
-                
-                emojiDisplay.textContent = emoji;
-                emojiDisplay.style.opacity = '1';
-                
-                // Hide after 2 seconds with fade out
-                window.emojiTimeout = setTimeout(() => {
-                    emojiDisplay.style.opacity = '0';
-                    // Clear the emoji after fade out completes
-                    setTimeout(() => {
-                        emojiDisplay.textContent = '';
-                    }, 300); // Match this with the CSS transition time
-                }, 2000);
-            }
-            
-            // Listen for emoji messages from opponent
-            if (window.socket) {
-                window.socket.on('emojiMessage', (data) => {
-                    console.log('Emoji received:', data.emoji);
-                    showEmoji(data.emoji);
-                    
-                    // Play sound for received emoji
-                    if (emojiSound) {
-                        emojiSound.currentTime = 0;
-                        emojiSound.play().catch(e => console.log('Sound play failed:', e));
-                    }
-                });
-                
-                // Oyun başladığında emoji butonunu göster
-                window.socket.on('gameStart', () => {
-                    console.log('Oyun başladı, emoji butonu gösteriliyor...');
-                    // 1 saniye bekle ve göster (oyun alanının yüklenmesi için)
-                    setTimeout(() => {
-                        showEmojiButton(true);
-                        // 2 saniye sonra tekrar kontrol et
-                        setTimeout(() => showEmojiButton(true), 2000);
-                    }, 1000);
-                });
-                
-                // Oyun bittiğinde veya lobiye dönüldüğünde
-                window.socket.on('returnToLobby', () => {
-                    console.log('Lobiye dönüldü, emoji butonu gizleniyor...');
-                    showEmojiButton(false);
-                });
-                
-                // Oyun hazır olduğunda
-                window.socket.on('gameReady', () => {
-                    console.log('Oyun hazır, emoji butonu gösteriliyor...');
-                    // 1 saniye bekle ve göster
-                    setTimeout(() => showEmojiButton(true), 1000);
-                });
-                
-                // Sayfa yüklendiğinde de kontrol et
-                window.addEventListener('load', () => {
-                    console.log('Sayfa yüklendi, emoji butonu kontrol ediliyor...');
-                    // 2 saniye bekle ve kontrol et
-                    setTimeout(() => {
-                        const gameScreen = document.getElementById('gameScreen');
-                        if (gameScreen && window.getComputedStyle(gameScreen).display !== 'none') {
-                            showEmojiButton(true);
-                        }
-                    }, 2000);
-                });
-                
-                // Oyun tahtası değişikliklerini izle
-                const gameBoard = document.getElementById('gameBoard');
-                if (gameBoard) {
-                    const observer = new MutationObserver((mutations) => {
-                        mutations.forEach((mutation) => {
-                            if (mutation.type === 'childList') {
-                                console.log('Oyun tahtası değişti, emoji butonu güncelleniyor...');
-                                // Kartlar yüklendiyse butonu göster
-                                if (gameBoard.children.length > 0) {
-                                    showEmojiButton(true);
-                                }
-                            }
-                        });
-                    });
-                    
-                    observer.observe(gameBoard, { childList: true, subtree: true });
-                }
-                
-                // Sıra durumunu güncelle
-                const turnStatus = document.getElementById('turnStatus');
-                if (turnStatus) {
-                    if (turnStatus.textContent.includes('SIRA SƏNDƏ')) {
-                        turnStatus.textContent = 'SIRA SƏNDƏ / YOUR TURN';
-                    } else if (turnStatus.textContent.includes('SIRA RƏQİBDƏ')) {
-                        turnStatus.textContent = 'SIRA RƏQİBDƏ / OPPONENT S TURN';
-                    }
-                }
-            } else {
-                // For testing without socket
-                showEmojiButton();
-            }
-        });
-    </script>
-    </body>
+</body>
 </html>
