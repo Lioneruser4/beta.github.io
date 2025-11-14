@@ -2,86 +2,119 @@
 class GameManager {
     constructor() {
         this.currentGame = null;
-        this.socket = null;
         this.initializeEventListeners();
     }
 
     initializeEventListeners() {
-        // Oyun kartlarına tıklama olayı
+        // Oyun kartlarına tıklama olaylarını ekle
         document.querySelectorAll('.game-card').forEach(card => {
             card.addEventListener('click', () => this.selectGame(card.dataset.game));
         });
-
-        // Menüye dön butonu
-        document.getElementById('backToMenu')?.addEventListener('click', () => {
-            this.showScreen('mainMenu');
-        });
+        
+        // Menüye dön butonunu ekle
+        document.getElementById('backToMenu')?.addEventListener('click', () => this.showScreen('mainMenu'));
     }
 
     selectGame(gameType) {
         this.currentGame = gameType;
-        const lobbyScreen = document.getElementById('lobby');
+        this.showLobbyScreen();
+    }
+
+    showLobbyScreen() {
+        // Lobi ekranını göster
+        document.getElementById('lobbyTitle').textContent = 
+            this.currentGame === 'bomb' ? 'Bomba Oyunu - Lobi' : 'Dama Oyunu - Lobi';
         
-        // Oyun türüne göre lobi ekranını güncelle
-        if (gameType === 'bomb') {
-            document.querySelector('.game-title').textContent = '💣 KartBomBot 1v1';
-            document.querySelector('.game-description').textContent = 'Dostunuzla oynayın ve bombalardan kaçının!';
-            document.querySelector('.rules-list').innerHTML = `
-                <li>Kartları açarak rakibinizin bombalarından kaçının</li>
-                <li>Canı biten oyunu kaybeder</li>
-                <li>Yeni oda oluşturmak için oda kodunu boş bırakın</li>
-                <li>Odaya katılmak için oda kodunu girin</li>
+        // Sadece oda kodu giriş alanını göster
+        const roomCodeContainer = document.getElementById('roomCodeContainer');
+        if (roomCodeContainer) {
+            roomCodeContainer.innerHTML = `
+                <div class="mb-4 w-full max-w-md mx-auto">
+                    <label for="roomCodeInput" class="block text-white text-sm font-medium mb-2">
+                        Oda Kodunu Girin
+                    </label>
+                    <div class="flex">
+                        <input type="text" id="roomCodeInput" 
+                               class="flex-1 px-4 py-3 rounded-l-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               placeholder="Oda kodu girin" maxlength="6" style="text-transform: uppercase">
+                        <button id="joinRoomBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-r-lg transition-colors">
+                            Katıl
+                        </button>
+                    </div>
+                    <div class="mt-2 text-center">
+                        <button id="createRoomBtn" class="text-blue-400 hover:text-blue-300 text-sm">
+                            Yeni Oda Oluştur
+                        </button>
+                    </div>
+                </div>
             `;
-        } else if (gameType === 'checkers') {
-            document.querySelector('.game-title').textContent = '♟️ Dama Oyunu';
-            document.querySelector('.game-description').textContent = 'Stratejinizi kullanın ve rakip taşları ele geçirin!';
-            document.querySelector('.rules-list').innerHTML = `
-                <li>Taşlarınızı çapraz hareket ettirin</li>
-                <li>Rakip taşlarını atlayarak yiyin</li>
-                <li>Karşı tarafa ulaşan taşlarınız vezir olur</li>
-                <li>Tüm rakip taşları yiyen veya rakibi hareketsiz bırakan kazanır</li>
-            `;
+            
+            // Odaya katıl butonuna tıklama olayını ekle
+            document.getElementById('joinRoomBtn')?.addEventListener('click', () => this.joinRoom());
+            
+            // Oda oluştur butonuna tıklama olayını ekle
+            document.getElementById('createRoomBtn')?.addEventListener('click', () => this.createRoom());
+            
+            // Enter tuşu ile de göndermeyi etkinleştir
+            document.getElementById('roomCodeInput')?.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.joinRoom();
+                }
+            });
         }
         
         this.showScreen('lobby');
     }
 
+    createRoom() {
+        const username = document.getElementById('telegramUsername')?.textContent || 'Oyuncu';
+        
+        // SocketManager üzerinden yeni oda oluştur
+        if (window.socketManager) {
+            window.socketManager.createRoom(username);
+            showScreen('wait');
+        } else {
+            console.error('SocketManager bulunamadı!');
+            showGlobalMessage('Bağlantı hatası. Lütfen sayfayı yenileyin.', true);
+        }
+    }
+
+    joinRoom() {
+        const roomCode = document.getElementById('roomCodeInput')?.value.trim().toUpperCase();
+        const username = document.getElementById('telegramUsername')?.textContent || 'Oyuncu';
+        
+        if (!roomCode) {
+            showGlobalMessage('Lütfen bir oda kodu girin', true);
+            return;
+        }
+        
+        // SocketManager üzerinden odaya katıl
+        if (window.socketManager) {
+            window.socketManager.joinRoom(roomCode, username);
+            showScreen('wait');
+        } else {
+            console.error('SocketManager bulunamadı!');
+            showGlobalMessage('Bağlantı hatası. Lütfen sayfayı yenileyin.', true);
+        }
+    }
+
     showScreen(screenId) {
-        // Tüm ekranları gizle
         document.querySelectorAll('.screen').forEach(screen => {
             screen.classList.remove('active');
         });
-        
-        // İstenen ekranı göster
-        const screen = document.getElementById(screenId);
-        if (screen) {
-            screen.classList.add('active');
-            
-            // Oyun ekranına geçiş yapılıyorsa, seçili oyunu başlat
-            if (screenId === 'gameScreen' && this.currentGame) {
-                this.startGame();
-            }
-        }
-    }
-
-    startGame() {
-        if (!this.currentGame) return;
-        
-        if (this.currentGame === 'bomb') {
-            // Bomba oyununu başlat
-            if (typeof initializeBombGame === 'function') {
-                initializeBombGame();
-            }
-        } else if (this.currentGame === 'checkers') {
-            // Dama oyununu başlat
-            if (typeof initializeCheckersGame === 'function') {
-                initializeCheckersGame();
-            }
-        }
+        document.getElementById(screenId)?.classList.add('active');
     }
 }
 
-// Oyun yöneticisini başlat
+// Sayfa yüklendiğinde GameManager'ı başlat
 document.addEventListener('DOMContentLoaded', () => {
     window.gameManager = new GameManager();
+    
+    // SocketManager'ı başlat
+    if (window.SocketManager) {
+        window.socketManager = new SocketManager();
+        window.socketManager.initialize();
+    } else {
+        console.error('SocketManager yüklenemedi!');
+    }
 });
