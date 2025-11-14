@@ -6,14 +6,40 @@ class SocketManager {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
         this.reconnectDelay = 1000; // 1 saniye
-        this.serverUrl = window.location.hostname === 'localhost' ? 
-            'http://localhost:3000' : 
-            'https://your-production-server.com'; // Gerçek sunucu URL'nizle değiştirin
+        
+        // Sunucu URL'sini güncelle
+        this.serverUrl = window.location.protocol + '//' + window.location.hostname + ':3000';
+        
+        // Hata mesajları için callback'ler
+        this.errorCallbacks = [];
+        this.connectionCallbacks = [];
+    }
+
+    // Hata callback'ini kaydet
+    onError(callback) {
+        this.errorCallbacks.push(callback);
+    }
+
+    // Bağlantı durumu değiştiğinde çağrılacak callback
+    onConnectionChange(callback) {
+        this.connectionCallbacks.push(callback);
+    }
+
+    // Hata işleme
+    handleError(error) {
+        console.error('Socket hatası:', error);
+        const errorMessage = typeof error === 'string' ? error : (error.message || 'Bilinmeyen hata');
+        this.errorCallbacks.forEach(cb => cb(errorMessage));
+        
+        // Kullanıcıya hata mesajını göster
+        if (typeof showGlobalMessage === 'function') {
+            showGlobalMessage(errorMessage, true);
+        }
     }
 
     // Socket bağlantısını başlat
     initialize() {
-        console.log('Socket bağlantısı başlatılıyor...');
+        console.log('Sunucuya bağlanılıyor:', this.serverUrl);
         
         // Mevcut bağlantıyı kapat
         this.disconnect();
@@ -21,11 +47,14 @@ class SocketManager {
         try {
             // Yeni socket bağlantısı oluştur
             this.socket = io(this.serverUrl, {
-                transports: ['websocket'],
+                transports: ['websocket', 'polling'],
                 reconnection: true,
                 reconnectionAttempts: this.maxReconnectAttempts,
                 reconnectionDelay: this.reconnectDelay,
-                timeout: 10000
+                reconnectionDelayMax: 5000,
+                timeout: 10000,
+                withCredentials: true,
+                forceNew: true
             });
             
             // Olay dinleyicilerini ayarla
@@ -33,8 +62,9 @@ class SocketManager {
             
             return this.socket;
         } catch (error) {
-            console.error('Socket bağlantı hatası:', error);
-            this.handleConnectionError('Bağlantı hatası oluştu');
+            const errorMsg = 'Sunucu bağlantı hatası: ' + error.message;
+            console.error(errorMsg, error);
+            this.handleError(errorMsg);
             return null;
         }
     }
@@ -45,17 +75,27 @@ class SocketManager {
         
         // Bağlantı başarılı olduğunda
         this.socket.on('connect', () => {
-            console.log('✅ Sunucuya bağlandı');
+            console.log('✅ Sunucuya bağlandı:', this.socket.id);
             this.isConnected = true;
             this.reconnectAttempts = 0;
+            this.connectionCallbacks.forEach(cb => cb(true));
             this.updateStatus(true, 'Sunucuya bağlandı');
             this.hideLoadingMessage();
         });
         
         // Bağlantı hatası olduğunda
         this.socket.on('connect_error', (error) => {
-            console.error('❌ Sunucu bağlantı hatası:', error);
-            this.handleConnectionError('Sunucuya bağlanılamadı. Lütfen tekrar deneyin.');
+            console.error('Bağlantı hatası:', error);
+            this.isConnected = false;
+            this.connectionCallbacks.forEach(cb => cb(false));
+            this.handleError('Sunucuya bağlanılamadı: ' + (error.message || 'Bilinmeyen hata'));
+            
+            // Otomatik yeniden bağlanmayı dene
+            this.reconnectAttempts++;
+            if (this.reconnectAttempts <= this.maxReconnectAttempts) {
+                console.log(`Yeniden bağlanılıyor (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+                setTimeout(() => this.initialize(), this.reconnectDelay);
+            }
         });
         
         // Bağlantı koptuğunda
@@ -87,9 +127,11 @@ class SocketManager {
     // Bağlantıyı kapat
     disconnect() {
         if (this.socket) {
+            console.log('Bağlantı kapatılıyor...');
             this.socket.disconnect();
             this.socket = null;
             this.isConnected = false;
+            this.connectionCallbacks.forEach(cb => cb(false));
         }
     }
     
