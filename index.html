@@ -763,6 +763,29 @@
         const socketManager = new SocketManager();
         window.socketManager = socketManager; // Global erişim için
         
+        // Hata yönetimi
+        socketManager.onError((error) => {
+            console.error('Socket hatası:', error);
+            showGlobalMessage(error, true);
+        });
+        
+        // Bağlantı durumu değişikliklerini dinle
+        socketManager.onConnectionChange((isConnected) => {
+            console.log('Bağlantı durumu değişti:', isConnected ? 'Bağlandı' : 'Bağlantı kesildi');
+            
+            // Bağlantı durumuna göre arayüzü güncelle
+            const connectionStatus = document.getElementById('connectionStatus');
+            if (connectionStatus) {
+                connectionStatus.textContent = isConnected ? 'Sunucuya bağlandı' : 'Sunucuya bağlanılıyor...';
+                connectionStatus.style.color = isConnected ? '#4CAF50' : '#F44336';
+            }
+            
+            // Bağlantı başarılıysa oyun yöneticisini başlat
+            if (isConnected && window.gameManager) {
+                window.gameManager.initialize();
+            }
+        });
+        
         // Kullanıcı bilgileri
         let username = 'Player';
         let userId = Math.floor(Math.random() * 1000000);
@@ -815,40 +838,43 @@
         
         // Oda işlemlerini yönet
         function setupRoomHandlers() {
-            // Oda oluştur butonu
-            const createRoomBtn = document.getElementById('createRoomBtn');
-            if (createRoomBtn) {
-                createRoomBtn.addEventListener('click', () => {
-                    const username = document.getElementById('usernameInput')?.value.trim() || 'Player';
-                    if (!username) {
-                        showGlobalMessage('Lütfen bir kullanıcı adı girin', true);
-                        return;
-                    }
-                    
-                    socketManager.createRoom(username);
-                    showScreen('wait');
-                });
-            }
-            
             // Odaya katıl butonu
             const joinRoomBtn = document.getElementById('joinRoomBtn');
             if (joinRoomBtn) {
                 joinRoomBtn.addEventListener('click', () => {
                     const roomCode = document.getElementById('roomCodeInput')?.value.trim().toUpperCase();
-                    const username = document.getElementById('usernameInput')?.value.trim() || 'Player';
+                    const username = document.getElementById('telegramUsername')?.textContent || 'Oyuncu';
                     
                     if (!roomCode) {
                         showGlobalMessage('Lütfen bir oda kodu girin', true);
                         return;
                     }
                     
-                    if (!username) {
-                        showGlobalMessage('Lütfen bir kullanıcı adı girin', true);
-                        return;
-                    }
-                    
                     socketManager.joinRoom(roomCode, username);
                     showScreen('wait');
+                });
+                
+                // Oda kodu giriş alanında Enter tuşu desteği
+                const roomCodeInput = document.getElementById('roomCodeInput');
+                if (roomCodeInput) {
+                    roomCodeInput.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') {
+                            joinRoomBtn.click();
+                        }
+                    });
+                }
+            }
+            
+            // Oda oluştur butonu
+            const createRoomBtn = document.getElementById('createRoomBtn');
+            if (createRoomBtn) {
+                createRoomBtn.addEventListener('click', () => {
+                    const username = document.getElementById('telegramUsername')?.textContent || 'Oyuncu';
+                    socketManager.createRoom(username);
+                    showScreen('wait');
+                });
+            }
+            
                 });
             }
             
