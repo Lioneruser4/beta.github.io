@@ -1,26 +1,426 @@
-// Dosya Adı: game.js
-// Socket bağlantısı artık SocketManager üzerinden yönetilecek
+// Uçak Savaşı Oyunu
+const GAME_SETTINGS = {
+    PLAYER_SPEED: 10,
+    BULLET_SPEED: 15,
+    PLAYER_HEALTH: 100,
+    BULLET_DAMAGE: 25,
+    GAME_DURATION: 120000 // 2 dakika
+};
+
+const GAME_STATES = {
+    WAITING: 'waiting',
+    COUNTDOWN: 'countdown',
+    PLAYING: 'playing',
+    FINISHED: 'finished'
+};
+class TelegramAuth {
+    constructor() {
+        this.isTelegramWebApp = typeof window.Telegram !== 'undefined' && 
+                              typeof window.Telegram.WebApp !== 'undefined';
+        this.user = null;
+        this.tg = this.isTelegramWebApp ? window.Telegram.WebApp : null;
+    }
+
+    init() {
+        // Check for existing session first
+        const savedUser = localStorage.getItem('gameUser');
+        if (savedUser) {
+            this.user = JSON.parse(savedUser);
+            return true;
+        }
+
+        // Try to initialize Telegram WebApp
+        if (this.isTelegramWebApp) {
+            try {
+                this.tg.expand();
+                
+                const userData = this.tg.initDataUnsafe?.user;
+                if (userData) {
+                    this.user = {
+                        id: userData.id,
+                        username: userData.username || `user_${userData.id}`,
+                        firstName: userData.first_name,
+                        lastName: userData.last_name || '',
+                        isTelegramUser: true
+                    };
+                    this.saveUser();
+                    return true;
+                }
+            } catch (error) {
+                console.error('Telegram auth error:', error);
+            }
+        }
+        return false;
+    }
+
+    loginAsGuest() {
+        const guestName = `Misafir_${Math.floor(1000 + Math.random() * 9000)}`;
+        this.user = {
+            id: `guest_${Date.now()}`,
+            username: guestName,
+            firstName: 'Misafir',
+            lastName: '',
+            isTelegramUser: false
+        };
+        this.saveUser();
+        return this.user;
+    }
+
+    getUser() {
+        if (this.user) return this.user;
+        
+        const savedUser = localStorage.getItem('gameUser');
+        if (savedUser) {
+            this.user = JSON.parse(savedUser);
+            return this.user;
+        }
+        return this.loginAsGuest();
+    }
+
+    isAuthenticated() {
+        return this.getUser() !== null;
+    }
+
+    getUsername() {
+        const user = this.getUser();
+        return user ? user.username : 'Guest';
+    }
+
+    saveUser() {
+        if (this.user) {
+            localStorage.setItem('gameUser', JSON.stringify(this.user));
+        }
+    }
+
+    // Close the WebApp (only works in Telegram)
+    closeApp() {
+        if (this.tg && this.tg.close) {
+            this.tg.close();
+        }
+    }
+
+    // Show a simple alert in Telegram WebApp
+    showAlert(message) {
+        if (this.tg && this.tg.showAlert) {
+            this.tg.showAlert(message);
+        } else {
+            alert(message);
+        }
+    }
+
+    // Get the current theme (light/dark)
+    getTheme() {
+        if (this.tg && this.tg.colorScheme) {
+            return this.tg.colorScheme;
+        }
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches 
+            ? 'dark' 
+            : 'light';
+    }
+
+    // Handle back button in Telegram
+    setupBackButton(handler) {
+        if (this.tg && this.tg.BackButton) {
+            this.tg.BackButton.show();
+            this.tg.BackButton.onClick(handler);
+        }
+    }
+
+    logout() {
+        this.user = null;
+        localStorage.removeItem('gameUser');
+        
+        // If in Telegram, close the WebApp, otherwise reload
+        if (this.tg && this.tg.close) {
+            this.tg.close();
+        } else {
+            window.location.reload();
+        }
+    }
+}
+
+// Initialize Telegram auth
+const telegramAuth = new TelegramAuth();
+
 let socket;
 let currentRoomCode = '';
 let isHost = false;
-let opponentName = '';
+let gameState = {
+    status: GAME_STATES.WAITING,
+    players: {},
+    bullets: [],
+    countdown: 3,
+    startTime: null,
+    endTime: null,
+    winner: null
+};
 
-// Socket bağlantısını yönetmek için yardımcı fonksiyon
-function getSocket() {
-    if (window.socketManager && window.socketManager.socket) {
-        return window.socketManager.socket;
-    }
-    console.error('Socket bağlantısı bulunamadı!');
-    return null;
+// Oyun öğeleri
+const gameContainer = document.getElementById('gameContainer');
+const gameCanvas = document.createElement('canvas');
+const ctx = gameCanvas.getContext('2d');
+gameContainer.appendChild(gameCanvas);
+
+// Tuş durumları
+const keys = {};
+document.addEventListener('keydown', (e) => keys[e.code] = true);
+document.addEventListener('keyup', (e) => keys[e.code] = false);
+
+// Ekran boyutlarını ayarla
+function resizeCanvas() {
+    gameCanvas.width = window.innerWidth;
+    gameCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// Oyun döngüsü
+function gameLoop() {
+    update();
+    render();
+    requestAnimationFrame(gameLoop);
 }
 
-// --- DOM Referansları ---
-const screens = { 
-    lobby: document.getElementById('lobby'), 
-    wait: document.getElementById('waitScreen'), 
-    game: document.getElementById('gameScreen') 
-};
-const gameBoardEl = document.getElementById('gameBoard');
+// Oyun güncellemeleri
+function update() {
+    const player = gameState.players[socket?.id];
+    if (!player) return;
+
+    // Oyuncu hareketi
+    if (keys['ArrowLeft'] || keys['KeyA']) {
+        player.x = Math.max(0, player.x - GAME_SETTINGS.PLAYER_SPEED);
+    }
+    if (keys['ArrowRight'] || keys['KeyD']) {
+        player.x = Math.min(gameCanvas.width - 50, player.x + GAME_SETTINGS.PLAYER_SPEED);
+    }
+
+    // Sunucuya hareket bilgisini gönder
+    if (socket) {
+        socket.emit('playerMove', { x: player.x });
+    }
+}
+
+// Oyun çizimleri
+function render() {
+    // Arkaplanı temizle
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+
+    // Oyuncuları çiz
+    Object.values(gameState.players).forEach(player => {
+        const isCurrentPlayer = player.id === socket?.id;
+        
+        // Uçak çiz
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        
+        // Uçağın yönünü ayarla
+        if (!isCurrentPlayer) ctx.rotate(Math.PI);
+        
+        // Uçak gövdesi
+        ctx.fillStyle = isCurrentPlayer ? '#4cc9f0' : '#f72585';
+        ctx.beginPath();
+        ctx.moveTo(0, -20);
+        ctx.lineTo(15, 15);
+        ctx.lineTo(-15, 15);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Kanatlar
+        ctx.fillStyle = isCurrentPlayer ? '#4895ef' : '#b5179e';
+        ctx.fillRect(-20, 0, 40, 10);
+        
+        ctx.restore();
+        
+        // İsim ve can göster
+        ctx.fillStyle = '#fff';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(player.username, player.x, isCurrentPlayer ? player.y - 30 : player.y + 40);
+        
+        // Can çubuğu
+        const healthPercent = player.health / GAME_SETTINGS.PLAYER_HEALTH;
+        ctx.fillStyle = healthPercent > 0.6 ? '#4ade80' : healthPercent > 0.3 ? '#fbbf24' : '#ef4444';
+        ctx.fillRect(player.x - 25, isCurrentPlayer ? player.y - 45 : player.y + 45, 50 * healthPercent, 5);
+    });
+    
+    // Mermileri çiz
+    gameState.bullets.forEach(bullet => {
+        ctx.fillStyle = bullet.direction === 'up' ? '#4cc9f0' : '#f72585';
+        ctx.fillRect(bullet.x - 2, bullet.y - 5, 4, 10);
+    });
+    
+    // Oyun durumuna göre arayüz göster
+    if (gameState.status === GAME_STATES.WAITING) {
+        showMessage('Rakip bekleniyor...');
+    } else if (gameState.status === GAME_STATES.COUNTDOWN) {
+        showMessage(gameState.countdown > 0 ? gameState.countdown : 'BAŞLA!');
+    } else if (gameState.status === GAME_STATES.FINISHED && gameState.winner) {
+        showMessage(`KAZANAN: ${gameState.winner}`);
+    }
+    
+    // Skor tablosu
+    ctx.fillStyle = '#fff';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'left';
+    Object.values(gameState.players).forEach((player, index) => {
+        ctx.fillText(`${player.username}: ${player.score}`, 10, 30 + (index * 25));
+    });
+    
+    // Kalan süre
+    if (gameState.endTime) {
+        const timeLeft = Math.max(0, Math.ceil((gameState.endTime - Date.now()) / 1000));
+        ctx.textAlign = 'right';
+        ctx.fillText(`Süre: ${timeLeft}s`, gameCanvas.width - 10, 30);
+    }
+}
+
+// Mesaj göster
+function showMessage(text) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    const textWidth = ctx.measureText(text).width;
+    const padding = 20;
+    const x = (gameCanvas.width - textWidth) / 2 - padding;
+    const y = gameCanvas.height / 2 - 30;
+    
+    ctx.fillRect(x, y, textWidth + padding * 2, 60);
+    ctx.fillStyle = '#fff';
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(text, gameCanvas.width / 2, gameCanvas.height / 2);
+}
+
+// Ateş et
+function fireBullet() {
+    const player = gameState.players[socket?.id];
+    if (!player || gameState.status !== GAME_STATES.PLAYING) return;
+    
+    socket.emit('playerShoot', {
+        x: player.x,
+        y: player.y,
+        direction: 'up' // Yukarı doğru ateş et
+    });
+}
+
+// Oyun başlatma ekranını göster
+function showLobby() {
+    document.getElementById('lobby').style.display = 'flex';
+    document.getElementById('gameContainer').style.display = 'none';
+    document.getElementById('roomScreen').style.display = 'none';
+}
+
+// Oda oluştur
+function createRoom() {
+    const username = document.getElementById('usernameInput').value || 'Oyuncu' + Math.floor(Math.random() * 1000);
+    
+    // Socket bağlantısı
+    socket = io('http://localhost:3000');
+    
+    // Hata mesajlarını dinle
+    socket.on('error', (data) => {
+        alert(data.message);
+    });
+    
+    // Oda oluşturulduğunda
+    socket.on('roomCreated', (data) => {
+        currentRoomCode = data.code;
+        isHost = data.isHost;
+        gameState = data.gameState;
+        
+        document.getElementById('lobby').style.display = 'none';
+        document.getElementById('roomScreen').style.display = 'flex';
+        document.getElementById('roomCode').textContent = currentRoomCode;
+        document.getElementById('waitingMessage').textContent = 'Rakip bekleniyor...';
+    });
+    
+    // Rakip katıldığında
+    socket.on('opponentJoined', (data) => {
+        gameState = data.gameState;
+        document.getElementById('waitingMessage').textContent = 'Rakip bağlandı! Oyun başlıyor...';
+    });
+    
+    // Oyun başladığında
+    socket.on('gameStart', (data) => {
+        gameState = data.gameState;
+        document.getElementById('roomScreen').style.display = 'none';
+        document.getElementById('gameContainer').style.display = 'block';
+    });
+    
+    // Oyun güncellemelerini dinle
+    socket.on('gameUpdate', (state) => {
+        gameState = state;
+    });
+    
+    // Yeni mermi eklendiğinde
+    socket.on('bulletFired', (bullet) => {
+        gameState.bullets.push(bullet);
+    });
+    
+    // Oyun bitişi
+    socket.on('gameOver', (winner) => {
+        gameState.status = GAME_STATES.FINISHED;
+        gameState.winner = winner;
+    });
+    
+    // Oda oluştur
+    socket.emit('createRoom', { username });
+}
+
+// Odaya katıl
+function joinRoom() {
+    const username = document.getElementById('usernameInput').value || 'Oyuncu' + Math.floor(Math.random() * 1000);
+    const roomCode = document.getElementById('roomCodeInput').value.toUpperCase();
+    
+    if (!roomCode) {
+        alert('Lütfen oda kodunu girin!');
+        return;
+    }
+    
+    // Socket bağlantısı
+    socket = io('http://localhost:3000');
+    
+    // Hata mesajlarını dinle
+    socket.on('error', (data) => {
+        alert(data.message);
+    });
+    
+    // Oyun başladığında
+    socket.on('gameStart', (data) => {
+        gameState = data.gameState;
+        document.getElementById('roomScreen').style.display = 'none';
+        document.getElementById('gameContainer').style.display = 'block';
+    });
+    
+    // Oyun güncellemelerini dinle
+    socket.on('gameUpdate', (state) => {
+        gameState = state;
+    });
+    
+    // Yeni mermi eklendiğinde
+    socket.on('bulletFired', (bullet) => {
+        gameState.bullets.push(bullet);
+    });
+    
+    // Oyun bitişi
+    socket.on('gameOver', (winner) => {
+        gameState.status = GAME_STATES.FINISHED;
+        gameState.winner = winner;
+    });
+    
+    // Odaya katıl
+    socket.emit('joinRoom', { code: roomCode, username });
+}
+
+// Ateş butonu
+document.getElementById('fireButton')?.addEventListener('click', fireBullet);
+
+// Oyun döngüsünü başlat
+gameLoop();
+
+// Buton eventleri
+document.getElementById('createRoomBtn')?.addEventListener('click', createRoom);
+document.getElementById('joinRoomBtn')?.addEventListener('click', joinRoom);
+document.getElementById('backToLobbyBtn')?.addEventListener('click', showLobby);
 const turnStatusEl = document.getElementById('turnStatus');
 const actionMessageEl = document.getElementById('actionMessage');
 const myLivesEl = document.getElementById('myLives');
@@ -42,94 +442,6 @@ function playSound(audioElement) {
     clone.play().catch(() => {});
 }
 
-// Bomba oyunu başlatma
-function initializeBombGame() {
-    // Mevcut oyun mantığını buraya taşıyacağız
-    const boardSize = 16; // Varsayılan tahta boyutu
-    
-    // Oyun tahtasını oluştur
-    gameData.board = Array.from({ length: boardSize }, () => ({
-        opened: false,
-        content: '',
-        hasBomb: false,
-        flagged: false
-    }));
-    
-    // Oyun durumunu sıfırla
-    gameData.cardsLeft = boardSize;
-    gameData.turn = 0; // Host başlar
-    gameData.isGameOver = false;
-    
-    // Can ve bomba ayarları
-    if (level === 1) {
-        gameData.hostLives = 3;
-        gameData.guestLives = 3;
-        gameData.hostBombs = [];
-        gameData.guestBombs = [];
-        
-        // Rastgele bombalı kartları seç
-        const totalCards = boardSize;
-        const allIndices = Array.from({length: totalCards}, (_, i) => i);
-        
-        // Karıştır
-        for (let i = allIndices.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [allIndices[i], allIndices[j]] = [allIndices[j], allIndices[i]];
-        }
-        
-        // İlk bombaları ata (3 tane)
-        gameData.hostBombs = allIndices.slice(0, 3);
-        gameData.guestBombs = allIndices.slice(3, 6);
-        
-        // Bombaları işaretle
-        gameData.hostBombs.forEach(index => gameData.board[index].hasBomb = true);
-        gameData.guestBombs.forEach(index => gameData.board[index].hasBomb = true);
-    }
-    
-    // Skor tablosunu güncelle
-    updateScoreDisplay();
-    
-    // Oyun tahtasını çiz
-    drawBoard();
-}
-
-// Dama oyunu başlatma
-function initializeCheckersGame() {
-    // Dama tahtasını oluştur
-    const boardSize = 8;
-    gameData.board = [];
-    gameData.turn = 0; // Siyah taşlar başlar
-    gameData.isGameOver = false;
-    gameData.selectedPiece = null;
-    gameData.validMoves = [];
-    
-    // Dama tahtasını oluştur
-    for (let row = 0; row < boardSize; row++) {
-        gameData.board[row] = [];
-        for (let col = 0; col < boardSize; col++) {
-            // Sadece siyah karelere taş yerleştir
-            if ((row + col) % 2 === 1) {
-                if (row < 3) {
-                    // Üstteki 3 sıra rakibin taşları (beyaz)
-                    gameData.board[row][col] = { type: 'man', player: 1, row, col };
-                } else if (row > 4) {
-                    // Alttaki 3 sıra bizim taşlarımız (siyah)
-                    gameData.board[row][col] = { type: 'man', player: 0, row, col };
-                } else {
-                    // Boş kare
-                    gameData.board[row][col] = { type: 'empty', player: null, row, col };
-                }
-            } else {
-                // Beyaz kareler boş olacak
-                gameData.board[row][col] = { type: 'empty', player: null, row, col };
-            }
-        }
-    }
-    
-    // Dama tahtasını çiz
-    drawCheckersBoard();
-}
-
 // Oyun başlatma / seviye hazırlama
 function initializeGame(boardSize) {
     gameData.board = Array.from({ length: boardSize }, () => ({ opened: false, content: '' }));
@@ -137,65 +449,13 @@ function initializeGame(boardSize) {
     gameData.turn = 0; // Host başlar
     gameData.isGameOver = false;
     
-    // Can ve bomba ayarları
-    if (level === 1) {
-        // İlk seviyede 3 can 3 bomba
-        gameData.hostLives = gameData.hostLives || 3;  // Eğer can varsa koru, yoksa 3 yap
-        gameData.guestLives = gameData.guestLives || 3;
-        const bombCount = 3;
-        
-        // Bombaları sıfırla ve yeni bombalar ata
-        gameData.hostBombs = [];
-        gameData.guestBombs = [];
-        
-        // Rastgele bombalı kartları seç
-        const totalCards = boardSize;
-        const allIndices = Array.from({length: totalCards}, (_, i) => i);
-        
-        // Karıştır
-        for (let i = allIndices.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [allIndices[i], allIndices[j]] = [allIndices[j], allIndices[i]];
-        }
-        
-        // İlk bombaları ata (3 tane)
-        gameData.hostBombs = allIndices.slice(0, bombCount);
-        gameData.guestBombs = allIndices.slice(bombCount, bombCount * 2);
-        
-    } else if (level === 2) {
-        // İkinci seviyede 4 can 5 bomba (eğer can 0 değilse bir önceki canları koru)
-        gameData.hostLives = gameData.hostLives > 0 ? Math.min(gameData.hostLives + 1, 4) : 4;
-        gameData.guestLives = gameData.guestLives > 0 ? Math.min(gameData.guestLives + 1, 4) : 4;
-        
-        // Yeni bombalar ata (5 tane)
-        const bombCount = 5;
-        const totalCards = boardSize;
-        const allIndices = Array.from({length: totalCards}, (_, i) => i);
-        
-        // Karıştır
-        for (let i = allIndices.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [allIndices[i], allIndices[j]] = [allIndices[j], allIndices[i]];
-        }
-        
-        // Yeni bombaları ata (5 tane)
-        gameData.hostBombs = allIndices.slice(0, bombCount);
-        gameData.guestBombs = allIndices.slice(bombCount, bombCount * 2);
-    }
+    // İlk seviyede 3 can 4 bomba, diğer seviyelerde 3 can 6 bomba
+    gameData.hostLives = 3;
+    gameData.guestLives = 3;
+    gameData.hostBombs = [];
+    gameData.guestBombs = [];
     
-    // Skor tablosunu güncelle
-    updateScoreDisplay();
-    
-    // Oyun durumunu güncelle
     gameStage = 'WAITING';
-    
-    // Oyun tahtasını çiz
-    drawBoard();
-    
-    // Oyun bilgilerini konsola yazdır (hata ayıklama için)
-    console.log(`Level ${level} başladı. Canlar: Host=${gameData.hostLives}, Guest=${gameData.guestLives}`);
-    console.log('Host Bombaları:', gameData.hostBombs);
-    console.log('Guest Bombaları:', gameData.guestBombs);
 }
 
 // --- OYUN DURUMU ---
@@ -205,12 +465,6 @@ const LEVELS = [16, 20];
 let gameStage = 'SELECTION'; // 'SELECTION' veya 'PLAY'
 let selectedBombs = []; // Kendi seçtiğimiz bombaların indexleri
 
-// Skor takibi için global değişkenler
-let scores = {
-    host: 0,
-    guest: 0
-};
-
 let gameData = {
     board: [], 
     turn: 0,  // 0 = Host, 1 = Guest
@@ -219,8 +473,7 @@ let gameData = {
     cardsLeft: 0,
     hostBombs: [], 
     guestBombs: [],
-    isGameOver: false,
-    scores: { host: 0, guest: 0 } // Oyun skorları
+    isGameOver: false
 };
 
 // Tüm cihazlarda güvenle çalışacak emojiler
@@ -254,55 +507,12 @@ export function showScreen(screenId) {
 export function showGlobalMessage(message, isError = true) {
     const globalMessage = document.getElementById('globalMessage');
     const globalMessageText = document.getElementById('globalMessageText');
-    
-    // Eğer message bir dize ise doğrudan kullan, değilse çeviri fonksiyonunu kullan
-    const displayMessage = typeof message === 'string' ? message : 
-        (window.languageManager ? window.languageManager.t(message) : message);
-    
-    globalMessageText.textContent = displayMessage;
+    globalMessageText.textContent = message;
     globalMessage.classList.remove('bg-red-600', 'bg-green-600');
     globalMessage.classList.add(isError ? 'bg-red-600' : 'bg-green-600');
     globalMessage.classList.remove('hidden');
     globalMessage.classList.add('show');
     setTimeout(() => { globalMessage.classList.add('hidden'); globalMessage.classList.remove('show'); }, 4000);
-}
-
-// Skor tablosunu güncelle
-function updateScoreDisplay() {
-    const scoreDisplay = document.getElementById('scoreDisplay');
-    const playerName = document.getElementById('telegramUsername')?.textContent || 'SEN';
-    const opponentName = document.getElementById('opponentName')?.textContent || 'RAKİP';
-    
-    if (scoreDisplay) {
-        // Can durumunu göster
-        const playerLives = isHost ? gameData.hostLives : gameData.guestLives;
-        const opponentLives = isHost ? gameData.guestLives : gameData.hostLives;
-        
-        // Seviye bilgisini hazırla
-        const levelText = window.languageManager ? 
-            `${window.languageManager.t('level')} ${level}` : 
-            `Səviyyə ${level} / Level ${level}`;
-        
-        scoreDisplay.innerHTML = `
-            <div class="w-full flex flex-col items-center mb-2">
-                <div class="text-lg font-bold text-yellow-300 mb-1">${levelText}</div>
-                <div class="flex justify-center items-center gap-6 w-full">
-                    <div class="text-center">
-                        <div class="font-bold text-sm text-white truncate">${isHost ? playerName : opponentName}</div>
-                        <div class="text-2xl font-bold text-green-400">${isHost ? scores.host : scores.guest}</div>
-                        <div class="text-sm text-gray-300">${'❤️'.repeat(playerLives)}</div>
-                    </div>
-                    <div class="text-2xl font-bold">-</div>
-                    <div class="text-center">
-                        <div class="font-bold text-sm text-white truncate">${!isHost ? playerName : opponentName}</div>
-                        <div class="text-2xl font-bold text-red-400">${!isHost ? scores.host : scores.guest}</div>
-                        <div class="text-sm text-gray-300">${'❤️'.repeat(opponentLives)}</div>
-                    </div>
-                </div>
-            </div>
-        `;
-        scoreDisplay.style.display = 'block';
-    }
 }
 
 // --- OYUN MANTIĞI VE ÇİZİM ---
@@ -363,23 +573,7 @@ function updateStatusDisplay() {
     const myLives = isHost ? gameData.hostLives : gameData.guestLives;
     const opponentLives = isHost ? gameData.guestLives : gameData.hostLives;
     
-    // Can göstergelerini güncelle
     myLivesEl.textContent = '❤️'.repeat(Math.max(0, myLives));
-    opponentLivesEl.textContent = '❤️'.repeat(Math.max(0, opponentLives));
-    
-    // Sıra bilgisini güncelle
-    if (gameData.turn === (isHost ? 0 : 1)) {
-        turnStatusEl.textContent = window.languageManager ? window.languageManager.t('yourTurn') : 'Sizin növbəniz / Your turn';
-    } else {
-        turnStatusEl.textContent = window.languageManager ? window.languageManager.t('opponentTurn') : 'Rəqibin növbəsi / Opponent\'s turn';
-    }
-    
-    // Rol bilgisini güncelle
-    if (isHost) {
-        roleStatusEl.textContent = window.languageManager ? window.languageManager.t('roleHost') : '🎮 Rol: HOST (Siz başlayırsınız) / 🎮 Role: HOST (You start)';
-    } else {
-        roleStatusEl.textContent = window.languageManager ? window.languageManager.t('roleGuest') : '🎮 Rol: QONAQ (Rəqib başlayır) / 🎮 Role: GUEST (Opponent starts)';
-    }
     opponentLivesEl.textContent = '❤️'.repeat(Math.max(0, opponentLives));
     
     // Skor göstergesini güncelle
@@ -387,8 +581,12 @@ function updateStatusDisplay() {
         const myScore = isHost ? gameData.scores.host : gameData.scores.guest;
         const opponentScore = isHost ? gameData.scores.guest : gameData.scores.host;
         
-        // Skor göstergesi kaldırıldı
-        scoreDisplayEl.style.display = 'none';
+        // Eğer isim bilgileri varsa onları kullan, yoksa varsayılan değerleri kullan
+        const myName = isHost ? 'Sen' : (gameData.opponentName || 'Rakip');
+        const opponentName = isHost ? (gameData.opponentName || 'Rakip') : 'Sen';
+        
+        scoreDisplayEl.textContent = `${myName} ${myScore} - ${opponentScore} ${opponentName}`;
+        scoreDisplayEl.style.display = 'block';
     }
 
     const isMyTurn = (isHost && gameData.turn === 0) || (!isHost && gameData.turn === 1);
@@ -400,20 +598,20 @@ function updateStatusDisplay() {
         turnStatusEl.classList.add('text-yellow-600');
     } else if (gameStage === 'PLAY') {
         if (isMyTurn) {
-            turnStatusEl.textContent = '✅ SIRA SƏNDƏ / You Play';
+            turnStatusEl.textContent = '✅ SIRA SƏNDƏ !';
             actionMessageEl.textContent = "Bir kart aç! Rakibinizin bombalarından kaçınmaya çalışın.";
             turnStatusEl.classList.remove('text-red-600');
             turnStatusEl.classList.add('text-green-600');
         } else {
-            turnStatusEl.textContent = '⏳ ONUN SIRASI / HIS TURN';
-            actionMessageEl.textContent = "RƏQİBİNİZİ GÖZLƏYİN / WAIT FOR YOUR OPPONENT";
+            turnStatusEl.textContent = '⏳ ONUN SIRASI';
+            actionMessageEl.textContent = "RƏQİBİNİZİ GÖZLƏYİN...";
             turnStatusEl.classList.remove('text-green-600');
             turnStatusEl.classList.add('text-red-600');
         }
     }
     
     if (gameData.isGameOver && gameStage === 'ENDED') {
-        turnStatusEl.textContent = "✅ OYUN BİTDİ! ";
+        turnStatusEl.textContent = "✅ OYUN BİTDİ!";
         actionMessageEl.textContent = "Sonuçlar hesaplanıyor...";
     }
 }
@@ -552,33 +750,18 @@ function endGame(winnerRole) {
     const iWon = (winnerRole === myRole);
     const isDraw = (winnerRole === 'DRAW');
     
-    // Skorları güncelle
-    if (!isDraw) {
-        if (winnerRole === 'Host') {
-            scores.host++;
-        } else {
-            scores.guest++;
-        }
-    }
-    
-    // Skorları oyun verisine de kopyala (sunucu senkronizasyonu için)
-    gameData.scores = { ...scores };
-    
-    // Skor tablosunu güncelle
-    updateScoreDisplay();
-    
     if (isDraw) {
         turnStatusEl.textContent = `🤝 BƏRABƏRLİK!`;
         actionMessageEl.textContent = `Her iki oyuncu da tüm canlarını kaybetti!`;
         showGlobalMessage('🤝 Beraberlik! Her ikiniz de harika oynadınız!', false);
     } else if (iWon) {
-        turnStatusEl.textContent = `🎉 QAZANDIN! (${scores[winnerRole.toLowerCase()]}-${scores[winnerRole === 'Host' ? 'guest' : 'host']})`;
+        turnStatusEl.textContent = `🎉 QAZANDIN!`;
         actionMessageEl.textContent = `Tebrikler! Rakibinizi yendiniz!`;
-        showGlobalMessage(`🎉 Tebrikler! Bu turu kazandınız! (${scores[winnerRole.toLowerCase()]}-${scores[winnerRole === 'Host' ? 'guest' : 'host']})`, false);
+        showGlobalMessage('🎉 Tebrikler! Bu turu kazandınız!', false);
     } else {
-        turnStatusEl.textContent = `😔 UDUZDUN! (${scores[winnerRole === 'Host' ? 'guest' : 'host']}-${scores[winnerRole.toLowerCase()]})`;
+        turnStatusEl.textContent = `😔 UDUZDUN!`;
         actionMessageEl.textContent = `Rakibiniz bu turu kazandı.`;
-        showGlobalMessage(`😔 Bu turu kaybettiniz. (${scores[winnerRole === 'Host' ? 'guest' : 'host']}-${scores[winnerRole.toLowerCase()]})`, true);
+        showGlobalMessage('😔 Bu turu kaybettiniz. Bir sonrakinde daha dikkatli olun!', true);
     }
     
     // 2 saniye bekle ve sunucuya oyun bitti bilgisini gönder
@@ -669,54 +852,149 @@ function hideLoadingMessage() {
     }
 }
 
-// Sayfa yüklendiğinde yükleme mesajını göster
+// Oyun seçim ekranını başlat
 document.addEventListener('DOMContentLoaded', () => {
-    showLoadingMessage();
-});
-
-// Basit bir ping endpoint'i ekleyelim
-export function setupPingEndpoint(app) {
-    app.get('/ping', (req, res) => {
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        return res.status(200).json({ 
-            status: 'ok', 
-            timestamp: new Date().toISOString(),
-            server: 'KartBomBot Server',
-            version: '1.0.0'
+    const user = telegramAuth.getUser();
+    const loginScreen = document.getElementById('telegramLoginScreen');
+    
+    // Oyun seçim kartlarına tıklama olaylarını ekle
+    document.querySelectorAll('.game-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            const gameType = card.dataset.game;
+            const button = e.target.closest('button');
+            
+            // Eğer butona tıklandıysa veya doğrudan karta tıklandıysa
+            if (button || !e.target.closest('.game-card-back')) {
+                document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+                
+                if (gameType === 'checkers') {
+                    // Dama oyunu ekranını göster
+                    document.getElementById('checkersScreen')?.classList.add('active');
+                    // Dama oyununu başlat
+                    if (!window.checkersGame) {
+                        // checkers.js dosyasını dinamik olarak yükle
+                        const script = document.createElement('script');
+                        script.src = 'checkers.js';
+                        document.head.appendChild(script);
+                        
+                        // Oyunun yüklenmesini bekle
+                        script.onload = () => {
+                            window.checkersGame = new CheckersGame();
+                        };
+                    } else {
+                        window.checkersGame.updateBoardView();
+                    }
+                } else {
+                    // Mevcut oyunu başlat
+                    document.getElementById('lobby')?.classList.add('active');
+                }
+            }
         });
     });
+    
+    // Menüye dön butonlarına tıklama olaylarını ekle
+    document.querySelectorAll('.back-to-menu').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+            document.getElementById('gameSelectScreen')?.classList.add('active');
+        });
+    });
+    const userProfile = document.getElementById('userProfile');
+    const userDisplayName = document.getElementById('userDisplayName');
+
+    // If user is already logged in, hide login screen
+    if (user) {
+        loginScreen.style.display = 'none';
+        userProfile.style.display = 'flex';
+        userDisplayName.textContent = user.firstName || user.username;
+        showLoadingMessage();
+    } else {
+        // Show login screen
+        loginScreen.style.display = 'flex';
+        
+        // Setup login button
+        document.getElementById('telegramLoginBtn').addEventListener('click', () => {
+            if (telegramAuth.init()) {
+                window.location.reload();
+            } else {
+                alert('Telegram girişi başarısız. Lütfen tekrar deneyin.');
+            }
+        });
+        
+        // Setup guest login
+        document.getElementById('guestLoginBtn').addEventListener('click', () => {
+            telegramAuth.loginAsGuest();
+            window.location.reload();
+        });
+    }
+});
+
+// Make logout function globally available
+window.logout = function() {
+    telegramAuth.logout();
+};
+
+// Kullanıcı bilgilerini güncelle
+function updateUserInfo() {
+    if (telegramAuth.isAuthenticated()) {
+        currentUser = {
+            id: telegramAuth.getUserId(),
+            name: telegramAuth.getUsername(),
+            isTelegramUser: true
+        };
+    } else {
+        // Guest user
+        const guestId = 'guest_' + Math.random().toString(36).substr(2, 9);
+        currentUser = {
+            id: guestId,
+            name: document.getElementById('usernameInput')?.value || `Guest_${Math.floor(Math.random() * 1000)}`,
+            isTelegramUser: false
+        };
+    }
+    return currentUser;
+}
+
+// Kullanıcı adı doğrulama
+function validateUsername(username) {
+    if (!username || username.trim() === '') {
+        showGlobalMessage('Lütfen geçerli bir kullanıcı adı girin.');
+        return false;
+    }
+    if (username.length > 20) {
+        showGlobalMessage('Kullanıcı adı çok uzun (maksimum 20 karakter)');
+        return false;
+    }
+    return true;
 }
 
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
-export function setupSocketHandlers(socket, roomCode, host, opponentNameFromIndex) {
-    console.log('🎯 setupSocketHandlers ÇAĞRILDI!', { roomCode, isHost: host, opponent: opponentNameFromIndex });
+export function setupSocketHandlers(s, roomCode, isHostParam, username) {
+    console.log('🎯 setupSocketHandlers ÇAĞRILDI!', { roomCode, isHost: isHostParam, opponent: username });
     
-    // Socket bağlantısını kontrol et
-    if (!socket) {
-        console.error('❌ Socket bağlantısı geçersiz!');
-        showGlobalMessage('Sunucu bağlantı hatası. Lütfen sayfayı yenileyin.', true);
-        return;
-    }
+    // Show loading message when setting up socket handlers
+    console.log('📡 Yükleme mesajı gösteriliyor...');
+    showLoadingMessage();
     
-    // Global değişkenleri güncelle
+    socket = s;
     currentRoomCode = roomCode;
-    isHost = host;
-    opponentName = opponentNameFromIndex;
+    isHost = isHostParam;
     
-    // Rakip adını güncelle
-    const opponentNameEl = document.getElementById('opponentName');
-    if (opponentNameEl) {
-        opponentNameEl.textContent = opponentName;
-    }
+    // Kullanıcı bilgilerini güncelle
+    const user = updateUserInfo();
     
-    // Rol durumunu güncelle
-    const roleStatusEl = document.getElementById('roleStatus');
-    if (roleStatusEl) {
-        roleStatusEl.textContent = isHost ? "🎮 Rol: HOST (Sen başla)" : "🎮 Rol: GUEST (Rakip başlar)";
-    }
+    // Sunucuya kullanıcı bilgilerini gönder
+    socket.emit('setUserInfo', {
+        userId: user.id,
+        username: user.name,
+        isTelegramUser: user.isTelegramUser,
+        roomCode: roomCode
+    });
     
+    // Rakip adını ayarla
+    opponentName = username || (isHost ? 'Guest' : 'Host');
+    opponentNameEl.textContent = opponentName;
+    roleStatusEl.textContent = isHost ? "🎮 Rol: HOST (Sen başla)" : "🎮 Rol: GUEST (Rakip başlar)";
+
     // Oyun başlatılıyor
     level = 1; // Yeni oyuna başlarken seviyeyi 1'e sıfırla
     
@@ -724,97 +1002,49 @@ export function setupSocketHandlers(socket, roomCode, host, opponentNameFromInde
     const boardSize = LEVELS[level - 1]; // İlk seviye 16 kart
     initializeGame(boardSize);
     
-    // Oyun başladı mesajını göster
-    showGlobalMessage(`🎮 Oyun ${opponentName} ile başladı! 🚀`, false);
-    
-    // Oyun ekranını göster
-    showScreen('game');
-    
-    // Socket olay dinleyicilerini ayarla
-    setupGameSocketHandlers(socket);
-    
-    // Oyun başladı mesajını gönder
-    if (isHost) {
-        // Sadece host oyun başlatma isteği gönderecek
-        console.log('🏁 Oyun başlatma isteği gönderiliyor...');
-        socket.emit('startGame', { room: currentRoomCode });
-    }
-}
-
-// Oyun için socket olay dinleyicilerini ayarla
-function setupGameSocketHandlers(socket) {
-    if (!socket) return;
-    
-    console.log('📡 Oyun socket dinleyicileri kuruluyor...');
-    
-    // Oyun hazır olduğunda
-    socket.on('gameReady', (gameState) => {
-        console.log('🎮 Oyun hazır, yükleme mesajı kaldırılıyor...');
-        
-        // Oyun durumunu güncelle
-        if (gameState) {
-            // Eğer oyun durumu geliyorsa, oyun durumunu güncelle
-            if (gameState.hostLives !== undefined) gameData.hostLives = gameState.hostLives;
-            if (gameState.guestLives !== undefined) gameData.guestLives = gameState.guestLives;
-            if (gameState.turn !== undefined) gameData.turn = gameState.turn;
-            if (gameState.board) gameData.board = gameState.board;
-            
-            // Oyun tahtasını güncelle
-            drawBoard();
-            updateStatusDisplay();
+    // Can sayılarını server'dan gelen bilgiyle güncelle
+    socket.once('gameReady', ({ hostBombs, guestBombs }) => {
+        // Seviyeye göre can sayılarını ayarla
+        if (level === 1) {
+            gameData.hostLives = 3;
+            gameData.guestLives = 3;
+        } else {
+            gameData.hostLives = 4;
+            gameData.guestLives = 4;
         }
-        
-        // Yükleme mesajını gizle
+        updateStatusDisplay();
+    });
+    
+    drawBoard();
+    showScreen('game');
+    showGlobalMessage(`🎮 Oyun ${opponentName} ile başladı! 🚀 Bombalar yerleştiriliyor...`, false);
+    
+    console.log('📡 Socket dinleyicileri kuruluyor...');
+    
+    // --- SOCKET.IO İŞLEYİCİLERİ ---
+
+    // Bağlantı durumunu dinle
+    socket.on('connect', () => {
+        console.log('✅ Sunucuya bağlandı');
+        // Oyun hazır olduğunda gizlenecek
+    });
+
+    // Bağlantı hatası olduğunda
+    socket.on('connect_error', (error) => {
+        console.error('❌ Sunucu bağlantı hatası:', error);
+        showGlobalMessage('Sunucuya bağlanılamadı. Lütfen tekrar deneyin.', true);
         hideLoadingMessage();
     });
-    
-    // Hamle yapıldığında
-    socket.on('moveMade', (moveData) => {
-        console.log('🎮 Hamle yapıldı:', moveData);
+
+    // Oyun Başlasın! (Bombalar otomatik seçildi)
+    socket.on('gameReady', (gameState) => {
+        console.log('🎮 Oyun hazır, yükleme mesajı kaldırılıyor...');
+        // Oyun hazır olduğunda yükleme mesajını gizle
+        hideLoadingMessage();
         
-        // Hamleyi uygula
-        if (moveData && moveData.index !== undefined) {
-            applyMove(moveData.index, moveData.emoji, moveData.isBomb);
-        }
-    });
-    
-    // Oyun bittiğinde
-    socket.on('gameOver', (result) => {
-        console.log('🏁 Oyun bitti:', result);
-        
-        // Oyun sonucunu göster
-        if (result.winner) {
-            const winnerName = result.winner === 'host' ? (isHost ? 'Sen' : opponentName) : 
-                             (result.winner === 'guest' ? (isHost ? opponentName : 'Sen') : 'Berabere');
-            
-            showGlobalMessage(`🏆 Oyun bitti! Kazanan: ${winnerName}`, false);
-        } else {
-            showGlobalMessage('🏁 Oyun bitti!', false);
-        }
-        
-        // 3 saniye sonra lobiye dön
+        // Ekstra güvenlik için 2 saniye sonra tekrar kontrol et
         setTimeout(() => {
-            showScreen('lobby');
-        }, 3000);
-    });
-    
-    // Hata mesajı geldiğinde
-    socket.on('error', (error) => {
-        console.error('❌ Oyun hatası:', error);
-        showGlobalMessage(`Hata: ${error.message || 'Bilinmeyen bir hata oluştu'}`, true);
-    });
-    
-    // Rakip bağlantısı koptuğunda
-    socket.on('opponentDisconnected', () => {
-        console.log('⚠️ Rakip bağlantısı koptu');
-        showGlobalMessage('Rakip bağlantısı koptu. Lobiye yönlendiriliyorsunuz...', true);
-        
-        // 3 saniye sonra lobiye dön
-        setTimeout(() => {
-            showScreen('lobby');
-        }, 3000);
-    });
-}
+            const loadingMessage = document.getElementById('loadingMessage');
             if (loadingMessage && !loadingMessage.classList.contains('hidden')) {
                 console.log('🔄 Yükleme mesajı hala görünür, tekrar kaldırılıyor...');
                 loadingMessage.classList.add('hidden');
@@ -916,55 +1146,9 @@ function setupGameSocketHandlers(socket) {
 }
 
 export function resetGame() {
-    // Tüm oyun ayarlarını sıfırlar ve lobiye döner
-    const message = window.languageManager ? 
-        window.languageManager.t('playerLeft') : 'Oyunçu ayrıldı / Player left';
-    showGlobalMessage(message, true);
-    
-    // 2 saniye sonra sayfayı yenile
-    setTimeout(() => {
-        window.location.reload();
-    }, 2000);
+    // Tüm oyun ayarlarını sıfırlar ve lobiye döner (En güvenli yol: Sayfayı yenilemek)
+    window.location.reload(); 
 }
-
-// Oda yönetim butonuna tıklama olayını ekleyelim
-document.addEventListener('DOMContentLoaded', () => {
-    const roomActionBtn = document.getElementById('roomActionBtn');
-    const roomCodeInput = document.getElementById('roomCodeInput');
-    
-    if (roomActionBtn) {
-        roomActionBtn.addEventListener('click', () => {
-            const roomCode = roomCodeInput.value.trim().toUpperCase();
-            const username = document.getElementById('usernameInput')?.value.trim() || 'Player';
-            
-            if (!username) {
-                showGlobalMessage('İstifadəçi adı daxil edin / Please enter a username', true);
-                return;
-            }
-            
-            if (roomCode) {
-                // Odaya bağlan
-                if (socket) {
-                    socket.emit('joinRoom', { room: roomCode, username });
-                    showScreen('wait');
-                }
-            } else {
-                // Yeni oda oluştur
-                if (socket) {
-                    socket.emit('createRoom', { username });
-                    showScreen('wait');
-                }
-            }
-        });
-        
-        // Enter tuşu ile de göndermeyi etkinleştir
-        roomCodeInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                roomActionBtn.click();
-            }
-        });
-    }
-});
 
 // Lobi Butonlarını dışarıdan erişilebilir yapıyoruz (index.html'in kullanması için)
 export const UIElements = {
@@ -972,5 +1156,8 @@ export const UIElements = {
     roomCodeInput: document.getElementById('roomCodeInput'), 
     usernameInput: document.getElementById('username'), 
     showGlobalMessage, 
-    resetGame
+    resetGame,
+    // Oyun seçim ekranı butonları
+    gameSelectScreen: document.getElementById('gameSelectScreen'),
+    checkersScreen: document.getElementById('checkersScreen')
 };
