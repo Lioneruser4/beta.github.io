@@ -1,8 +1,18 @@
 // Dosya Adı: game.js
+// Socket bağlantısı artık SocketManager üzerinden yönetilecek
 let socket;
 let currentRoomCode = '';
 let isHost = false;
 let opponentName = '';
+
+// Socket bağlantısını yönetmek için yardımcı fonksiyon
+function getSocket() {
+    if (window.socketManager && window.socketManager.socket) {
+        return window.socketManager.socket;
+    }
+    console.error('Socket bağlantısı bulunamadı!');
+    return null;
+}
 
 // --- DOM Referansları ---
 const screens = { 
@@ -30,6 +40,94 @@ function playSound(audioElement) {
     const clone = audioElement.cloneNode();
     clone.volume = 0.5;
     clone.play().catch(() => {});
+}
+
+// Bomba oyunu başlatma
+function initializeBombGame() {
+    // Mevcut oyun mantığını buraya taşıyacağız
+    const boardSize = 16; // Varsayılan tahta boyutu
+    
+    // Oyun tahtasını oluştur
+    gameData.board = Array.from({ length: boardSize }, () => ({
+        opened: false,
+        content: '',
+        hasBomb: false,
+        flagged: false
+    }));
+    
+    // Oyun durumunu sıfırla
+    gameData.cardsLeft = boardSize;
+    gameData.turn = 0; // Host başlar
+    gameData.isGameOver = false;
+    
+    // Can ve bomba ayarları
+    if (level === 1) {
+        gameData.hostLives = 3;
+        gameData.guestLives = 3;
+        gameData.hostBombs = [];
+        gameData.guestBombs = [];
+        
+        // Rastgele bombalı kartları seç
+        const totalCards = boardSize;
+        const allIndices = Array.from({length: totalCards}, (_, i) => i);
+        
+        // Karıştır
+        for (let i = allIndices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [allIndices[i], allIndices[j]] = [allIndices[j], allIndices[i]];
+        }
+        
+        // İlk bombaları ata (3 tane)
+        gameData.hostBombs = allIndices.slice(0, 3);
+        gameData.guestBombs = allIndices.slice(3, 6);
+        
+        // Bombaları işaretle
+        gameData.hostBombs.forEach(index => gameData.board[index].hasBomb = true);
+        gameData.guestBombs.forEach(index => gameData.board[index].hasBomb = true);
+    }
+    
+    // Skor tablosunu güncelle
+    updateScoreDisplay();
+    
+    // Oyun tahtasını çiz
+    drawBoard();
+}
+
+// Dama oyunu başlatma
+function initializeCheckersGame() {
+    // Dama tahtasını oluştur
+    const boardSize = 8;
+    gameData.board = [];
+    gameData.turn = 0; // Siyah taşlar başlar
+    gameData.isGameOver = false;
+    gameData.selectedPiece = null;
+    gameData.validMoves = [];
+    
+    // Dama tahtasını oluştur
+    for (let row = 0; row < boardSize; row++) {
+        gameData.board[row] = [];
+        for (let col = 0; col < boardSize; col++) {
+            // Sadece siyah karelere taş yerleştir
+            if ((row + col) % 2 === 1) {
+                if (row < 3) {
+                    // Üstteki 3 sıra rakibin taşları (beyaz)
+                    gameData.board[row][col] = { type: 'man', player: 1, row, col };
+                } else if (row > 4) {
+                    // Alttaki 3 sıra bizim taşlarımız (siyah)
+                    gameData.board[row][col] = { type: 'man', player: 0, row, col };
+                } else {
+                    // Boş kare
+                    gameData.board[row][col] = { type: 'empty', player: null, row, col };
+                }
+            } else {
+                // Beyaz kareler boş olacak
+                gameData.board[row][col] = { type: 'empty', player: null, row, col };
+            }
+        }
+    }
+    
+    // Dama tahtasını çiz
+    drawCheckersBoard();
 }
 
 // Oyun başlatma / seviye hazırlama
@@ -592,24 +690,33 @@ export function setupPingEndpoint(app) {
 }
 
 // --- SOCKET.IO İÇİN SETUP FONKSİYONU ---
-export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
-    // Oyun başladığında mesaj göster
-    showGlobalMessage(window.languageManager ? 
-        window.languageManager.t('gameStarting') : 'Oyun başlayır / Game starting', false);
+export function setupSocketHandlers(socket, roomCode, host, opponentNameFromIndex) {
     console.log('🎯 setupSocketHandlers ÇAĞRILDI!', { roomCode, isHost: host, opponent: opponentNameFromIndex });
     
-    // Show loading message when setting up socket handlers
-    console.log('📡 Yükleme mesajı gösteriliyor...');
-    showLoadingMessage();
+    // Socket bağlantısını kontrol et
+    if (!socket) {
+        console.error('❌ Socket bağlantısı geçersiz!');
+        showGlobalMessage('Sunucu bağlantı hatası. Lütfen sayfayı yenileyin.', true);
+        return;
+    }
     
-    socket = s;
+    // Global değişkenleri güncelle
     currentRoomCode = roomCode;
     isHost = host;
     opponentName = opponentNameFromIndex;
     
-    opponentNameEl.textContent = opponentName;
-    roleStatusEl.textContent = isHost ? "🎮 Rol: HOST (Sen başla)" : "🎮 Rol: GUEST (Rakip başlar)";
-
+    // Rakip adını güncelle
+    const opponentNameEl = document.getElementById('opponentName');
+    if (opponentNameEl) {
+        opponentNameEl.textContent = opponentName;
+    }
+    
+    // Rol durumunu güncelle
+    const roleStatusEl = document.getElementById('roleStatus');
+    if (roleStatusEl) {
+        roleStatusEl.textContent = isHost ? "🎮 Rol: HOST (Sen başla)" : "🎮 Rol: GUEST (Rakip başlar)";
+    }
+    
     // Oyun başlatılıyor
     level = 1; // Yeni oyuna başlarken seviyeyi 1'e sıfırla
     
@@ -617,49 +724,97 @@ export function setupSocketHandlers(s, roomCode, host, opponentNameFromIndex) {
     const boardSize = LEVELS[level - 1]; // İlk seviye 16 kart
     initializeGame(boardSize);
     
-    // Can sayılarını server'dan gelen bilgiyle güncelle
-    socket.once('gameReady', ({ hostBombs, guestBombs }) => {
-        // Seviyeye göre can sayılarını ayarla
-        if (level === 1) {
-            gameData.hostLives = 3;
-            gameData.guestLives = 3;
-        } else {
-            gameData.hostLives = 4;
-            gameData.guestLives = 4;
-        }
-        updateStatusDisplay();
-    });
+    // Oyun başladı mesajını göster
+    showGlobalMessage(`🎮 Oyun ${opponentName} ile başladı! 🚀`, false);
     
-    drawBoard();
+    // Oyun ekranını göster
     showScreen('game');
-    showGlobalMessage(`🎮 Oyun ${opponentName} ile başladı! 🚀 Bombalar yerleştiriliyor...`, false);
     
-    console.log('📡 Socket dinleyicileri kuruluyor...');
+    // Socket olay dinleyicilerini ayarla
+    setupGameSocketHandlers(socket);
     
-    // --- SOCKET.IO İŞLEYİCİLERİ ---
+    // Oyun başladı mesajını gönder
+    if (isHost) {
+        // Sadece host oyun başlatma isteği gönderecek
+        console.log('🏁 Oyun başlatma isteği gönderiliyor...');
+        socket.emit('startGame', { room: currentRoomCode });
+    }
+}
 
-    // Bağlantı durumunu dinle
-    socket.on('connect', () => {
-        console.log('✅ Sunucuya bağlandı');
-        // Oyun hazır olduğunda gizlenecek
-    });
-
-    // Bağlantı hatası olduğunda
-    socket.on('connect_error', (error) => {
-        console.error('❌ Sunucu bağlantı hatası:', error);
-        showGlobalMessage('Sunucuya bağlanılamadı. Lütfen tekrar deneyin.', true);
-        hideLoadingMessage();
-    });
-
-    // Oyun Başlasın! (Bombalar otomatik seçildi)
+// Oyun için socket olay dinleyicilerini ayarla
+function setupGameSocketHandlers(socket) {
+    if (!socket) return;
+    
+    console.log('📡 Oyun socket dinleyicileri kuruluyor...');
+    
+    // Oyun hazır olduğunda
     socket.on('gameReady', (gameState) => {
         console.log('🎮 Oyun hazır, yükleme mesajı kaldırılıyor...');
-        // Oyun hazır olduğunda yükleme mesajını gizle
-        hideLoadingMessage();
         
-        // Ekstra güvenlik için 2 saniye sonra tekrar kontrol et
+        // Oyun durumunu güncelle
+        if (gameState) {
+            // Eğer oyun durumu geliyorsa, oyun durumunu güncelle
+            if (gameState.hostLives !== undefined) gameData.hostLives = gameState.hostLives;
+            if (gameState.guestLives !== undefined) gameData.guestLives = gameState.guestLives;
+            if (gameState.turn !== undefined) gameData.turn = gameState.turn;
+            if (gameState.board) gameData.board = gameState.board;
+            
+            // Oyun tahtasını güncelle
+            drawBoard();
+            updateStatusDisplay();
+        }
+        
+        // Yükleme mesajını gizle
+        hideLoadingMessage();
+    });
+    
+    // Hamle yapıldığında
+    socket.on('moveMade', (moveData) => {
+        console.log('🎮 Hamle yapıldı:', moveData);
+        
+        // Hamleyi uygula
+        if (moveData && moveData.index !== undefined) {
+            applyMove(moveData.index, moveData.emoji, moveData.isBomb);
+        }
+    });
+    
+    // Oyun bittiğinde
+    socket.on('gameOver', (result) => {
+        console.log('🏁 Oyun bitti:', result);
+        
+        // Oyun sonucunu göster
+        if (result.winner) {
+            const winnerName = result.winner === 'host' ? (isHost ? 'Sen' : opponentName) : 
+                             (result.winner === 'guest' ? (isHost ? opponentName : 'Sen') : 'Berabere');
+            
+            showGlobalMessage(`🏆 Oyun bitti! Kazanan: ${winnerName}`, false);
+        } else {
+            showGlobalMessage('🏁 Oyun bitti!', false);
+        }
+        
+        // 3 saniye sonra lobiye dön
         setTimeout(() => {
-            const loadingMessage = document.getElementById('loadingMessage');
+            showScreen('lobby');
+        }, 3000);
+    });
+    
+    // Hata mesajı geldiğinde
+    socket.on('error', (error) => {
+        console.error('❌ Oyun hatası:', error);
+        showGlobalMessage(`Hata: ${error.message || 'Bilinmeyen bir hata oluştu'}`, true);
+    });
+    
+    // Rakip bağlantısı koptuğunda
+    socket.on('opponentDisconnected', () => {
+        console.log('⚠️ Rakip bağlantısı koptu');
+        showGlobalMessage('Rakip bağlantısı koptu. Lobiye yönlendiriliyorsunuz...', true);
+        
+        // 3 saniye sonra lobiye dön
+        setTimeout(() => {
+            showScreen('lobby');
+        }, 3000);
+    });
+}
             if (loadingMessage && !loadingMessage.classList.contains('hidden')) {
                 console.log('🔄 Yükleme mesajı hala görünür, tekrar kaldırılıyor...');
                 loadingMessage.classList.add('hidden');
