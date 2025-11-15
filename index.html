@@ -8,121 +8,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-
-    <style>
-        /* Basit CSS stil şeması (style.css dosyanız varsa bu kısım oraya taşınmalı) */
-        :root {
-            --primary-color: #3498db;
-            --secondary-color: #2ecc71;
-            --dark-bg: #2c3e50;
-            --light-bg: #ecf0f1;
-            --square-light: #f5f5dc;
-            --square-dark: #8b4513;
-        }
-
-        body {
-            font-family: 'Poppins', sans-serif;
-            background-color: var(--dark-bg);
-            color: #fff;
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        #app-container {
-            background: #34495e;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-            width: 90%;
-            max-width: 500px;
-            text-align: center;
-        }
-
-        /* Ekranlar */
-        .screen { display: none; }
-        .screen.active { display: block; }
-        
-        /* Logo ve Başlıklar */
-        .logo-text { font-size: 2.5em; margin-bottom: 5px; font-weight: 800; }
-        .logo-span { color: var(--primary-color); }
-        .info-text { margin-top: 10px; font-size: 0.9em; opacity: 0.8; }
-        .status-conn { color: #f39c12; }
-        .status-conn.green { color: var(--secondary-color); }
-        .status-conn.red { color: #e74c3c; }
-
-        /* Butonlar */
-        .main-btn, .secondary-btn {
-            padding: 12px 20px;
-            margin: 8px 5px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1em;
-            font-weight: 600;
-            transition: background-color 0.3s;
-        }
-        .main-btn { background-color: var(--primary-color); color: white; }
-        .main-btn:hover:not(:disabled) { background-color: #2980b9; }
-        .main-btn:disabled { background-color: #7f8c8d; cursor: not-allowed; }
-        .main-btn.green-btn { background-color: var(--secondary-color); }
-        .secondary-btn { background-color: #e74c3c; color: white; }
-
-        /* Lobi Kontrolleri */
-        .lobby-controls { margin-top: 20px; }
-        .join-group { display: flex; gap: 5px; margin-top: 10px; }
-        #roomIdInput {
-            flex-grow: 1;
-            padding: 10px;
-            border-radius: 8px;
-            border: 2px solid #bdc3c7;
-            text-align: center;
-            font-size: 1em;
-        }
-
-        /* Oyun Tahtası */
-        #board {
-            display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            width: 100%;
-            max-width: 400px;
-            height: 400px;
-            margin: 20px auto;
-            border: 5px solid #c0392b;
-        }
-        .square {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-        }
-        .square.light { background-color: var(--square-light); }
-        .square.dark { background-color: var(--square-dark); }
-        .square.possible-move { background-color: rgba(255, 255, 0, 0.5); cursor: pointer; }
-
-        /* Taşlar */
-        .piece {
-            width: 80%;
-            height: 80%;
-            border-radius: 50%;
-            cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            transition: transform 0.1s;
-        }
-        .piece.black { background-color: #000; }
-        .piece.white { background-color: #fff; }
-        .piece.king { border: 4px solid gold; box-shadow: 0 0 10px gold; }
-        .piece.selected { transform: scale(1.1); border-color: var(--primary-color); }
-
-        /* Göstergeler */
-        .turn-mine { color: var(--secondary-color); }
-        .turn-opponent { color: #e74c3c; }
-    </style>
 </head>
 <body>
     <div id="app-container">
@@ -132,18 +17,9 @@
             
             <div id="auth-status">
                 <p id="player-name">Giriş Yapılıyor...</p>
-                <script async src="https://telegram.org/js/telegram-widget.js?24" 
-                    data-telegram-login="[BOT_KULLANICI_ADINIZ]" 
-                    data-size="large" 
-                    data-auth-url="[SUNUCU_ADRESİNİZ]/telegram-auth" 
-                    data-request-access="write"></script>
             </div>
             
             <div class="lobby-controls">
-                <button id="rankedBtn" class="main-btn green-btn" disabled>
-                    <i class="fas fa-medal"></i> Dereceli Eşleşme Bul
-                </button>
-
                 <button id="createBtn" class="main-btn" disabled>
                     <i class="fas fa-plus-circle"></i> Yeni Oda Kur
                 </button>
@@ -157,6 +33,12 @@
                 
                 <p id="roomCodeDisplay" class="info-text"></p>
             </div>
+
+            <script async src="https://telegram.org/js/telegram-widget.js?24" 
+                data-telegram-login="[BOT_KULLANICI_ADINIZ]" 
+                data-size="large" 
+                data-auth-url="https://mario-io-1.onrender.com/telegram-auth" 
+                data-request-access="write"></script>
         </div>
         
         <div id="game" class="screen">
@@ -175,10 +57,9 @@
 
     <script>
         // Sunucu adresiniz (Render URL'niz)
-        const SERVER_URL = 'https://mario-io-1.onrender.com'; // Kendi adresinizle değiştirin! 
+        const SERVER_URL = 'https://mario-io-1.onrender.com'; 
         const socket = io(SERVER_URL);
 
-        // --- DOM Elementleri ---
         const lobbyDiv = document.getElementById('lobby');
         const gameDiv = document.getElementById('game');
         const statusDiv = document.getElementById('status');
@@ -191,82 +72,41 @@
         const leaveBtn = document.getElementById('leaveBtn');
         const playerNameDisplay = document.getElementById('player-name');
         const playerRoleDisplay = document.getElementById('playerRoleDisplay');
-        const rankedBtn = document.getElementById('rankedBtn'); // YENİ Dereceli Buton
-
-        // --- Oyun Durum Değişkenleri ---
+        
         let currentRoomId = null;
-        let playerRole = null; // 'player1' veya 'player2'
+        let playerRole = null; 
+        let currentUsername = null; 
         let currentBoard = null;
-        let currentTurn = null;
-        let currentUsername = null; // Misafir veya Telegram kullanıcı adı
         let selectedPiece = null; // Seçili taşın {r, c} konumu
-
-        // --- YENİ: Misafir Adı Oluşturma Fonksiyonu ---
-        function generateGuestName() {
-            const randomNumber = Math.floor(Math.random() * 900) + 100;
-            return `Guest${randomNumber}`;
-        }
-
-        // --- YENİ: Kullanıcı Adını Kontrol Etme (URL veya Guest) ---
-        function checkAndSetUsername() {
+        
+        // --- TELEGRAM KULLANICI ADI ALMA ---
+        function getUsernameFromUrl() {
             const urlParams = new URLSearchParams(window.location.search);
-            const tgUsername = urlParams.get('username');
-            const tgId = urlParams.get('id');
-            
-            if (tgUsername) {
-                currentUsername = tgUsername;
-                playerNameDisplay.textContent = `Hoş Geldin, @${tgUsername}`;
-            } else if (tgId) {
-                currentUsername = `User${tgId}`;
-                playerNameDisplay.textContent = `Hoş Geldin, ${currentUsername}`;
+            const username = urlParams.get('username');
+            if (username) {
+                currentUsername = username;
+                playerNameDisplay.textContent = `Hoş Geldin, @${username}`;
+                // Butonları aktif et
+                createBtn.disabled = false;
+                joinBtn.disabled = false;
             } else {
-                // Telegram ile giriş yapmayanlar için Misafir adı atama
-                currentUsername = generateGuestName(); 
-                playerNameDisplay.textContent = `Misafir: ${currentUsername}`;
-                // Telegram widget'ını kaldır (Misafir girişi yapıldı)
-                const tgWidget = document.querySelector('[data-telegram-login]');
-                if(tgWidget) tgWidget.style.display = 'none';
+                playerNameDisplay.textContent = 'Lütfen Telegram Widget ile giriş yapın.';
             }
         }
-        checkAndSetUsername(); // Sayfa yüklendiğinde çalıştır
+        getUsernameFromUrl(); // Sayfa yüklendiğinde çalıştır
 
         // --- SOCKET BAĞLANTILARI ---
 
         socket.on('connect', () => {
             statusDiv.textContent = '✅ Sunucuya bağlandı.';
-            statusDiv.classList.remove('red');
-            statusDiv.classList.add('green');
-
-            // Kullanıcı adını sunucuya bildir
-            socket.emit('playerIdentity', { username: currentUsername });
-            
-            // Butonları aktif et
-            createBtn.disabled = false;
-            joinBtn.disabled = false;
-            rankedBtn.disabled = false;
+            if (currentUsername) {
+                createBtn.disabled = false;
+                joinBtn.disabled = false;
+            }
         });
 
         socket.on('disconnect', () => {
             statusDiv.textContent = '❌ Sunucu bağlantısı kesildi.';
-            statusDiv.classList.remove('green');
-            statusDiv.classList.add('red');
-            
-            createBtn.disabled = true;
-            joinBtn.disabled = true;
-            rankedBtn.disabled = true;
-        });
-        
-        // Sunucudan eşleşme bulundu mesajı (Dereceli lobi için kritik)
-        socket.on('matchFound', (data) => {
-            currentRoomId = data.roomId;
-            playerRole = data.role;
-            // 'gameStart' olayının hemen ardından gelmesi beklenir.
-            statusDiv.textContent = `Eşleşme bulundu! Oyun başlıyor... 🎉`;
-        });
-        
-        // Dereceli arama durum güncellemeleri
-        socket.on('matchMakingStatus', (message) => {
-            statusDiv.textContent = message;
         });
 
         socket.on('gameStart', (data) => {
@@ -277,7 +117,7 @@
             const opponentName = playerRole === 'player1' ? data.player2Name : data.player1Name;
             
             playerRoleDisplay.textContent = `Siz: ${myColor} | Rakip: ${opponentName}`;
-            currentRoomId = currentRoomId || data.roomId; // Dereceli olmayan odalar için 
+            currentRoomId = data.roomId;
             updateBoard(data.board);
             updateTurn(data.turn);
         });
@@ -293,30 +133,15 @@
         });
 
         // --- LOBİ BUTONLARI ---
-        
-        // YENİ: Dereceli Eşleşme Butonu
-        rankedBtn.addEventListener('click', () => {
-            statusDiv.textContent = 'Dereceli eşleşme aranıyor... Lütfen bekleyin. ⏳';
-            
-            // Tüm lobi butonlarını devre dışı bırak
-            createBtn.disabled = true;
-            joinBtn.disabled = true;
-            rankedBtn.disabled = true;
-            
-            // Sunucuya dereceli lobiye katılma isteği gönder
-            socket.emit('findRankedMatch');
-        });
 
         createBtn.addEventListener('click', () => {
-            // Sunucuya oda oluşturma isteği gönder
-            socket.emit('createGame', (response) => {
+            socket.emit('createGame', { username: currentUsername }, (response) => {
                 if (response.success) {
                     currentRoomId = response.roomId;
                     playerRole = response.role;
                     roomCodeDisplay.textContent = `Oda Kodunuz: ${currentRoomId}. Rakip bekleniyor...`;
-                    statusDiv.textContent = 'Özel oda başarıyla oluşturuldu.';
                 } else {
-                    alert('Oda oluşturulamadı: ' + response.message);
+                    alert('Oda oluşturulamadı.');
                 }
             });
         });
@@ -324,12 +149,9 @@
         joinBtn.addEventListener('click', () => {
             const roomId = roomIdInput.value.trim();
             if (roomId.length === 4) {
-                // Sunucuya odaya katılma isteği gönder
-                socket.emit('joinGame', { roomId: roomId }, (response) => {
+                socket.emit('joinGame', { roomId: roomId, username: currentUsername }, (response) => {
                     if (response.success) {
-                        currentRoomId = response.roomId;
                         playerRole = response.role;
-                        statusDiv.textContent = 'Odaya başarıyla katıldınız.';
                         // Oyunun başlaması 'gameStart' ile sunucudan gelecek.
                     } else {
                         alert(response.message);
@@ -341,7 +163,6 @@
         });
 
         leaveBtn.addEventListener('click', () => {
-            // Basitçe yeniden bağlanarak oyundan çıkışı simüle et
             socket.disconnect();
             socket.connect();
             resetGame();
@@ -349,54 +170,6 @@
 
         // --- OYUN ARAYÜZÜ VE HAREKET MANTIĞI ---
 
-        function clearSelections() {
-            selectedPiece = null;
-            document.querySelectorAll('.piece.selected').forEach(p => p.classList.remove('selected'));
-            document.querySelectorAll('.square.possible-move').forEach(s => s.classList.remove('possible-move'));
-        }
-        
-        function handlePieceClick(event) {
-            event.stopPropagation();
-            const piece = event.currentTarget;
-            const square = piece.parentElement;
-            const clickedPos = {
-                row: parseInt(square.dataset.row),
-                col: parseInt(square.dataset.col)
-            };
-            
-            // Hata Düzeltme: Taş tipi kontrolü
-            const pieceType = currentBoard[clickedPos.row][clickedPos.col];
-            const isMyPiece = (playerRole === 'player1' && (pieceType === 1 || pieceType === 3)) ||
-                             (playerRole === 'player2' && (pieceType === 2 || pieceType === 4));
-            
-            if (currentTurn === playerRole && isMyPiece) {
-                clearSelections();
-                
-                selectedPiece = clickedPos;
-                piece.classList.add('selected');
-
-                // Basit bir görsel geri bildirim için olası hamleleri vurgula (Gerçek kural sunucuda)
-                // İstemci tarafında gerçek Dama kurallarını uygulamak çok karmaşık olduğundan 
-                // burada sadece boş kareleri veya uygun zıplama hedeflerini (çok basitçe) işaretleyebiliriz.
-                
-                // Örnek: Çapraz boş kareleri işaretle (Sadece görsel amaçlı, kural sunucuda kontrol edilir)
-                const directions = pieceType === 3 || pieceType === 4 
-                    ? [[-1, -1], [-1, 1], [1, -1], [1, 1]] // Kral
-                    : (playerRole === 'player1' ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]]); // Normal taş
-                
-                directions.forEach(([dr, dc]) => {
-                    const r = clickedPos.row + dr;
-                    const c = clickedPos.col + dc;
-                    if (r >= 0 && r < 8 && c >= 0 && c < 8 && currentBoard[r][c] === 0) {
-                        const targetSquare = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
-                        if (targetSquare) targetSquare.classList.add('possible-move');
-                    }
-                });
-            } else {
-                clearSelections();
-            }
-        }
-        
         function handleSquareClick(event) {
             const square = event.currentTarget;
             const target = {
@@ -404,7 +177,7 @@
                 col: parseInt(square.dataset.col)
             };
 
-            // Eğer bir taş seçiliyse ve tıklanan kare geçerli bir hamleyse (vurgulanan)
+            // Eğer bir taş seçiliyse ve tıklanan kare geçerli bir hamleyse
             if (selectedPiece && square.classList.contains('possible-move')) {
                 // Hamleyi sunucuya gönder
                 socket.emit('move', { 
@@ -416,15 +189,84 @@
                 // Seçimi temizle
                 clearSelections();
             }
-            // Seçili taş yoksa veya tıklanan kare hamle yeri değilse bir şey yapma (taş seçme işi taş tıklamasına ait)
+        }
+        
+        function handlePieceClick(event) {
+            event.stopPropagation(); // Kare tıklamasını engelle
+            const piece = event.currentTarget;
+            const square = piece.parentElement;
+            const clickedPos = {
+                row: parseInt(square.dataset.row),
+                col: parseInt(square.dataset.col)
+            };
+
+            const isMyPiece = (playerRole === 'player1' && (currentBoard[clickedPos.row][clickedPos.col] === 1 || currentBoard[clickedPos.row][clickedPos.col] === 3)) ||
+                             (playerRole === 'player2' && (currentBoard[clickedPos.row][clickedCcol] === 2 || currentBoard[clickedPos.row][clickedPos.col] === 4));
+
+            if (currentTurn === playerRole && isMyPiece) {
+                clearSelections();
+                
+                // Yeni taşı seç
+                selectedPiece = clickedPos;
+                piece.classList.add('selected');
+
+                // Olası hamleleri hesapla ve vurgula (İSTEMCİ TARAFI GÖRSEL İÇİN BASİT KURALLAR)
+                // Bu kısım sunucuda da kontrol edildiği için burada sadece görsel geri bildirim verilir.
+                const pieceType = currentBoard[clickedPos.row][clickedPos.col];
+                const direction = (playerRole === 'player1') ? -1 : 1; // Siyah (Player 1) yukarı gider
+                const possibleMoves = getPossibleMoves(clickedPos, pieceType, direction);
+                
+                possibleMoves.forEach(move => {
+                    const targetSquare = document.querySelector(`[data-row="${move.r}"][data-col="${move.c}"]`);
+                    if (targetSquare) {
+                        targetSquare.classList.add('possible-move');
+                    }
+                });
+
+            } else {
+                clearSelections();
+            }
+        }
+        
+        function clearSelections() {
+            selectedPiece = null;
+            document.querySelectorAll('.piece.selected').forEach(p => p.classList.remove('selected'));
+            document.querySelectorAll('.square.possible-move').forEach(s => s.classList.remove('possible-move'));
         }
 
+        // Basitleştirilmiş Hareket Hesaplayıcı (Sadece görsel geri bildirim için)
+        function getPossibleMoves(pos, type, dir) {
+            const moves = [];
+            const isKing = type === 3 || type === 4;
+
+            const check = (r, c) => {
+                if (r >= 0 && r < 8 && c >= 0 && c < 8 && currentBoard[r][c] === 0) {
+                    moves.push({ r, c });
+                }
+            };
+
+            // Normal hareketler
+            if (!isKing) {
+                check(pos.row + dir, pos.col - 1);
+                check(pos.row + dir, pos.col + 1);
+            } else {
+                check(pos.row - 1, pos.col - 1);
+                check(pos.row - 1, pos.col + 1);
+                check(pos.row + 1, pos.col - 1);
+                check(pos.row + 1, pos.col + 1);
+            }
+            
+            // Vurma hareketleri (Bu kısım çok daha karmaşıktır, basitleştirildi)
+            // İhmal edildi. Sunucuya bırakıldı.
+            return moves;
+        }
+        
         // --- ARAYÜZ GÜNCELLEME ---
 
         function updateBoard(board) {
             currentBoard = board;
             boardDiv.innerHTML = '';
-            clearSelections(); // Tahta değiştiğinde seçimi temizle
+            clearSelections();
             
             for (let r = 0; r < 8; r++) {
                 for (let c = 0; c < 8; c++) {
@@ -440,8 +282,8 @@
                         let pieceClass = '';
                         let isKing = false;
 
-                        if (pieceType === 1 || pieceType === 3) pieceClass = 'black'; // 1: Siyah, 3: Siyah Kral
-                        if (pieceType === 2 || pieceType === 4) pieceClass = 'white'; // 2: Beyaz, 4: Beyaz Kral
+                        if (pieceType === 1 || pieceType === 3) pieceClass = 'black';
+                        if (pieceType === 2 || pieceType === 4) pieceClass = 'white';
                         if (pieceType === 3 || pieceType === 4) isKing = true;
                         
                         piece.className = `piece ${pieceClass} ${isKing ? 'king' : ''}`;
@@ -466,23 +308,13 @@
             currentRoomId = null;
             playerRole = null;
             currentBoard = null;
-            currentTurn = null;
-            clearSelections();
             
             gameDiv.classList.remove('active');
             lobbyDiv.classList.add('active');
             roomCodeDisplay.textContent = '';
             boardDiv.innerHTML = '';
             turnIndicator.textContent = 'Sıra: Bekleniyor...';
-            
-            // Lobi butonlarını tekrar aktif et
-            createBtn.disabled = false;
-            joinBtn.disabled = false;
-            rankedBtn.disabled = false;
         }
-        
-        // İlk yükleme için boş tahtayı göster (sadece görsel)
-        updateBoard(Array(8).fill(0).map(() => Array(8).fill(0)));
     </script>
 </body>
 </html>
