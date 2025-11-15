@@ -45,7 +45,7 @@ function initializeSocket() {
     
     // Yeni bir socket bağlantısı oluştur
     gameState.socket = io(serverUrl, {
-        path: '/socket.io/',
+        path: 'https://mario-io-1.onrender.com',
         reconnection: true,
         reconnectionAttempts: 10,
         reconnectionDelay: 1000,
