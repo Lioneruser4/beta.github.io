@@ -3,6 +3,14 @@ let currentHostName = '';
 let currentGuestName = '';
 let selectedTile = null;
 
+// Sabitler (game.js'den kopyalandı)
+const BOARD_SIZE = 8;
+const PIECE_NONE = 0;
+const PIECE_RED = 1; 
+const PIECE_WHITE = 2; 
+const PIECE_RED_KING = 3;
+const PIECE_WHITE_KING = 4;
+
 const UIElements = {
     // --- Yardımcı Fonksiyonlar ---
     getHostName: () => currentHostName,
@@ -13,7 +21,7 @@ const UIElements = {
         if (!messageBox) return;
 
         messageBox.textContent = message;
-        messageBox.className = 'show'; // CSS animasyonunu başlat
+        messageBox.className = 'show'; 
         messageBox.classList.add(isError ? 'bg-red-500' : 'bg-green-500');
 
         setTimeout(() => {
@@ -28,7 +36,6 @@ const UIElements = {
         });
         document.getElementById(screenId).classList.add('active');
         
-        // Emoji Butonu Kontrolü
         const emojiChat = document.getElementById('emojiChat');
         if (emojiChat) {
             emojiChat.style.display = screenId === 'gameScreen' ? 'block' : 'none';
@@ -39,10 +46,9 @@ const UIElements = {
 
     initializeBoard: (size, clickHandler) => {
         const boardContainer = document.getElementById('boardContainer');
-        boardContainer.innerHTML = ''; // Tahtayı temizle
-        boardContainer.className = 'grid gap-0 max-w-lg mx-auto bg-gray-900 border-4 border-gray-700 shadow-2xl';
+        boardContainer.innerHTML = ''; 
+        boardContainer.className = 'grid gap-0 w-full aspect-square max-w-lg mx-auto bg-gray-900 border-4 border-gray-700 shadow-2xl';
         boardContainer.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
-        boardContainer.style.aspectRatio = '1 / 1';
 
         for (let r = 0; r < size; r++) {
             for (let c = 0; c < size; c++) {
@@ -50,7 +56,7 @@ const UIElements = {
                 const tile = document.createElement('div');
                 tile.id = `tile-${r}-${c}`;
                 tile.className = `w-full h-full flex items-center justify-center relative cursor-pointer transition-all duration-100 ease-in-out`;
-                tile.style.backgroundColor = isLight ? '#cbd5e0' : '#4a5568'; // Açık Gri / Koyu Mavi-Gri
+                tile.style.backgroundColor = isLight ? '#cbd5e0' : '#4a5568'; // Açık / Koyu
                 tile.dataset.r = r;
                 tile.dataset.c = c;
                 tile.onclick = () => clickHandler(r, c);
@@ -60,8 +66,8 @@ const UIElements = {
     },
     
     updateBoard: (board, isHost) => {
-        // Tahtanın dönmesini sağla
         const boardContainer = document.getElementById('boardContainer');
+        // Tahtayı oyuncunun bakış açısına göre döndür
         boardContainer.style.transform = isHost ? 'rotate(0deg)' : 'rotate(180deg)';
 
         for (let r = 0; r < BOARD_SIZE; r++) {
@@ -69,9 +75,8 @@ const UIElements = {
                 const tile = document.getElementById(`tile-${r}-${c}`);
                 if (!tile) continue;
                 
-                // Önceki içeriği temizle (vurgulamalar hariç)
-                tile.innerHTML = '';
-                tile.classList.remove('selected', 'valid-move', 'king-tile');
+                tile.innerHTML = ''; // Taşı ve vurguyu temizle
+                tile.classList.remove('selected', 'valid-move', 'has-piece');
                 
                 const pieceType = board[r][c];
                 
@@ -82,14 +87,15 @@ const UIElements = {
                     const piece = document.createElement('div');
                     piece.className = `piece w-10/12 h-10/12 rounded-full flex items-center justify-center shadow-lg transition-transform duration-300 transform ${isRed ? 'bg-red-600 border-red-800' : 'bg-white border-gray-400'}`;
                     piece.style.borderWidth = '4px';
-                    piece.style.transform = isHost ? 'rotate(0deg)' : 'rotate(-180deg)'; // Taşın dik durmasını sağla
+                    // Taşın dik durmasını sağla (Tahta döndüyse ters rotasyon uygula)
+                    piece.style.transform = isHost ? 'rotate(0deg)' : 'rotate(-180deg)'; 
 
                     if (isKing) {
                         piece.classList.add('king-piece', 'text-yellow-300', 'text-xl');
                         piece.innerHTML = '<i class="fas fa-crown"></i>';
                     }
-
                     tile.appendChild(piece);
+                    tile.classList.add('has-piece');
                 }
             }
         }
@@ -108,7 +114,7 @@ const UIElements = {
             const moveTile = document.getElementById(`tile-${move.r}-${move.c}`);
             if (moveTile) {
                 moveTile.classList.add('valid-move', 'ring-2', 'ring-green-400');
-                // Vurguyu göstermek için ufak bir daire
+                // Vurgu noktası
                 moveTile.innerHTML = '<div class="absolute w-3 h-3 rounded-full bg-green-500 opacity-75"></div>';
             }
         });
@@ -121,8 +127,9 @@ const UIElements = {
         }
         document.querySelectorAll('.valid-move').forEach(tile => {
             tile.classList.remove('valid-move', 'ring-2', 'ring-green-400');
-            if (tile.children.length === 1 && tile.children[0].classList.contains('absolute')) {
-                tile.innerHTML = ''; // Sadece vurgu noktasını temizle
+            // Sadece vurgu noktasını temizle
+            if (!tile.classList.contains('has-piece')) {
+                tile.innerHTML = ''; 
             }
         });
     },
@@ -136,26 +143,23 @@ const UIElements = {
         const guestScore = document.getElementById('guestScore');
         const hostNameEl = document.getElementById('hostName');
         const guestNameEl = document.getElementById('guestName');
-        const mySide = host ? 'Kırmızı (Siz)' : 'Beyaz (Siz)';
-        const opponentSide = host ? 'Beyaz (Rakib)' : 'Kırmızı (Rakib)';
         
-        // Skorları ve İsimleri Güncelle
         hostScore.textContent = `${scores.host}`;
         guestScore.textContent = `${scores.guest}`;
-        hostNameEl.textContent = currentHostName;
-        guestNameEl.textContent = currentGuestName;
+        hostNameEl.textContent = currentHostName + (host ? ' (Siz)' : '');
+        guestNameEl.textContent = currentGuestName + (!host ? ' (Siz)' : '');
 
-        const currentTurnName = turn === 1 ? currentHostName : currentGuestName;
-        const currentColor = turn === 1 ? 'red' : 'white';
+        const currentTurnName = turn === PIECE_RED ? currentHostName : currentGuestName;
+        const currentColorClass = turn === PIECE_RED ? 'text-red-400' : 'text-blue-400';
 
-        turnText.innerHTML = `Sıra: <span class="font-bold text-${currentColor}-400">${currentTurnName}</span>`;
+        turnText.className = 'text-xl font-bold transition-colors duration-500 ' + currentColorClass;
+        turnText.innerHTML = `Sıra: <span class="font-bold">${currentTurnName}</span>`;
 
-        // Benim sıramda iken butonu aktif et
-        const isMyTurn = (host && turn === 1) || (!host && turn === 2);
-        
-        // Sıra rengi
-        turnText.classList.remove('text-red-400', 'text-white');
-        turnText.classList.add(turn === 1 ? 'text-red-400' : 'text-white');
+        // Skor renklerini de güncelle
+        document.getElementById('hostScore').classList.remove('text-red-400', 'text-blue-400');
+        document.getElementById('guestScore').classList.remove('text-red-400', 'text-blue-400');
+        document.getElementById('hostScore').classList.add('text-red-400');
+        document.getElementById('guestScore').classList.add('text-blue-400');
     },
 
     showGameResult: (winnerName) => {
@@ -171,23 +175,53 @@ const UIElements = {
         `;
         
         document.getElementById('restartBtn').addEventListener('click', () => {
+             // window.socket ve window.roomCode index.html'den set edilmiştir
              if (window.socket && window.roomCode) {
                 window.socket.emit('resetGame', { roomCode: window.roomCode });
-                gameStatus.innerHTML = ''; // Sonuç kutusunu gizle
+                gameStatus.innerHTML = '<p id="turnStatus" class="text-xl font-bold text-yellow-400 transition-colors duration-500">Gözləyirik...</p>';
             }
         });
     },
     
     resetGame: () => {
+        // Tamamen lobiye dön
         UIElements.showScreen('lobby');
         UIElements.clearSelection();
         const gameStatus = document.getElementById('gameStatus');
         if(gameStatus) gameStatus.innerHTML = '';
         if(window.socket) window.socket.disconnect();
+    },
+
+    showEmoji: (emoji, isMe) => {
+        const boardContainer = document.getElementById('boardContainer');
+        if (!boardContainer) return;
+        
+        const emojiDisplay = document.createElement('div');
+        emojiDisplay.textContent = emoji;
+        emojiDisplay.className = `fixed text-5xl z-50 animate-bounce transition-opacity duration-1000`;
+        
+        // Konum: Host ise altta, Guest ise üstte
+        if (isMe) {
+            emojiDisplay.style.bottom = '15%';
+            emojiDisplay.style.left = '10%';
+        } else {
+            emojiDisplay.style.top = '15%';
+            emojiDisplay.style.right = '10%';
+        }
+
+        document.body.appendChild(emojiDisplay);
+
+        // Bir süre sonra kaybol
+        setTimeout(() => {
+            emojiDisplay.style.opacity = '0';
+        }, 1500);
+
+        setTimeout(() => {
+            emojiDisplay.remove();
+        }, 2000);
     }
 };
 
-// Index.html dosyasının bu fonksiyonları kullanabilmesi için global'e açmak
 window.showScreen = UIElements.showScreen;
 window.UIElements = UIElements;
 
