@@ -4,79 +4,81 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Checkers Global</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Rajdhani:wght@600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body>
+
   <canvas id="particles"></canvas>
-  
-  <div class="container">
+
+  <!-- LOBİ -->
+  <div id="lobby" class="screen active">
     <div class="logo">
-      <h1>CHECKERS <span>GLOBAL</span></h1>
-      <p>Online • Gerçek Zamanlı • Dereceli</p>
+      <h1>CHECKERS<span>GLOBAL</span></h1>
+      <p>Online • Gerçek Zamanlı • Dünya Çapında</p>
     </div>
-
     <div class="buttons">
-      <button id="rankedBtn" class="btn primary">
-        <span>⚡ DERECELİ OYNA</span>
-        <div class="glow"></div>
-      </button>
-
-      <button id="friendBtn" class="btn secondary">
-        <span>👥 ARKADAŞLA OYNA</span>
-        <div class="glow"></div>
-      </button>
+      <button id="rankedBtn" class="btn glow-btn">DERECELİ OYNA</button>
+      <button id="friendBtn" class="btn glow-btn">ARKADAŞLA OYNA</button>
     </div>
-
-    <div class="footer">© 2025 Checkers Global • %100 Gerçek Oyuncular</div>
+    <div class="footer">© 2025 Checkers Global</div>
   </div>
 
-  <!-- Dereceli Bekleme Ekranı -->
+  <!-- DERECELİ BEKLEME -->
   <div id="matchmaking" class="screen">
-    <div class="searching">
-      <h2>Rakip Aranıyor...</h2>
-      <div class="spinner"></div>
-      <p id="timer">0</p>
-      <button id="cancelMatch" class="btn small">İptal Et</button>
-    </div>
+    <h2>Rakip Aranıyor...</h2>
+    <div class="loader"></div>
+    <p id="timer">0</p>
+    <button id="cancelRanked" class="btn small">İptal Et</button>
   </div>
 
-  <!-- Arkadaş Odası Oluştur -->
-  <div id="roomCreate" class="screen">
-    <h2>Oda Oluşturuldu!</h2>
-    <div class="room-code" id="roomCode">0000</div>
-    <button id="copyCode" class="btn">Kodu Kopyala</button>
-    <p>Arkadaşın bu kodu girsin →</p>
-    <button id="backToLobby" class="btn small">Lobiye Dön</button>
+  <!-- ARKADAŞLA OYNA -->
+  <div id="friendMenu" class="screen">
+    <button id="createRoomBtn" class="btn glow-btn">Oda Oluştur</button>
+    <button id="joinRoomBtn" class="btn glow-btn">Kodu Gir</button>
+    <button id="backLobby" class="btn small">← Geri</button>
   </div>
 
-  <!-- Oda Giriş -->
+  <!-- ODA OLUŞTURULDU -->
+  <div id="roomCreated" class="screen">
+    <h2>Odan Hazır!</h2>
+    <div class="room-code" id="roomCodeDisplay">0000</div>
+    <button id="copyCodeBtn" class="btn">Kodu Kopyala</button>
+    <p>Arkadaşına gönder, o da girsin!</p>
+    <button id="backFromRoom" class="btn small">Lobiye Dön</button>
+  </div>
+
+  <!-- KOD GİR -->
   <div id="roomJoin" class="screen">
     <h2>Odaya Katıl</h2>
-    <input type="text" id="joinCode" maxlength="4" placeholder="4 haneli kod" />
-    <button id="joinRoomBtn" class="btn">Katıl</button>
+    <input type="text" id="codeInput" maxlength="4" placeholder="4 haneli kod" />
+    <button id="enterRoomBtn" class="btn">Katıl</button>
     <button id="backFromJoin" class="btn small">Geri</button>
   </div>
 
-  <!-- Oyun Ekranı -->
-  <div id="gameScreen" class="screen">
-    <div class="game-header">
-      <div class="player-info">
-        <span id="playerName">Sen</span> <span id="playerElo">1200</span>
-      </div>
+  <!-- OYUN EKRANI -->
+  <div id="game" class="screen">
+    <div class="header">
+      <div class="player you"><span id="youName">Sen</span> <span id="youElo">1200</span></div>
       <div class="vs">VS</div>
-      <div class="player-info opponent">
-        <span id="opponentName">Rakip</span> <span id="opponentElo">1200</span>
-      </div>
+      <div class="player opp"><span id="oppName">Rakip</span> <span id="oppElo">1200</span></div>
     </div>
     <canvas id="board" width="600" height="600"></canvas>
-    <div class="game-controls">
+    <div class="controls">
       <button id="resignBtn" class="btn small danger">Pes Et</button>
+      <div id="turnIndicator">Sıra Sende</div>
     </div>
   </div>
 
+  <!-- KAZANMA EKRANI -->
+  <div id="winScreen" class="screen">
+    <h1 id="winText">KAZANDIN!</h1>
+    <button id="backToLobbyBtn" class="btn glow-btn">Lobiye Dön</button>
+  </div>
+
+  <audio id="clickSound" src="assets/click.mp3"></audio>
+
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="script.js"></script>
-  <script src="game.js"></script>
 </body>
 </html>
