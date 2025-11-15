@@ -172,158 +172,6 @@
             flex-grow: 1; /* Board'ın mevcut alanı doldurmasını sağlar */
             display: flex;
             flex-direction: column;
-            justify-content: center; /* İçindeki öğeleri ortala */
-            align-items: center;
-            max-width: 100%; /* Mobil genişlik */
-            width: 100%;
-        }
-
-        .game-board {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0.25rem;
-            margin: 0 auto;
-            max-width: 100%;
-            width: 100%;
-            perspective: 1000px;
-            padding: 0.25rem;
-            box-sizing: border-box;
-            flex: 1;
-            overflow: hidden;
-        }
-        .card-container {
-            perspective: 1000px; 
-            aspect-ratio: 1; 
-            width: 100%; /* Esneklik */
-        }
-        .card {
-            aspect-ratio: 1;
-            background: #4a5568;
-            border-radius: 0.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.25rem;
-            cursor: pointer;
-            user-select: none;
-            -webkit-transform-style: preserve-3d;
-            transform-style: preserve-3d;
-            -webkit-backface-visibility: hidden;
-            backface-visibility: hidden;
-            position: relative;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-            min-width: 0;
-            min-height: 0;
-            -webkit-transform: translate3d(0,0,0);
-            transform: translate3d(0,0,0);
-        }
-        .card.flipped {
-            transform: rotateY(180deg);
-        }
-        .card-face {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            backface-visibility: hidden; 
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            border-radius: 12px;
-            font-size: 2rem; /* Büyük emoji */
-            font-weight: bold;
-        }
-        @media (min-width: 400px) {
-            .card-face { font-size: 2.5rem; }
-        }
-        .card-face.front {
-            background: linear-gradient(135deg, #4299e1, #63b3ed); /* Mavi gradient */
-            color: white;
-            border: 4px solid #364052; /* Koyu kenarlık */
-            transform: rotateY(0deg); 
-            z-index: 2;
-        }
-        .card-face.back {
-            background: #e2e8f0; /* Açık arka plan */
-            color: #2d3748; /* Koyu metin */
-            transform: rotateY(180deg);
-            z-index: 1;
-            -webkit-backface-visibility: visible !important;
-            backface-visibility: visible !important;
-            -webkit-transform: rotateY(180deg) translateZ(1px);
-            transform: rotateY(180deg) translateZ(1px);
-        }
-        .card.bomb-selected .card-face.front {
-            background: linear-gradient(135deg, #f56565, #e53e3e); /* Kırmızı gradient */
-            animation: pulse-red 0.5s infinite alternate;
-        }
-        @keyframes pulse-red {
-            from { opacity: 1; }
-            to { opacity: 0.8; }
-        }
-        @keyframes vibrate {
-            0% { transform: translate(1px, 1px) rotate(0deg); }
-            20% { transform: translate(-1px, -2px) rotate(-1deg); }
-            40% { transform: translate(-3px, 0px) rotate(1deg); }
-            60% { transform: translate(3px, 2px) rotate(0deg); }
-            80% { transform: translate(1px, -1px) rotate(-1deg); }
-            100% { transform: translate(-1px, 2px) rotate(1deg); }
-        }
-        .vibrate {
-            animation: vibrate 0.1s linear infinite;
-        }
-
-        /* Oyun İçi Durum Ekranları */
-        #gameScreen h1 {
-            color: #f7fafc; /* Beyaz başlık */
-            margin-bottom: 1rem;
-        }
-        #gameScreen .status-panel {
-            background: rgba(45, 55, 72, 0.9);
-            border-radius: 0.5rem;
-            padding: 0.5rem;
-            margin: 0.25rem 0;
-            width: 100%;
-            max-width: 100%;
-            font-size: 0.9rem;
-        }
-        #turnStatus {
-            font-size: 1.8rem;
-            color: #f7fafc; /* Beyaz */
-            text-shadow: 0 2px 5px rgba(0,0,0,0.3);
-        }
-        #actionMessage {
-            color: #a0aec0; /* Gri ton */
-            font-size: 1rem;
-            margin-top: 0.5rem;
-        }
-        #roleStatus {
-            color: #cbd5e0;
-            background-color: #4a5568;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            margin-bottom: 1rem;
-        }
-        #gameContent {
-            background-color: #2d3748; /* Koyu gri */
-            border-radius: 15px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-            padding: 1.5rem;
-            width: 100%; /* Tam genişlik */
-            max-width: 500px; /* Ortalama cihazlarda daha iyi görünüm */
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center; /* İçeriyi ortala */
-        }
-        #endGameBtn {
-            margin-top: 1.5rem;
-            background-color: #e53e3e;
-            color: white;
-            width: 80%; /* Daha dar */
-            max-width: 250px; /* Max genişlik */
-        }
-
         /* Başlıklar ve Metinler */
         h1, h2 {
             font-family: 'Poppins', sans-serif; /* Modern başlık fontu */
@@ -373,18 +221,6 @@
             margin: 5px 0;
             font-size: 1.1rem;
             line-height: 1.5;
-        }
-        .spinner {
-            width: 30px;
-            height: 30px;
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            margin-bottom: 15px;
-            animation: spin 1s ease-in-out infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
         }
     </style>
     <style>
@@ -466,112 +302,67 @@
     <div id="loadingMessage">
         <div class="spinner"></div>
         <p>Server qoşulur, zəhmət olmasa gözləyin...</p>
-        <p>Connecting to server, please wait...</p>
-    </div>
-    
-    <div id="globalMessage" class="hidden w-11/12 max-w-md p-4 bg-red-600 text-white rounded-lg shadow-lg">
-        <p id="globalMessageText"></p>
     </div>
 
-    <div id="lobby" class="screen active space-y-6">
-        <h1 class="text-4xl font-black animated-lobby-item lobby-title mb-1">
-            💣 KartBombot
-        </h1>
-        <p class="text-sm text-gray-400 animated-lobby-item lobby-subtitle mb-4">
-            Telegram üzərindən 1v1 oyna
-        </p>
-        
-        <div class="bg-blue-800 bg-opacity-30 border-l-2 border-blue-500 text-blue-100 p-2 rounded-lg shadow-lg animated-lobby-item rules-box w-full max-w-md">
-            <p class="font-bold text-sm mb-1 text-white">📋 Oyun Qaydaları:</p>
-            <ul class="list-disc list-inside text-left text-xs space-y-1">
-                <li>Kartları açaraq rəqibinizin bombalarından qaçının</li>
-                <li>Canı bitən oyunu uduzur</li>
-                <li>Yeni otaq yaratmaq üçün otaq kodunu boş buraxın</li>
-                <li>Odaya qoşulmaq üçün otaq kodunu daxil edin</li>
-            </ul>
-        </div>
-        
-        <div id="userInfo" class="w-full bg-gray-800 p-3 rounded-lg shadow-lg text-center">
-            <p class="text-white font-bold">👤 Xoş gəlmisiniz, <span id="telegramUsername">İstifadəçi</span>!</p>
-        </div>
-        
-        <div class="w-full animated-lobby-item input-roomcode-container max-w-md">
-            <p class="text-center text-lg font-bold mb-1 text-white">
-                🔑 Otaq Kodu (Yeni otaq üçün boş buraxın) 
-            </p>
-            <input type="text" id="roomCode" class="w-full p-3 text-lg text-center rounded-lg shadow-lg text-black" placeholder="Otaq Kodu" maxlength="6" style="color: #000000 !important;" autocomplete="off">
-        </div>
-        
-        <div class="w-full flex flex-col items-center space-y-4 mt-4">
-            <button id="createRoomBtn" class="btn btn-primary w-full max-w-md py-4 text-lg">
-                <i class="fas fa-plus-circle mr-2"></i> Yeni Otaq Yarat
-            </button>
-            <button id="joinRoomBtn" class="btn bg-green-600 hover:bg-green-500 text-white w-full max-w-md py-4 text-lg">
-                <i class="fas fa-sign-in-alt mr-2"></i> Otağa Qoşul
-            </button>
-        </div>
-    </div>
-    
-    <div id="waitScreen" class="screen p-4">
-        <div class="flex flex-col items-center justify-center h-full">
-            <div class="wait-spinner mb-4">
-                <i class="fas fa-spinner fa-spin text-4xl text-blue-400"></i> 
+    <!-- Lobby Screen -->
+    <div id="lobby" class="screen active">
+        <div class="container mx-auto px-4 py-8 max-w-md">
+            <h1 class="text-3xl font-bold text-center mb-2 text-white">Oyun Lobbisi</h1>
+            <p class="text-center text-gray-300 mb-8">Dostlarınla oyun oyna!</p>
+            
+            <div class="bg-gray-800 rounded-xl p-6 shadow-lg mb-6">
+                <div class="mb-6">
+                    <label for="usernameInput" class="block text-gray-300 text-sm font-medium mb-2">İstifadəçi adı</label>
+                    <input type="text" id="usernameInput" 
+                           class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="Adınız" maxlength="15" value="">
+                </div>
+                
+                <div class="space-y-4">
+                    <button id="matchBtn" class="btn btn-primary w-full">
+                        <i class="fas fa-random mr-2"></i> Təsadüfi Oyuncu Tap
+                    </button>
+                    
+                    <div class="flex items-center my-4">
+                        <div class="flex-1 h-px bg-gray-600"></div>
+                        <span class="px-4 text-gray-400">və ya</span>
+                        <div class="flex-1 h-px bg-gray-600"></div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <input type="text" id="roomCodeInput" 
+                               class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+                               placeholder="Otaq kodu daxil edin" maxlength="6">
+                        <button id="joinRoomBtn" class="btn bg-purple-600 hover:bg-purple-700 text-white w-full">
+                            <i class="fas fa-door-open mr-2"></i> Otağa Qoşul
+                        </button>
+                    </div>
+                    
+                    <button id="createRoomBtn" class="btn bg-green-600 hover:bg-green-700 text-white w-full">
+                        <i class="fas fa-plus-circle mr-2"></i> Yeni Otaq Yarat
+                    </button>
+                </div>
             </div>
-            <h2 id="waitTitle" class="text-2xl font-bold mb-6">Otaq Hazırlanır... / Preparing Room...</h2>
-            
-            <div id="codeArea" class="w-full max-w-md mb-6">
-                <p class="text-sm text-gray-300 mb-2">🌟 Otaq kodunuzu dostunuzla paylaşın / Share your room code:</p>
-                <div id="roomCodeDisplay" class="text-3xl font-bold bg-gray-800 p-4 rounded-lg mb-4 text-center tracking-widest"></div>
-                <button id="copyCodeBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-lg">
-                    <i class="fas fa-copy mr-2"></i> Kodu Kopyala / Copy Code
-                </button>
-            </div>
-            
-            <p id="waitStatus" class="text-lg text-gray-300 mb-6">Rəqib qoşulması gözlənilir... / Waiting for opponent...</p>
-            
-            <button id="cancelBtn" class="w-full max-w-xs py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-lg">
-                <i class="fas fa-times-circle mr-2"></i> Ləğv Et / Lobiye Qayıt<br>Cancel / Return to Lobby
-            </button>
         </div>
     </div>
 
-    <div id="gameScreen" class="screen">
-        <!-- Skor göstergesi -->
-        <div id="scoreDisplay" class="w-full text-center text-lg font-bold text-yellow-300 py-1 bg-black bg-opacity-50 mb-1" style="display: none;">
-          Bot beta versiyadadır - Bot is in beta version
-        </div>
-        
-        <div class="w-full flex justify-between items-center p-1">
-            <div class="text-left pl-2">
-                <div id="myLives" class="text-xl">❤️❤️❤️</div>
-                <div class="text-xs text-blue-300">Sənin Canın / Your Lives</div>
+    <!-- Wait Screen -->
+    <div id="waitScreen" class="screen">
+        <div class="flex flex-col items-center justify-center h-full p-4">
+            <div class="wait-spinner mb-6">
+                <i class="fas fa-spinner"></i>
             </div>
-            
-            <div class="text-center">
-                <h1 class="text-xl font-bold m-0 p-0">💣</h1>
-                <div id="levelInfo" class="text-xs">Səviyyə / Level 1</div>
+            <h2 class="text-2xl font-bold text-white mb-2">Gözləyirik...</h2>
+            <p class="text-gray-300 text-center mb-6">Oyunçular qoşulur. Zəhmət olmasa, gözləyin.</p>
+            <p id="roomCodeDisplay" class="text-xl font-mono bg-gray-800 px-4 py-2 rounded-lg text-yellow-400 mb-6"></p>
+            <div class="flex items-center space-x-2 text-gray-400">
+                <i class="fas fa-users"></i>
+                <span id="playerCount">1/2</span> oyunçu
             </div>
-            
-            <div class="text-right pr-2">
-                <div id="opponentLives" class="text-xl">❤️❤️❤️</div>
-                <div id="opponentName" class="text-xs text-blue-300">Rəqibin Canı / Opponent's Lives</div>
-            </div>
+            <button id="cancelWaitBtn" class="mt-8 px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">
+                Ləğv et
+            </button>
         </div>
-        
-        <div class="w-full text-center p-1">
-            <div id="turnStatus" class="text-sm font-bold text-yellow-400">SIRA SƏNDƏ / YOUR TURN</div>
-            <div id="actionMessage" class="text-xs text-gray-300">Bir kart seç / Select a card</div>
-        </div>
-        <p id="roleStatus" class="text-gray-300 text-xs bg-gray-700 p-2 rounded-lg"></p>
-
-        <div id="gameContent" class="bg-gray-800 rounded-xl w-full space-y-4 p-4 shadow-xl">
-            <h3 id="turnStatus" class="text-2xl font-bold text-red-400"></h3>
-            
-            <div id="gameBoard" class="grid w-full mx-auto">
-            </div>
-        </div>
-        
-        <button id="endGameBtn" class="btn bg-red-600 hover:bg-red-500 text-white text-sm py-3">🚪 Oyundan Çıx <i class="fas fa-door-open ml-2"></i></button>
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
