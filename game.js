@@ -1,5 +1,5 @@
 // Dosya Adı: game.js - DAMA OYUNU İÇİN GÜNCELLENMİŞ VERSİYON
-import { UIElements, showScreen, showGlobalMessage } from './ui.js';
+import { UIElements, showScreen } from './ui.js';
 
 let socket;
 let roomCode = null;
@@ -12,12 +12,12 @@ let playerColor = 0; // 1: Kırmızı (Host), 2: Beyaz (Guest)
 // --- Oyun Sabitleri ---
 const BOARD_SIZE = 8;
 const PIECE_NONE = 0;
-const PIECE_RED = 1; // Host
-const PIECE_WHITE = 2; // Guest
+const PIECE_RED = 1; // Host (Kırmızı)
+const PIECE_WHITE = 2; // Guest (Beyaz)
 const PIECE_RED_KING = 3;
 const PIECE_WHITE_KING = 4;
 
-// --- Dama Mantığı Fonksiyonları (Basitleştirilmiş) ---
+// --- Dama Mantığı Fonksiyonları ---
 
 function getValidMoves(board, r, c, piece) {
     const moves = [];
@@ -28,6 +28,9 @@ function getValidMoves(board, r, c, piece) {
 
     const directions = isKing ? [-1, 1] : [direction];
 
+    // Bu, istemci tarafındaki Dama mantığının basitleştirilmiş bir sürümüdür. 
+    // Zorunlu kapma kuralları burada tam olarak uygulanmamıştır, sadece olası hamleleri işaretler.
+    
     for (const dr of directions) {
         for (const dc of [-1, 1]) {
             const nextR = r + dr;
@@ -53,72 +56,97 @@ function getValidMoves(board, r, c, piece) {
         }
     }
     
-    // Zorunlu Kapma Kontrolü (Sadece kapmalar varsa normal hamleleri kaldır)
-    const captures = moves.filter(m => m.isCapture);
-    if (captures.length > 0) {
-        return captures;
+    // Zorunlu Kapma Kontrolü (Client tarafında zorunlu kapma kontrolü)
+    const allMoves = getAllPossibleMoves(board, player);
+    const requiredCaptures = allMoves.filter(m => m.isCapture && m.from.r === r && m.from.c === c);
+
+    const hasCaptureRequirement = allMoves.some(m => m.isCapture);
+
+    if (hasCaptureRequirement) {
+        // Eğer tahtada herhangi bir kapma zorunluluğu varsa
+        if (requiredCaptures.length > 0) {
+             return requiredCaptures;
+        } else {
+             // Kapma zorunluluğu var ama bu taşla yapılamıyorsa hamle yok demektir.
+             return [];
+        }
     }
 
     return moves;
 }
 
+function getAllPossibleMoves(board, player) {
+    let allMoves = [];
+    for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+            const piece = board[r][c];
+            if (piece === player || piece === player + 2) {
+                const pieceMoves = getValidMoves(board, r, c, piece);
+                pieceMoves.forEach(m => allMoves.push({ from: { r, c }, ...m, isCapture: m.isCapture }));
+            }
+        }
+    }
+    return allMoves;
+}
+
 function handlePieceClick(r, c) {
     if (gameState.turn !== playerColor) {
-        showGlobalMessage('Sıra rakibinizdədir!', true);
+        UIElements.showGlobalMessage('Sıra rakibinizdədir!', true);
         return;
     }
     
     const piece = gameState.board[r][c];
     
-    // Kendi taşım değilse
-    if (piece !== playerColor && piece !== playerColor + 2) {
-        if (gameState.selectedPiece) {
-            // Hamle yap
-            const { r: prevR, c: prevC } = gameState.selectedPiece;
-            const prevPiece = gameState.board[prevR][prevC];
-            const validMoves = getValidMoves(gameState.board, prevR, prevC, prevPiece);
+    // Hamle Yapma Denemesi
+    if (gameState.selectedPiece) {
+        const { r: prevR, c: prevC } = gameState.selectedPiece;
+        const prevPiece = gameState.board[prevR][prevC];
+        const validMoves = getValidMoves(gameState.board, prevR, prevC, prevPiece);
+        
+        const move = validMoves.find(m => m.r === r && m.c === c);
+        
+        if (move) {
+            // Hamle geçerli, sunucuya gönder
+            socket.emit('makeMove', {
+                roomCode: roomCode,
+                fromRow: prevR,
+                fromCol: prevC,
+                toRow: r,
+                toCol: c
+            });
             
-            const move = validMoves.find(m => m.r === r && m.c === c);
-            
-            if (move) {
-                // Sunucuya hamleyi gönder
-                socket.emit('makeMove', {
-                    roomCode: roomCode,
-                    fromRow: prevR,
-                    fromCol: prevC,
-                    toRow: r,
-                    toCol: c
-                });
-                
-                // Seçimi temizle
-                gameState.selectedPiece = null;
-                UIElements.clearSelection();
-                return;
-            }
+            gameState.selectedPiece = null;
+            UIElements.clearSelection();
+            return;
+        }
+    }
+    
+    // Taş Seçme Denemesi (Kendi taşım olmalı)
+    if (piece === playerColor || piece === playerColor + 2) {
+        // Seçimi temizle
+        if (gameState.selectedPiece && gameState.selectedPiece.r === r && gameState.selectedPiece.c === c) {
+            gameState.selectedPiece = null;
+            UIElements.clearSelection();
+            return;
         }
         
-        // Hamle yapma denemesi başarısız
-        showGlobalMessage('Bu sizin daşınız deyil və ya etibarlı hamle deyil.', true);
-        return;
-    }
-
-    // Seçimi temizle
-    if (gameState.selectedPiece && gameState.selectedPiece.r === r && gameState.selectedPiece.c === c) {
-        gameState.selectedPiece = null;
-        UIElements.clearSelection();
+        // Yeni taşı seç
+        const validMoves = getValidMoves(gameState.board, r, c, piece);
+        
+        if (validMoves.length > 0) {
+            gameState.selectedPiece = { r, c };
+            UIElements.highlightMoves(r, c, validMoves);
+        } else {
+            UIElements.showGlobalMessage('Bu daşla etibarlı hamle yoxdur.', true);
+            gameState.selectedPiece = null;
+            UIElements.clearSelection();
+        }
         return;
     }
     
-    // Yeni taşı seç
-    const validMoves = getValidMoves(gameState.board, r, c, piece);
-    
-    if (validMoves.length > 0) {
-        gameState.selectedPiece = { r, c };
-        UIElements.highlightMoves(r, c, validMoves);
-    } else {
-        showGlobalMessage('Bu daşla etibarlı hamle yoxdur.', true);
-        gameState.selectedPiece = null;
-        UIElements.clearSelection();
+    // Ne hamle ne de taş seçimi ise
+    if (!gameState.selectedPiece) {
+        UIElements.showGlobalMessage('Əvvəlcə öz daşınızı seçin.', true);
     }
 }
 
@@ -132,11 +160,11 @@ function setupSocketHandlers(s, rCode, host, opponentName) {
     opponentUsername = opponentName;
     playerColor = isHost ? PIECE_RED : PIECE_WHITE; // Kırmızı: 1 (Host), Beyaz: 2 (Guest)
     
-    // Kullanıcı adını Telegram'dan alıyoruz
-    myUsername = document.getElementById('usernameInput').value || window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || 'Player';
+    // Kullanıcı adını al
+    myUsername = document.getElementById('usernameInput').value;
     
     // Oyun Ekranını Ayarla
-    showScreen('game');
+    showScreen('gameScreen');
     
     // Dama tahtasını oluştur
     UIElements.initializeBoard(BOARD_SIZE, handlePieceClick);
@@ -149,9 +177,10 @@ function setupSocketHandlers(s, rCode, host, opponentName) {
         gameState.turn = data.turn; // 1: Host, 2: Guest
         
         UIElements.updateBoard(gameState.board, isHost); // Tahtayı çiz
-        UIElements.updateUI(gameState.turn, isHost, opponentUsername, myUsername); // Sıra ve isimleri güncelle
+        UIElements.updateUI(gameState.turn, isHost, opponentUsername, myUsername, data.scores); // Sıra ve isimleri güncelle
         
-        showGlobalMessage('Oyun Başladı! İlk sıra ' + (data.turn === 1 ? UIElements.getHostName() : UIElements.getGuestName()) + ' oyunçusundadır.', false);
+        const turnName = data.turn === (isHost ? PIECE_RED : PIECE_WHITE) ? "Sizin" : opponentName + " oyunçunun";
+        UIElements.showGlobalMessage(`Oyun Başladı! İlk sıra ${turnName} oyunçusundadır.`, false);
     });
 
     socket.on('moveMade', (data) => {
@@ -164,28 +193,10 @@ function setupSocketHandlers(s, rCode, host, opponentName) {
         
         // Kazanan kontrolü
         if (data.winner) {
-            showGlobalMessage(`🎉 Oyunu Qazanan: ${data.winner}!`, false, 5000);
-            
-            // Kazanan mesajını göster ve sıfırlama butonu ekle
             UIElements.showGameResult(data.winner);
         } else {
-            showGlobalMessage('Rakib hamle etdi.', false, 1500);
+            UIElements.showGlobalMessage('Rakib hamle etdi.', false, 1500);
         }
-    });
-
-    socket.on('opponentLeft', (message) => {
-        showGlobalMessage(message, true);
-        UIElements.resetGame();
-    });
-
-    socket.on('error', (message) => {
-        showGlobalMessage(message, true);
-    });
-    
-    // Emoji mesajı (index.html'den taşındı)
-    socket.on('emojiMessage', (data) => {
-        console.log('Emoji received:', data.emoji);
-        UIElements.showEmoji(data.emoji, isHost);
     });
 }
 
