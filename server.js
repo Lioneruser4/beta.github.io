@@ -21,22 +21,31 @@ const rooms = {};
 function initializeBoard() {
     // 0: Boş, 1: Kırmızı Oyuncu, 2: Beyaz Oyuncu
     // 3: Kırmızı Şah, 4: Beyaz Şah
-    const board = Array(8).fill(0).map(() => Array(8).fill(0));
+    const BOARD_SIZE = 8;
+    const board = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(0));
 
     // Kırmızı (Host) altta (oyuncu 1)
-    for (let i = 5; i < 8; i++) {
-        for (let j = (i % 2 === 0 ? 1 : 0); j < 8; j += 2) {
+    for (let i = 5; i < BOARD_SIZE; i++) {
+        for (let j = (i % 2 === 0 ? 1 : 0); j < BOARD_SIZE; j += 2) {
             board[i][j] = 1;
         }
     }
 
     // Beyaz (Guest) üstte (oyuncu 2)
     for (let i = 0; i < 3; i++) {
-        for (let j = (i % 2 === 0 ? 1 : 0); j < 8; j += 2) {
+        for (let j = (i % 2 === 0 ? 1 : 0); j < BOARD_SIZE; j += 2) {
             board[i][j] = 2;
         }
     }
     return board;
+}
+
+function generateRoomCode() {
+    let code = Math.random().toString(36).substring(2, 6).toUpperCase();
+    while (rooms[code]) {
+        code = Math.random().toString(36).substring(2, 6).toUpperCase();
+    }
+    return code;
 }
 
 io.on('connection', (socket) => {
@@ -97,8 +106,7 @@ io.on('connection', (socket) => {
                 board: room.gameState.board,
                 turn: room.gameState.turn,
                 hostName: room.hostUsername,
-                guestName: room.guestUsername,
-                isHost: socket.id === room.hostId // Bu bilgi gameStart ile gönderiliyor, burası gereksiz olabilir
+                guestName: room.guestUsername
             });
             console.log(`🚀 gameReady sinyali gönderildi: ${code}`);
         }, 500);
@@ -118,66 +126,67 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // Basit bir hamle kontrolü (Asıl detaylı kontrol client tarafında yapılacak)
-        // Burada sadece hamleyi diğer oyuncuya yayınlıyoruz ve sırayı değiştiriyoruz.
+        const PIECE_RED = 1; 
+        const PIECE_WHITE = 2;
+        const PIECE_RED_KING = 3;
+        const PIECE_WHITE_KING = 4;
         
-        // Hamleyi işleme (Basit doğrulama)
+        // Basit Hamle Doğrulama ve Uygulama
         const piece = room.gameState.board[fromRow][fromCol];
-        if (piece !== playerTurn && piece !== playerTurn + 2) { // Kendi taşı değilse
+        if (piece !== playerTurn && piece !== playerTurn + 2) {
             socket.emit('error', 'Bu sizin daşınız deyil.');
             return;
         }
 
-        // Hamleyi Tahtada Uygula (Şah yapma mantığı dahil)
-        const isKing = (piece === 3 || piece === 4);
-        const isCapture = Math.abs(fromRow - toRow) === 2; // Basit yakalama kontrolü
+        const isKing = (piece === PIECE_RED_KING || piece === PIECE_WHITE_KING);
+        const isCapture = Math.abs(fromRow - toRow) === 2;
 
         let newBoard = JSON.parse(JSON.stringify(room.gameState.board));
         
         // Taşı yeni konuma taşı
         let newPiece = piece;
-        if (playerTurn === 1 && toRow === 0 && !isKing) { // Kırmızı şah
-            newPiece = 3; 
-        } else if (playerTurn === 2 && toRow === 7 && !isKing) { // Beyaz şah
-            newPiece = 4;
+        // Şah yapma mantığı
+        if (playerTurn === PIECE_RED && toRow === 0 && !isKing) { 
+            newPiece = PIECE_RED_KING; 
+        } else if (playerTurn === PIECE_WHITE && toRow === 7 && !isKing) {
+            newPiece = PIECE_WHITE_KING;
         }
         newBoard[toRow][toCol] = newPiece;
-        newBoard[fromRow][fromCol] = 0; // Eski konumu boşalt
+        newBoard[fromRow][fromCol] = 0; 
 
         if (isCapture) {
             // Yakalanan taşı tahtadan kaldır
             const capturedRow = (fromRow + toRow) / 2;
             const capturedCol = (fromCol + toCol) / 2;
             newBoard[capturedRow][capturedCol] = 0;
-            
-            // Eğer yakalama varsa ve hala yakalama imkanı varsa sıra değişmez.
-            // Bu mantık client'ta çok daha karmaşık olduğu için burada basitleştiriyoruz
         }
 
         // Oyun Durumunu Güncelle
         room.gameState.board = newBoard;
         room.gameState.turn = room.gameState.turn === 1 ? 2 : 1; // Sırayı değiştir
         
-        // Kazanan kontrolü (Çok basit)
-        const remainingPiecesHost = newBoard.flat().filter(p => p === 1 || p === 3).length;
-        const remainingPiecesGuest = newBoard.flat().filter(p => p === 2 || p === 4).length;
+        // Kazanan kontrolü (Taşları say)
+        const remainingPiecesHost = newBoard.flat().filter(p => p === PIECE_RED || p === PIECE_RED_KING).length;
+        const remainingPiecesGuest = newBoard.flat().filter(p => p === PIECE_WHITE || p === PIECE_WHITE_KING).length;
         let winner = null;
 
         if (remainingPiecesHost === 0) {
             winner = room.guestUsername;
             room.gameState.guestScore += 1;
+            room.gameState.stage = 'ENDED';
         } else if (remainingPiecesGuest === 0) {
             winner = room.hostUsername;
             room.gameState.hostScore += 1;
+            room.gameState.stage = 'ENDED';
         }
 
         // Hareketi her iki oyuncuya da gönder
         io.to(roomCode).emit('moveMade', {
             board: room.gameState.board,
-            turn: room.gameState.turn, // Yeni sıra
+            turn: room.gameState.turn,
             from: { r: fromRow, c: fromCol },
             to: { r: toRow, c: toCol },
-            isCapture: isCapture, // Yakalama olup olmadığı
+            isCapture: isCapture,
             winner: winner,
             scores: { host: room.gameState.hostScore, guest: room.gameState.guestScore }
         });
@@ -199,17 +208,24 @@ io.on('connection', (socket) => {
             turn: room.gameState.turn,
             hostName: room.hostUsername,
             guestName: room.guestUsername,
+            scores: { host: room.gameState.hostScore, guest: room.gameState.guestScore } // Skorları da gönder
         });
         
         console.log(`🎲 Oyun Sıfırlandı: ${roomCode}`);
     });
 
-    // Sohbet mesajı işleme (Aynı Kalsın)
+    // Sohbet mesajı işleme
+    socket.on('chatMessage', (data) => {
+        const { roomCode, message, sender } = data;
+        io.to(roomCode).emit('chatMessage', { sender, message, timestamp: new Date().toISOString() });
+    });
+    
+    // Emoji mesajı işleme
     socket.on('emojiMessage', ({ roomCode, emoji }) => {
         io.to(roomCode).emit('emojiMessage', { emoji: emoji });
     });
 
-    // Bağlantı kesildiğinde (Aynı Kalsın)
+    // Bağlantı kesildiğinde
     socket.on('disconnect', () => {
         console.log(`Bağlantı kesildi: ${socket.id}`);
         for (const code in rooms) {
@@ -237,13 +253,6 @@ io.on('connection', (socket) => {
     });
 });
 
-function generateRoomCode() {
-    let code = Math.random().toString(36).substring(2, 6).toUpperCase();
-    while (rooms[code]) {
-        code = Math.random().toString(36).substring(2, 6).toUpperCase();
-    }
-    return code;
-}
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
