@@ -29,16 +29,20 @@ const waitingPlayers = [];
 // --- Socket.io Event Handlers ---
 
 io.on('connection', (socket) => {
-    console.log('Oyuncu baglandi:', socket.id);
+    console.log('✅ Oyuncu baglandi:', socket.id);
 
     // Dereceli eslesme
     socket.on('findMatch', () => {
-        console.log(socket.id + ' eslesme ariyor');
+        console.log('🔍 ' + socket.id + ' eslesme ariyor');
+        console.log('📊 Mevcut kuyruk: [' + waitingPlayers.join(', ') + '] (' + waitingPlayers.length + ' kisi)');
         
         // Bekleyen oyuncu var mi?
         if (waitingPlayers.length > 0) {
             const opponentId = waitingPlayers.shift();
+            console.log('🎯 Rakip ID: ' + opponentId);
             const opponent = io.sockets.sockets.get(opponentId);
+            
+            console.log('🔌 Rakip var mi: ' + (opponent ? 'evet' : 'yok'));
             
             if (opponent) {
                 // Oda olustur
@@ -56,7 +60,8 @@ io.on('connection', (socket) => {
                 
                 rooms.set(roomCode, room);
                 
-                console.log('Eslesme basarili:', socket.id, 'vs', opponentId, 'Oda:', roomCode);
+                console.log('🎉 Eslesme basarili:', socket.id, 'vs', opponentId, 'Oda:', roomCode);
+                console.log('📤 MatchFound gonderiliyor...');
                 
                 // Iki oyuncuya da bilgi gonder
                 socket.emit('matchFound', { 
@@ -74,15 +79,20 @@ io.on('connection', (socket) => {
                 // Oyunculari odaya kat
                 socket.join(roomCode);
                 opponent.join(roomCode);
+                
+                console.log('✅ Oyuncular odaya katildi, eslesme tamamlandi!');
             } else {
+                console.log('⚠️ Rakip baglanti kopmus, kuyruga geri ekleniyor');
                 waitingPlayers.push(socket.id);
                 socket.emit('searchStatus', { message: 'Raqib axtarilir...' });
             }
         } else {
             waitingPlayers.push(socket.id);
             socket.emit('searchStatus', { message: 'Raqib axtarilir...' });
-            console.log(socket.id + ' kuyruga eklendi (' + waitingPlayers.length + ' kisi)');
+            console.log('⏳ Kuyruk bos, ' + socket.id + ' eklendi (' + waitingPlayers.length + ' kisi)');
         }
+        
+        console.log('📈 Son durum: [' + waitingPlayers.join(', ') + '] (' + waitingPlayers.length + ' kisi)');
     });
 
     // Eslesmeyi iptal et
@@ -91,7 +101,7 @@ io.on('connection', (socket) => {
         if (index > -1) {
             waitingPlayers.splice(index, 1);
             socket.emit('searchCancelled', { message: 'Axtaris legv edildi.' });
-            console.log(socket.id + ' axtarisi legv etti');
+            console.log('❌ ' + socket.id + ' axtarisi legv etti');
         }
     });
 
@@ -117,7 +127,7 @@ io.on('connection', (socket) => {
         socket.join(roomCode);
         socket.emit('roomCreated', { roomCode });
         
-        console.log('Oda olusturuldu:', roomCode, 'Sahip:', socket.id);
+        console.log('🏠 Oda olusturuldu:', roomCode, 'Sahip:', socket.id);
     });
 
     // Odaya katil
@@ -147,7 +157,7 @@ io.on('connection', (socket) => {
             host.emit('opponentJoined', { roomCode, color: 'red' });
         }
         
-        console.log(socket.id + ' odaya katildi:', roomCode);
+        console.log('👥 ' + socket.id + ' odaya katildi:', roomCode);
     });
 
     // Hamle yap
@@ -204,13 +214,13 @@ io.on('connection', (socket) => {
             
             rooms.delete(roomCode);
             socket.leave(roomCode);
-            console.log(socket.id + ' oyundan ayrildi:', roomCode);
+            console.log('🚪 ' + socket.id + ' oyundan ayrildi:', roomCode);
         }
     });
 
     // Baglanti koparsa
     socket.on('disconnect', () => {
-        console.log('Oyuncu ayrildi:', socket.id);
+        console.log('❌ Oyuncu ayrildi:', socket.id);
         
         // Bekleme kuyrugundan cikar
         const index = waitingPlayers.indexOf(socket.id);
@@ -358,6 +368,6 @@ function checkWinner(board) {
 
 // Server'i baslat
 server.listen(PORT, () => {
-    console.log('Server port ' + PORT + 'de calisiyor');
-    console.log('https://mario-io-1.onrender.com');
+    console.log('🚀 Server port ' + PORT + 'de calisiyor');
+    console.log('🌐 https://mario-io-1.onrender.com');
 });
