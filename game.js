@@ -28,13 +28,17 @@ let searchTime = 0;
 
 // UI elementleri
 const loader = document.getElementById('loader');
-const lobbyScreen = document.getElementById('lobby-screen');
+const mainLobby = document.getElementById('main-lobby');
+const rankedLobby = document.getElementById('ranked-lobby');
+const friendLobby = document.getElementById('friend-lobby');
 const gameScreen = document.getElementById('game-screen');
 const connectionStatus = document.getElementById('connection-status');
 const dereceliBtn = document.getElementById('dereceli-btn');
 const friendBtn = document.getElementById('friend-btn');
-const cancelBtn = document.getElementById('cancel-btn');
-const lobiStatusMessage = document.getElementById('lobi-status-message');
+const cancelRankedBtn = document.getElementById('cancel-ranked-btn');
+const createRoomBtn = document.getElementById('create-room-btn');
+const backToMainBtn = document.getElementById('back-to-main-btn');
+const rankedStatus = document.getElementById('ranked-status');
 const roomCodeOutput = document.getElementById('room-code-output');
 const copyCodeBtn = document.getElementById('copy-code-btn');
 const joinRoomInput = document.getElementById('join-room-input');
@@ -57,7 +61,7 @@ socket.on('connect', () => {
     connectionStatus.textContent = 'Serverə qoşuldu!';
     connectionStatus.classList.remove('text-yellow-400');
     connectionStatus.classList.add('text-green-500');
-    showScreen('lobby');
+    showScreen('main');
 });
 
 socket.on('connected', (data) => {
@@ -124,7 +128,7 @@ socket.on('gameOver', (data) => {
 socket.on('error', (message) => {
     showModal(message);
     gameState.isSearching = false;
-    showScreen('lobby');
+    showScreen('main');
 });
 
 socket.on('searchStatus', (data) => {
@@ -137,7 +141,7 @@ socket.on('searchCancelled', (data) => {
     showModal(data.message);
     clearInterval(searchTimer);
     searchTimer = null;
-    showScreen('lobby');
+    showScreen('main');
 });
 
 socket.on('mandatoryCapture', (data) => {
@@ -166,28 +170,31 @@ function showModal(message) {
 
 function showScreen(screen) {
     loader.classList.add('hidden');
-    lobbyScreen.classList.add('hidden');
+    mainLobby.classList.add('hidden');
+    rankedLobby.classList.add('hidden');
+    friendLobby.classList.add('hidden');
     gameScreen.classList.add('hidden');
-    cancelBtn.classList.add('hidden');
 
-    if (screen === 'lobby') {
-        lobbyScreen.classList.remove('hidden');
-        lobiStatusMessage.textContent = 'Oyun rejimi seçin.';
+    if (screen === 'main') {
+        mainLobby.classList.remove('hidden');
         gameState.isSearching = false;
-        // Timer'ı durdur
+        clearInterval(searchTimer);
+        searchTimer = null;
+    } else if (screen === 'ranked') {
+        rankedLobby.classList.remove('hidden');
+        gameState.isSearching = true;
+        gameState.searchStartTime = Date.now();
+        searchTime = 0;
+        startSearchTimer();
+    } else if (screen === 'friend') {
+        friendLobby.classList.remove('hidden');
+        gameState.isSearching = false;
         clearInterval(searchTimer);
         searchTimer = null;
     } else if (screen === 'game') {
         gameScreen.classList.remove('hidden');
-    } else if (screen === 'searching') {
-        lobbyScreen.classList.remove('hidden');
-        cancelBtn.classList.remove('hidden');
-        lobiStatusMessage.textContent = '🔍 Rəqib axtarılır... (0:00)';
-        gameState.isSearching = true;
-        gameState.searchStartTime = Date.now();
-        searchTime = 0;
-        // Timer'ı başlat
-        startSearchTimer();
+        clearInterval(searchTimer);
+        searchTimer = null;
     } else {
         loader.classList.remove('hidden');
     }
@@ -200,9 +207,10 @@ function startSearchTimer() {
         const minutes = Math.floor(searchTime / 60);
         const seconds = searchTime % 60;
         const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        lobiStatusMessage.textContent = `🔍 Rəqib axtarılır... (${timeString})`;
+        rankedStatus.textContent = `🔍 Rəqib axtarılır... (${timeString})`;
     }, 1000);
 }
+
 
 function createInitialBoard() {
     const board = [];
@@ -434,22 +442,29 @@ function handleCellClick(r, c) {
 // --- Button Eventləri ---
 
 dereceliBtn.onclick = () => {
-    gameState.isSearching = true;
-    showScreen('searching');
+    showScreen('ranked');
     socket.emit('findMatch');
 };
 
 friendBtn.onclick = () => {
+    showScreen('friend');
+};
+
+cancelRankedBtn.onclick = () => {
+    gameState.isSearching = false;
+    socket.emit('cancelSearch');
+    showScreen('main');
+};
+
+createRoomBtn.onclick = () => {
     const roomCode = generateRoomCode();
     gameState.roomCode = roomCode;
     gameState.myColor = 'red';
     socket.emit('createRoom', { roomCode });
 };
 
-cancelBtn.onclick = () => {
-    gameState.isSearching = false;
-    socket.emit('cancelSearch');
-    showScreen('lobby');
+backToMainBtn.onclick = () => {
+    showScreen('main');
 };
 
 copyCodeBtn.onclick = () => {
@@ -490,10 +505,14 @@ function leaveGame() {
         isMyTurn: false,
         roomCode: null,
         isSearching: false,
-        gameStarted: false
+        gameStarted: false,
+        searchStartTime: null,
+        mandatoryCaptures: [],
+        mustContinueJump: false,
+        jumpPosition: null
     };
     
-    showScreen('lobby');
+    showScreen('main');
 }
 
 modalCloseBtn.onclick = () => {
