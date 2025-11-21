@@ -1,7 +1,10 @@
 // --- Oyun Durumu ve UI Elementleri ---
 
 // Socket.io bağlantısı
-const socket = io('https://mario-io-1.onrender.com');
+const socket = io('https://mario-io-1.onrender.com', {
+    timeout: 20000,
+    transports: ['websocket', 'polling']
+});
 
 // Oyun durumu
 let gameState = {
@@ -42,10 +45,16 @@ const BOARD_SIZE = 8;
 // --- Socket.io Eventləri ---
 
 socket.on('connect', () => {
+    console.log('✅ Socket.io bağlantısı başarılı');
     connectionStatus.textContent = 'Serverə qoşuldu!';
     connectionStatus.classList.remove('text-yellow-400');
     connectionStatus.classList.add('text-green-500');
     showScreen('lobby');
+});
+
+socket.on('connected', (data) => {
+    console.log('🎮 Sunucu mesajı:', data.message);
+    showModal('✅ Sunucuya bağlandı!');
 });
 
 socket.on('disconnect', () => {
