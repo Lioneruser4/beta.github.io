@@ -20,7 +20,7 @@ const PORT = process.env.PORT || 10000;
 // Loglama
 console.log('🎮 Amerikan Daması Sunucusu Başlatılıyor...');
 console.log(`📱 Port: ${PORT}`);
-console.log(`🌐 URL: https://mario-io-1.onrender.com`);
+console.log(`🌐 URL: https://mario-io-1.onrender.com (Örnek URL)`);
 
 // Statik dosyaları sun
 app.use(express.static(path.join(__dirname)));
@@ -30,13 +30,14 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Oyun odaları
+// Oyun odaları ve Eşleşme Kuyruğu
 const rooms = new Map();
-// Eşleşme kuyruğu (Değişkeni const yerine let yapıldı - Bot eşleşmesinde yeniden tanımlama hatasını engellemek için)
+// Kuyruk let olarak tanımlandı, bot eşleşmesinde slice işlemi için kritik.
 let matchmakingQueue = []; 
 
 // Eşleşme durumunu tüm kuyruğa bildiren yardımcı fonksiyon
 function broadcastMatchmakingStatus() {
+    // Sadece matchmaking lobisindeki kullanıcılara gönderilir.
     io.to('matchmaking').emit('searchStatus', {
         status: 'searching',
         queueSize: matchmakingQueue.length,
@@ -48,7 +49,6 @@ function broadcastMatchmakingStatus() {
 
 io.on('connection', (socket) => {
     console.log(`✅ Oyuncu bağlandı: ${socket.id}`);
-    console.log(`👥 Toplam oyuncu sayısı: ${io.engine.clientsCount}`);
 
     // Bağlantı durumu
     socket.emit('connected', { 
@@ -61,7 +61,10 @@ io.on('connection', (socket) => {
         console.log(`🔍 Oyuncu ${socket.id} dereceli eşleşme arıyor`);
         
         // Zaten kuyrukta ise tekrar ekleme
-        if (matchmakingQueue.includes(socket.id)) return;
+        if (matchmakingQueue.includes(socket.id)) {
+            socket.emit('error', 'Zaten eşleşme arıyorsunuz.');
+            return;
+        }
         
         // Oyuncuyu matchmaking lobisine al
         socket.join('matchmaking');
@@ -72,16 +75,15 @@ io.on('connection', (socket) => {
             const opponentId = matchmakingQueue.shift();
             const opponent = io.sockets.sockets.get(opponentId);
             
-            // Eğer rəqib hala bağlı ise
+            // Eğer rəqib hala bağlı ise ve aynı kişi değilse
             if (opponent && opponent.connected && opponent.id !== socket.id) {
-                console.log(`🎯 Eşleşme bulundu: ${socket.id} (Yeni) vs ${opponentId} (Kuyruk)`);
+                console.log(`🎯 Eşleşme bulundu: ${opponentId} (Kuyruk) vs ${socket.id} (Yeni)`);
                 
-                // Otaq oluştur
                 const roomCode = generateRoomCode();
                 const room = {
                     code: roomCode,
                     players: {
-                        red: opponentId, // Kuyruktaki oyuncu kırmızı başlasın
+                        red: opponentId, // Kuyruktaki oyuncu kırmızı başlar
                         white: socket.id
                     },
                     board: createInitialBoard(),
@@ -112,12 +114,23 @@ io.on('connection', (socket) => {
                     color: 'white',
                     opponentId: opponentId
                 });
+
+                // İlk tahta durumunu gönder (Gerekli değilse silinebilir, client side'da matchFound'da istenmesi daha iyi)
+                io.to(roomCode).emit('gameUpdate', {
+                    board: room.board,
+                    currentTurn: room.currentTurn,
+                    mandatoryCaptures: findAllMandatoryJumps(room.board, room.currentTurn),
+                    lastMove: null
+                });
                 
                 console.log(`✅ Eşleşme başarılı: ${opponentId} (Red) vs ${socket.id} (White), Oda: ${roomCode}`);
             } else {
-                // Rəqib bağlantısı kəsilmiş, kuyruğa yeni oyuncuyu ekle ve durumu yayınla
+                // Rəqib bağlı deyil, kuyruğa yeni oyuncuyu ekle (Kuyrukta kalmışsa tekrar eklenir)
+                if (opponentId && opponent && !opponent.connected) {
+                    console.log(`⚠️ Kuyruktaki ${opponentId} bağlantısı kəsilmiş.`);
+                }
                 matchmakingQueue.push(socket.id);
-                console.log(`⚠️ Kuyruktaki ${opponentId} bağlı deyil, ${socket.id} kuyruğa eklendi.`);
+                console.log(`⏳ Oyuncu eklendi: ${socket.id}`);
             }
         } else {
             // Kuyruk boş, oyuncuyu ekle
@@ -127,7 +140,7 @@ io.on('connection', (socket) => {
         
         broadcastMatchmakingStatus();
         
-        // Bot eşleştirme mantığı (Kuyrukta tek kişi ise ve beklemeye başladıysa)
+        // Bot eşleştirme mantığı
         if (matchmakingQueue.includes(socket.id) && matchmakingQueue.length === 1) {
             setTimeout(() => {
                 // Timeout süresi dolduğunda hala kuyrukta mı kontrol et
@@ -152,7 +165,7 @@ io.on('connection', (socket) => {
                     matchmakingQueue = matchmakingQueue.filter(id => id !== socket.id);
                     socket.leave('matchmaking');
                     
-                    // Botla eşleşme bildirimi
+                    // Botla eşleşme bildirimi (matchFound event'i)
                     socket.emit('matchFound', { 
                         roomCode, 
                         color: 'red', // Bot beyaz oynar
@@ -161,6 +174,14 @@ io.on('connection', (socket) => {
                     
                     socket.join(roomCode);
                     console.log(`🤖 Bot eşleşmesi başarılı: ${socket.id} (Red) vs Bot, Oda: ${roomCode}`);
+                    
+                    // Oyun durumu güncellemesi gönder
+                    socket.emit('gameUpdate', {
+                        board: room.board,
+                        currentTurn: room.currentTurn,
+                        mandatoryCaptures: findAllMandatoryJumps(room.board, room.currentTurn),
+                        lastMove: null
+                    });
                 }
             }, 5000);
         }
@@ -178,7 +199,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Oda oluştur (Arkadaşla Oyna)
+    // Oda oluştur
     socket.on('createRoom', ({ roomCode }) => {
         console.log(`Oyuncu ${socket.id} oda oluşturuyor: ${roomCode}`);
         
@@ -205,7 +226,7 @@ io.on('connection', (socket) => {
         console.log(`Oda oluşturuldu: ${roomCode} by ${socket.id}`);
     });
 
-    // Odaya katıl (Arkadaşla Oyna)
+    // Odaya katıl
     socket.on('joinRoom', ({ roomCode }) => {
         console.log(`Oyuncu ${socket.id} odaya katılıyor: ${roomCode}`);
         
@@ -227,8 +248,11 @@ io.on('connection', (socket) => {
         
         socket.join(roomCode);
         
-        // Her iki oyuncuya da bildirim ve tahta durumunu gönder
-        io.to(roomCode).emit('opponentJoined', { roomCode });
+        // Her iki oyuncuya da bildirim gönder
+        io.to(roomCode).emit('opponentJoined', { 
+            roomCode,
+            opponentId: room.players.red === socket.id ? room.players.white : room.players.red
+        });
         
         // İlk tahta durumunu gönder
         io.to(roomCode).emit('gameUpdate', {
@@ -241,7 +265,7 @@ io.on('connection', (socket) => {
         console.log(`Oyuncu ${socket.id} odaya katıldı: ${roomCode}. Oyun başladı.`);
     });
 
-    // Hamle yap (Oyun mantığına dokunulmadı)
+    // Hamle yap
     socket.on('makeMove', ({ roomCode, from, to }) => {
         const room = rooms.get(roomCode);
         if (!room) {
@@ -249,26 +273,17 @@ io.on('connection', (socket) => {
             return;
         }
         
-        // Sıra kontrolü
-        const playerColor = room.players.red === socket.id ? 'red' : 'white';
-        if (room.currentTurn !== playerColor) {
-            socket.emit('error', 'Sıra sizde değil.');
+        const playerColor = room.players.red === socket.id ? 'red' : room.players.white === socket.id ? 'white' : null;
+
+        if (!playerColor || room.currentTurn !== playerColor) {
+            socket.emit('error', 'Sıra sizde değil veya oyunda değilsiniz.');
             return;
         }
         
-        // Zorunlu yeme kontrolü
+        // Hamle geçerlilik ve zorunlu yeme kontrolü... (Orijinal mantık korundu)
         const mandatoryJumps = findAllMandatoryJumps(room.board, playerColor);
         const isJumpMove = Math.abs(from.r - to.r) === 2;
         
-        // Eğer zorunlu yeme varsa ve bu hamle yeme değilse
-        if (mandatoryJumps.length > 0 && !isJumpMove) {
-            socket.emit('error', 'Məcburi yemə var! Başqa daş yeməlisiniz.');
-            socket.emit('mandatoryCapture', { mandatoryJumps });
-            return;
-        }
-        
-        // Hamle geçerliliği kontrolü
-        // Zorunlu yeme varsa, yapılan hamle bu zorunlu yeme listesinde olmalı (Dama Kuralı)
         if (mandatoryJumps.length > 0) {
             const isMandatoryMove = mandatoryJumps.some(jump => 
                 jump.from.r === from.r && jump.from.c === from.c &&
@@ -276,6 +291,7 @@ io.on('connection', (socket) => {
             );
             if (!isMandatoryMove) {
                 socket.emit('error', 'Məcburi yeməni etməlisiniz!');
+                socket.emit('mandatoryCapture', { mandatoryJumps });
                 return;
             }
         } else if (!isValidMove(room.board, from.r, from.c, to.r, to.c, playerColor)) {
@@ -283,22 +299,21 @@ io.on('connection', (socket) => {
             return;
         }
         
-        // Hamleyi uygula
         const capturedPiece = applyMove(room.board, from, to, playerColor);
         
-        // Eğer yeme hamlesi ise, devam eden yeme var mı kontrol et
+        // Devam eden yeme kontrolü
         if (capturedPiece) {
             const additionalJumps = findJumps(room.board, to.r, to.c, playerColor);
             if (additionalJumps.length > 0) {
-                // Devam eden yeme var, sıra aynı oyuncuda kalır
+                // Sıra aynı oyuncuda kalır, devam etmesi gerektiğini bildir
                 io.to(roomCode).emit('gameUpdate', {
                     board: room.board,
-                    currentTurn: room.currentTurn, // Sıra değişmez
+                    currentTurn: room.currentTurn,
                     mustContinueJump: true,
                     jumpPosition: { r: to.r, c: to.c },
                     lastMove: { from, to, player: playerColor, captured: capturedPiece }
                 });
-                console.log(`🔄 Devam eden yeme: ${socket.id} (${playerColor}) ${to.r},${to.c} konumunda`);
+                console.log(`🔄 Devam eden yeme: ${socket.id} (${playerColor})`);
                 return;
             }
         }
@@ -314,19 +329,17 @@ io.on('connection', (socket) => {
             board: room.board,
             currentTurn: room.currentTurn,
             mandatoryCaptures: nextPlayerMandatoryJumps,
-            mustContinueJump: false, // Yeni hamle başladığı için sıfırlanır
-            jumpPosition: null, // Sıfırlanır
+            mustContinueJump: false,
+            jumpPosition: null,
             lastMove: { from, to, player: playerColor, captured: capturedPiece }
         });
         
-        // Oyun bitiş kontrolü (Hala oyun bitişi kontrol ediliyor)
+        // Oyun bitiş kontrolü
         const winner = checkWinner(room.board);
         if (winner) {
-            // ... (Oyun bitiş mantığına dokunulmadı)
             const winnerId = winner === 'red' ? room.players.red : room.players.white;
             const loserId = winner === 'red' ? room.players.white : room.players.red;
             
-            // Kazanan ve kaybedene bildirim gönder
             io.to(roomCode).emit('gameOver', { 
                 winner, 
                 winnerId,
@@ -335,28 +348,27 @@ io.on('connection', (socket) => {
                 gameDuration: Math.floor((Date.now() - room.startTime) / 1000)
             });
             
-            // 3 saniye sonra lobiye dön
             setTimeout(() => {
                 io.to(roomCode).emit('returnToLobby');
             }, 3000);
             
             rooms.delete(roomCode);
         }
-        
-        console.log(`♟️ Hamle yapıldı: ${socket.id} (${playerColor}) ${from.r},${from.c} -> ${to.r},${to.c} ${capturedPiece ? '(yedi)' : ''}`);
+
+        console.log(`♟️ Hamle yapıldı: ${playerColor} ${from.r},${from.c} -> ${to.r},${to.c} ${capturedPiece ? '(yedi)' : ''}`);
     });
 
     // Oyundan ayrıl
     socket.on('leaveGame', ({ roomCode }) => {
         const room = rooms.get(roomCode);
         if (room) {
-            // Diğer oyuncuya bildir
             const opponentId = room.players.red === socket.id ? room.players.white : room.players.red;
             const opponent = io.sockets.sockets.get(opponentId);
             
             if (opponent) {
-                opponent.emit('gameOver', { winner: opponentId === room.players.red ? 'red' : 'white', reason: 'Rəqib oyunu tərk etdi.' });
-                opponent.leave(roomCode); // Rakibi de odadan çıkar
+                const winnerColor = opponentId === room.players.red ? 'red' : 'white';
+                opponent.emit('gameOver', { winner: winnerColor, reason: 'Rəqib oyunu tərk etdi.' });
+                opponent.leave(roomCode);
             }
             
             rooms.delete(roomCode);
@@ -374,7 +386,7 @@ io.on('connection', (socket) => {
         const index = matchmakingQueue.indexOf(socket.id);
         if (index > -1) {
             matchmakingQueue.splice(index, 1);
-            broadcastMatchmakingStatus(); // Kuyruk durumunu güncelle
+            broadcastMatchmakingStatus();
         }
         
         // Odalardan çıkar ve rəqibi bilgilendir
@@ -383,9 +395,10 @@ io.on('connection', (socket) => {
                 const opponentId = room.players.red === socket.id ? room.players.white : room.players.red;
                 const opponent = io.sockets.sockets.get(opponentId);
                 
-                if (opponent) {
-                    opponent.emit('gameOver', { winner: opponentId === room.players.red ? 'red' : 'white', reason: 'Rəqib bağlantısı kəsildi.' });
-                    opponent.leave(roomCode); // Rakibi odadan çıkar
+                if (opponent && opponentId !== 'bot') {
+                    const winnerColor = opponentId === room.players.red ? 'red' : 'white';
+                    opponent.emit('gameOver', { winner: winnerColor, reason: 'Rəqib bağlantısı kəsildi.' });
+                    opponent.leave(roomCode);
                 }
                 
                 rooms.delete(roomCode);
@@ -395,7 +408,7 @@ io.on('connection', (socket) => {
     });
 });
 
-// --- Yardımcı Fonksiyar (Oyun mantığına dokunulmadı) ---
+// --- Yardımcı Fonksiyonlar (Oyun Mantığı) ---
 
 function generateRoomCode() {
     return String(Math.floor(1000 + Math.random() * 9000));
@@ -408,9 +421,9 @@ function createInitialBoard() {
         for (let c = 0; c < 8; c++) {
             if ((r + c) % 2 !== 0) {
                 if (r < 3) {
-                    board[r][c] = 1; // Kırmızı taş
+                    board[r][c] = 1; // Kırmızı (Red)
                 } else if (r > 4) {
-                    board[r][c] = 2; // Beyaz taş
+                    board[r][c] = 2; // Beyaz (White)
                 }
             }
         }
@@ -477,11 +490,10 @@ function findValidMoves(board, r, c, player) {
     return moves;
 }
 
-// BU FONKSİYON SADECE checkMandatoryJumps'ün alt fonksiyonu olarak kullanılmalı, tek başına çağrılmamalıdır!
-// function isValidMove(board, fromR, fromC, toR, toC, player) {
-//     const moves = findValidMoves(board, fromR, fromC, player);
-//     return moves.some(move => move.to.r === toR && move.to.c === toC);
-// }
+function isValidMove(board, fromR, fromC, toR, toC, player) {
+    const moves = findValidMoves(board, fromR, fromC, player);
+    return moves.some(move => move.to.r === toR && move.to.c === toC);
+}
 
 function applyMove(board, from, to, player) {
     const piece = board[from.r][from.c];
@@ -536,7 +548,6 @@ function checkWinner(board) {
         }
     }
     
-    // Ayrıca geçerli hamle kontrolü de yapılmalıdır, ancak sadece taş sayısıyla yetinildi
     if (redCount === 0) return 'white';
     if (whiteCount === 0) return 'red';
     return null;
@@ -545,8 +556,6 @@ function checkWinner(board) {
 // Server'ı başlat
 server.listen(PORT, () => {
     console.log(`🚀 Server port ${PORT}'de başarıyla başlatıldı!`);
-    console.log(`🌐 Web adresi: https://mario-io-1.onrender.com`);
-    console.log(`📱 Mobil uyumlu: Evet`);
     console.log(`🎮 Oyun hazır!`);
 });
 
