@@ -1,10 +1,5 @@
-// --- Oyun Durumu ve UI Elementleri ---
-
-// Socket.io bağlantısı
-const socket = io('https://mario-io-1.onrender.com', {
-    timeout: 20000,
-    transports: ['websocket', 'polling']
-});
+// Socket.io baglantisi
+const socket = io('https://mario-io-1.onrender.com');
 
 // Oyun durumu
 let gameState = {
@@ -15,14 +10,10 @@ let gameState = {
     isMyTurn: false,
     roomCode: null,
     isSearching: false,
-    gameStarted: false,
-    searchStartTime: null,
-    mandatoryCaptures: [],
-    mustContinueJump: false,
-    jumpPosition: null
+    gameStarted: false
 };
 
-// Timer için değişkenler
+// Timer
 let searchTimer = null;
 let searchTime = 0;
 
@@ -51,92 +42,44 @@ const messageModal = document.getElementById('message-modal');
 const modalMessage = document.getElementById('modal-message');
 const modalCloseBtn = document.getElementById('modal-close-btn');
 
-// Sabitler
 const BOARD_SIZE = 8;
 
-// --- Socket.io Eventləri ---
+// --- Socket.io Eventleri ---
 
 socket.on('connect', () => {
-    console.log('✅ Socket.io bağlantısı başarılı');
-    connectionStatus.textContent = 'Serverə qoşuldu!';
+    console.log('Servere baglandi');
+    connectionStatus.textContent = 'Servere baglandi!';
     connectionStatus.classList.remove('text-yellow-400');
     connectionStatus.classList.add('text-green-500');
     showScreen('main');
 });
 
-socket.on('connected', (data) => {
-    console.log('🎮 Sunucu mesajı:', data.message);
-    showModal('✅ Sunucuya bağlandı!');
-});
-
 socket.on('disconnect', () => {
-    connectionStatus.textContent = 'Serverlə əlaqə kəsildi';
+    connectionStatus.textContent = 'Serverle elaqe kesildi';
     connectionStatus.classList.remove('text-green-500');
     connectionStatus.classList.add('text-red-500');
-    showModal('Serverlə əlaqə kəsildi. Səhifəni yeniləyin.');
+    showModal('Serverle elaqe kesildi. Səhifeni yenileyin.');
 });
 
 socket.on('matchFound', (data) => {
-    console.log('🎉 Match found!', data);
+    console.log('Raqib tapildi!', data);
     gameState.roomCode = data.roomCode;
     gameState.myColor = data.color;
     gameState.gameStarted = true;
     gameState.isSearching = false;
     gameState.board = createInitialBoard();
     
-    showModal(`✅ Rəqib tapıldı! Siz ${gameState.myColor === 'red' ? 'Qırmızı' : 'Ağ'} rəngindəsiniz.`);
+    clearInterval(searchTimer);
+    searchTimer = null;
+    
+    showModal('Raqib tapildi! Siz ' + (gameState.myColor === 'red' ? 'Qirmizi' : 'Ag') + ' rengindesiniz.');
     showScreen('game');
     updateGameUI();
-});
-
-socket.on('roomCreated', (data) => {
-    gameState.roomCode = data.roomCode;
-    gameState.myColor = 'red';
-    roomCodeOutput.textContent = data.roomCode;
-    lobiStatusMessage.textContent = `Otaq kodu: ${data.roomCode}. Rəqib gözlənilir...`;
-});
-
-socket.on('opponentJoined', (data) => {
-    gameState.gameStarted = true;
-    gameState.isMyTurn = gameState.myColor === 'red';
-    gameState.board = createInitialBoard();
-    lobiStatusMessage.textContent = 'Rəqib qoşuldu! Oyun başlayır...';
-    showScreen('game');
-    updateGameUI();
-});
-
-socket.on('gameUpdate', (data) => {
-    gameState.board = data.board;
-    gameState.currentTurn = data.currentTurn;
-    gameState.isMyTurn = gameState.currentTurn === gameState.myColor;
-    gameState.mandatoryCaptures = data.mandatoryCaptures || [];
-    gameState.mustContinueJump = data.mustContinueJump || false;
-    gameState.jumpPosition = data.jumpPosition || null;
-    
-    // Son hamle animasyonu
-    if (data.lastMove) {
-        showLastMoveAnimation(data.lastMove);
-    }
-    
-    updateGameUI();
-});
-
-socket.on('gameOver', (data) => {
-    showModal(`Oyun bitdi! Qalib: ${data.winner === gameState.myColor ? 'Siz' : 'Rəqib'}`);
-    setTimeout(() => leaveGame(), 3000);
-});
-
-socket.on('error', (message) => {
-    showModal(message);
-    gameState.isSearching = false;
-    showScreen('main');
 });
 
 socket.on('searchStatus', (data) => {
-    console.log('🔍 Search status:', data);
-    if (data.status === 'searching' && data.inQueue) {
-        rankedStatus.textContent = `🔍 Rəqib axtarılır... (${data.queueSize} nəfər kuyrukda)`;
-    }
+    console.log('Axtaris statusu:', data);
+    rankedStatus.textContent = data.message;
 });
 
 socket.on('searchCancelled', (data) => {
@@ -146,24 +89,44 @@ socket.on('searchCancelled', (data) => {
     showScreen('main');
 });
 
-socket.on('mandatoryCapture', (data) => {
-    gameState.mandatoryCaptures = data.mandatoryJumps;
-    showModal('⚠️ Məcburi yemə var! Başqa daş yeməlisiniz.');
-    drawBoard();
+socket.on('roomCreated', (data) => {
+    gameState.roomCode = data.roomCode;
+    gameState.myColor = 'red';
+    roomCodeOutput.textContent = data.roomCode;
+    console.log('Oda yaradildi:', data.roomCode);
 });
 
-socket.on('mustContinueJump', (data) => {
-    gameState.mustContinueJump = true;
-    gameState.jumpPosition = data.position;
-    showModal('🔄 Yeməyə davam et! Daha çox daş yeyə bilərsiniz.');
-    drawBoard();
+socket.on('opponentJoined', (data) => {
+    gameState.gameStarted = true;
+    gameState.isMyTurn = gameState.myColor === 'red';
+    gameState.board = createInitialBoard();
+    console.log('Raqib qosuldu! Oyun baslayir...');
+    showScreen('game');
+    updateGameUI();
 });
 
-socket.on('returnToLobby', () => {
-    leaveGame();
+socket.on('gameUpdate', (data) => {
+    gameState.board = data.board;
+    gameState.currentTurn = data.currentTurn;
+    gameState.isMyTurn = gameState.currentTurn === gameState.myColor;
+    updateGameUI();
 });
 
-// --- Yardımçı Funksiyalar ---
+socket.on('gameOver', (data) => {
+    const isWinner = data.winner === gameState.myColor;
+    showModal('Oyun bitdi! ' + (isWinner ? 'Siz qazandiniz!' : 'Raqib qazandi!'));
+    setTimeout(() => leaveGame(), 3000);
+});
+
+socket.on('error', (message) => {
+    showModal(message);
+    gameState.isSearching = false;
+    clearInterval(searchTimer);
+    searchTimer = null;
+    showScreen('main');
+});
+
+// --- Yardimci Funksiyalar ---
 
 function showModal(message) {
     modalMessage.textContent = message;
@@ -185,7 +148,6 @@ function showScreen(screen) {
     } else if (screen === 'ranked') {
         rankedLobby.classList.remove('hidden');
         gameState.isSearching = true;
-        gameState.searchStartTime = Date.now();
         searchTime = 0;
         startSearchTimer();
     } else if (screen === 'friend') {
@@ -205,14 +167,13 @@ function showScreen(screen) {
 function startSearchTimer() {
     clearInterval(searchTimer);
     searchTimer = setInterval(() => {
-        searchTime = Math.floor((Date.now() - gameState.searchStartTime) / 1000);
+        searchTime++;
         const minutes = Math.floor(searchTime / 60);
         const seconds = searchTime % 60;
-        const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        rankedStatus.textContent = `🔍 Rəqib axtarılır... (${timeString})`;
+        const timeString = minutes + ':' + seconds.toString().padStart(2, '0');
+        rankedStatus.textContent = 'Raqib axtarilir... (' + timeString + ')';
     }, 1000);
 }
-
 
 function createInitialBoard() {
     const board = [];
@@ -221,9 +182,9 @@ function createInitialBoard() {
         for (let c = 0; c < BOARD_SIZE; c++) {
             if ((r + c) % 2 !== 0) {
                 if (r < 3) {
-                    board[r][c] = 1; // Qırmızı daş
+                    board[r][c] = 1; // Kirmizi
                 } else if (r > 4) {
-                    board[r][c] = 2; // Ağ daş
+                    board[r][c] = 2; // Ag
                 }
             }
         }
@@ -232,13 +193,7 @@ function createInitialBoard() {
 }
 
 function generateRoomCode() {
-    return String(Math.floor(1000 + Math.random() * 9000));
-}
-
-// --- Dama Məntiqi ---
-
-function isValidCell(r, c) { 
-    return r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE; 
+    return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
 function getPiecePlayer(pieceValue) {
@@ -247,8 +202,8 @@ function getPiecePlayer(pieceValue) {
     return null;
 }
 
-function isKing(r, player) {
-    return (player === 'white' && r === 0) || (player === 'red' && r === BOARD_SIZE - 1);
+function isValidCell(r, c) { 
+    return r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE; 
 }
 
 function findJumps(board, r, c, player) {
@@ -281,11 +236,9 @@ function findValidMoves(board, r, c, player) {
     const piece = board[r][c];
     const isKingPiece = piece === 3 || piece === 4;
     
-    // Yemə hərəkətlərini yoxla
     const jumps = findJumps(board, r, c, player);
     if (jumps.length > 0) return jumps;
     
-    // Adi hərəkətləri yoxla
     const directions = isKingPiece ? [[-1, -1], [-1, 1], [1, -1], [1, 1]] :
         player === 'red' ? [[1, -1], [1, 1]] : [[-1, -1], [-1, 1]];
 
@@ -305,25 +258,17 @@ function isValidMove(board, fromR, fromC, toR, toC, player) {
     return moves.some(move => move.to.r === toR && move.to.c === toC);
 }
 
-// --- UI Funksiyaları ---
+// --- UI Funksiyalari ---
 
 function drawBoard() {
     boardElement.innerHTML = '';
-    
-    // Zorunlu yeme olan daşları bul
-    const mandatoryPieces = [];
-    if (gameState.mandatoryCaptures && gameState.mandatoryCaptures.length > 0) {
-        gameState.mandatoryCaptures.forEach(capture => {
-            mandatoryPieces.push(capture.from);
-        });
-    }
     
     for (let r = 0; r < BOARD_SIZE; r++) {
         for (let c = 0; c < BOARD_SIZE; c++) {
             const cell = document.createElement('div');
             const isDark = (r + c) % 2 !== 0;
 
-            cell.className = `cell ${isDark ? 'cell-black' : 'cell-white'}`;
+            cell.className = 'cell ' + (isDark ? 'cell-black' : 'cell-white');
             cell.dataset.r = r;
             cell.dataset.c = c;
             cell.onclick = () => handleCellClick(r, c);
@@ -334,49 +279,26 @@ function drawBoard() {
                 const piecePlayer = getPiecePlayer(pieceValue);
                 const isKingPiece = pieceValue === 3 || pieceValue === 4;
 
-                pieceElement.className = `piece ${
-                    piecePlayer === 'red' ? 'piece-black' : 'piece-white'
-                } ${isKingPiece ? (piecePlayer === 'red' ? 'piece-king piece-king-black' : 'piece-king piece-king-white') : ''}`;
+                pieceElement.className = 'piece ' + 
+                    (piecePlayer === 'red' ? 'piece-black' : 'piece-white') + 
+                    (isKingPiece ? ' piece-king ' + (piecePlayer === 'red' ? 'piece-king-black' : 'piece-king-white') : '');
 
                 pieceElement.innerHTML = isKingPiece ? '👑' : '●';
 
-                // Seçilmiş daş
                 if (gameState.selectedPiece && gameState.selectedPiece.r === r && gameState.selectedPiece.c === c) {
                     pieceElement.classList.add('selected');
                 }
 
-                // Cari növbədəki daşlar parlasın
                 if (gameState.currentTurn === piecePlayer && gameState.isMyTurn) {
                     pieceElement.classList.add('current-turn-piece');
-                }
-
-                // Zorunlu yeme olan daşlar parlasın (kırmızı animasyon)
-                if (mandatoryPieces.some(pos => pos.r === r && pos.c === c)) {
-                    pieceElement.classList.add('mandatory-capture-piece');
-                    pieceElement.title = '⚠️ Məcburi yemə!';
-                }
-
-                // Devam eden yeme pozisyonu
-                if (gameState.mustContinueJump && gameState.jumpPosition && 
-                    gameState.jumpPosition.r === r && gameState.jumpPosition.c === c) {
-                    pieceElement.classList.add('continue-jump-piece');
-                    pieceElement.title = '🔄 Yeməyə davam et!';
                 }
 
                 cell.appendChild(pieceElement);
             }
 
-            // Mümkün hərəkətləri göstər
             if (gameState.selectedPiece && gameState.isMyTurn) {
                 if (isValidMove(gameState.board, gameState.selectedPiece.r, gameState.selectedPiece.c, r, c, gameState.myColor)) {
                     cell.classList.add('valid-move');
-                    // Yeme hamlesi mi?
-                    if (Math.abs(gameState.selectedPiece.r - r) === 2) {
-                        cell.classList.add('capture-move');
-                        cell.title = '💥 Yeme!';
-                    } else {
-                        cell.title = '➡️ Hərəkət et';
-                    }
                 }
             }
 
@@ -388,29 +310,11 @@ function drawBoard() {
 function updateGameUI() {
     if (!gameState.gameStarted) return;
     
-    turnText.textContent = gameState.isMyTurn ? 'Sizdədir! 🎯' : 'Rəqibdədir ⏳';
-    currentTurnDisplay.className = `w-full max-w-md mb-4 p-4 rounded-xl shadow-xl text-center ${
-        gameState.isMyTurn ? 'bg-green-700' : 'bg-yellow-700'
-    }`;
+    turnText.textContent = gameState.isMyTurn ? 'Sizdir!' : 'Raqibdir';
+    currentTurnDisplay.className = 'w-full max-w-md mb-4 p-4 rounded-xl shadow-xl text-center ' + 
+        (gameState.isMyTurn ? 'bg-green-700' : 'bg-yellow-700');
     
     drawBoard();
-}
-
-function showLastMoveAnimation(lastMove) {
-    const fromCell = document.querySelector(`[data-r="${lastMove.from.r}"][data-c="${lastMove.from.c}"]`);
-    const toCell = document.querySelector(`[data-r="${lastMove.to.r}"][data-c="${lastMove.to.c}"]`);
-    
-    if (fromCell && toCell) {
-        // Hareket animasyonu
-        fromCell.classList.add('last-move-from');
-        toCell.classList.add('last-move-to');
-        
-        // 1 saniye sonra animasyonları kaldır
-        setTimeout(() => {
-            fromCell.classList.remove('last-move-from');
-            toCell.classList.remove('last-move-to');
-        }, 1000);
-    }
 }
 
 // --- Event Handlers ---
@@ -422,11 +326,9 @@ function handleCellClick(r, c) {
     const piecePlayer = getPiecePlayer(pieceValue);
 
     if (piecePlayer === gameState.myColor) {
-        // Daş seç
         gameState.selectedPiece = { r, c };
         drawBoard();
     } else if (gameState.selectedPiece && !pieceValue) {
-        // Hərəkət et
         const fromR = gameState.selectedPiece.r;
         const fromC = gameState.selectedPiece.c;
 
@@ -441,12 +343,12 @@ function handleCellClick(r, c) {
     }
 }
 
-// --- Button Eventləri ---
+// --- Button Eventleri ---
 
 dereceliBtn.onclick = () => {
-    console.log('🎮 Dereceli butona tıklandı');
+    console.log('Dereceli butona tiklandi');
     showScreen('ranked');
-    console.log('📡 findMatch gönderiliyor...');
+    console.log('findMatch gonderiliyor...');
     socket.emit('findMatch');
 };
 
@@ -457,7 +359,6 @@ friendBtn.onclick = () => {
 cancelRankedBtn.onclick = () => {
     gameState.isSearching = false;
     socket.emit('cancelSearch');
-    showScreen('main');
 };
 
 createRoomBtn.onclick = () => {
@@ -475,9 +376,9 @@ copyCodeBtn.onclick = () => {
     const code = roomCodeOutput.textContent;
     if (code && code !== '...') {
         navigator.clipboard.writeText(code).then(() => {
-            showModal(`Otaq kodu (${code}) kopyalandı! 📋`);
+            showModal('Otaq kodu (' + code + ') kopyalandi!');
         }).catch(() => {
-            showModal("Kopyalama xətası: Kodu əl ilə kopyalayın.");
+            showModal("Kopyalama xetasi: Kodu el ile kopyalayin.");
         });
     }
 };
@@ -485,7 +386,7 @@ copyCodeBtn.onclick = () => {
 joinRoomBtn.onclick = () => {
     const roomCode = joinRoomInput.value.trim();
     if (roomCode.length !== 4) {
-        showModal("Xahiş edirik, 4 rəqəmli otaq kodunu daxil edin.");
+        showModal("Xahis edirik, 4 reqemli otaq kodunu daxil edin.");
         return;
     }
     
@@ -509,11 +410,7 @@ function leaveGame() {
         isMyTurn: false,
         roomCode: null,
         isSearching: false,
-        gameStarted: false,
-        searchStartTime: null,
-        mandatoryCaptures: [],
-        mustContinueJump: false,
-        jumpPosition: null
+        gameStarted: false
     };
     
     showScreen('main');
@@ -523,8 +420,8 @@ modalCloseBtn.onclick = () => {
     messageModal.classList.add('hidden');
 };
 
-// Başlanğıc
+// Baslangic
 document.addEventListener('DOMContentLoaded', () => {
-    connectionStatus.textContent = 'Serverə qoşulur...';
+    connectionStatus.textContent = 'Servere qosulur...';
     connectionStatus.classList.add('text-yellow-400', 'animate-pulse');
 });
