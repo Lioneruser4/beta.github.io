@@ -303,39 +303,58 @@
         <p class="text-lg font-semibold">Yüklənir...</p>
     </div>
 
-    <!-- Lobi Ekranı -->
-    <div id="lobby-screen" class="hidden w-full max-w-md bg-gray-800 p-6 rounded-2xl shadow-2xl border border-gray-700">
-        <h2 class="text-2xl sm:text-3xl font-bold text-center mb-6 text-red-400 animate-float">Oyun Lobisi</h2>
-        <p id="lobi-status-message" class="text-center text-yellow-300 mb-8 font-semibold transition-all duration-300 text-sm sm:text-base">
-            Oyun rejimi seçin.
-        </p>
-
+    <!-- Ana Lobi Ekranı -->
+    <div id="main-lobby" class="hidden w-full max-w-md bg-gray-800 p-6 rounded-2xl shadow-2xl border border-gray-700">
+        <h2 class="text-2xl sm:text-3xl font-bold text-center mb-8 text-red-400 animate-float">AMERİKAN DAMASI</h2>
+        
         <div class="space-y-4">
-            <!-- 1. Dereceli Eşleşme -->
+            <!-- Dereceli Oyna -->
             <button id="dereceli-btn" class="w-full button-red text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-xl text-lg">
                 🏆 Dereceli Oyna
             </button>
-            <button id="cancel-btn" class="hidden w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-xl">
-                ❌ İptal Et
+            
+            <!-- Arkadaşla Oyna -->
+            <button id="friend-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-xl text-lg">
+                👥 Arkadaşla Oyna
             </button>
+        </div>
+    </div>
 
-            <!-- 2. Arkadaşla Oyna -->
-            <div class="bg-gray-700 p-5 rounded-xl shadow-inner space-y-4">
-                <h3 class="text-xl font-bold text-blue-400">👥 Arkadaşla Oyna</h3>
-                <button id="friend-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg">
-                    Oda Yarat
-                </button>
-                <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2">
+    <!-- Dereceli Arama Lobi -->
+    <div id="ranked-lobby" class="hidden w-full max-w-md bg-gray-800 p-6 rounded-2xl shadow-2xl border border-gray-700">
+        <h2 class="text-2xl sm:text-3xl font-bold text-center mb-6 text-red-400 animate-float">🏆 Dereceli Eşleşme</h2>
+        <p id="ranked-status" class="text-center text-yellow-300 mb-8 font-semibold transition-all duration-300 text-lg">
+            Rəqib axtarılır...
+        </p>
+        
+        <button id="cancel-ranked-btn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-xl">
+            ❌ İptal Et
+        </button>
+    </div>
+
+    <!-- Arkadaş Lobi -->
+    <div id="friend-lobby" class="hidden w-full max-w-md bg-gray-800 p-6 rounded-2xl shadow-2xl border border-gray-700">
+        <h2 class="text-2xl sm:text-3xl font-bold text-center mb-6 text-blue-400 animate-float">👥 Arkadaşla Oyna</h2>
+        
+        <div class="space-y-4">
+            <!-- Oda Yarat -->
+            <button id="create-room-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg">
+                🏠 Oda Yarat
+            </button>
+            
+            <!-- Oda Kodu -->
+            <div class="bg-gray-700 p-4 rounded-lg">
+                <div class="flex flex-col items-center space-y-2">
                     <span class="text-sm font-semibold text-gray-300">Oda Kodu:</span>
-                    <span id="room-code-output" class="text-xl sm:text-2xl font-mono text-green-400 bg-gray-900 px-3 py-2 rounded-lg shadow-inner select-all flex-1 text-center">...</span>
+                    <span id="room-code-output" class="text-2xl font-mono text-green-400 bg-gray-900 px-4 py-2 rounded-lg shadow-inner select-all">...</span>
                     <button id="copy-code-btn" class="bg-green-600 hover:bg-green-700 text-white text-sm py-2 px-4 rounded-lg transition-all duration-200 transform hover:scale-105">
                         📋 Kopyala
                     </button>
                 </div>
             </div>
-
-            <!-- 3. Koda Bağlan -->
-            <div class="bg-gray-700 p-5 rounded-xl shadow-inner space-y-3">
+            
+            <!-- Koda Bağlan -->
+            <div class="bg-gray-700 p-4 rounded-lg space-y-3">
                 <input id="join-room-input" type="text" placeholder="Oda Kodu (4 Rəqəm)" maxlength="4" 
                     class="w-full p-3 rounded-lg border-2 border-gray-600 bg-gray-900 text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 text-center text-lg font-mono">
                 <button id="join-room-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg">
@@ -343,6 +362,11 @@
                 </button>
             </div>
         </div>
+        
+        <!-- Geri Dön -->
+        <button id="back-to-main-btn" class="w-full mt-4 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-all duration-200">
+            🔙 Ana Menü
+        </button>
     </div>
 
     <!-- Oyun Ekranı -->
