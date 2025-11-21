@@ -1,4 +1,4 @@
-const socket = io(SERVER_URL);
+const socket = io(https://beta-github-io.onrender.com);
 
 const lobbyDiv = document.getElementById('lobby');
 const gameDiv = document.getElementById('game');
