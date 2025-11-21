@@ -3,194 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Amerikan Daması - Online Multiplayer</title>
-    <!-- Tailwind CSS CDN -->
+    <title>Amerikan Damasi</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Socket.io CDN -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
-        
-        /* Professional Animations */
-        @keyframes pulse-glow {
-            0%, 100% { 
-                box-shadow: 0 0 20px rgba(239, 68, 68, 0.5), 
-                           0 0 40px rgba(239, 68, 68, 0.3),
-                           0 0 60px rgba(239, 68, 68, 0.1);
-            }
-            50% { 
-                box-shadow: 0 0 30px rgba(239, 68, 68, 0.8), 
-                           0 0 60px rgba(239, 68, 68, 0.5),
-                           0 0 80px rgba(239, 68, 68, 0.3);
-            }
-        }
-        
-        @keyframes float-animation {
+        @keyframes float {
             0%, 100% { transform: translateY(0px); }
             50% { transform: translateY(-10px); }
         }
         
-        @keyframes slide-in {
-            from { 
-                opacity: 0; 
-                transform: translateY(30px); 
-            }
-            to { 
-                opacity: 1; 
-                transform: translateY(0); 
-            }
-        }
-        
         @keyframes piece-glow {
             0%, 100% { 
-                box-shadow: 0 0 15px rgba(255, 215, 0, 0.8),
-                           0 0 30px rgba(255, 215, 0, 0.5);
+                box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+                transform: scale(1);
             }
             50% { 
-                box-shadow: 0 0 25px rgba(255, 215, 0, 1),
-                           0 0 50px rgba(255, 215, 0, 0.7);
+                box-shadow: 0 0 25px rgba(255, 255, 255, 0.8);
+                transform: scale(1.05);
             }
         }
         
         @keyframes valid-move-pulse {
             0%, 100% { 
-                background-color: rgba(34, 197, 94, 0.3);
-                box-shadow: inset 0 0 20px rgba(34, 197, 94, 0.6);
+                background-color: rgba(34, 197, 94, 0.4);
+                transform: scale(1);
             }
             50% { 
-                background-color: rgba(34, 197, 94, 0.5);
-                box-shadow: inset 0 0 30px rgba(34, 197, 94, 0.8);
+                background-color: rgba(34, 197, 94, 0.6);
+                transform: scale(1.02);
             }
         }
         
-        .animate-pulse-glow { animation: pulse-glow 2s infinite ease-in-out; }
-        .animate-float { animation: float-animation 3s infinite ease-in-out; }
-        .animate-slide-in { animation: slide-in 0.5s ease-out; }
-        .animate-piece-glow { animation: piece-glow 1.5s infinite ease-in-out; }
-        .animate-valid-move { animation: valid-move-pulse 1s infinite ease-in-out; }
-        
-        .title-glow { 
-            text-shadow: 0 0 20px #ef4444, 
-                        0 0 40px #ef4444, 
-                        0 0 60px #ef4444;
-        }
-        
-        .button-red {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .button-red:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(239, 68, 68, 0.4);
-        }
-        
-        .button-red::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-        
-        .button-red:hover::before {
-            left: 100%;
-        }
-
-        .board {
-            display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            grid-template-rows: repeat(8, 1fr);
-            width: min(95vw, 95vh);
-            height: min(95vw, 95vh);
-            max-width: 600px;
-            max-height: 600px;
-            border: 8px solid #1e293b;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
-            border-radius: 15px;
-            overflow: hidden;
-            touch-action: manipulation;
-            margin: 0 auto;
-            background: linear-gradient(45deg, #f3f4f6, #e5e7eb);
-            aspect-ratio: 1;
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
         }
         
         .cell {
+            width: 60px;
+            height: 60px;
             display: flex;
-            justify-content: center;
             align-items: center;
-            transition: all 0.3s ease;
+            justify-content: center;
             cursor: pointer;
+            transition: all 0.3s ease;
             position: relative;
-            width: 100%;
-            height: 100%;
         }
         
-        .cell-black { 
-            background: linear-gradient(135deg, #374151, #1f2937);
+        .cell-white {
+            background-color: #f3f4f6;
+            border: 1px solid #e5e7eb;
         }
         
-        .cell-white { 
-            background: linear-gradient(135deg, #f9fafb, #f3f4f6);
-        }
-        
-        .cell:hover {
-            transform: scale(1.05);
-            z-index: 10;
+        .cell-black {
+            background-color: #374151;
+            border: 1px solid #4b5563;
         }
         
         .piece {
-            width: 85%;
-            height: 85%;
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: clamp(1rem, 4vw, 2rem);
+            font-size: 24px;
             font-weight: bold;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
-            border: 2px solid;
             transition: all 0.3s ease;
             cursor: pointer;
-            position: relative;
+            border: 3px solid transparent;
         }
         
-        .piece-white { 
-            background: linear-gradient(145deg, #ffffff, #f3f4f6); 
-            color: #1f2937; 
-            border-color: #d1d5db;
+        .piece-black {
+            background: linear-gradient(135deg, #dc2626, #991b1b);
+            color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
         }
         
-        .piece-black { 
-            background: linear-gradient(145deg, #1f2937, #111827); 
-            color: #ffffff; 
-            border-color: #4b5563;
+        .piece-white {
+            background: linear-gradient(135deg, #ffffff, #e5e7eb);
+            color: #374151;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border: 3px solid #9ca3af;
         }
         
-        .piece-king { 
-            animation: piece-glow 2s infinite ease-in-out;
+        .piece-king {
+            border: 3px solid #fbbf24;
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
         }
         
-        .piece-king-white { 
-            background: linear-gradient(145deg, #fef3c7, #fbbf24); 
-            border-color: #f59e0b;
-            color: #78350f;
+        .piece-king-black {
+            border: 3px solid #f59e0b;
         }
         
-        .piece-king-black { 
-            background: linear-gradient(145deg, #4b5563, #374151); 
-            border-color: #fbbf24;
-            color: #fbbf24;
+        .piece-king-white {
+            border: 3px solid #fbbf24;
         }
         
-        .piece.selected {
-            animation: piece-glow 1s infinite ease-in-out;
+        .selected {
             transform: scale(1.1);
+            box-shadow: 0 0 25px rgba(59, 130, 246, 0.8);
+            border: 3px solid #3b82f6 !important;
         }
         
         .valid-move {
@@ -203,74 +115,24 @@
             animation: piece-glow 2s infinite ease-in-out;
         }
         
-        .mandatory-capture-piece {
-            animation: mandatory-capture-pulse 1s infinite ease-in-out;
-            border: 3px solid #ef4444 !important;
-            box-shadow: 0 0 20px rgba(239, 68, 68, 0.8);
+        .button-red {
+            background: linear-gradient(135deg, #dc2626, #991b1b);
         }
         
-        .continue-jump-piece {
-            animation: continue-jump-pulse 0.8s infinite ease-in-out;
-            border: 3px solid #3b82f6 !important;
-            box-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+        .button-red:hover {
+            background: linear-gradient(135deg, #b91c1c, #7f1d1d);
         }
         
-        .capture-move {
-            background-color: rgba(239, 68, 68, 0.4) !important;
-            box-shadow: inset 0 0 25px rgba(239, 68, 68, 0.9);
-            animation: capture-pulse 0.6s infinite ease-in-out;
-        }
-        
-        @keyframes mandatory-capture-pulse {
-            0%, 100% { 
-                transform: scale(1);
-                box-shadow: 0 0 20px rgba(239, 68, 68, 0.8);
+        @media (max-width: 640px) {
+            .cell {
+                width: 40px;
+                height: 40px;
             }
-            50% { 
-                transform: scale(1.1);
-                box-shadow: 0 0 30px rgba(239, 68, 68, 1);
-            }
-        }
-        
-        @keyframes continue-jump-pulse {
-            0%, 100% { 
-                transform: scale(1);
-                box-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
-            }
-            50% { 
-                transform: scale(1.1);
-                box-shadow: 0 0 30px rgba(59, 130, 246, 1);
-            }
-        }
-        
-        @keyframes capture-pulse {
-            0%, 100% { 
-                background-color: rgba(239, 68, 68, 0.4);
-            }
-            50% { 
-                background-color: rgba(239, 68, 68, 0.6);
-            }
-        }
-        
-        .last-move-from {
-            background-color: rgba(251, 191, 36, 0.3) !important;
-            box-shadow: inset 0 0 15px rgba(251, 191, 36, 0.6);
-        }
-        
-        .last-move-to {
-            background-color: rgba(251, 191, 36, 0.5) !important;
-            box-shadow: inset 0 0 20px rgba(251, 191, 36, 0.8);
-            animation: last-move-glow 1s ease-in-out;
-        }
-        
-        @keyframes last-move-glow {
-            0% { 
-                background-color: rgba(251, 191, 36, 0.8);
-                transform: scale(1.05);
-            }
-            100% { 
-                background-color: rgba(251, 191, 36, 0.5);
-                transform: scale(1);
+            
+            .piece {
+                width: 32px;
+                height: 32px;
+                font-size: 16px;
             }
         }
     </style>
@@ -283,37 +145,27 @@
         <div class="bg-gray-800 text-white p-6 rounded-2xl shadow-2xl max-w-sm w-full transform transition-all duration-300 scale-100">
             <h3 class="text-xl font-bold mb-4 text-red-400">Bildiriş</h3>
             <p id="modal-message" class="mb-6 text-gray-300"></p>
-            <button id="modal-close-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-xl transition-all duration-200 transform hover:scale-105">
+            <button id="modal-close-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-200">
                 Bağla
             </button>
         </div>
     </div>
 
-    <!-- Başlık ve Status -->
-    <div class="mb-6 p-4 rounded-2xl bg-gray-800 shadow-2xl text-center animate-pulse-glow">
-        <h1 class="text-2xl sm:text-4xl font-extrabold title-glow mb-2">
-            AMERİKAN DAMASI
-        </h1>
-        <p id="connection-status" class="text-sm text-yellow-400 font-semibold transition-all duration-300">Serverə qoşulur...</p>
-    </div>
-
     <!-- Loading Ekranı -->
     <div id="loader" class="text-center p-8 bg-gray-800 rounded-2xl shadow-xl max-w-sm w-full">
         <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-red-500 mx-auto mb-4"></div>
-        <p class="text-lg font-semibold">Yüklənir...</p>
+        <p class="text-lg font-semibold">Yuklenir...</p>
     </div>
 
     <!-- Ana Lobi Ekranı -->
     <div id="main-lobby" class="hidden w-full max-w-md bg-gray-800 p-6 rounded-2xl shadow-2xl border border-gray-700">
-        <h2 class="text-2xl sm:text-3xl font-bold text-center mb-8 text-red-400 animate-float">AMERİKAN DAMASI</h2>
+        <h2 class="text-2xl sm:text-3xl font-bold text-center mb-8 text-red-400 animate-float">AMERIKAN DAMASI</h2>
         
         <div class="space-y-4">
-            <!-- Dereceli Oyna -->
             <button id="dereceli-btn" class="w-full button-red text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-xl text-lg">
                 🏆 Dereceli Oyna
             </button>
             
-            <!-- Arkadaşla Oyna -->
             <button id="friend-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-xl text-lg">
                 👥 Arkadaşla Oyna
             </button>
@@ -324,7 +176,7 @@
     <div id="ranked-lobby" class="hidden w-full max-w-md bg-gray-800 p-6 rounded-2xl shadow-2xl border border-gray-700">
         <h2 class="text-2xl sm:text-3xl font-bold text-center mb-6 text-red-400 animate-float">🏆 Dereceli Eşleşme</h2>
         <p id="ranked-status" class="text-center text-yellow-300 mb-8 font-semibold transition-all duration-300 text-lg">
-            Rəqib axtarılır...
+            Raqib axtarilir...
         </p>
         
         <button id="cancel-ranked-btn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-xl">
@@ -337,12 +189,10 @@
         <h2 class="text-2xl sm:text-3xl font-bold text-center mb-6 text-blue-400 animate-float">👥 Arkadaşla Oyna</h2>
         
         <div class="space-y-4">
-            <!-- Oda Yarat -->
             <button id="create-room-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg">
                 🏠 Oda Yarat
             </button>
             
-            <!-- Oda Kodu -->
             <div class="bg-gray-700 p-4 rounded-lg">
                 <div class="flex flex-col items-center space-y-2">
                     <span class="text-sm font-semibold text-gray-300">Oda Kodu:</span>
@@ -353,9 +203,8 @@
                 </div>
             </div>
             
-            <!-- Koda Bağlan -->
             <div class="bg-gray-700 p-4 rounded-lg space-y-3">
-                <input id="join-room-input" type="text" placeholder="Oda Kodu (4 Rəqəm)" maxlength="4" 
+                <input id="join-room-input" type="text" placeholder="Oda Kodu (4 Reqem)" maxlength="4" 
                     class="w-full p-3 rounded-lg border-2 border-gray-600 bg-gray-900 text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 text-center text-lg font-mono">
                 <button id="join-room-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg">
                     🔗 Odaya Bağlan
@@ -363,7 +212,6 @@
             </div>
         </div>
         
-        <!-- Geri Dön -->
         <button id="back-to-main-btn" class="w-full mt-4 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-all duration-200">
             🔙 Ana Menü
         </button>
@@ -374,23 +222,27 @@
         
         <!-- Növbə Göstəricisi -->
         <div id="current-turn-display" class="w-full max-w-md mb-4 p-4 rounded-xl bg-gray-800 shadow-xl text-center">
-            <p class="text-lg sm:text-xl font-bold">Sıra: <span id="turn-text" class="text-yellow-400">Yüklənir...</span></p>
+            <p class="text-lg sm:text-xl font-bold">Sıra: <span id="turn-text" class="text-yellow-400">Yuklenir...</span></p>
         </div>
-
-        <!-- Dama Tahtası -->
-        <div id="board" class="board mb-6">
-            <!-- Taşlar JavaScript ile çizilir -->
+        
+        <!-- Oyun Tahtası -->
+        <div id="board" class="grid grid-cols-8 gap-0 border-4 border-gray-700 rounded-lg overflow-hidden shadow-2xl bg-white">
+            <!-- Tahta hücreləri JavaScript ilə dinamik olaraq yaradılacaq -->
         </div>
-
-        <!-- Oyundan Çık Butonu -->
-        <button id="leave-game-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-xl">
-            🚪 Oyundan Çıx
-        </button>
-
+        
+        <!-- Oyun Kontrolleri -->
+        <div class="mt-6 w-full max-w-md flex flex-col sm:flex-row gap-3">
+            <button id="leave-game-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg">
+                🚪 Oyundan Çıx
+            </button>
+        </div>
     </div>
 
-    <!-- JavaScript Dosyaları -->
-    <script src="game.js"></script>
+    <!-- Bağlantı Statusu -->
+    <div class="fixed top-4 right-4 bg-gray-800 px-4 py-2 rounded-lg shadow-lg">
+        <p id="connection-status" class="text-sm font-semibold">Serverə qoşulur...</p>
+    </div>
 
+    <script src="game.js"></script>
 </body>
 </html>
