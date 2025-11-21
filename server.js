@@ -53,15 +53,14 @@ io.on('connection', (socket) => {
         // Oyuncuyu matchmaking lobisine al
         socket.join('matchmaking');
         
-        // Arama başlatma zamanı
-        const searchStartTime = Date.now();
-        
         // Kuyrukta rəqib var mı?
         if (matchmakingQueue.length > 0) {
             const opponentId = matchmakingQueue.shift();
             const opponent = io.sockets.sockets.get(opponentId);
             
             if (opponent && opponent.connected) {
+                console.log(`🎯 Eşleşme bulundu: ${socket.id} vs ${opponentId}`);
+                
                 // Otaq oluştur
                 const roomCode = generateRoomCode();
                 const room = {
@@ -86,32 +85,70 @@ io.on('connection', (socket) => {
                 socket.emit('matchFound', { 
                     roomCode, 
                     color: 'red',
-                    opponentId: opponentId,
-                    searchTime: Math.floor((Date.now() - searchStartTime) / 1000)
+                    opponentId: opponentId
                 });
                 
                 opponent.emit('matchFound', { 
                     roomCode, 
                     color: 'white',
-                    opponentId: socket.id,
-                    searchTime: Math.floor((Date.now() - searchStartTime) / 1000)
+                    opponentId: socket.id
                 });
                 
                 // Oyuncuları odaya kat
                 socket.join(roomCode);
                 opponent.join(roomCode);
                 
-                console.log(`🎉 Eşleşme başarılı: ${socket.id} vs ${opponentId}, Oda: ${roomCode}`);
+                console.log(`✅ Eşleşme başarılı: ${socket.id} vs ${opponentId}, Oda: ${roomCode}`);
             } else {
                 // Rəqib bağlantısı kəsilmiş, kuyruğa ekle
                 matchmakingQueue.push(socket.id);
-                socket.emit('searchStatus', { status: 'searching', queueSize: matchmakingQueue.length });
+                console.log(`⚠️ Rəqib bağlantısı kəsilmiş, kuyruğa eklendi: ${socket.id}`);
             }
         } else {
             // Kuyruk boş, oyuncuyu ekle
             matchmakingQueue.push(socket.id);
-            socket.emit('searchStatus', { status: 'searching', queueSize: 1 });
-            console.log(`⏳ Oyuncu ${socket.id} eşleşme kuyruğuna eklendi`);
+            console.log(`⏳ Kuyruk boş, oyuncu eklendi: ${socket.id}`);
+        }
+        
+        // Kuyruk durumunu gönder
+        socket.emit('searchStatus', { 
+            status: 'searching', 
+            queueSize: matchmakingQueue.length,
+            inQueue: true
+        });
+        
+        // Test için: 5 saniye sonra bot eşleştir
+        if (matchmakingQueue.length === 1) {
+            setTimeout(() => {
+                if (matchmakingQueue.includes(socket.id)) {
+                    console.log(`🤖 Bot eşleştiriliyor: ${socket.id}`);
+                    const roomCode = generateRoomCode();
+                    const room = {
+                        code: roomCode,
+                        players: {
+                            red: socket.id,
+                            white: 'bot'
+                        },
+                        board: createInitialBoard(),
+                        currentTurn: 'red',
+                        gameStarted: true,
+                        startTime: Date.now()
+                    };
+                    
+                    rooms.set(roomCode, room);
+                    matchmakingQueue = matchmakingQueue.filter(id => id !== socket.id);
+                    socket.leave('matchmaking');
+                    
+                    socket.emit('matchFound', { 
+                        roomCode, 
+                        color: 'red',
+                        opponentId: 'bot'
+                    });
+                    
+                    socket.join(roomCode);
+                    console.log(`🤖 Bot eşleşmesi başarılı: ${socket.id} vs Bot, Oda: ${roomCode}`);
+                }
+            }, 5000);
         }
     });
 
