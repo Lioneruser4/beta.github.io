@@ -48,14 +48,20 @@ io.on('connection', (socket) => {
 
     // Dereceli eşleşme isteği
     socket.on('findMatch', () => {
-        console.log(`Oyuncu ${socket.id} dereceli eşleşme arıyor`);
+        console.log(`🔍 Oyuncu ${socket.id} dereceli eşleşme arıyor`);
+        
+        // Oyuncuyu matchmaking lobisine al
+        socket.join('matchmaking');
+        
+        // Arama başlatma zamanı
+        const searchStartTime = Date.now();
         
         // Kuyrukta rəqib var mı?
         if (matchmakingQueue.length > 0) {
             const opponentId = matchmakingQueue.shift();
             const opponent = io.sockets.sockets.get(opponentId);
             
-            if (opponent) {
+            if (opponent && opponent.connected) {
                 // Otaq oluştur
                 const roomCode = generateRoomCode();
                 const room = {
@@ -66,28 +72,46 @@ io.on('connection', (socket) => {
                     },
                     board: createInitialBoard(),
                     currentTurn: 'red',
-                    gameStarted: true
+                    gameStarted: true,
+                    startTime: Date.now()
                 };
                 
                 rooms.set(roomCode, room);
                 
+                // İki oyuncudan matchmaking lobisini çıkar
+                socket.leave('matchmaking');
+                opponent.leave('matchmaking');
+                
                 // İki oyuncuya da otaq bilgisini gönder
-                socket.emit('matchFound', { roomCode, color: 'red' });
-                opponent.emit('matchFound', { roomCode, color: 'white' });
+                socket.emit('matchFound', { 
+                    roomCode, 
+                    color: 'red',
+                    opponentId: opponentId,
+                    searchTime: Math.floor((Date.now() - searchStartTime) / 1000)
+                });
+                
+                opponent.emit('matchFound', { 
+                    roomCode, 
+                    color: 'white',
+                    opponentId: socket.id,
+                    searchTime: Math.floor((Date.now() - searchStartTime) / 1000)
+                });
                 
                 // Oyuncuları odaya kat
                 socket.join(roomCode);
                 opponent.join(roomCode);
                 
-                console.log(`Eşleşme başarılı: ${socket.id} vs ${opponentId}, Oda: ${roomCode}`);
+                console.log(`🎉 Eşleşme başarılı: ${socket.id} vs ${opponentId}, Oda: ${roomCode}`);
             } else {
                 // Rəqib bağlantısı kəsilmiş, kuyruğa ekle
                 matchmakingQueue.push(socket.id);
+                socket.emit('searchStatus', { status: 'searching', queueSize: matchmakingQueue.length });
             }
         } else {
             // Kuyruk boş, oyuncuyu ekle
             matchmakingQueue.push(socket.id);
-            console.log(`Oyuncu ${socket.id} eşleşme kuyruğuna eklendi`);
+            socket.emit('searchStatus', { status: 'searching', queueSize: 1 });
+            console.log(`⏳ Oyuncu ${socket.id} eşleşme kuyruğuna eklendi`);
         }
     });
 
@@ -96,7 +120,9 @@ io.on('connection', (socket) => {
         const index = matchmakingQueue.indexOf(socket.id);
         if (index > -1) {
             matchmakingQueue.splice(index, 1);
-            console.log(`Oyuncu ${socket.id} eşleşme aramasını iptal etti`);
+            socket.leave('matchmaking');
+            socket.emit('searchCancelled', { message: 'Eşleşme araması iptal edildi.' });
+            console.log(`❌ Oyuncu ${socket.id} eşleşme aramasını iptal etti`);
         }
     });
 
@@ -173,6 +199,17 @@ io.on('connection', (socket) => {
             return;
         }
         
+        // Zorunlu yeme kontrolü
+        const mandatoryJumps = findAllMandatoryJumps(room.board, playerColor);
+        const isJumpMove = Math.abs(from.r - to.r) === 2;
+        
+        // Eğer zorunlu yeme varsa ve bu hamle yeme değilse
+        if (mandatoryJumps.length > 0 && !isJumpMove) {
+            socket.emit('error', 'Məcburi yemə var! Başqa daş yeməlisiniz.');
+            socket.emit('mandatoryCapture', { mandatoryJumps });
+            return;
+        }
+        
         // Hamle geçerliliği kontrolü
         if (!isValidMove(room.board, from.r, from.c, to.r, to.c, playerColor)) {
             socket.emit('error', 'Geçersiz hamle.');
@@ -180,25 +217,66 @@ io.on('connection', (socket) => {
         }
         
         // Hamleyi uygula
-        applyMove(room.board, from, to, playerColor);
+        const capturedPiece = applyMove(room.board, from, to, playerColor);
+        
+        // Eğer yeme hamlesi ise, devam eden yeme var mı kontrol et
+        if (capturedPiece) {
+            const additionalJumps = findJumps(room.board, to.r, to.c, playerColor);
+            if (additionalJumps.length > 0) {
+                // Devam eden yeme var, sıra aynı oyuncuda kalır
+                socket.emit('mustContinueJump', { 
+                    position: { r: to.r, c: to.c },
+                    possibleJumps: additionalJumps
+                });
+                io.to(roomCode).emit('gameUpdate', {
+                    board: room.board,
+                    currentTurn: room.currentTurn,
+                    mustContinueJump: true,
+                    jumpPosition: { r: to.r, c: to.c }
+                });
+                console.log(`🔄 Devam eden yeme: ${socket.id} (${playerColor}) ${to.r},${to.c} konumunda`);
+                return;
+            }
+        }
         
         // Sırayı değiştir
         room.currentTurn = room.currentTurn === 'red' ? 'white' : 'red';
         
+        // Yeni sıradaki oyuncu için zorunlu yeme kontrolü
+        const nextPlayerMandatoryJumps = findAllMandatoryJumps(room.board, room.currentTurn);
+        
         // Her iki oyuncuya da güncel durumu gönder
         io.to(roomCode).emit('gameUpdate', {
             board: room.board,
-            currentTurn: room.currentTurn
+            currentTurn: room.currentTurn,
+            mandatoryCaptures: nextPlayerMandatoryJumps,
+            lastMove: { from, to, player: playerColor, captured: capturedPiece }
         });
         
         // Oyun bitiş kontrolü
         const winner = checkWinner(room.board);
         if (winner) {
-            io.to(roomCode).emit('gameOver', { winner });
+            const winnerId = winner === 'red' ? room.players.red : room.players.white;
+            const loserId = winner === 'red' ? room.players.white : room.players.red;
+            
+            // Kazanan ve kaybedene bildirim gönder
+            io.to(roomCode).emit('gameOver', { 
+                winner, 
+                winnerId,
+                loserId,
+                reason: 'Bütün daşlar yeyildi!',
+                gameDuration: Math.floor((Date.now() - room.startTime) / 1000)
+            });
+            
+            // 3 saniye sonra lobiye dön
+            setTimeout(() => {
+                io.to(roomCode).emit('returnToLobby');
+            }, 3000);
+            
             rooms.delete(roomCode);
         }
         
-        console.log(`Hamle yapıldı: ${socket.id} (${playerColor}) ${from.r},${from.c} -> ${to.r},${to.c}`);
+        console.log(`♟️ Hamle yapıldı: ${socket.id} (${playerColor}) ${from.r},${from.c} -> ${to.r},${to.c} ${capturedPiece ? '(yedi)' : ''}`);
     });
 
     // Oyundan ayrıl
@@ -336,6 +414,8 @@ function isValidMove(board, fromR, fromC, toR, toC, player) {
 
 function applyMove(board, from, to, player) {
     const piece = board[from.r][from.c];
+    let capturedPiece = null;
+    
     board[from.r][from.c] = 0;
     board[to.r][to.c] = piece;
     
@@ -343,6 +423,7 @@ function applyMove(board, from, to, player) {
     if (Math.abs(from.r - to.r) === 2) {
         const capturedR = (from.r + to.r) / 2;
         const capturedC = (from.c + to.c) / 2;
+        capturedPiece = board[capturedR][capturedC];
         board[capturedR][capturedC] = 0;
     }
     
@@ -352,6 +433,24 @@ function applyMove(board, from, to, player) {
     } else if (player === 'white' && to.r === 0 && piece === 2) {
         board[to.r][to.c] = 4; // Beyaz kral
     }
+    
+    return capturedPiece;
+}
+
+function findAllMandatoryJumps(board, player) {
+    const allJumps = [];
+    for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+            const piecePlayer = getPiecePlayer(board[r][c]);
+            if (piecePlayer === player) {
+                const jumps = findJumps(board, r, c, player);
+                if (jumps.length > 0) {
+                    allJumps.push({ from: { r, c }, jumps });
+                }
+            }
+        }
+    }
+    return allJumps;
 }
 
 function checkWinner(board) {
