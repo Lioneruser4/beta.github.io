@@ -202,6 +202,77 @@
         .current-turn-piece {
             animation: piece-glow 2s infinite ease-in-out;
         }
+        
+        .mandatory-capture-piece {
+            animation: mandatory-capture-pulse 1s infinite ease-in-out;
+            border: 3px solid #ef4444 !important;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.8);
+        }
+        
+        .continue-jump-piece {
+            animation: continue-jump-pulse 0.8s infinite ease-in-out;
+            border: 3px solid #3b82f6 !important;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+        }
+        
+        .capture-move {
+            background-color: rgba(239, 68, 68, 0.4) !important;
+            box-shadow: inset 0 0 25px rgba(239, 68, 68, 0.9);
+            animation: capture-pulse 0.6s infinite ease-in-out;
+        }
+        
+        @keyframes mandatory-capture-pulse {
+            0%, 100% { 
+                transform: scale(1);
+                box-shadow: 0 0 20px rgba(239, 68, 68, 0.8);
+            }
+            50% { 
+                transform: scale(1.1);
+                box-shadow: 0 0 30px rgba(239, 68, 68, 1);
+            }
+        }
+        
+        @keyframes continue-jump-pulse {
+            0%, 100% { 
+                transform: scale(1);
+                box-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+            }
+            50% { 
+                transform: scale(1.1);
+                box-shadow: 0 0 30px rgba(59, 130, 246, 1);
+            }
+        }
+        
+        @keyframes capture-pulse {
+            0%, 100% { 
+                background-color: rgba(239, 68, 68, 0.4);
+            }
+            50% { 
+                background-color: rgba(239, 68, 68, 0.6);
+            }
+        }
+        
+        .last-move-from {
+            background-color: rgba(251, 191, 36, 0.3) !important;
+            box-shadow: inset 0 0 15px rgba(251, 191, 36, 0.6);
+        }
+        
+        .last-move-to {
+            background-color: rgba(251, 191, 36, 0.5) !important;
+            box-shadow: inset 0 0 20px rgba(251, 191, 36, 0.8);
+            animation: last-move-glow 1s ease-in-out;
+        }
+        
+        @keyframes last-move-glow {
+            0% { 
+                background-color: rgba(251, 191, 36, 0.8);
+                transform: scale(1.05);
+            }
+            100% { 
+                background-color: rgba(251, 191, 36, 0.5);
+                transform: scale(1);
+            }
+        }
     </style>
 </head>
 
