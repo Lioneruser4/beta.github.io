@@ -14,94 +14,91 @@ const io = socketIo(server, {
 
 const PORT = process.env.PORT || 10000;
 
-// Statik dosyaları sun
+// Statik dosyalari sun
 app.use(express.static(path.join(__dirname)));
 
-// Ana sayfa route'u
+// Ana sayfa route
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Oyun odaları
+// Oyun odalari
 const rooms = new Map();
-const aitnge = [];ar
+const waitingPlayers = [];
 
-// --- Socket.io Event Hndles ---
+// --- Socket.io Event Handlers ---
 
 io.on('connection', (socket) => {
-    console.log(`✅ Oyuncu bağlandı: ${socket.id}`);
+    console.log('Oyuncu baglandi:', socket.id);
 
-    // Dereceli eşleşme
+    // Dereceli eslesme
     socket.on('findMatch', () => {
-        console.log(`🔍 ${socket.id} eşleşme arıyor`);
+        console.log(socket.id + ' eslesme ariyor');
         
-        // eklen yu var mı?
-        if (aitnge.length > 0) {
-            n ouncu
-            const opponenId  aitnlyerit
+        // Bekleyen oyuncu var mi?
+        if (waitingPlayers.length > 0) {
+            const opponentId = waitingPlayers.shift();
             const opponent = io.sockets.sockets.get(opponentId);
             
-            i opponent) 
-                // Oa oluştur
-                const roomCode = ratomoring();
+            if (opponent) {
+                // Oda olustur
+                const roomCode = Math.floor(1000 + Math.random() * 9000).toString();
                 const room = {
                     code: roomCode,
                     players: {
                         red: socket.id,
                         white: opponentId
                     },
-                    boad: createIntialBoard(),
-                    curretTurn: 'red',
-                    ameStarted: true
+                    board: createInitialBoard(),
+                    currentTurn: 'red',
+                    gameStarted: true
                 };
                 
-                rom.set(romCode, room);
+                rooms.set(roomCode, room);
                 
-                consog l socket.i  opponentam);
+                console.log('Eslesme basarili:', socket.id, 'vs', opponentId, 'Oda:', roomCode);
                 
-                // İki oyuncuya da bilgi gönder
+                // Iki oyuncuya da bilgi gonder
                 socket.emit('matchFound', { 
                     roomCode, 
                     color: 'red',
                     opponentId: opponentId
-                );
-                
-                opponent.emit('matchFound', { 
-                    roomCod, 
-                    coor: 'white',
-                    opponentId: ockt.id
                 });
                 
-                // Oyuncuları odaya kat
+                opponent.emit('matchFound', { 
+                    roomCode, 
+                    color: 'white',
+                    opponentId: socket.id
+                });
+                
+                // Oyunculari odaya kat
                 socket.join(roomCode);
                 opponent.join(roomCode);
-            } else 
-                oen baaıı kopm, yei ekle
-                atinge.push(soe.id);
-                sockt.e(aa,  ge i t.});
+            } else {
+                waitingPlayers.push(socket.id);
+                socket.emit('searchStatus', { message: 'Raqib axtarilir...' });
             }
         } else {
-            // Kuyruk oş, bekle
-            aitnges.push(socket.id);
-            oe.(ru,  eei t. });
-           console.log(` ce kuyruaken (${aitngyers.length} kişi)`);
+            waitingPlayers.push(socket.id);
+            socket.emit('searchStatus', { message: 'Raqib axtarilir...' });
+            console.log(socket.id + ' kuyruga eklendi (' + waitingPlayers.length + ' kisi)');
         }
     });
 
-    // Eşleşmei iptal et
-    socket.on('cancelSeach', () => {
-        cont index = aitnges.indexOf(ocket.id);
+    // Eslesmeyi iptal et
+    socket.on('cancelSearch', () => {
+        const index = waitingPlayers.indexOf(socket.id);
         if (index > -1) {
-            aitnges.plice(index, 1);
-            socket.emit('searchCancelled', { message: 'arı l edildi.' });
-            console.log(`❌ ${socket.id} arıı l eti`);
+            waitingPlayers.splice(index, 1);
+            socket.emit('searchCancelled', { message: 'Axtaris legv edildi.' });
+            console.log(socket.id + ' axtarisi legv etti');
         }
     });
 
-    // Oda oluştu
+    // Oda olustur
     socket.on('createRoom', ({ roomCode }) => {
         if (rooms.has(roomCode)) {
-            socket.emit('error', 'Bu oda kodu art ur.');
+            socket.emit('error', 'Bu oda kodu zaten var.');
             return;
         }
         
@@ -120,83 +117,85 @@ io.on('connection', (socket) => {
         socket.join(roomCode);
         socket.emit('roomCreated', { roomCode });
         
-        console.log(` Odarld: ${roomCode} b ${socket.id}`);
+        console.log('Oda olusturuldu:', roomCode, 'Sahip:', socket.id);
     });
 
-    // Odaya l
+    // Odaya katil
     socket.on('joinRoom', ({ roomCode }) => {
         const room = rooms.get(roomCode);
         if (!room) {
-            socket.emit('error', 'Oda ılmad.');
+            socket.emit('error', 'Oda bulunamadi.');
             return;
         }
         
         if (room.players.white) {
-            socket.emit('error', 'Oda doluur.');
-            retn;
+            socket.emit('error', 'Oda dolu.');
+            return;
         }
         
-        // İkinci oyuncuu l et
+        // Ikinci oyuncuyu ekle
         room.players.white = socket.id;
         room.gameStarted = true;
         
-       socke.join(roomCode);
-          socket.emit('opponentJoined',{roomCode  });
+        socket.join(roomCode);
         
-       const host = io.sockets.sockets.get(room.players.red);
+        // Iki oyuncuya da haber ver
+        socket.emit('opponentJoined', { roomCode, color: 'white' });
+        
+        const host = io.sockets.sockets.get(room.players.red);
         if (host) {
-            host.emit('opponentJoined' { roomCode, });
+            host.emit('opponentJoined', { roomCode, color: 'red' });
         }
         
-        console.log(` ${socket.id} odaya ld: ${roomCode}`);
+        console.log(socket.id + ' odaya katildi:', roomCode);
     });
 
-    // Hamle 
-    socke.on('mkeMove', ({ roomCode, from, to }) => {
+    // Hamle yap
+    socket.on('makeMove', ({ roomCode, from, to }) => {
         const room = rooms.get(roomCode);
         if (!room) {
-            socket.emit('error', 'Oda taılmad.');
+            socket.emit('error', 'Oda bulunamadi.');
             return;
         }
         
-        // Sıra kontrolü
+        // Sira kontrolu
         const playerColor = room.players.red === socket.id ? 'red' : 'white';
         if (room.currentTurn !== playerColor) {
-            socket.emit('error', 'Sıra sizd deyil.');
+            socket.emit('error', 'Sira sizde degil.');
             return;
         }
         
-        // Hamle geçerliliği
-        if (!isValidMove(room.board, from.r, from.c, to.r, to.c, plaerColor)) {
-            socket.emit('error', ' hamle.');
+        // Hamle gecerliligi
+        if (!isValidMove(room.board, from.r, from.c, to.r, to.c, playerColor)) {
+            socket.emit('error', 'Yanlis hamle.');
             return;
         }
         
         // Hamleyi uygula
         applyMove(room.board, from, to, playerColor);
         
-        // ırayı dyiş
+        // Sirayi degistir
         room.currentTurn = room.currentTurn === 'red' ? 'white' : 'red';
         
-        // Her iki oyuncuya da güncel durumu gönder
+        // Iki oyuncuya da guncel durumu gonder
         io.to(roomCode).emit('gameUpdate', {
             board: room.board,
             currentTurn: room.currentTurn
         });
         
-        // alibi kontrol et
+        // Kazanani kontrol et
         const winner = checkWinner(room.board);
         if (winner) {
-            io.to(roomCode).emit('gmeOver', { winner });
-            rooms.deete(roomCode);
+            io.to(roomCode).emit('gameOver', { winner });
+            rooms.delete(roomCode);
         }
     });
 
-    // Oyundan ayrıl
+    // Oyundan ayril
     socket.on('leaveGame', ({ roomCode }) => {
         const room = rooms.get(roomCode);
-        f(room) {
-            const opponnId = room.players.red === socket.id ? room.players.white : room.players.red;
+        if (room) {
+            const opponentId = room.players.red === socket.id ? room.players.white : room.players.red;
             const opponent = io.sockets.sockets.get(opponentId);
             
             if (opponent) {
@@ -205,28 +204,28 @@ io.on('connection', (socket) => {
             
             rooms.delete(roomCode);
             socket.leave(roomCode);
-            console.log(` ${socket.id} ondan ayrıldı: ${roomCode}`);
+            console.log(socket.id + ' oyundan ayrildi:', roomCode);
         }
     });
 
-    // Bağlantı koparsa
+    // Baglanti koparsa
     socket.on('disconnect', () => {
-        cosole.log(` Oyuncu ayrıldı: ${socket.id}`);
+        console.log('Oyuncu ayrildi:', socket.id);
         
-        //eklem kuyruğundan çıar
-        const index = aitnges.indexOf(ocket.id);
+        // Bekleme kuyrugundan cikar
+        const index = waitingPlayers.indexOf(socket.id);
         if (index > -1) {
-            aitnglayers.splice(index, 1);
+            waitingPlayers.splice(index, 1);
         }
         
-        // Odalardan çıkar
+        // Odalardan cikar
         for (const [roomCode, room] of rooms) {
             if (room.players.red === socket.id || room.players.white === socket.id) {
                 const opponentId = room.players.red === socket.id ? room.players.white : room.players.red;
                 const opponent = io.sockets.sockets.get(opponentId);
                 
                 if (opponent) {
-                    opponent.emit('gameOver', { winner: opponentId === room.pe.red ? 'red' : 'white' });
+                    opponent.emit('gameOver', { winner: opponentId === room.players.red ? 'red' : 'white' });
                 }
                 
                 rooms.delete(roomCode);
@@ -236,7 +235,7 @@ io.on('connection', (socket) => {
     });
 });
 
-// ---  Fksiyaar ---
+// --- Oyun Fonksiyonlari ---
 
 function createInitialBoard() {
     const board = [];
@@ -245,10 +244,10 @@ function createInitialBoard() {
         for (let c = 0; c < 8; c++) {
             if ((r + c) % 2 !== 0) {
                 if (r < 3) {
-                    board[r][c] = 1; // ırmızı
+                    board[r][c] = 1; // Kirmizi
                 } else if (r > 4) {
-                    board[r][c] = 2; // 
-              }
+                    board[r][c] = 2; // Ag
+                }
             }
         }
     }
@@ -332,11 +331,11 @@ function applyMove(board, from, to, player) {
         board[capturedR][capturedC] = 0;
     }
     
-    // Kral yapımı
+    // Kral yapimi
     if (player === 'red' && to.r === 7 && piece === 1) {
-        board[to.r][to.c] = 3; // Kırmızı kral
+        board[to.r][to.c] = 3; // Kirmizi kral
     } else if (player === 'white' && to.r === 0 && piece === 2) {
-        board[to.r][to.c] = 4; // Beyaz kral
+        board[to.r][to.c] = 4; // Ag kral
     }
 }
 
@@ -357,8 +356,8 @@ function checkWinner(board) {
     return null;
 }
 
-// Server'ı başlat
+// Server'i baslat
 server.listen(PORT, () => {
-    console.log(`🚀 Server port ${PORT}'de başladı!`);
-    console.log(`🌐 https://mario-io-1.onrender.com`);
+    console.log('Server port ' + PORT + 'de calisiyor');
+    console.log('https://mario-io-1.onrender.com');
 });
