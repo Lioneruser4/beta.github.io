@@ -77,13 +77,14 @@ socket.on('disconnect', () => {
 });
 
 socket.on('matchFound', (data) => {
+    console.log('🎉 Match found!', data);
     gameState.roomCode = data.roomCode;
     gameState.myColor = data.color;
     gameState.gameStarted = true;
     gameState.isSearching = false;
     gameState.board = createInitialBoard();
     
-    lobiStatusMessage.textContent = `Rəqib tapıldı! Siz ${gameState.myColor === 'red' ? 'Qırmızı' : 'Ağ'} rəngindəsiniz.`;
+    showModal(`✅ Rəqib tapıldı! Siz ${gameState.myColor === 'red' ? 'Qırmızı' : 'Ağ'} rəngindəsiniz.`);
     showScreen('game');
     updateGameUI();
 });
@@ -132,8 +133,9 @@ socket.on('error', (message) => {
 });
 
 socket.on('searchStatus', (data) => {
-    if (data.status === 'searching') {
-        lobiStatusMessage.textContent = `🔍 Rəqib axtarılır... (${data.queueSize} nəfər kuyrukda)`;
+    console.log('🔍 Search status:', data);
+    if (data.status === 'searching' && data.inQueue) {
+        rankedStatus.textContent = `🔍 Rəqib axtarılır... (${data.queueSize} nəfər kuyrukda)`;
     }
 });
 
@@ -442,7 +444,9 @@ function handleCellClick(r, c) {
 // --- Button Eventləri ---
 
 dereceliBtn.onclick = () => {
+    console.log('🎮 Dereceli butona tıklandı');
     showScreen('ranked');
+    console.log('📡 findMatch gönderiliyor...');
     socket.emit('findMatch');
 };
 
