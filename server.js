@@ -8,11 +8,19 @@ const server = http.createServer(app);
 const io = socketIo(server, {
     cors: {
         origin: "*",
-        methods: ["GET", "POST"]
-    }
+        methods: ["GET", "POST"],
+        credentials: true
+    },
+    transports: ['websocket', 'polling'],
+    allowEIO3: true
 });
 
 const PORT = process.env.PORT || 10000;
+
+// Loglama
+console.log('🎮 Amerikan Daması Sunucusu Başlatılıyor...');
+console.log(`📱 Port: ${PORT}`);
+console.log(`🌐 URL: https://mario-io-1.onrender.com`);
 
 // Statik dosyaları sun
 app.use(express.static(path.join(__dirname)));
@@ -29,7 +37,14 @@ const matchmakingQueue = [];
 // --- Socket.io Event Handlers ---
 
 io.on('connection', (socket) => {
-    console.log(`Oyuncu bağlandı: ${socket.id}`);
+    console.log(`✅ Oyuncu bağlandı: ${socket.id}`);
+    console.log(`👥 Toplam oyuncu sayısı: ${io.engine.clientsCount}`);
+
+    // Bağlantı durumu
+    socket.emit('connected', { 
+        message: 'Sunucuya başarıyla bağlandınız!',
+        playerId: socket.id 
+    });
 
     // Dereceli eşleşme isteği
     socket.on('findMatch', () => {
@@ -358,6 +373,17 @@ function checkWinner(board) {
 
 // Server'ı başlat
 server.listen(PORT, () => {
-    console.log(`Server port ${PORT}'de çalışıyor`);
-    console.log(`https://mario-io-1.onrender.com adresinde erişilebilir`);
+    console.log(`🚀 Server port ${PORT}'de başarıyla başlatıldı!`);
+    console.log(`🌐 Web adresi: https://mario-io-1.onrender.com`);
+    console.log(`📱 Mobil uyumlu: Evet`);
+    console.log(`🎮 Oyun hazır!`);
+});
+
+// Hata yakalama
+process.on('uncaughtException', (error) => {
+    console.error('❌ Sunucu hatası:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Promise hatası:', reason);
 });
