@@ -15,8 +15,16 @@ let gameState = {
     isMyTurn: false,
     roomCode: null,
     isSearching: false,
-    gameStarted: false
+    gameStarted: false,
+    searchStartTime: null,
+    mandatoryCaptures: [],
+    mustContinueJump: false,
+    jumpPosition: null
 };
+
+// Timer için değişkenler
+let searchTimer = null;
+let searchTime = 0;
 
 // UI elementleri
 const loader = document.getElementById('loader');
@@ -96,6 +104,15 @@ socket.on('gameUpdate', (data) => {
     gameState.board = data.board;
     gameState.currentTurn = data.currentTurn;
     gameState.isMyTurn = gameState.currentTurn === gameState.myColor;
+    gameState.mandatoryCaptures = data.mandatoryCaptures || [];
+    gameState.mustContinueJump = data.mustContinueJump || false;
+    gameState.jumpPosition = data.jumpPosition || null;
+    
+    // Son hamle animasyonu
+    if (data.lastMove) {
+        showLastMoveAnimation(data.lastMove);
+    }
+    
     updateGameUI();
 });
 
@@ -108,6 +125,36 @@ socket.on('error', (message) => {
     showModal(message);
     gameState.isSearching = false;
     showScreen('lobby');
+});
+
+socket.on('searchStatus', (data) => {
+    if (data.status === 'searching') {
+        lobiStatusMessage.textContent = `🔍 Rəqib axtarılır... (${data.queueSize} nəfər kuyrukda)`;
+    }
+});
+
+socket.on('searchCancelled', (data) => {
+    showModal(data.message);
+    clearInterval(searchTimer);
+    searchTimer = null;
+    showScreen('lobby');
+});
+
+socket.on('mandatoryCapture', (data) => {
+    gameState.mandatoryCaptures = data.mandatoryJumps;
+    showModal('⚠️ Məcburi yemə var! Başqa daş yeməlisiniz.');
+    drawBoard();
+});
+
+socket.on('mustContinueJump', (data) => {
+    gameState.mustContinueJump = true;
+    gameState.jumpPosition = data.position;
+    showModal('🔄 Yeməyə davam et! Daha çox daş yeyə bilərsiniz.');
+    drawBoard();
+});
+
+socket.on('returnToLobby', () => {
+    leaveGame();
 });
 
 // --- Yardımçı Funksiyalar ---
@@ -127,16 +174,34 @@ function showScreen(screen) {
         lobbyScreen.classList.remove('hidden');
         lobiStatusMessage.textContent = 'Oyun rejimi seçin.';
         gameState.isSearching = false;
+        // Timer'ı durdur
+        clearInterval(searchTimer);
+        searchTimer = null;
     } else if (screen === 'game') {
         gameScreen.classList.remove('hidden');
     } else if (screen === 'searching') {
         lobbyScreen.classList.remove('hidden');
         cancelBtn.classList.remove('hidden');
-        lobiStatusMessage.textContent = 'Rəqib axtarılır... Lütfən gözləyin.';
+        lobiStatusMessage.textContent = '🔍 Rəqib axtarılır... (0:00)';
         gameState.isSearching = true;
+        gameState.searchStartTime = Date.now();
+        searchTime = 0;
+        // Timer'ı başlat
+        startSearchTimer();
     } else {
         loader.classList.remove('hidden');
     }
+}
+
+function startSearchTimer() {
+    clearInterval(searchTimer);
+    searchTimer = setInterval(() => {
+        searchTime = Math.floor((Date.now() - gameState.searchStartTime) / 1000);
+        const minutes = Math.floor(searchTime / 60);
+        const seconds = searchTime % 60;
+        const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        lobiStatusMessage.textContent = `🔍 Rəqib axtarılır... (${timeString})`;
+    }, 1000);
 }
 
 function createInitialBoard() {
@@ -235,6 +300,14 @@ function isValidMove(board, fromR, fromC, toR, toC, player) {
 function drawBoard() {
     boardElement.innerHTML = '';
     
+    // Zorunlu yeme olan daşları bul
+    const mandatoryPieces = [];
+    if (gameState.mandatoryCaptures && gameState.mandatoryCaptures.length > 0) {
+        gameState.mandatoryCaptures.forEach(capture => {
+            mandatoryPieces.push(capture.from);
+        });
+    }
+    
     for (let r = 0; r < BOARD_SIZE; r++) {
         for (let c = 0; c < BOARD_SIZE; c++) {
             const cell = document.createElement('div');
@@ -267,6 +340,19 @@ function drawBoard() {
                     pieceElement.classList.add('current-turn-piece');
                 }
 
+                // Zorunlu yeme olan daşlar parlasın (kırmızı animasyon)
+                if (mandatoryPieces.some(pos => pos.r === r && pos.c === c)) {
+                    pieceElement.classList.add('mandatory-capture-piece');
+                    pieceElement.title = '⚠️ Məcburi yemə!';
+                }
+
+                // Devam eden yeme pozisyonu
+                if (gameState.mustContinueJump && gameState.jumpPosition && 
+                    gameState.jumpPosition.r === r && gameState.jumpPosition.c === c) {
+                    pieceElement.classList.add('continue-jump-piece');
+                    pieceElement.title = '🔄 Yeməyə davam et!';
+                }
+
                 cell.appendChild(pieceElement);
             }
 
@@ -274,6 +360,13 @@ function drawBoard() {
             if (gameState.selectedPiece && gameState.isMyTurn) {
                 if (isValidMove(gameState.board, gameState.selectedPiece.r, gameState.selectedPiece.c, r, c, gameState.myColor)) {
                     cell.classList.add('valid-move');
+                    // Yeme hamlesi mi?
+                    if (Math.abs(gameState.selectedPiece.r - r) === 2) {
+                        cell.classList.add('capture-move');
+                        cell.title = '💥 Yeme!';
+                    } else {
+                        cell.title = '➡️ Hərəkət et';
+                    }
                 }
             }
 
@@ -291,6 +384,23 @@ function updateGameUI() {
     }`;
     
     drawBoard();
+}
+
+function showLastMoveAnimation(lastMove) {
+    const fromCell = document.querySelector(`[data-r="${lastMove.from.r}"][data-c="${lastMove.from.c}"]`);
+    const toCell = document.querySelector(`[data-r="${lastMove.to.r}"][data-c="${lastMove.to.c}"]`);
+    
+    if (fromCell && toCell) {
+        // Hareket animasyonu
+        fromCell.classList.add('last-move-from');
+        toCell.classList.add('last-move-to');
+        
+        // 1 saniye sonra animasyonları kaldır
+        setTimeout(() => {
+            fromCell.classList.remove('last-move-from');
+            toCell.classList.remove('last-move-to');
+        }, 1000);
+    }
 }
 
 // --- Event Handlers ---
