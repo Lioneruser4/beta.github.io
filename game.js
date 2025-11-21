@@ -47,7 +47,8 @@ const BOARD_SIZE = 8;
 // --- Socket.io Eventleri ---
 
 socket.on('connect', () => {
-    console.log('Servere baglandi');
+    console.log('✅ Servere baglandi');
+    console.log('🔗 Socket ID:', socket.id);
     connectionStatus.textContent = 'Servere baglandi!';
     connectionStatus.classList.remove('text-yellow-400');
     connectionStatus.classList.add('text-green-500');
@@ -62,7 +63,7 @@ socket.on('disconnect', () => {
 });
 
 socket.on('matchFound', (data) => {
-    console.log('Raqib tapildi!', data);
+    console.log('🎉 Raqib tapildi!', data);
     gameState.roomCode = data.roomCode;
     gameState.myColor = data.color;
     gameState.gameStarted = true;
@@ -78,7 +79,7 @@ socket.on('matchFound', (data) => {
 });
 
 socket.on('searchStatus', (data) => {
-    console.log('Axtaris statusu:', data);
+    console.log('🔍 Axtaris statusu:', data);
     rankedStatus.textContent = data.message;
 });
 
@@ -93,14 +94,14 @@ socket.on('roomCreated', (data) => {
     gameState.roomCode = data.roomCode;
     gameState.myColor = 'red';
     roomCodeOutput.textContent = data.roomCode;
-    console.log('Oda yaradildi:', data.roomCode);
+    console.log('🏠 Oda yaradildi:', data.roomCode);
 });
 
 socket.on('opponentJoined', (data) => {
     gameState.gameStarted = true;
     gameState.isMyTurn = gameState.myColor === 'red';
     gameState.board = createInitialBoard();
-    console.log('Raqib qosuldu! Oyun baslayir...');
+    console.log('👥 Raqib qosuldu! Oyun baslayir...');
     showScreen('game');
     updateGameUI();
 });
@@ -311,7 +312,7 @@ function updateGameUI() {
     if (!gameState.gameStarted) return;
     
     turnText.textContent = gameState.isMyTurn ? 'Sizdir!' : 'Raqibdir';
-    currentTurnDisplay.className = 'w-full max-w-md mb-4 p-4 rounded-xl shadow-xl text-center ' + 
+    currentTurnDisplay.className = 'w-full max-w-md mb-4 p-4 rounded-xl bg-gray-800 shadow-xl text-center ' + 
         (gameState.isMyTurn ? 'bg-green-700' : 'bg-yellow-700');
     
     drawBoard();
@@ -346,10 +347,11 @@ function handleCellClick(r, c) {
 // --- Button Eventleri ---
 
 dereceliBtn.onclick = () => {
-    console.log('Dereceli butona tiklandi');
+    console.log('🎮 Dereceli butona tiklandi');
     showScreen('ranked');
-    console.log('findMatch gonderiliyor...');
+    console.log('📡 findMatch gonderiliyor...');
     socket.emit('findMatch');
+    console.log('✅ findMatch gonderildi!');
 };
 
 friendBtn.onclick = () => {
