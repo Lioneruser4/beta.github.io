@@ -3,8 +3,37 @@ const http = require(‘http’);
 const express = require(‘express’);
 
 const app = express();
+
+// CORS ayarları
+app.use((req, res, next) => {
+res.header(‘Access-Control-Allow-Origin’, ‘*’);
+res.header(‘Access-Control-Allow-Methods’, ‘GET, POST, OPTIONS’);
+res.header(‘Access-Control-Allow-Headers’, ‘Content-Type’);
+next();
+});
+
+app.use(express.json());
+
+// Health check endpoint
+app.get(’/’, (req, res) => {
+res.json({
+status: ‘online’,
+message: ‘Domino WebSocket Server’,
+players: playerConnections.size,
+rooms: rooms.size
+});
+});
+
+app.get(’/health’, (req, res) => {
+res.json({ status: ‘ok’ });
+});
+
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocket.Server({
+server,
+perMessageDeflate: false,
+clientTracking: true
+});
 
 const rooms = new Map();
 const matchQueue = [];
@@ -79,13 +108,13 @@ return;
 const leftEnd = board[0][0];
 const rightEnd = board[board.length - 1][1];
 
-if (position === ‘left’) {
+if (position === ‘left’ || position === ‘both’) {
 if (tile[1] === leftEnd) {
 board.unshift(tile);
 } else if (tile[0] === leftEnd) {
 board.unshift([tile[1], tile[0]]);
 }
-} else if (position === ‘right’) {
+} else if (position === ‘right’ || position === ‘both’) {
 if (tile[0] === rightEnd) {
 board.push(tile);
 } else if (tile[1] === rightEnd) {
@@ -130,7 +159,11 @@ for (const playerId in room.players) {
 if (playerId === excludePlayer) continue;
 const ws = playerConnections.get(playerId);
 if (ws && ws.readyState === WebSocket.OPEN) {
+try {
 ws.send(JSON.stringify(message));
+} catch (error) {
+console.error(‘Broadcast error:’, error);
+}
 }
 }
 }
@@ -147,18 +180,39 @@ const gameState = {
 playerId: playerId
 };
 
+try {
 ws.send(JSON.stringify({
 type: ‘gameUpdate’,
 gameState: gameState
 }));
+} catch (error) {
+console.error(‘Send game state error:’, error);
+}
 }
 
-wss.on(‘connection’, (ws) => {
-console.log(‘Yeni bağlantı kuruldu’);
+function sendMessage(ws, message) {
+if (ws.readyState === WebSocket.OPEN) {
+try {
+ws.send(JSON.stringify(message));
+} catch (error) {
+console.error(‘Send message error:’, error);
+}
+}
+}
+
+wss.on(‘connection’, (ws, req) => {
+console.log(‘✅ Yeni bağlantı:’, req.socket.remoteAddress);
+
+// Ping-pong ile bağlantıyı canlı tut
+ws.isAlive = true;
+ws.on(‘pong’, () => {
+ws.isAlive = true;
+});
 
 ws.on(‘message’, (message) => {
 try {
 const data = JSON.parse(message);
+console.log(‘📨 Mesaj alındı:’, data.type);
 
 ```
   switch (data.type) {
@@ -182,15 +236,39 @@ const data = JSON.parse(message);
       break;
   }
 } catch (error) {
-  console.error('Mesaj işleme hatası:', error);
+  console.error('❌ Mesaj işleme hatası:', error);
+  sendMessage(ws, { type: 'error', message: 'Sunucu hatası' });
 }
 ```
 
 });
 
 ws.on(‘close’, () => {
+console.log(‘❌ Bağlantı kapandı’);
 handleDisconnect(ws);
 });
+
+ws.on(‘error’, (error) => {
+console.error(‘❌ WebSocket hatası:’, error);
+});
+
+// Hoş geldin mesajı
+sendMessage(ws, { type: ‘connected’, message: ‘Sunucuya bağlandınız’ });
+});
+
+// Ping interval - bağlantıları canlı tut
+const pingInterval = setInterval(() => {
+wss.clients.forEach((ws) => {
+if (ws.isAlive === false) {
+return ws.terminate();
+}
+ws.isAlive = false;
+ws.ping();
+});
+}, 30000);
+
+wss.on(‘close’, () => {
+clearInterval(pingInterval);
 });
 
 function handleFindMatch(ws, data) {
@@ -200,6 +278,8 @@ ws.playerName = data.playerName;
 
 playerConnections.set(playerId, ws);
 matchQueue.push({ ws, playerId, playerName: data.playerName });
+
+console.log(‘🔍 Oyuncu arama kuyruğuna eklendi:’, data.playerName);
 
 if (matchQueue.length >= 2) {
 const player1 = matchQueue.shift();
@@ -220,31 +300,30 @@ rooms.set(roomCode, room);
 player1.ws.roomCode = roomCode;
 player2.ws.roomCode = roomCode;
 
+console.log('✨ Eşleşme bulundu! Oda:', roomCode);
+
 const gameState = initializeGame(roomCode, player1.playerId, player2.playerId);
 
-player1.ws.send(JSON.stringify({
+sendMessage(player1.ws, {
   type: 'matchFound',
   roomCode: roomCode
-}));
+});
 
-player2.ws.send(JSON.stringify({
+sendMessage(player2.ws, {
   type: 'matchFound',
   roomCode: roomCode
-}));
+});
 
 setTimeout(() => {
-  sendGameState(roomCode, player1.playerId);
-  sendGameState(roomCode, player2.playerId);
-  
-  player1.ws.send(JSON.stringify({
+  sendMessage(player1.ws, {
     type: 'gameStart',
     gameState: { ...gameState, playerId: player1.playerId }
-  }));
+  });
   
-  player2.ws.send(JSON.stringify({
+  sendMessage(player2.ws, {
     type: 'gameStart',
     gameState: { ...gameState, playerId: player2.playerId }
-  }));
+  });
 }, 500);
 ```
 
@@ -255,6 +334,7 @@ function handleCancelSearch(ws) {
 const index = matchQueue.findIndex(p => p.ws === ws);
 if (index !== -1) {
 matchQueue.splice(index, 1);
+console.log(‘❌ Arama iptal edildi’);
 }
 }
 
@@ -279,28 +359,30 @@ host: playerId
 
 rooms.set(roomCode, room);
 
-ws.send(JSON.stringify({
+console.log(‘🏠 Oda oluşturuldu:’, roomCode);
+
+sendMessage(ws, {
 type: ‘roomCreated’,
 roomCode: roomCode
-}));
+});
 }
 
 function handleJoinRoom(ws, data) {
 const room = rooms.get(data.roomCode);
 
 if (!room) {
-ws.send(JSON.stringify({
+sendMessage(ws, {
 type: ‘error’,
 message: ‘Oda bulunamadı’
-}));
+});
 return;
 }
 
 if (Object.keys(room.players).length >= 2) {
-ws.send(JSON.stringify({
+sendMessage(ws, {
 type: ‘error’,
 message: ‘Oda dolu’
-}));
+});
 return;
 }
 
@@ -312,26 +394,25 @@ ws.roomCode = data.roomCode;
 playerConnections.set(playerId, ws);
 room.players[playerId] = { name: data.playerName };
 
+console.log(‘🚪 Odaya katıldı:’, data.roomCode);
+
 const hostId = room.host;
 const gameState = initializeGame(data.roomCode, hostId, playerId);
 
 setTimeout(() => {
-sendGameState(data.roomCode, hostId);
-sendGameState(data.roomCode, playerId);
-
-```
 const hostWs = playerConnections.get(hostId);
 if (hostWs && hostWs.readyState === WebSocket.OPEN) {
-  hostWs.send(JSON.stringify({
-    type: 'gameStart',
-    gameState: { ...gameState, playerId: hostId }
-  }));
+sendMessage(hostWs, {
+type: ‘gameStart’,
+gameState: { …gameState, playerId: hostId }
+});
 }
 
-ws.send(JSON.stringify({
+```
+sendMessage(ws, {
   type: 'gameStart',
   gameState: { ...gameState, playerId: playerId }
-}));
+});
 ```
 
 }, 500);
@@ -347,10 +428,10 @@ if (!room || !room.gameState) return;
 const gameState = room.gameState;
 
 if (gameState.currentPlayer !== playerId) {
-ws.send(JSON.stringify({
+sendMessage(ws, {
 type: ‘error’,
 message: ‘Sıra sizde değil’
-}));
+});
 return;
 }
 
@@ -360,21 +441,24 @@ const tile = player.hand[data.tileIndex];
 if (!tile) return;
 
 if (gameState.board.length > 0 && !canPlayTile(tile, gameState.board)) {
-ws.send(JSON.stringify({
+sendMessage(ws, {
 type: ‘error’,
 message: ‘Bu taş oynanamaz’
-}));
+});
 return;
 }
 
 player.hand.splice(data.tileIndex, 1);
 
-playTileOnBoard(tile, gameState.board, data.position || ‘right’);
+playTileOnBoard(tile, gameState.board, data.position || ‘both’);
+
+console.log(‘🎲 Taş oynadı:’, tile);
 
 const winner = checkWinner(gameState);
 
 if (winner) {
 gameState.winner = winner;
+console.log(‘🏆 Kazanan:’, gameState.players[winner].name);
 broadcastToRoom(roomCode, {
 type: ‘gameEnd’,
 winner: winner,
@@ -405,6 +489,8 @@ const gameState = room.gameState;
 
 if (gameState.currentPlayer !== playerId) return;
 
+console.log(‘⏭️ Pas geçti:’, ws.playerName);
+
 const playerIds = Object.keys(gameState.players);
 gameState.currentPlayer = playerIds.find(id => id !== playerId);
 gameState.turn++;
@@ -419,6 +505,7 @@ const playerId = ws.playerId;
 
 if (playerId) {
 playerConnections.delete(playerId);
+console.log(‘👋 Oyuncu ayrıldı:’, ws.playerName);
 }
 
 const queueIndex = matchQueue.findIndex(p => p.ws === ws);
@@ -442,8 +529,9 @@ message: ‘Rakip oyundan ayrıldı’
 }
 }
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
-server.listen(PORT, () => {
-console.log(`Sunucu ${PORT} portunda çalışıyor`);
+server.listen(PORT, ‘0.0.0.0’, () => {
+console.log(`🚀 Domino sunucusu ${PORT} portunda çalışıyor`);
+console.log(`📡 WebSocket: ws://0.0.0.0:${PORT}`);
 });
