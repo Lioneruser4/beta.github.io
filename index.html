@@ -59,32 +59,45 @@
 
         const connectToServer = () => {
             try {
-                const ws = new WebSocket('wss://beta-github-io.onrender.com');
+                // Render.com WebSocket bağlantısı
+                const wsUrl = 'wss://beta-github-io.onrender.com';
+                console.log('🔌 Sunucuya bağlanılıyor:', wsUrl);
+                
+                const ws = new WebSocket(wsUrl);
                 
                 ws.onopen = () => {
+                    console.log('✅ WebSocket bağlantısı açıldı');
                     setConnected(true);
                     showNotification('✅ Sunucuya bağlanıldı!', 'success');
                     wsRef.current = ws;
                 };
 
-                ws.onclose = () => {
+                ws.onclose = (event) => {
+                    console.log('❌ WebSocket bağlantısı kapandı:', event.code, event.reason);
                     setConnected(false);
-                    showNotification('❌ Bağlantı kesildi', 'error');
+                    showNotification('❌ Bağlantı kesildi, yeniden bağlanıyor...', 'error');
                     setTimeout(connectToServer, 3000);
                 };
 
-                ws.onerror = () => {
+                ws.onerror = (error) => {
+                    console.error('⚠️ WebSocket hatası:', error);
                     setConnected(false);
                     showNotification('⚠️ Bağlantı hatası', 'error');
                 };
 
                 ws.onmessage = (event) => {
-                    const data = JSON.parse(event.data);
-                    handleServerMessage(data);
+                    console.log('📨 Mesaj alındı:', event.data);
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleServerMessage(data);
+                    } catch (error) {
+                        console.error('❌ Mesaj parse hatası:', error);
+                    }
                 };
             } catch (error) {
+                console.error('❌ Bağlantı hatası:', error);
                 showNotification('⚠️ Sunucuya bağlanılamadı', 'error');
-                setTimeout(connectToServer, 3000);
+                setTimeout(connectToServer, 5000);
             }
         };
 
