@@ -7,42 +7,24 @@
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
     <script src="https://cdn.tailwindcss.com"></script>
-    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
                     colors: {
                         brand: {
-                            dark: '#0f172a',
-                            surface: '#1e293b',
-                            accent: '#6366f1',
-                            gold: '#fbbf24'
+                            dark: '#0f172a', surface: '#1e293b', accent: '#6366f1', gold: '#fbbf24'
                         }
                     },
-                    animation: {
-                        'slide-in': 'slideIn 0.3s ease-out',
-                        'pop': 'pop 0.2s ease-in-out',
-                    },
+                    animation: { 'slide-in': 'slideIn 0.3s ease-out', 'pop': 'pop 0.2s ease-in-out' },
                     keyframes: {
-                        slideIn: {
-                            '0%': { transform: 'translateY(-20px)', opacity: '0' },
-                            '100%': { transform: 'translateY(0)', opacity: '1' },
-                        },
-                        pop: {
-                            '0%': { transform: 'scale(0.9)' },
-                            '50%': { transform: 'scale(1.05)' },
-                            '100%': { transform: 'scale(1)' },
-                        }
+                        slideIn: { '0%': { transform: 'translateY(-20px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
+                        pop: { '0%': { transform: 'scale(0.9)' }, '50%': { transform: 'scale(1.05)' }, '100%': { transform: 'scale(1)' } }
                     }
                 }
             }
@@ -51,22 +33,10 @@
 
     <style>
         body { background-color: #0f172a; color: white; }
-        
-        /* Domino Noktaları (Pips) için CSS Grid */
-        .pip-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: repeat(3, 1fr);
-            width: 100%;
-            height: 100%;
-            padding: 4px;
-        }
+        .pip-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 100%; padding: 4px; }
         .pip { background-color: #1e293b; border-radius: 50%; width: 6px; height: 6px; margin: auto; }
-        /* Domino Yüzeyleri */
         .tile-face { background: #f8fafc; }
         .tile-face-dark { background: #334155; }
-        
-        /* Kaydırma Çubuğu Özelleştirme */
         ::-webkit-scrollbar { height: 8px; width: 8px; }
         ::-webkit-scrollbar-track { background: #1e293b; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
@@ -79,9 +49,6 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // --- YARDIMCI BİLEŞENLER ---
-
-        // Bildirim Bileşeni
         const Toast = ({ message, type }) => {
             const styles = {
                 success: 'bg-emerald-500/90 border-emerald-400 text-white',
@@ -89,7 +56,6 @@
                 warning: 'bg-amber-500/90 border-amber-400 text-white',
                 info: 'bg-blue-500/90 border-blue-400 text-white'
             };
-            
             return (
                 <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-lg border shadow-2xl backdrop-blur-sm animate-slide-in flex items-center gap-3 ${styles[type] || styles.info}`}>
                     <span className="text-xl">{type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span>
@@ -98,25 +64,14 @@
             );
         };
 
-        // Domino Noktalarını Çizen Fonksiyon
         const RenderPips = ({ number }) => {
-            // Nokta pozisyonları (3x3 grid)
-            const pips = [];
             const center = 4;
             const tl=0, tr=2, ml=3, mr=5, bl=6, br=8;
-            
             const layouts = {
-                0: [],
-                1: [center],
-                2: [tl, br],
-                3: [tl, center, br],
-                4: [tl, tr, bl, br],
-                5: [tl, tr, center, bl, br],
-                6: [tl, tr, ml, mr, bl, br]
+                0: [], 1: [center], 2: [tl, br], 3: [tl, center, br],
+                4: [tl, tr, bl, br], 5: [tl, tr, center, bl, br], 6: [tl, tr, ml, mr, bl, br]
             };
-
             const activePips = layouts[number] || [];
-
             return (
                 <div className="pip-grid">
                     {[...Array(9)].map((_, i) => (
@@ -126,7 +81,6 @@
             );
         };
 
-        // Domino Taşı Görseli
         const DominoTile = ({ values, onClick, disabled, isSelected, isValidMove, vertical = false }) => {
             return (
                 <button 
@@ -151,8 +105,6 @@
             );
         };
 
-        // --- ANA OYUN MANTIĞI ---
-
         const DominoGame = () => {
             const [screen, setScreen] = useState('lobby');
             const [connected, setConnected] = useState(false);
@@ -166,18 +118,20 @@
             const [notification, setNotification] = useState(null);
             const wsRef = useRef(null);
 
-            // WebSocket Bağlantı Mantığı (Aynen korundu)
             useEffect(() => {
                 connectToServer();
-                return () => {
-                    if (wsRef.current) wsRef.current.close();
-                };
+                return () => { if (wsRef.current) wsRef.current.close(); };
             }, []);
 
             const connectToServer = () => {
                 try {
-                    const wsUrl = 'wss://beta-github-io.onrender.com';
-                    console.log('🔌 Sunucuya bağlanılıyor:', wsUrl);
+                    // Otomatik URL Algılama: Localhost ise localhost, değilse verilen URL
+                    let wsUrl = 'wss://beta-github-io.onrender.com';
+                    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                        wsUrl = `ws://${window.location.hostname}:10000`;
+                    }
+                    
+                    console.log('🔌 Bağlanılıyor:', wsUrl);
                     const ws = new WebSocket(wsUrl);
                     
                     ws.onopen = () => {
@@ -185,29 +139,19 @@
                         showNotification('Sunucuya bağlanıldı', 'success');
                         wsRef.current = ws;
                     };
-
                     ws.onclose = () => {
                         setConnected(false);
-                        showNotification('Bağlantı kesildi, tekrar deneniyor...', 'error');
+                        // showNotification('Bağlantı kesildi, tekrar deneniyor...', 'error');
                         setTimeout(connectToServer, 3000);
                     };
-
-                    ws.onerror = (error) => {
-                        setConnected(false);
-                    };
-
+                    ws.onerror = () => setConnected(false);
                     ws.onmessage = (event) => {
                         try {
                             const data = JSON.parse(event.data);
                             handleServerMessage(data);
-                        } catch (error) {
-                            console.error('Parse hatası:', error);
-                        }
+                        } catch (e) { console.error(e); }
                     };
-                } catch (error) {
-                    showNotification('Sunucu hatası', 'error');
-                    setTimeout(connectToServer, 5000);
-                }
+                } catch (e) { setTimeout(connectToServer, 5000); }
             };
 
             const showNotification = (message, type = 'info') => {
@@ -228,6 +172,9 @@
                         break;
                     case 'gameUpdate':
                         setGameState(data.gameState);
+                        // Tahta güncellendiğinde seçimleri sıfırla
+                        setSelectedTile(null);
+                        setValidMoves([]);
                         break;
                     case 'matchFound':
                         showNotification('Rakip Bulundu!', 'success');
@@ -237,12 +184,13 @@
                         setTimeout(() => { setScreen('lobby'); setGameState(null); }, 2000);
                         break;
                     case 'gameEnd':
-                        showNotification(`Oyun Bitti! Kazanan: ${data.winnerName}`, 'success');
-                        setTimeout(() => { setScreen('lobby'); setGameState(null); }, 3000);
+                        const msg = data.winner === 'DRAW' ? 'Oyun Berabere!' : `Oyun Bitti! Kazanan: ${data.winnerName}`;
+                        showNotification(msg, data.winner === 'DRAW' ? 'info' : 'success');
+                        setTimeout(() => { setScreen('lobby'); setGameState(null); }, 4000);
                         break;
                     case 'error':
                         showNotification(data.message, 'error');
-                        setSearching(false);
+                        if(screen === 'lobby') setSearching(false);
                         break;
                 }
             };
@@ -253,7 +201,6 @@
                 }
             };
 
-            // Oyun Aksiyonları
             const startRankedMatch = () => {
                 if (!playerName.trim()) return showNotification('Lütfen isminizi girin', 'warning');
                 setSearching(true);
@@ -283,42 +230,36 @@
 
             const calculateValidMoves = (tile) => {
                 if (!gameState?.board.length) return ['both'];
+                
                 const leftEnd = gameState.board[0][0];
                 const rightEnd = gameState.board[gameState.board.length - 1][1];
+                
                 const moves = [];
+                // Domino mantığı: Taşın herhangi bir ucu sol uca uyuyorsa
                 if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
+                
+                // Taşın herhangi bir ucu sağ uca uyuyorsa
                 if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
+                
                 return moves;
             };
 
             const playTile = (position) => {
                 if (!selectedTile || !validMoves.includes(position)) return;
                 sendMessage({ type: 'playTile', tileIndex: selectedTile.index, position });
-                setSelectedTile(null);
-                setValidMoves([]);
+                // Optimistik güncelleme yapmıyoruz, sunucudan cevap bekliyoruz
             };
 
             const passTurn = () => sendMessage({ type: 'pass' });
-
-            const copyRoomCode = () => {
-                navigator.clipboard.writeText(roomCode);
-                showNotification('Kodu kopyalandı', 'success');
-            };
-
-
-            // --- ARAYÜZ RENDER ---
+            const copyRoomCode = () => { navigator.clipboard.writeText(roomCode); showNotification('Kodu kopyalandı', 'success'); };
 
             if (screen === 'lobby') {
                 return (
                     <div className="min-h-screen flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-brand-dark relative overflow-hidden">
                         {notification && <Toast message={notification.message} type={notification.type} />}
-                        
-                        {/* Arkaplan Efektleri */}
                         <div className="absolute top-0 left-0 w-96 h-96 bg-brand-accent/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
                         <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
-
                         <div className="w-full max-w-md z-10 p-6">
-                            {/* Logo Alanı */}
                             <div className="text-center mb-10">
                                 <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-tr from-brand-accent to-purple-500 rounded-2xl shadow-2xl mb-4 transform rotate-12">
                                     <span className="text-5xl">🎲</span>
@@ -329,21 +270,12 @@
                                     {connected ? 'Sunucu Aktif' : 'Bağlanıyor...'}
                                 </div>
                             </div>
-
-                            {/* Kart */}
                             <div className="bg-brand-surface/50 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
                                 <div className="space-y-5">
                                     <div>
                                         <label className="block text-sm text-slate-400 mb-2 ml-1">Oyuncu Adı</label>
-                                        <input
-                                            type="text"
-                                            value={playerName}
-                                            onChange={(e) => setPlayerName(e.target.value)}
-                                            placeholder="Adınızı girin..."
-                                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-accent/50 transition-all"
-                                        />
+                                        <input type="text" value={playerName} onChange={(e) => setPlayerName(e.target.value)} placeholder="Adınızı girin..." className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-accent/50 transition-all" />
                                     </div>
-
                                     {searching ? (
                                         <div className="bg-brand-dark/50 rounded-xl p-6 text-center border border-brand-accent/30 relative overflow-hidden">
                                             <div className="absolute inset-0 bg-brand-accent/10 animate-pulse"></div>
@@ -354,24 +286,16 @@
                                             </div>
                                         </div>
                                     ) : (
-                                        <button
-                                            onClick={startRankedMatch}
-                                            disabled={!connected}
-                                            className="w-full group relative overflow-hidden bg-gradient-to-r from-brand-accent to-purple-600 hover:to-purple-500 text-white font-bold py-4 rounded-xl transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-brand-accent/20"
-                                        >
+                                        <button onClick={startRankedMatch} disabled={!connected} className="w-full group relative overflow-hidden bg-gradient-to-r from-brand-accent to-purple-600 hover:to-purple-500 text-white font-bold py-4 rounded-xl transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-brand-accent/20">
                                             <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                                            <span className="relative flex items-center justify-center gap-2">
-                                                🏆 DERECELİ MAÇ BUL
-                                            </span>
+                                            <span className="relative flex items-center justify-center gap-2">🏆 DERECELİ MAÇ BUL</span>
                                         </button>
                                     )}
-
                                     <div className="relative flex py-2 items-center">
                                         <div className="flex-grow border-t border-white/10"></div>
                                         <span className="flex-shrink-0 mx-4 text-slate-500 text-xs uppercase tracking-widest">veya</span>
                                         <div className="flex-grow border-t border-white/10"></div>
                                     </div>
-
                                     {roomCode ? (
                                         <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 text-center animate-slide-in">
                                             <p className="text-sm text-emerald-400 mb-1">Oda Oluşturuldu</p>
@@ -383,29 +307,10 @@
                                         </div>
                                     ) : (
                                         <div className="grid grid-cols-2 gap-3">
-                                            <button
-                                                onClick={createRoom}
-                                                disabled={!connected}
-                                                className="bg-brand-surface border border-white/10 hover:bg-white/5 text-white p-4 rounded-xl font-semibold text-sm transition-all"
-                                            >
-                                                🛠️ Oda Kur
-                                            </button>
+                                            <button onClick={createRoom} disabled={!connected} className="bg-brand-surface border border-white/10 hover:bg-white/5 text-white p-4 rounded-xl font-semibold text-sm transition-all">🛠️ Oda Kur</button>
                                             <div className="relative">
-                                                <input
-                                                    type="text"
-                                                    value={joinRoomCode}
-                                                    onChange={(e) => setJoinRoomCode(e.target.value.toUpperCase())}
-                                                    maxLength={4}
-                                                    placeholder="KOD"
-                                                    className="w-full h-full bg-brand-surface border border-white/10 rounded-xl px-4 text-center text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-brand-accent transition-all uppercase"
-                                                />
-                                                <button 
-                                                    onClick={joinRoom}
-                                                    disabled={!joinRoomCode}
-                                                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-brand-accent hover:bg-brand-accent/80 text-white p-1.5 rounded-lg disabled:opacity-0 transition-all"
-                                                >
-                                                    ➝
-                                                </button>
+                                                <input type="text" value={joinRoomCode} onChange={(e) => setJoinRoomCode(e.target.value.toUpperCase())} maxLength={4} placeholder="KOD" className="w-full h-full bg-brand-surface border border-white/10 rounded-xl px-4 text-center text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-brand-accent transition-all uppercase" />
+                                                <button onClick={joinRoom} disabled={!joinRoomCode} className="absolute right-2 top-1/2 -translate-y-1/2 bg-brand-accent hover:bg-brand-accent/80 text-white p-1.5 rounded-lg disabled:opacity-0 transition-all">➝</button>
                                             </div>
                                         </div>
                                     )}
@@ -416,125 +321,63 @@
                 );
             }
 
-            // OYUN EKRANI
             if (screen === 'game' && gameState) {
                 const isMyTurn = gameState.currentPlayer === gameState.playerId;
                 const myHand = gameState.players[gameState.playerId]?.hand || [];
                 const opponentId = Object.keys(gameState.players).find(id => id !== gameState.playerId);
                 const opponent = gameState.players[opponentId];
+                
+                // Elde oynanabilir taş var mı kontrolü (Pas butonu için)
+                const hasValidMoves = myHand.some(tile => calculateValidMoves(tile).length > 0);
 
                 return (
                     <div className="h-screen flex flex-col bg-[#0f172a] overflow-hidden relative">
                          {notification && <Toast message={notification.message} type={notification.type} />}
-                        
-                        {/* Üst Bilgi Çubuğu */}
                         <header className="bg-brand-surface border-b border-white/10 px-6 py-3 flex items-center justify-between z-20 shadow-md">
                             <div className="flex items-center gap-4">
                                 <div className="flex items-center gap-3 bg-slate-800/50 px-4 py-2 rounded-lg border border-white/5">
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center text-xs font-bold shadow-lg">
-                                        VS
-                                    </div>
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center text-xs font-bold shadow-lg">VS</div>
                                     <div>
                                         <p className="text-xs text-slate-400">Rakip</p>
                                         <p className="font-bold text-sm text-slate-200">{opponent?.name || 'Oyuncu'} <span className="text-slate-500">({opponent?.hand?.length} taş)</span></p>
                                     </div>
                                 </div>
                             </div>
-
                             <div className="flex flex-col items-center">
                                 <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">TUR {gameState.turn}</div>
-                                {isMyTurn ? (
-                                    <span className="bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/20 animate-pulse">
-                                        Senin Sıran
-                                    </span>
-                                ) : (
-                                    <span className="bg-amber-500/10 text-amber-400 px-3 py-1 rounded-full text-xs font-bold border border-amber-500/20">
-                                        Rakip Bekleniyor
-                                    </span>
-                                )}
+                                {isMyTurn ? <span className="bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/20 animate-pulse">Senin Sıran</span> : <span className="bg-amber-500/10 text-amber-400 px-3 py-1 rounded-full text-xs font-bold border border-amber-500/20">Rakip Bekleniyor</span>}
                             </div>
-
                             <div className="flex items-center gap-3">
                                 <div className={`text-right ${isMyTurn ? 'opacity-100' : 'opacity-70'}`}>
                                     <p className="text-xs text-slate-400">Sen</p>
                                     <p className="font-bold text-sm text-brand-accent">{playerName}</p>
                                 </div>
-                                <div className="w-10 h-10 rounded-lg bg-brand-accent flex items-center justify-center text-white font-bold shadow-lg shadow-brand-accent/20">
-                                    {playerName.charAt(0)}
-                                </div>
+                                <div className="w-10 h-10 rounded-lg bg-brand-accent flex items-center justify-center text-white font-bold shadow-lg shadow-brand-accent/20">{playerName.charAt(0)}</div>
                             </div>
                         </header>
-
-                        {/* Oyun Tahtası (Masa) */}
                         <main className="flex-1 relative bg-[url('https://www.transparenttextures.com/patterns/felt.png')] bg-slate-900 flex items-center overflow-hidden">
                             <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/30 pointer-events-none"></div>
-                            
-                            {/* Hamle Butonları (Sol/Sağ) */}
-                            {validMoves.includes('left') && (
-                                <button onClick={() => playTile('left')} className="absolute left-4 top-1/2 -translate-y-1/2 z-30 bg-emerald-500 hover:bg-emerald-400 text-white w-12 h-12 rounded-full shadow-2xl flex items-center justify-center animate-bounce border-4 border-slate-900">
-                                    <span className="text-xl">⬅️</span>
-                                </button>
-                            )}
-                            
-                            {validMoves.includes('right') && (
-                                <button onClick={() => playTile('right')} className="absolute right-4 top-1/2 -translate-y-1/2 z-30 bg-emerald-500 hover:bg-emerald-400 text-white w-12 h-12 rounded-full shadow-2xl flex items-center justify-center animate-bounce border-4 border-slate-900">
-                                    <span className="text-xl">➡️</span>
-                                </button>
-                            )}
-
-                            {/* Scrollable Tahta Alanı */}
+                            {validMoves.includes('left') && <button onClick={() => playTile('left')} className="absolute left-4 top-1/2 -translate-y-1/2 z-30 bg-emerald-500 hover:bg-emerald-400 text-white w-12 h-12 rounded-full shadow-2xl flex items-center justify-center animate-bounce border-4 border-slate-900"><span className="text-xl">⬅️</span></button>}
+                            {validMoves.includes('right') && <button onClick={() => playTile('right')} className="absolute right-4 top-1/2 -translate-y-1/2 z-30 bg-emerald-500 hover:bg-emerald-400 text-white w-12 h-12 rounded-full shadow-2xl flex items-center justify-center animate-bounce border-4 border-slate-900"><span className="text-xl">➡️</span></button>}
                             <div className="w-full overflow-x-auto px-16 py-10 flex items-center min-h-[300px] custom-scrollbar">
                                 <div className="flex items-center gap-1 mx-auto min-w-max">
-                                    {gameState.board.length === 0 ? (
-                                        <div className="text-slate-500 font-medium border-2 border-dashed border-slate-700 rounded-xl p-8">
-                                            İlk taşı oyna
-                                        </div>
-                                    ) : (
-                                        gameState.board.map((tile, idx) => (
-                                            <DominoTile 
-                                                key={idx} 
-                                                values={tile} 
-                                                disabled={true}
-                                                vertical={false} // Tahtadaki taşları yatay diziyoruz
-                                            />
-                                        ))
-                                    )}
+                                    {gameState.board.length === 0 ? <div className="text-slate-500 font-medium border-2 border-dashed border-slate-700 rounded-xl p-8">İlk taşı oyna</div> : gameState.board.map((tile, idx) => <DominoTile key={idx} values={tile} disabled={true} vertical={false} />)}
                                 </div>
                             </div>
                         </main>
-
-                        {/* Oyuncu Eli */}
                         <footer className="bg-brand-surface border-t border-white/10 p-6 z-20">
                             <div className="max-w-4xl mx-auto">
                                 <div className="flex justify-between items-end mb-4">
-                                    <h3 className="text-slate-400 text-sm font-semibold flex items-center gap-2">
-                                        <span className="w-2 h-2 bg-brand-accent rounded-full"></span>
-                                        TAŞLARIN ({myHand.length})
-                                    </h3>
-                                    {isMyTurn && (
-                                        <button 
-                                            onClick={passTurn}
-                                            className="text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-1.5 rounded transition-colors"
-                                        >
-                                            PAS GEÇ ⏭️
-                                        </button>
+                                    <h3 className="text-slate-400 text-sm font-semibold flex items-center gap-2"><span className="w-2 h-2 bg-brand-accent rounded-full"></span>TAŞLARIN ({myHand.length})</h3>
+                                    {isMyTurn && !hasValidMoves && (
+                                        <button onClick={passTurn} className="text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-1.5 rounded transition-colors">PAS GEÇ ⏭️</button>
                                     )}
+                                    {isMyTurn && hasValidMoves && <span className="text-xs text-emerald-400 font-medium animate-pulse">Hamle yapın...</span>}
                                 </div>
-
                                 <div className="flex gap-4 overflow-x-auto pb-4 justify-center">
                                     {myHand.map((tile, idx) => {
                                         const canPlay = isMyTurn && (gameState.board.length === 0 || calculateValidMoves(tile).length > 0);
-                                        return (
-                                            <DominoTile
-                                                key={idx}
-                                                values={tile}
-                                                onClick={() => selectTile(tile, idx)}
-                                                disabled={!isMyTurn}
-                                                isSelected={selectedTile?.index === idx}
-                                                isValidMove={canPlay && selectedTile?.index !== idx} // İpucu efekti
-                                                vertical={true} // Eldeki taşlar dikey
-                                            />
-                                        );
+                                        return <DominoTile key={idx} values={tile} onClick={() => selectTile(tile, idx)} disabled={!isMyTurn} isSelected={selectedTile?.index === idx} isValidMove={canPlay && selectedTile?.index !== idx} vertical={true} />;
                                     })}
                                 </div>
                             </div>
@@ -542,10 +385,8 @@
                     </div>
                 );
             }
-
             return null;
         };
-
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<DominoGame />);
     </script>
