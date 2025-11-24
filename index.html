@@ -160,6 +160,7 @@
             const [selectedTileIndex, setSelectedTileIndex] = useState(null);
             const [validMoves, setValidMoves] = useState([]); // ['left', 'right', 'both']
             const [notification, setNotification] = useState(null);
+            const [searching, setSearching] = useState(false);
             
             const wsRef = useRef(null);
             const boardScrollRef = useRef(null);
@@ -214,17 +215,27 @@
                         setScreen('game');
                         setSelectedTileIndex(null);
                         setValidMoves([]);
+                        setSearching(false); // Reset searching state
                         if(data.type === 'gameStart') showNotification('Oyun Başladı!', 'success');
                         break;
                     case 'error':
                         showNotification(data.message, 'error');
+                        setSearching(false); // Reset on error
                         break;
                     case 'gameEnd':
                         showNotification(`Oyun Bitti! Kazanan: ${data.winnerName}`, 'info');
-                        setTimeout(() => { setScreen('lobby'); setGameState(null); }, 4000);
+                        setTimeout(() => { setScreen('lobby'); setGameState(null); setRoomCode(''); setSearching(false); }, 4000);
+                        break;
+                    case 'searchCancelled':
+                        showNotification('Arama iptal edildi', 'info');
+                        setSearching(false);
+                        break;
+                    case 'searchStatus':
+                        // Status message from server
                         break;
                     case 'matchFound':
                         showNotification('Rakip Bulundu!', 'success');
+                        setSearching(false);
                         break;
                 }
             };
@@ -329,13 +340,27 @@
                             <button 
                                 onClick={() => {
                                     if(!playerName) return showNotification('İsim giriniz', 'error');
+                                    if(searching) return; // Prevent multiple clicks
+                                    setSearching(true);
                                     sendMessage({ type: 'findMatch', playerName });
                                 }}
-                                disabled={!connected}
-                                className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4 flex items-center justify-center gap-2"
+                                disabled={!connected || searching}
+                                className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4 flex items-center justify-center gap-2"
                             >
-                                <span>🏆</span> Dereceli Maç Ara
+                                <span>🏆</span> {searching ? 'Rakip Aranıyor...' : 'Dereceli Maç Ara'}
                             </button>
+
+                            {searching && (
+                                <button 
+                                    onClick={() => {
+                                        setSearching(false);
+                                        sendMessage({ type: 'cancelSearch' });
+                                    }}
+                                    className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4"
+                                >
+                                    ❌ Aramayı İptal Et
+                                </button>
+                            )}
 
                             <div className="flex items-center gap-2 my-4">
                                 <div className="h-px bg-white/10 flex-1"></div>
@@ -347,9 +372,11 @@
                                 <button 
                                     onClick={() => {
                                         if(!playerName) return showNotification('İsim giriniz', 'error');
+                                        if(roomCode) return; // Prevent creating multiple rooms
                                         sendMessage({ type: 'createRoom', playerName });
                                     }}
-                                    className="bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl text-sm font-semibold transition-colors"
+                                    disabled={roomCode !== ''}
+                                    className="bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-semibold transition-colors"
                                 >
                                     Oda Kur
                                 </button>
