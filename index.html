@@ -204,13 +204,14 @@
         // --- ANA OYUN ---
 
         const DominoGame = () => {
-            const [screen, setScreen] = useState('loading'); // loading, lobby, game, leaderboard
+            const [screen, setScreen] = useState('loading'); // loading, lobby, searching, game, leaderboard
             const [connected, setConnected] = useState(false);
             const [playerData, setPlayerData] = useState(null); // Telegram user data
             const [leaderboard, setLeaderboard] = useState([]);
             const [roomCode, setRoomCode] = useState('');
             const [joinCode, setJoinCode] = useState('');
             const [gameState, setGameState] = useState(null);
+            const [searchTime, setSearchTime] = useState(0);
             
             // Oyun İçi State
             const [selectedTileIndex, setSelectedTileIndex] = useState(null);
@@ -220,6 +221,7 @@
             
             const wsRef = useRef(null);
             const boardScrollRef = useRef(null);
+            const searchTimerRef = useRef(null);
 
             // Ses Efektleri (Opsiyonel - Tarayıcı izin verirse çalışır)
             const playSound = (type) => {
@@ -240,11 +242,13 @@
                         const user = tg.initDataUnsafe.user;
                         const telegramData = {
                             telegramId: user.id.toString(),
-                            username: user.username || user.first_name,
-                            firstName: user.first_name,
-                            lastName: user.last_name,
+                            username: user.username || user.first_name || 'User',
+                            firstName: user.first_name || '',
+                            lastName: user.last_name || '',
                             photoUrl: user.photo_url || null
                         };
+
+                        console.log('📡 Telegram kullanıcısı:', telegramData);
 
                         // MongoDB'ye kaydet/güncelle
                         const response = await fetch(`${API_URL}/api/auth/telegram`, {
@@ -255,31 +259,43 @@
 
                         const data = await response.json();
                         if (data.success) {
-                            setPlayerData(data.player);
-                            console.log('✅ Telegram Auth başarılı:', data.player.username);
+                            setPlayerData({
+                                ...data.player,
+                                isGuest: false,
+                                photoUrl: telegramData.photoUrl || data.player.photoUrl
+                            });
+                            console.log('✅ Telegram Auth başarılı:', data.player);
                         } else {
                             throw new Error('Auth failed');
                         }
                     } else {
                         // Normal tarayıcı - Guest mode
-                        setPlayerData({ 
+                        const guestData = { 
                             isGuest: true, 
                             username: 'Guest' + Math.floor(Math.random() * 9999),
+                            firstName: '',
+                            lastName: '',
+                            photoUrl: null,
                             level: 0,
-                            elo: 0
-                        });
-                        console.log('👥 Guest mode');
+                            elo: 0,
+                            telegramId: null
+                        };
+                        setPlayerData(guestData);
+                        console.log('👥 Guest mode:', guestData);
                     }
                 } catch (error) {
                     console.error('Auth error:', error);
                     setPlayerData({ 
                         isGuest: true, 
                         username: 'Guest' + Math.floor(Math.random() * 9999), 
+                        firstName: '',
+                        lastName: '',
+                        photoUrl: null,
                         level: 0, 
-                        elo: 0 
+                        elo: 0,
+                        telegramId: null
                     });
                 } finally {
-                    // Her durumda lobby'ye geç
                     setScreen('lobby');
                 }
             };
@@ -327,22 +343,47 @@
             };
 
             const handleServerMessage = (data) => {
+                console.log('📨 Server mesajı:', data.type, data);
+                
                 switch(data.type) {
                     case 'roomCreated':
                         setRoomCode(data.roomCode);
                         break;
                     case 'gameStart':
-                    case 'gameUpdate':
+                        console.log('🎮 Oyun başlıyor...', data.gameState);
                         setGameState(data.gameState);
                         setScreen('game');
                         setSelectedTileIndex(null);
                         setValidMoves([]);
                         setSearching(false);
-                        if(data.type === 'gameStart') showNotification('Oyun Başladı!', 'success');
+                        // Timer durdur
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
+                        showNotification('Oyun Başladı!', 'success');
+                        break;
+                    case 'gameUpdate':
+                        console.log('🔄 Oyun güncelleniyor...', data.gameState);
+                        if (data.gameState && data.gameState.board) {
+                            setGameState(prevState => ({
+                                ...prevState,
+                                ...data.gameState,
+                                playerId: prevState?.playerId || data.gameState.playerId
+                            }));
+                            setSelectedTileIndex(null);
+                            setValidMoves([]);
+                        }
                         break;
                     case 'error':
                         showNotification(data.message, 'error');
                         setSearching(false);
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
                         break;
                     case 'gameEnd':
                         const isRanked = data.isRanked;
@@ -361,7 +402,6 @@
                             setRoomCode(''); 
                             setSearching(false);
                             if (isRanked && playerData && !playerData.isGuest) {
-                                // ELO güncellendi, yeniden auth yap
                                 initializeTelegramAuth();
                             }
                         }, 4000);
@@ -369,12 +409,23 @@
                     case 'searchCancelled':
                         showNotification('Arama iptal edildi', 'info');
                         setSearching(false);
+                        setScreen('lobby');
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
                         break;
                     case 'searchStatus':
                         break;
                     case 'matchFound':
                         showNotification(`Rakip Bulundu! ${data.gameType === 'ranked' ? '🏆 RANKED' : '🎮 CASUAL'}`, 'success');
                         setSearching(false);
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
                         break;
                 }
             };
@@ -462,6 +513,99 @@
                 showNotification('🎲 Pazardan taş çekiliyor...', 'info');
             };
 
+            // --- SEARCHING LOBBY ---
+            if (screen === 'searching') {
+                const minutes = Math.floor(searchTime / 60);
+                const seconds = searchTime % 60;
+                const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6 relative overflow-hidden">
+                        {/* Animated Background */}
+                        <div className="absolute inset-0 overflow-hidden">
+                            {[...Array(20)].map((_, i) => 
+                                <div
+                                    key={i}
+                                    className="absolute animate-pulse"
+                                    style={{
+                                        left: `${Math.random() * 100}%`,
+                                        top: `${Math.random() * 100}%`,
+                                        width: `${Math.random() * 4 + 2}px`,
+                                        height: `${Math.random() * 4 + 2}px`,
+                                        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                                        borderRadius: '50%',
+                                        animationDelay: `${Math.random() * 2}s`,
+                                        animationDuration: `${Math.random() * 3 + 2}s`
+                                    }}
+                                />
+                            )}
+                        </div>
+
+                        {notification && <Toast message={notification.message} type={notification.type} />}
+
+                        <div className="relative z-10 max-w-md w-full">
+                            <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20">
+                                {/* Player Card */}
+                                <div className="text-center mb-8">
+                                    {playerData?.photoUrl && (
+                                        <img src={playerData.photoUrl} alt="Profile" className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 animate-pulse" />
+                                    )}
+                                    <h2 className="text-white text-2xl font-bold mb-2">{playerData?.username}</h2>
+                                    {!playerData?.isGuest && (
+                                        <div className="flex justify-center gap-3">
+                                            <span className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-4 py-1 rounded-full text-sm font-bold">
+                                                LVL {playerData?.level}
+                                            </span>
+                                            <span className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-4 py-1 rounded-full text-sm font-bold">
+                                                {playerData?.elo} ELO
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Searching Animation */}
+                                <div className="mb-8">
+                                    <div className="w-32 h-32 mx-auto relative">
+                                        <div className="absolute inset-0 border-8 border-yellow-400/30 rounded-full"></div>
+                                        <div className="absolute inset-0 border-8 border-t-yellow-400 rounded-full animate-spin"></div>
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <span className="text-5xl">🎯</span>
+                                        </div>
+                                    </div>
+                                    <h3 className="text-white text-2xl font-bold text-center mt-6 mb-2">Rakip Aranıyor...</h3>
+                                    <p className="text-white/70 text-center text-sm mb-4">
+                                        {!playerData?.isGuest ? '🏆 Dereceli Maç' : '🎮 Casual Maç'}
+                                    </p>
+                                    
+                                    {/* Timer */}
+                                    <div className="bg-black/30 rounded-xl p-4 text-center mb-6">
+                                        <div className="text-white text-4xl font-mono font-bold">{timeString}</div>
+                                        <div className="text-white/60 text-sm mt-1">Geçen Süre</div>
+                                    </div>
+                                </div>
+
+                                {/* Cancel Button */}
+                                <button
+                                    onClick={() => {
+                                        setSearching(false);
+                                        setScreen('lobby');
+                                        if (searchTimerRef.current) {
+                                            clearInterval(searchTimerRef.current);
+                                            searchTimerRef.current = null;
+                                        }
+                                        setSearchTime(0);
+                                        sendMessage({ type: 'cancelSearch' });
+                                    }}
+                                    className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all"
+                                >
+                                    ❌ Aramayı İptal Et
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
             // --- LOBBY EKRANI ---
             if (screen === 'loading') {
                 return (
@@ -514,7 +658,18 @@
                                 onClick={() => {
                                     if(!playerData) return showNotification('İsim giriniz', 'error');
                                     if(searching) return;
+                                    
+                                    // Özel arama ekranına geç
+                                    setScreen('searching');
                                     setSearching(true);
+                                    setSearchTime(0);
+                                    
+                                    // Timer başlat
+                                    searchTimerRef.current = setInterval(() => {
+                                        setSearchTime(prev => prev + 1);
+                                    }, 1000);
+                                    
+                                    // Server'a gönder
                                     sendMessage({ 
                                         type: 'findMatch', 
                                         ...playerData,
@@ -524,20 +679,8 @@
                                 disabled={!connected || searching}
                                 className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4 flex items-center justify-center gap-2"
                             >
-                                <span>🏆</span> {searching ? 'Rakip Aranıyor...' : (!playerData?.isGuest ? 'Dereceli Maç Ara' : 'Maç Ara (Casual)')}
+                                <span>🏆</span> {!playerData?.isGuest ? 'Dereceli Maç Ara' : 'Maç Ara (Casual)'}
                             </button>
-
-                            {searching && (
-                                <button 
-                                    onClick={() => {
-                                        setSearching(false);
-                                        sendMessage({ type: 'cancelSearch' });
-                                    }}
-                                    className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4"
-                                >
-                                    ❌ Aramayı İptal Et
-                                </button>
-                            )}
 
                             <div className="flex items-center gap-2 my-4">
                                 <div className="h-px bg-white/10 flex-1"></div>
