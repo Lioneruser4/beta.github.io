@@ -66,8 +66,23 @@ function initializeGame(roomCode, player1Id, player2Id) {
     const tiles = createDominoSet();
     const player1Hand = tiles.slice(0, 7);
     const player2Hand = tiles.slice(7, 14);
+    const market = tiles.slice(14); // Kalan taşlar pazar
 
     const room = rooms.get(roomCode);
+    
+    // En yüksek çifti bul (6|6, 5|5, 4|4, ...)
+    let startingPlayer = player1Id;
+    let highestDouble = -1;
+    
+    for (let player of [player1Id, player2Id]) {
+        const hand = player === player1Id ? player1Hand : player2Hand;
+        for (let tile of hand) {
+            if (tile[0] === tile[1] && tile[0] > highestDouble) {
+                highestDouble = tile[0];
+                startingPlayer = player;
+            }
+        }
+    }
     
     room.gameState = {
         board: [],
@@ -75,12 +90,15 @@ function initializeGame(roomCode, player1Id, player2Id) {
             [player1Id]: { hand: player1Hand, name: room.players[player1Id].name },
             [player2Id]: { hand: player2Hand, name: room.players[player2Id].name }
         },
-        currentPlayer: player1Id,
+        market: market,
+        currentPlayer: startingPlayer,
         turn: 1,
-        lastMove: null
+        lastMove: null,
+        startingDouble: highestDouble
     };
 
     rooms.set(roomCode, room);
+    console.log(`🎮 Oyun başlatıldı - Başlayan: ${startingPlayer === player1Id ? room.players[player1Id].name : room.players[player2Id].name} (${highestDouble}|${highestDouble})`);
     return room.gameState;
 }
 
@@ -204,7 +222,7 @@ wss.on('connection', (ws, req) => {
                 case 'createRoom': handleCreateRoom(ws, data); break;
                 case 'joinRoom': handleJoinRoom(ws, data); break;
                 case 'playTile': handlePlayTile(ws, data); break;
-                case 'pass': handlePass(ws); break;
+                case 'drawFromMarket': handleDrawFromMarket(ws); break;
             }
         } catch (error) {
             console.error('Hata:', error);
@@ -379,7 +397,6 @@ function handlePass(ws) {
     const gs = room.gameState;
     if (gs.currentPlayer !== ws.playerId) return;
 
-    // Kritik Düzeltme: Eğer oyuncunun elinde oynanabilir taş varsa pas geçemez!
     const playerHand = gs.players[ws.playerId].hand;
     const canPlay = playerHand.some(tile => canPlayTile(tile, gs.board));
 
@@ -387,12 +404,9 @@ function handlePass(ws) {
         return sendMessage(ws, { type: 'error', message: 'Elinizde oynanabilir taş var, pas geçemezsiniz!' });
     }
 
-    // Oyun kilitlendi mi kontrolü (İki taraf da oynayamıyorsa)
-    // Bu basit pas mantığı. Gelişmiş versiyonda iki taraf da pas geçerse oyun biter.
     gs.turn++;
     gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
     
-    // Pas geçince oyunun kilitlenip kilitlenmediğini kontrol et
     const winner = checkWinner(gs);
     if (winner) {
         broadcastToRoom(ws.roomCode, { 
@@ -404,6 +418,53 @@ function handlePass(ws) {
     } else {
         Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
     }
+}
+
+function handleDrawFromMarket(ws) {
+    const room = rooms.get(ws.roomCode);
+    if (!room || !room.gameState) return;
+
+    const gs = room.gameState;
+    if (gs.currentPlayer !== ws.playerId) return sendMessage(ws, { type: 'error', message: 'Sıra sizde değil' });
+
+    const player = gs.players[ws.playerId];
+    
+    // Pazarda taş var mı?
+    if (!gs.market || gs.market.length === 0) {
+        // Pazar boş, otomatik sıra geç
+        console.log(`🎲 ${player.name} pazardan çekemedi (boş) - Sıra geçiyor`);
+        gs.turn++;
+        gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
+        Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+        return;
+    }
+
+    // Pazardan taş çek
+    const drawnTile = gs.market.shift();
+    player.hand.push(drawnTile);
+    
+    console.log(`🎲 ${player.name} pazardan taş çekti: [${drawnTile}] - Kalan: ${gs.market.length}`);
+    
+    // Çekilen taş oynanabilir mi kontrol et
+    const canPlayDrawn = canPlayTile(drawnTile, gs.board);
+    
+    if (!canPlayDrawn) {
+        // Oynanamıyor, tekrar çekmeli mi yoksa sıra geçmeli mi?
+        // Domino kurallarına göre: Oynanabilir taş bulana kadar çeker
+        const hasPlayable = player.hand.some(tile => canPlayTile(tile, gs.board));
+        
+        if (!hasPlayable && gs.market.length > 0) {
+            // Hala oynanabilir taş yok ve pazar doluysa, oyuncu tekrar çekebilir
+            sendMessage(ws, { type: 'info', message: 'Taş oynanamıyor, tekrar çekin veya bekleyin' });
+        } else if (!hasPlayable && gs.market.length === 0) {
+            // Pazar bitti ve hala oynanabilir taş yok - sıra geç
+            console.log(`❌ ${player.name} oynanabilir taş bulamadı - Sıra geçiyor`);
+            gs.turn++;
+            gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
+        }
+    }
+    
+    Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
 }
 
 function handleDisconnect(ws) {
