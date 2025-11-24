@@ -228,17 +228,32 @@ wss.on('close', () => clearInterval(pingInterval));
 // --- OYUN MANTIKLARI ---
 
 function handleFindMatch(ws, data) {
-    const playerId = generateRoomCode();
+    // Eğer zaten kuyruktaysa veya oyundaysa, tekrar ekleme
+    if (ws.playerId && playerConnections.has(ws.playerId)) {
+        const existingInQueue = matchQueue.find(p => p.playerId === ws.playerId);
+        if (existingInQueue) {
+            return sendMessage(ws, { type: 'error', message: 'Zaten kuyrukta bekliyorsunuz' });
+        }
+        if (ws.roomCode) {
+            return sendMessage(ws, { type: 'error', message: 'Zaten bir oyundasınız' });
+        }
+    }
+
+    const playerId = ws.playerId || generateRoomCode();
     ws.playerId = playerId;
     ws.playerName = data.playerName;
     playerConnections.set(playerId, ws);
     matchQueue.push({ ws, playerId, playerName: data.playerName });
+
+    console.log(`✅ ${data.playerName} (${playerId}) kuyrukta - Toplam: ${matchQueue.length}`);
 
     if (matchQueue.length >= 2) {
         const p1 = matchQueue.shift();
         const p2 = matchQueue.shift();
         const roomCode = generateRoomCode();
         
+        console.log(`🎮 Maç oluşturuluyor: ${p1.playerName} vs ${p2.playerName}`);
+
         const room = {
             code: roomCode,
             players: { [p1.playerId]: { name: p1.playerName }, [p2.playerId]: { name: p2.playerName } },
@@ -257,15 +272,20 @@ function handleFindMatch(ws, data) {
         setTimeout(() => {
             sendGameState(roomCode, p1.playerId);
             sendGameState(roomCode, p2.playerId);
-            // Sadece ilk başlatma mesajı
-            broadcastToRoom(roomCode, { type: 'gameStart', gameState });
+            console.log(`✅ Oyun başladı: ${roomCode}`);
         }, 500);
+    } else {
+        sendMessage(ws, { type: 'searchStatus', message: 'Rakip aranıyor...' });
     }
 }
 
 function handleCancelSearch(ws) {
     const index = matchQueue.findIndex(p => p.ws === ws);
-    if (index !== -1) matchQueue.splice(index, 1);
+    if (index !== -1) {
+        matchQueue.splice(index, 1);
+        console.log(`❌ ${ws.playerName} aramayı iptal etti - Kalan: ${matchQueue.length}`);
+        sendMessage(ws, { type: 'searchCancelled', message: 'Arama iptal edildi' });
+    }
 }
 
 function handleCreateRoom(ws, data) {
@@ -387,11 +407,18 @@ function handlePass(ws) {
 }
 
 function handleDisconnect(ws) {
+    console.log(`🔌 Oyuncu ayrıldı: ${ws.playerName || 'Bilinmeyen'}`);
+    
     if (ws.playerId) playerConnections.delete(ws.playerId);
+    
     const qIdx = matchQueue.findIndex(p => p.ws === ws);
-    if (qIdx !== -1) matchQueue.splice(qIdx, 1);
+    if (qIdx !== -1) {
+        matchQueue.splice(qIdx, 1);
+        console.log(`❌ Kuyruktan çıkarıldı - Kalan: ${matchQueue.length}`);
+    }
 
     if (ws.roomCode) {
+        console.log(`🏠 Odadan ayrıldı: ${ws.roomCode}`);
         broadcastToRoom(ws.roomCode, { type: 'playerDisconnected' });
         rooms.delete(ws.roomCode);
     }
