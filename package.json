@@ -1,7 +1,7 @@
 {
-  "name": "american-checkers-online",
-  "version": "1.0.0",
-  "description": "Online American Checkers Game with Socket.io",
+  "name": "domino-101-online",
+  "version": "2.0.0",
+  "description": "Professional Domino 101 Game with MongoDB, ELO System & Telegram Integration",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -9,12 +9,14 @@
   },
   "dependencies": {
     "express": "^4.18.2",
-    "socket.io": "^4.7.5"
+    "ws": "^8.16.0",
+    "mongoose": "^8.0.3",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
   },
-  "keywords": ["checkers", "game", "socket.io", "multiplayer", "azerbaijani"],
+  "keywords": ["domino", "101", "game", "websocket", "multiplayer", "mongodb", "elo", "telegram"],
   "author": "Developer",
   "license": "MIT"
 }
