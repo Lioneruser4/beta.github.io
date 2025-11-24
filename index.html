@@ -6,7 +6,10 @@
     <meta name="theme-color" content="#1b4d3e">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Domino Pro | 3D Mobile</title>
+    <title>Domino 101 Pro - Telegram Game</title>
+    
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -129,6 +132,16 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
+        // Telegram WebApp Initialization
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // API Base URL
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
+
         // --- BİLEŞENLER ---
 
         // 1. Domino Noktaları (Pips)
@@ -191,9 +204,10 @@
         // --- ANA OYUN ---
 
         const DominoGame = () => {
-            const [screen, setScreen] = useState('lobby'); // lobby, game
+            const [screen, setScreen] = useState('loading'); // loading, lobby, game, leaderboard
             const [connected, setConnected] = useState(false);
-            const [playerName, setPlayerName] = useState('');
+            const [playerData, setPlayerData] = useState(null); // Telegram user data
+            const [leaderboard, setLeaderboard] = useState([]);
             const [roomCode, setRoomCode] = useState('');
             const [joinCode, setJoinCode] = useState('');
             const [gameState, setGameState] = useState(null);
@@ -213,9 +227,67 @@
             };
 
             useEffect(() => {
+                initializeTelegramAuth();
                 connectToServer();
                 return () => { if (wsRef.current) wsRef.current.close(); };
             }, []);
+
+            // Telegram Auth
+            const initializeTelegramAuth = async () => {
+                try {
+                    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                        // Telegram WebApp - Otomatik giriş
+                        const user = tg.initDataUnsafe.user;
+                        const telegramData = {
+                            telegramId: user.id.toString(),
+                            username: user.username || user.first_name,
+                            firstName: user.first_name,
+                            lastName: user.last_name,
+                            photoUrl: user.photo_url || null
+                        };
+
+                        // MongoDB'ye kaydet/güncelle
+                        const response = await fetch(`${API_URL}/api/auth/telegram`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(telegramData)
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            setPlayerData(data.player);
+                            console.log('✅ Telegram Auth başarılı:', data.player.username);
+                        }
+                    } else {
+                        // Normal tarayıcı - Guest mode
+                        setPlayerData({ 
+                            isGuest: true, 
+                            username: 'Guest' + Math.floor(Math.random() * 9999),
+                            level: 0,
+                            elo: 0
+                        });
+                        console.log('👥 Guest mode');
+                    }
+                    setScreen('lobby');
+                } catch (error) {
+                    console.error('Auth error:', error);
+                    setPlayerData({ isGuest: true, username: 'Guest' + Math.floor(Math.random() * 9999), level: 0, elo: 0 });
+                    setScreen('lobby');
+                }
+            };
+
+            // Leaderboard yükle
+            const loadLeaderboard = async () => {
+                try {
+                    const response = await fetch(`${API_URL}/api/leaderboard`);
+                    const data = await response.json();
+                    if (data.success) {
+                        setLeaderboard(data.leaderboard);
+                    }
+                } catch (error) {
+                    console.error('Leaderboard error:', error);
+                }
+            };
 
             // Otomatik Kaydırma: Oyun güncellendiğinde tahtayı ortala veya sona git
             useEffect(() => {
@@ -257,33 +329,43 @@
                         setScreen('game');
                         setSelectedTileIndex(null);
                         setValidMoves([]);
-                        setSearching(false); // Reset searching state
+                        setSearching(false);
                         if(data.type === 'gameStart') showNotification('Oyun Başladı!', 'success');
                         break;
                     case 'error':
                         showNotification(data.message, 'error');
-                        setSearching(false); // Reset on error
+                        setSearching(false);
                         break;
                     case 'gameEnd':
-                        showNotification(`Oyun Bitti! Kazanan: ${data.winnerName}`, 'info');
-                        // Zafer kutlama efekti
-                        if (data.winner === gameState?.playerId) {
-                            // Kazandın!
+                        const isRanked = data.isRanked;
+                        const winMsg = `Oyun Bitti! Kazanan: ${data.winnerName}`;
+                        const eloMsg = data.eloChanges ? ` (ELO: ${data.eloChanges.winner > 0 ? '+' : ''}${data.eloChanges.winner})` : '';
+                        showNotification(winMsg + (isRanked ? eloMsg : ' (Casual)'), 'info');
+                        
+                        if (data.winner === gameState?.playerId && isRanked) {
                             setTimeout(() => {
-                                setNotification({ message: '🏆 KAZANDINIZ! 🎉', type: 'success' });
+                                setNotification({ message: `🏆 KAZANDINIZ! ${eloMsg}`, type: 'success' });
                             }, 500);
                         }
-                        setTimeout(() => { setScreen('lobby'); setGameState(null); setRoomCode(''); setSearching(false); }, 4000);
+                        setTimeout(() => { 
+                            setScreen('lobby'); 
+                            setGameState(null); 
+                            setRoomCode(''); 
+                            setSearching(false);
+                            if (isRanked && playerData && !playerData.isGuest) {
+                                // ELO güncellendi, yeniden auth yap
+                                initializeTelegramAuth();
+                            }
+                        }, 4000);
                         break;
                     case 'searchCancelled':
                         showNotification('Arama iptal edildi', 'info');
                         setSearching(false);
                         break;
                     case 'searchStatus':
-                        // Status message from server
                         break;
                     case 'matchFound':
-                        showNotification('Rakip Bulundu!', 'success');
+                        showNotification(`Rakip Bulundu! ${data.gameType === 'ranked' ? '🏆 RANKED' : '🎮 CASUAL'}`, 'success');
                         setSearching(false);
                         break;
                 }
