@@ -332,32 +332,56 @@ function initializeGame(roomCode, player1Id, player2Id) {
 
     const room = rooms.get(roomCode);
     
-    // En yüksek çifti bul (6|6, 5|5, 4|4, ...)
+    // Önce en düşük çifti bul (1|1, 2|2, 3|3, ...)
     let startingPlayer = player1Id;
-    let highestDouble = -1;
+    let lowestDouble = 7; // 7 doesn't exist, so any double will be lower
+    let lowestNonDouble = 13; // 13 doesn't exist, so any tile will be lower
+    let lowestNonDoubleTile = null;
     
     // Önce player1 elini kontrol et
     for (let tile of player1Hand) {
-        if (tile[0] === tile[1] && tile[0] > highestDouble) {
-            highestDouble = tile[0];
+        if (tile[0] === tile[1] && tile[0] < lowestDouble) {
+            lowestDouble = tile[0];
             startingPlayer = player1Id;
+        } else if (tile[0] + tile[1] < lowestNonDouble) {
+            lowestNonDouble = tile[0] + tile[1];
+            lowestNonDoubleTile = tile;
         }
     }
     
     // Sonra player2 elini kontrol et
     for (let tile of player2Hand) {
-        if (tile[0] === tile[1] && tile[0] > highestDouble) {
-            highestDouble = tile[0];
+        if (tile[0] === tile[1] && tile[0] < lowestDouble) {
+            lowestDouble = tile[0];
             startingPlayer = player2Id;
+        } else if (tile[0] + tile[1] < lowestNonDouble) {
+            lowestNonDouble = tile[0] + tile[1];
+            lowestNonDoubleTile = tile;
         }
     }
     
-    // Eğer hiç çift yoksa, player1 başlasın
-    if (highestDouble === -1) {
-        startingPlayer = player1Id;
-        console.log(`🎲 Çift taş bulunamadı, ${room.players[player1Id].name} başlıyor`);
+    // Eğer hiç çift yoksa, en düşük toplamı olan oyuncu başlasın
+    if (lowestDouble === 7 && lowestNonDoubleTile) {
+        // Hangi oyuncuda bu taş var?
+        for (let tile of player1Hand) {
+            if (tile[0] === lowestNonDoubleTile[0] && tile[1] === lowestNonDoubleTile[1]) {
+                startingPlayer = player1Id;
+                break;
+            }
+        }
+        for (let tile of player2Hand) {
+            if (tile[0] === lowestNonDoubleTile[0] && tile[1] === lowestNonDoubleTile[1]) {
+                startingPlayer = player2Id;
+                break;
+            }
+        }
+        console.log(`🎲 En düşük taş: [${lowestNonDoubleTile}] - ${room.players[startingPlayer].name} başlıyor`);
+    } else if (lowestDouble < 7) {
+        console.log(`🎲 Başlangıç çifti: ${lowestDouble}|${lowestDouble} - ${room.players[startingPlayer].name} başlıyor`);
     } else {
-        console.log(`🎲 Başlangıç çifti: ${highestDouble}|${highestDouble} - ${room.players[startingPlayer].name} başlıyor`);
+        // Eğer hiç uygun taş yoksa, player1 başlasın
+        startingPlayer = player1Id;
+        console.log(`🎲 Uygun taş bulunamadı, ${room.players[player1Id].name} başlıyor`);
     }
     
     room.gameState = {
@@ -370,7 +394,7 @@ function initializeGame(roomCode, player1Id, player2Id) {
         currentPlayer: startingPlayer,
         turn: 1,
         lastMove: null,
-        startingDouble: highestDouble,
+        startingDouble: lowestDouble < 7 ? lowestDouble : -1,
         // AFK tracking
         playerLastAction: {
             [player1Id]: Date.now(),
@@ -525,6 +549,8 @@ wss.on('connection', (ws, req) => {
                 case 'cancelSearch': handleCancelSearch(ws); break;
                 case 'createRoom': handleCreateRoom(ws, data); break;
                 case 'joinRoom': handleJoinRoom(ws, data); break;
+                case 'rejoinRoom': handleRejoinRoom(ws, data); break;
+                case 'playerDisconnected': handlePlayerDisconnected(ws, data); break;
                 case 'playTile': handlePlayTile(ws, data); break;
                 case 'drawFromMarket': handleDrawFromMarket(ws); break;
             }
@@ -728,6 +754,43 @@ function handleJoinRoom(ws, data) {
             if(socket) socket.send(JSON.stringify({ type: 'gameStart', gameState: {...gameState, playerId: pid} }));
         });
     }, 500);
+}
+
+function handleRejoinRoom(ws, data) {
+    const room = rooms.get(data.roomCode);
+    if (!room) {
+        return sendMessage(ws, { type: 'error', message: 'Oda bulunamadı' });
+    }
+
+    // Find the player in the room
+    let playerId = null;
+    for (const [id, player] of Object.entries(room.players)) {
+        if (player.telegramId === data.telegramId || player.name === data.playerName) {
+            playerId = id;
+            break;
+        }
+    }
+
+    if (!playerId) {
+        return sendMessage(ws, { type: 'error', message: 'Oyuncu bulunamadı' });
+    }
+
+    // Update the websocket connection
+    ws.playerId = playerId;
+    ws.playerName = data.playerName;
+    ws.roomCode = data.roomCode;
+    playerConnections.set(playerId, ws);
+
+    // Send current game state
+    if (room.gameState) {
+        sendGameState(data.roomCode, playerId);
+        sendMessage(ws, { type: 'gameStart', gameState: { ...room.gameState, playerId } });
+    }
+}
+
+function handlePlayerDisconnected(ws, data) {
+    // This is just for client-side notification, server-side cleanup is done in handleDisconnect
+    console.log(`📤 Player disconnected notification: ${ws.playerName || 'Unknown'}`);
 }
 
 function makeAutoMove(roomCode, playerId) {
