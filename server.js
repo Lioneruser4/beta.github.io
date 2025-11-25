@@ -86,9 +86,10 @@ function calculateElo(winnerElo, loserElo, winnerLevel) {
 // Level Calculation - Every 100 points = 1 level
 function calculateLevel(elo) {
     // Level 1: 0-99 ELO
-    // Level 2: 100-199 ELO
+    // Level 2: 100-199 ELO  
     // Level 3: 200-299 ELO
     // ...
+    // Example: 156 ELO = Level 2, 200 ELO = Level 3
     return Math.floor(elo / 100) + 1;
 }
 
@@ -1173,37 +1174,49 @@ function handleDrawFromMarket(ws) {
 function handleDisconnect(ws) {
     console.log(`🔌 Oyuncu ayrıldı: ${ws.playerName || 'Bilinmeyen'}`);
     
-    if (ws.playerId) playerConnections.delete(ws.playerId);
-    
     // Remove from matchmaking queue
     const qIdx = matchQueue.findIndex(p => p.ws === ws);
     if (qIdx !== -1) {
         matchQueue.splice(qIdx, 1);
         console.log(`❌ Kuyruktan çıkarıldı - Kalan: ${matchQueue.length}`);
     }
-
-    // Handle active game disconnect
+    
     if (ws.roomCode) {
-        console.log(`🏠 Odadan ayrıldı: ${ws.roomCode}`);
         const room = rooms.get(ws.roomCode);
         
         if (room && room.gameState) {
-            // Notify other player and end game
+            // Oyun devam ediyorsa ve bu oyuncu oyundayken ayrıldıysa
+            const remainingPlayerId = Object.keys(room.gameState.players).find(id => id !== ws.playerId);
+            
+            if (remainingPlayerId) {
+                // Kalan oyuncuyu otomatik olarak kazanan yap
+                console.log(`🏆 ${room.players[remainingPlayerId].name} otomatik kazandı (rakip ayrıldı)`);
+                
+                // ELO hesaplaması ve oyun sonu işlemleri
+                handleGameEnd(ws.roomCode, remainingPlayerId, room.gameState);
+                
+                return; // Oyun zaten bitti, room silinecek
+            }
+            
+            // Eğer kalan oyuncu yoksa sadece notification gönder
             broadcastToRoom(ws.roomCode, { 
                 type: 'playerDisconnected',
                 message: 'Rakip oyundan ayrıldı',
                 reason: 'disconnect'
             }, ws.playerId);
-            
-            // Clean up room after short delay to allow message delivery
-            setTimeout(() => {
-                rooms.delete(ws.roomCode);
-                console.log(`🗑️ Oda silindi: ${ws.roomCode}`);
-            }, 1000);
-        } else {
-            // No active game, just delete room
-            rooms.delete(ws.roomCode);
         }
+        
+        // Clean up room after short delay to allow message delivery
+        setTimeout(() => {
+            rooms.delete(ws.roomCode);
+            console.log(`🗑️ Oda silindi: ${ws.roomCode}`);
+        }, 1000);
+    }
+    
+    // Clean up player connections
+    if (ws.playerId) {
+        playerConnections.delete(ws.playerId);
+        playerSessions.delete(ws.playerId);
     }
 }
 
