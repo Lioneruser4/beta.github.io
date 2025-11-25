@@ -124,6 +124,13 @@ socket.on('gameOver', (data) => {
 socket.on('opponentLeft', (data) => {
     // Raqib cikdiqda qalib olunur
     const eloChange = data.eloChange || 25;
+    
+    // Oyun ekraninda iken bildirim goster
+    if (gameState.gameStarted) {
+        showModal('🎉 Raqip cikdi! Qazandiniz! (+25 ELO)');
+    }
+    
+    // Sonuc lobisine gonder
     showResultLobby(true, eloChange);
 });
 
