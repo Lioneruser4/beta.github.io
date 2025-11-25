@@ -434,6 +434,13 @@
                     case 'opponentLeft':
                         // Raqib cikdiqda qalib olunur
                         const eloChange = 25;
+                        
+                        // Oyun ekraninda iken bildirim goster
+                        if (screen === 'game') {
+                            showNotification('🎉 Raqip cikdi! Qazandiniz! (+25 ELO)', 'success');
+                        }
+                        
+                        // Sonuc lobisine gonder
                         setScreen('result');
                         setNotification({ 
                             message: `🎉 Raqip cikdi! Qazandiniz! (+${eloChange} ELO)`, 
@@ -474,6 +481,14 @@
                 setNotification({ message: msg, type });
                 setTimeout(() => setNotification(null), 3000);
             };
+            
+            // Modal bildirim goster (oyun ekrani icin)
+            const showModal = (message) => {
+                if (screen === 'game') {
+                    setNotification({ message, type: 'info' });
+                    setTimeout(() => setNotification(null), 3000);
+                }
+            };
 
             // --- OYUN MANTIĞI ---
 
@@ -482,6 +497,19 @@
             const myHand = gameState?.players[myPlayerId]?.hand || [];
             const marketSize = gameState?.market?.length || 0;
             const canDrawFromMarket = marketSize > 0;
+
+            // Elinde oynanabilir taş var mı kontrol et
+            const hasValidTilesInHand = () => {
+                if (gameState.board.length === 0) return myHand.length > 0;
+                
+                const leftEnd = gameState.board[0][0];
+                const rightEnd = gameState.board[gameState.board.length - 1][1];
+                
+                return myHand.some(tile => {
+                    return tile[0] === leftEnd || tile[1] === leftEnd || 
+                           tile[0] === rightEnd || tile[1] === rightEnd;
+                });
+            };
 
             // calculateValidMoves fonksiyonu - EKSİKTİ!
             const calculateValidMoves = (tile) => {
@@ -556,7 +584,7 @@
             };
 
             const drawFromMarket = () => {
-                if (!isMyTurn || !canDrawFromMarket) return;
+                if (!isMyTurn || !canDrawFromMarket || hasValidTilesInHand()) return;
                 sendMessage({ type: 'drawFromMarket' });
                 showNotification('🎲 Pazardan taş çekiliyor...', 'info');
             };
@@ -853,6 +881,9 @@
                 const isWinner = notification?.isWinner || false;
                 const eloChange = notification?.eloChange || 0;
                 
+                // Rakibin bilgilerini al
+                const opponent = gameState ? Object.values(gameState.players).find(p => p.id !== myPlayerId) : null;
+                
                 return (
                     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6 relative overflow-hidden">
                         {/* Animated Background */}
@@ -877,12 +908,40 @@
 
                         <div className="relative z-10 max-w-md w-full">
                             <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20 text-center">
-                                {/* Player Card */}
-                                <div className="text-center mb-8">
-                                    {playerData?.photoUrl && (
-                                        <img src={playerData.photoUrl} alt="Profile" className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 animate-pulse" />
-                                    )}
-                                    <h2 className="text-white text-2xl font-bold mb-2">{playerData?.username}</h2>
+                                {/* Oyuncular */}
+                                <div className="flex justify-center gap-4 mb-8">
+                                    {/* Sen */}
+                                    <div className="text-center">
+                                        {playerData?.photoUrl ? (
+                                            <img src={playerData.photoUrl} alt="Sen" className="w-16 h-16 rounded-full mx-auto mb-2 border-2 border-green-400" />
+                                        ) : (
+                                            <div className="w-16 h-16 rounded-full mx-auto mb-2 bg-green-600 flex items-center justify-center">
+                                                👤
+                                            </div>
+                                        )}
+                                        <div className="text-white text-sm font-bold">{playerData?.username}</div>
+                                        {!playerData?.isGuest && (
+                                            <div className="text-xs text-green-400">LVL {playerData?.level}</div>
+                                        )}
+                                    </div>
+                                    
+                                    {/* VS */}
+                                    <div className="flex items-center text-white text-xl font-bold">VS</div>
+                                    
+                                    {/* Rakip */}
+                                    <div className="text-center">
+                                        {opponent?.photoUrl ? (
+                                            <img src={opponent.photoUrl} alt="Rakip" className="w-16 h-16 rounded-full mx-auto mb-2 border-2 border-red-400" />
+                                        ) : (
+                                            <div className="w-16 h-16 rounded-full mx-auto mb-2 bg-red-600 flex items-center justify-center">
+                                                👤
+                                            </div>
+                                        )}
+                                        <div className="text-white text-sm font-bold">{opponent?.username || 'Rakip'}</div>
+                                        {!opponent?.isGuest && (
+                                            <div className="text-xs text-red-400">LVL {opponent?.level || 0}</div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Result Message */}
@@ -924,13 +983,35 @@
                         {/* ÜST PANEL: Rakip */}
                         <div className="h-16 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between px-4 z-20">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center shadow-lg">
-                                    👤
-                                </div>
+                                {Object.values(gameState.players).find(p => p.id !== myPlayerId)?.photoUrl ? (
+                                    <img 
+                                        src={Object.values(gameState.players).find(p => p.id !== myPlayerId)?.photoUrl} 
+                                        alt="Rakip" 
+                                        className="w-10 h-10 rounded-full border-2 border-slate-600 shadow-lg"
+                                    />
+                                ) : (
+                                    <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center shadow-lg">
+                                        👤
+                                    </div>
+                                )}
                                 <div>
-                                    <div className="text-white text-sm font-bold shadow-black drop-shadow-md">🎯 RAIP</div>
-                                    <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
-                                        🎲 {Object.values(gameState.players).find(p => p.id !== myPlayerId)?.hand?.length || 0} Taş
+                                    <div className="text-white text-sm font-bold shadow-black drop-shadow-md">
+                                        {Object.values(gameState.players).find(p => p.id !== myPlayerId)?.username || '🎯 RAIP'}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {!Object.values(gameState.players).find(p => p.id !== myPlayerId)?.isGuest && (
+                                            <div className="text-xs text-yellow-400 bg-black/40 px-2 py-0.5 rounded-full inline-block">
+                                                LVL {Object.values(gameState.players).find(p => p.id !== myPlayerId)?.level || 0}
+                                            </div>
+                                        )}
+                                        <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
+                                            🎲 {Object.values(gameState.players).find(p => p.id !== myPlayerId)?.hand?.length || 0} Taş
+                                        </div>
+                                        {!Object.values(gameState.players).find(p => p.id !== myPlayerId)?.isGuest && (
+                                            <div className="text-xs text-blue-400 bg-black/40 px-2 py-0.5 rounded-full inline-block">
+                                                {Object.values(gameState.players).find(p => p.id !== myPlayerId)?.elo || 0} ELO
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1039,7 +1120,7 @@
                                     </button>
                                     {isMyTurn && (
                                         <div className="flex gap-2">
-                                            {canDrawFromMarket && validMoves.length === 0 && selectedTileIndex === null && (
+                                            {canDrawFromMarket && validMoves.length === 0 && selectedTileIndex === null && !hasValidTilesInHand() && (
                                                 <button 
                                                     onClick={drawFromMarket}
                                                     className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
