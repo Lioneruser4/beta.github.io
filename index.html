@@ -265,102 +265,30 @@
             };
 
             useEffect(() => {
-                // Telegram auth'ı 5 saniye içinde tamamlanmazsa guest mode'a geç
-                const authTimeout = setTimeout(() => {
-                    if (!playerData) {
-                        setPlayerData({ 
-                            isGuest: true, 
-                            username: 'Guest' + Math.floor(Math.random() * 9999), 
-                            firstName: '',
-                            lastName: '',
-                            photoUrl: null,
-                            level: 0, 
-                            elo: 0,
-                            telegramId: null
-                        });
-                        setScreen('lobby');
-                    }
-                }, 5000);
-
                 initializeTelegramAuth();
                 connectToServer();
                 
                 return () => { 
                     if (wsRef.current) wsRef.current.close(); 
-                    clearTimeout(authTimeout);
                 };
             }, []);
 
-            // Telegram Auth
+            // Telegram Auth - Geçici olarak devre dışı
             const initializeTelegramAuth = async () => {
-                // Eğer zaten playerData varsa tekrar çalıştırma
-                if (playerData) return;
-                
-                try {
-                    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                        // Telegram WebApp - Otomatik giriş
-                        const user = tg.initDataUnsafe.user;
-                        const telegramData = {
-                            telegramId: user.id.toString(),
-                            username: user.username || user.first_name || 'User',
-                            firstName: user.first_name || '',
-                            lastName: user.last_name || '',
-                            photoUrl: user.photo_url || null
-                        };
-
-                        console.log('📡 Telegram kullanıcısı:', telegramData);
-
-                        // MongoDB'ye kaydet/güncelle
-                        const response = await fetch(`${API_URL}/api/auth/telegram`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(telegramData)
-                        });
-
-                        const data = await response.json();
-                        if (data.success) {
-                            setPlayerData({
-                                ...data.player,
-                                isGuest: false,
-                                photoUrl: telegramData.photoUrl || data.player.photoUrl
-                            });
-                            setScreen('lobby');
-                            console.log('✅ Telegram Auth başarılı:', data.player);
-                        } else {
-                            throw new Error('Auth failed');
-                        }
-                    } else {
-                        // Normal tarayıcı - Guest mode
-                        const guestData = { 
-                            isGuest: true, 
-                            username: 'Guest' + Math.floor(Math.random() * 9999),
-                            firstName: '',
-                            lastName: '',
-                            photoUrl: null,
-                            level: 0,
-                            elo: 0,
-                            telegramId: null
-                        };
-                        setPlayerData(guestData);
-                        setScreen('lobby');
-                        console.log('👥 Guest mode:', guestData);
-                    }
-                } catch (error) {
-                    console.error('Auth error:', error);
-                    // Her hata durumunda guest mode'a geç
-                    const guestData = { 
-                        isGuest: true, 
-                        username: 'Guest' + Math.floor(Math.random() * 9999), 
-                        firstName: '',
-                        lastName: '',
-                        photoUrl: null,
-                        level: 0, 
-                        elo: 0,
-                        telegramId: null
-                    };
-                    setPlayerData(guestData);
-                    setScreen('lobby');
-                }
+                // Her zaman guest mode kullan
+                const guestData = { 
+                    isGuest: true, 
+                    username: 'Guest' + Math.floor(Math.random() * 9999), 
+                    firstName: '',
+                    lastName: '',
+                    photoUrl: null,
+                    level: 0,
+                    elo: 0,
+                    telegramId: null
+                };
+                setPlayerData(guestData);
+                setScreen('lobby');
+                console.log('👥 Guest mode (geçici):', guestData);
             };
 
             // Leaderboard yükle
@@ -971,14 +899,12 @@
                             >
                                 🏆 Skor Tablosu
                             </button>
-                            {playerData?.telegramId === '976640409' && (
-                                <button 
-                                    onClick={() => setScreen('admin')} 
-                                    className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold cursor-pointer pointer-events-auto transition-colors shadow-lg"
-                                >
-                                    🔧 Admin Panel
-                                </button>
-                            )}
+                            <button 
+                                onClick={() => setScreen('admin')} 
+                                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold cursor-pointer pointer-events-auto transition-colors shadow-lg"
+                            >
+                                🔧 Admin Panel
+                            </button>
                         </div>
 
                         {roomCode && (
