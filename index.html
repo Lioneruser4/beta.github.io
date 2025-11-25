@@ -175,7 +175,7 @@
         }
 
         // API Base URL
-        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
+        const API_URL = 'http://localhost:10000';
 
         // --- BİLEŞENLER ---
 
@@ -402,11 +402,7 @@
             }, [gameState?.board, gameState?.lastPlayedPosition]);
 
             const connectToServer = () => {
-                let wsUrl = 'wss://beta-github-io.onrender.com';
-                // Test için Localhost kontrolü
-                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                    wsUrl = `ws://${window.location.hostname}:10000`;
-                }
+                let wsUrl = 'ws://localhost:10000';
 
                 const ws = new WebSocket(wsUrl);
 
