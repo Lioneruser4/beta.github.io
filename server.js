@@ -61,6 +61,96 @@ const matchQueue = [];
 const playerConnections = new Map();
 const playerSessions = new Map(); // telegramId -> player data
 
+// Oda durumunu MongoDB'ye kaydetme ve yükleme
+async function saveRoomToDatabase(roomCode, roomData) {
+    try {
+        const RoomState = mongoose.model('RoomState', new mongoose.Schema({
+            roomCode: { type: String, required: true, unique: true },
+            players: [{
+                playerId: String,
+                ws: String, // WebSocket ID placeholder
+                playerName: String,
+                telegramId: String,
+                level: Number,
+                elo: Number,
+                photoUrl: String,
+                isGuest: Boolean,
+                hand: [[Number]], // Domino tiles
+                connected: Boolean
+            }],
+            gameState: {
+                board: [[Number]],
+                currentPlayer: String,
+                market: [[Number]],
+                gameStarted: Boolean,
+                gameType: String,
+                createdAt: Date,
+                lastMove: Date
+            },
+            createdAt: { type: Date, default: Date.now },
+            updatedAt: { type: Date, default: Date.now }
+        }, { collection: 'room_states' }));
+        
+        await RoomState.findOneAndUpdate(
+            { roomCode },
+            { 
+                roomCode,
+                players: roomData.players.map(p => ({
+                    playerId: p.playerId,
+                    ws: '',
+                    playerName: p.playerName,
+                    telegramId: p.telegramId,
+                    level: p.level,
+                    elo: p.elo,
+                    photoUrl: p.photoUrl,
+                    isGuest: p.isGuest,
+                    hand: p.hand || [],
+                    connected: true
+                })),
+                gameState: roomData.gameState,
+                updatedAt: new Date()
+            },
+            { upsert: true, new: true }
+        );
+        
+        console.log(`💾 Oda ${roomCode} veritabanına kaydedildi`);
+    } catch (error) {
+        console.error('❌ Oda kaydetme hatası:', error);
+    }
+}
+
+async function loadRoomFromDatabase(roomCode) {
+    try {
+        const RoomState = mongoose.model('RoomState', new mongoose.Schema({
+            roomCode: String,
+            players: [mongoose.Schema.Types.Mixed],
+            gameState: mongoose.Schema.Types.Mixed,
+            createdAt: Date,
+            updatedAt: Date
+        }), { collection: 'room_states' });
+        
+        const roomData = await RoomState.findOne({ roomCode });
+        if (roomData) {
+            console.log(`📂 Oda ${roomCode} veritabanından yüklendi`);
+            return roomData;
+        }
+        return null;
+    } catch (error) {
+        console.error('❌ Oda yükleme hatası:', error);
+        return null;
+    }
+}
+
+async function deleteRoomFromDatabase(roomCode) {
+    try {
+        const RoomState = mongoose.model('RoomState', new mongoose.Schema({}, { collection: 'room_states' }));
+        await RoomState.deleteOne({ roomCode });
+        console.log(`🗑️ Oda ${roomCode} veritabanından silindi`);
+    } catch (error) {
+        console.error('❌ Oda silme hatası:', error);
+    }
+}
+
 // ELO Calculation - Win-based system
 function calculateElo(winnerElo, loserElo, winnerLevel) {
     // Random points between 13-20 for levels 1-5
@@ -282,6 +372,7 @@ function initializeGame(roomCode, player1Id, player2Id) {
     };
 
     rooms.set(roomCode, room);
+    saveRoomToDatabase(roomCode, room);
     console.log(`🎮 Oyun başlatıldı - Başlayan: ${startingPlayer === player1Id ? room.players[player1Id].name : room.players[player2Id].name} (${highestDouble}|${highestDouble})`);
     return room.gameState;
 }
@@ -497,6 +588,7 @@ function handleFindMatch(ws, data) {
         };
 
         rooms.set(roomCode, room);
+        saveRoomToDatabase(roomCode, room);
         p1.ws.roomCode = roomCode;
         p2.ws.roomCode = roomCode;
 
@@ -548,30 +640,88 @@ function handleCreateRoom(ws, data) {
 }
 
 function handleJoinRoom(ws, data) {
-    const room = rooms.get(data.roomCode);
-    if (!room || Object.keys(room.players).length >= 2) {
-        return sendMessage(ws, { type: 'error', message: 'Oda bulunamadı veya dolu' });
-    }
+    // Önce veritabanından oda durumunu kontrol et
+    loadRoomFromDatabase(data.roomCode).then(async (savedRoom) => {
+        let room = rooms.get(data.roomCode);
+        
+        if (savedRoom && !room) {
+            // Sunucu restart olmuş, odayı veritabanından geri yükle
+            console.log(`🔄 Oda ${data.roomCode} veritabanından geri yükleniyor...`);
+            
+            room = {
+                host: savedRoom.players[0]?.playerId || 'host',
+                players: {},
+                gameState: savedRoom.gameState || { board: [], currentPlayer: null, market: [], gameStarted: false },
+                type: savedRoom.gameState?.gameType || 'private'
+            };
+            
+            // Oyuncuları geri ekle (WebSocket bağlantıları olmadan)
+            savedRoom.players.forEach(player => {
+                room.players[player.playerId] = {
+                    name: player.playerName,
+                    telegramId: player.telegramId,
+                    level: player.level,
+                    elo: player.elo,
+                    photoUrl: player.photoUrl,
+                    isGuest: player.isGuest,
+                    hand: player.hand || []
+                };
+            });
+            
+            rooms.set(data.roomCode, room);
+            saveRoomToDatabase(data.roomCode, room);
+        }
+        
+        room = rooms.get(data.roomCode);
+        if (!room || Object.keys(room.players).length >= 2) {
+            return sendMessage(ws, { type: 'error', message: 'Oda bulunamadı veya dolu' });
+        }
 
-    const playerId = generateRoomCode();
-    ws.playerId = playerId;
-    ws.playerName = data.playerName;
-    ws.roomCode = data.roomCode;
-    playerConnections.set(playerId, ws);
-    room.players[playerId] = { name: data.playerName };
+        const playerId = generateRoomCode();
+        ws.playerId = playerId;
+        ws.playerName = data.playerName;
+        ws.roomCode = data.roomCode;
+        playerConnections.set(playerId, ws);
+        
+        room.players[playerId] = { 
+            name: data.playerName,
+            telegramId: data.telegramId,
+            level: data.level,
+            elo: data.elo,
+            photoUrl: data.photoUrl,
+            isGuest: data.isGuest,
+            hand: []
+        };
 
-    const hostId = room.host;
-    const gameState = initializeGame(data.roomCode, hostId, playerId);
-
-    setTimeout(() => {
-        sendGameState(data.roomCode, hostId);
-        sendGameState(data.roomCode, playerId);
-        // Herkese oyunun başladığını bildir
-        [hostId, playerId].forEach(pid => {
-            const socket = playerConnections.get(pid);
-            if(socket) socket.send(JSON.stringify({ type: 'gameStart', gameState: {...gameState, playerId: pid} }));
-        });
-    }, 500);
+        const hostId = room.host;
+        
+        // Eğer oyun zaten başlamışsa, oyun durumunu gönder
+        if (room.gameState && room.gameState.gameStarted) {
+            // Yeni gelen oyuncuya mevcut oyun durumunu gönder
+            setTimeout(() => {
+                sendGameState(data.roomCode, hostId);
+                sendGameState(data.roomCode, playerId);
+                
+                ws.send(JSON.stringify({ 
+                    type: 'gameStart', 
+                    gameState: {...room.gameState, playerId: playerId} 
+                }));
+            }, 500);
+        } else {
+            // Yeni oyun başlat
+            const gameState = initializeGame(data.roomCode, hostId, playerId);
+            
+            setTimeout(() => {
+                sendGameState(data.roomCode, hostId);
+                sendGameState(data.roomCode, playerId);
+                // Herkese oyunun başladığını bildir
+                [hostId, playerId].forEach(pid => {
+                    const socket = playerConnections.get(pid);
+                    if(socket) socket.send(JSON.stringify({ type: 'gameStart', gameState: {...gameState, playerId: pid} }));
+                });
+            }, 500);
+        }
+    });
 }
 
 function handlePlayTile(ws, data) {
@@ -595,6 +745,12 @@ function handlePlayTile(ws, data) {
 
     player.hand.splice(data.tileIndex, 1);
     gs.moves = (gs.moves || 0) + 1;
+    gs.lastMove = new Date();
+    
+    // Oda durumunu veritabanına kaydet
+    if (room) {
+        saveRoomToDatabase(ws.roomCode, room);
+    }
     
     const winner = checkWinner(gs);
     if (winner) {
@@ -636,6 +792,7 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
                     winnerName: isDraw ? 'Beraberlik' : gameState.players[winnerId].name,
                     isRanked: false
                 });
+                deleteRoomFromDatabase(roomCode);
                 rooms.delete(roomCode);
                 return;
             }
@@ -710,7 +867,7 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
             }
         } else {
             // Casual (Guest) maç - ELO guncellenmez
-            console.log(`🎮 CASUAL Maç bitti: ${isDraw ? 'Beraberlik' : gameState.players[winnerId].name + ' kazandı'}`);
+            console.log(`🎮 CASUAL Maç bitti: ${isDraw ? 'Beraberlik' : gameState.players[winnerId].name}`);
         }
 
         broadcastToRoom(roomCode, { 
@@ -760,6 +917,7 @@ function handlePass(ws) {
             winner, 
             winnerName: winner === 'DRAW' ? 'Beraberlik' : gs.players[winner].name 
         });
+        deleteRoomFromDatabase(ws.roomCode);
         rooms.delete(ws.roomCode);
     } else {
         Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
@@ -853,6 +1011,7 @@ function handleDisconnect(ws) {
         }
         
         broadcastToRoom(ws.roomCode, { type: 'playerDisconnected' });
+        deleteRoomFromDatabase(ws.roomCode);
         rooms.delete(ws.roomCode);
     }
 }
