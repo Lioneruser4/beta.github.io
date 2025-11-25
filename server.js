@@ -987,26 +987,32 @@ function handleDisconnect(ws) {
         
         // Oyuncu odadan ayrıldığında diğer oyuncuya kazanç ver
         const room = rooms.get(ws.roomCode);
-        if (room && room.players && room.players.length === 2) {
-            const remainingPlayer = room.players.find(p => p.ws !== ws);
-            if (remainingPlayer) {
-                // Level'e göre ELO belirle
-                const playerLevel = remainingPlayer.level || 1;
-                let eloChange;
+        if (room && room.players) {
+            // players object formatında çalış
+            const remainingPlayerId = Object.keys(room.players).find(playerId => playerId !== ws.playerId);
+            if (remainingPlayerId) {
+                const remainingPlayer = room.players[remainingPlayerId];
+                const remainingWs = playerConnections.get(remainingPlayerId);
                 
-                if (playerLevel <= 5) {
-                    eloChange = Math.floor(Math.random() * 6) + 15; // 15-20 arası
-                } else {
-                    eloChange = Math.floor(Math.random() * 6) + 10; // 10-15 arası
+                if (remainingWs) {
+                    // Level'e göre ELO belirle
+                    const playerLevel = remainingPlayer.level || 1;
+                    let eloChange;
+                    
+                    if (playerLevel <= 5) {
+                        eloChange = Math.floor(Math.random() * 6) + 15; // 15-20 arası
+                    } else {
+                        eloChange = Math.floor(Math.random() * 6) + 10; // 10-15 arası
+                    }
+                    
+                    // Kalan oyuncuya kazanç bildirimi gönder
+                    remainingWs.send(JSON.stringify({
+                        type: 'opponentLeft',
+                        eloChange: eloChange,
+                        winner: remainingPlayerId,
+                        opponentName: ws.playerName || 'Bilinmeyen Oyuncu'
+                    }));
                 }
-                
-                // Kalan oyuncuya kazanç bildirimi gönder
-                remainingPlayer.ws.send(JSON.stringify({
-                    type: 'opponentLeft',
-                    eloChange: eloChange,
-                    winner: remainingPlayer.playerId,
-                    opponentName: ws.playerName || 'Bilinmeyen Oyuncu'
-                }));
             }
         }
         
