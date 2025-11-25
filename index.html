@@ -86,6 +86,13 @@
             -webkit-tap-highlight-color: transparent;
             user-select: none;
             -webkit-user-select: none;
+            /* Mobil uyumluluk için */
+            height: 100vh;
+            width: 100vw;
+            position: fixed;
+            top: 0;
+            left: 0;
+            font-size: 16px;
         }
         
         .pip-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 100%; padding: 2px; }
@@ -129,6 +136,29 @@
         .game-board-container {
             scroll-behavior: smooth;
         }
+        
+        /* Mobil Taş Boyutları */
+        @media (max-width: 768px) {
+            .pip { 
+                width: 4px; 
+                height: 4px; 
+            }
+            .domino-tile-mobile {
+                width: 28px !important;
+                height: 56px !important;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .pip { 
+                width: 3px; 
+                height: 3px; 
+            }
+            .domino-tile-mobile {
+                width: 24px !important;
+                height: 48px !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -170,7 +200,7 @@
             const baseClasses = `
                 relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
                 transition-all duration-300 select-none
-                ${vertical ? 'flex-col w-8 h-16 md:w-9 md:h-[4.5rem] lg:w-10 lg:h-20' : 'flex-row w-16 h-8 md:w-[4.5rem] md:h-9 lg:w-20 lg:h-10'}
+                ${vertical ? 'flex-col w-8 h-16 md:w-9 md:h-[4.5rem] lg:w-10 lg:h-20 domino-tile-mobile' : 'flex-row w-16 h-8 md:w-[4.5rem] md:h-9 lg:w-20 lg:h-10'}
                 ${isGhost ? 'opacity-0 pointer-events-none' : 'shadow-3d'}
                 ${isSelected ? '-translate-y-4 shadow-3d-active ring-2 ring-yellow-500 z-10 animate-celebrate' : ''}
                 ${isLastPlayed ? 'ring-4 ring-green-500 ring-opacity-80 animate-pulse' : ''}
@@ -359,21 +389,25 @@
                     
                     // Rejoin room if we were in one
                     if (roomCode && playerData && (screen === 'game' || screen === 'gameResult')) {
-                        // Try to rejoin the room
+                        // Try to rejoin the room with game state preservation
                         sendMessage({ 
                             type: 'rejoinRoom', 
                             roomCode, 
                             ...playerData,
-                            playerName: playerData.username
+                            playerName: playerData.username,
+                            preserveGameState: true
                         });
                     }
                 };
                 ws.onclose = () => { 
                     setConnected(false); 
+                    showNotification('Bağlantı kesildi, yeniden bağlanılıyor...', 'warning');
                     
-                    // Only reconnect if we're in a game screen
-                    if (screen === 'game' || screen === 'gameResult') {
-                        setTimeout(connectToServer, 3000);
+                    // Only reconnect if we're in a game screen or searching
+                    if (screen === 'game' || screen === 'gameResult' || screen === 'searching') {
+                        setTimeout(() => {
+                            connectToServer();
+                        }, 2000);
                     }
                 };
                 ws.onmessage = (e) => {
@@ -893,7 +927,7 @@
                 const isDraw = winner === 'DRAW';
                 const isWinner = winner === myPlayerId;
                 
-                // Auto return to lobby after 8 seconds
+                // Auto return to lobby after 10 seconds
                 useEffect(() => {
                     const timer = setTimeout(() => {
                         setScreen('lobby');
@@ -903,7 +937,7 @@
                         if (isRanked && playerData && !playerData.isGuest) {
                             initializeTelegramAuth();
                         }
-                    }, 8000);
+                    }, 10000);
                     
                     return () => clearTimeout(timer);
                 }, []);
@@ -916,18 +950,18 @@
                     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center p-6 relative overflow-hidden">
                         {/* Animated Background Elements */}
                         <div className="absolute inset-0 overflow-hidden">
-                            {[...Array(20)].map((_, i) => 
+                            {[...Array(30)].map((_, i) => 
                                 <div
                                     key={i}
                                     className="absolute rounded-full opacity-10 animate-pulse"
                                     style={{
                                         left: `${Math.random() * 100}%`,
                                         top: `${Math.random() * 100}%`,
-                                        width: `${Math.random() * 30 + 10}px`,
-                                        height: `${Math.random() * 30 + 10}px`,
+                                        width: `${Math.random() * 40 + 15}px`,
+                                        height: `${Math.random() * 40 + 15}px`,
                                         backgroundColor: isDraw ? '#6b7280' : isWinner ? '#10b981' : '#ef4444',
-                                        animationDelay: `${Math.random() * 2}s`,
-                                        animationDuration: `${Math.random() * 6 + 4}s`
+                                        animationDelay: `${Math.random() * 3}s`,
+                                        animationDuration: `${Math.random() * 8 + 5}s`
                                     }}
                                 />
                             )}
@@ -940,69 +974,81 @@
                             <div className="absolute top-1/3 right-1/4 w-32 h-32 border border-white rotate-[-30deg]"></div>
                         </div>
                         
-                        <div className="relative z-10 max-w-md w-full">
+                        <div className="relative z-10 max-w-lg w-full">
                             <div className="bg-table-dark/90 backdrop-blur-md rounded-3xl p-8 shadow-2xl border border-white/20 text-center">
                                 {/* Result Icon */}
                                 <div className="mb-6">
                                     {isDraw ? (
-                                        <div className="w-24 h-24 mx-auto bg-gray-500 rounded-full flex items-center justify-center mb-4">
-                                            <span className="text-5xl">🤝</span>
+                                        <div className="w-32 h-32 mx-auto bg-gray-500 rounded-full flex items-center justify-center mb-4 animate-pulse">
+                                            <span className="text-6xl">🤝</span>
                                         </div>
                                     ) : isWinner ? (
-                                        <div className="w-24 h-24 mx-auto bg-green-500 rounded-full flex items-center justify-center mb-4 animate-pulse">
-                                            <span className="text-5xl">🏆</span>
+                                        <div className="w-32 h-32 mx-auto bg-green-500 rounded-full flex items-center justify-center mb-4 animate-pulse shadow-lg">
+                                            <span className="text-6xl">🏆</span>
                                         </div>
                                     ) : (
-                                        <div className="w-24 h-24 mx-auto bg-red-500 rounded-full flex items-center justify-center mb-4">
-                                            <span className="text-5xl">😢</span>
+                                        <div className="w-32 h-32 mx-auto bg-red-500 rounded-full flex items-center justify-center mb-4">
+                                            <span className="text-6xl">😢</span>
                                         </div>
                                     )}
                                     
-                                    <h2 className="text-white text-3xl font-bold">
-                                        {isDraw ? 'BERABERLİK!' : isWinner ? 'TEBRİKLER!' : 'MAALESEF!'}
+                                    <h2 className="text-white text-4xl font-bold mb-2">
+                                        {isDraw ? 'BERABERLİK!' : isWinner ? 'TEBRİKLER KAZANDIN!' : 'MAALESEF KAYBETTİN!'}
                                     </h2>
-                                    <p className="text-gray-300 mt-2">
-                                        {isDraw ? 'Oyun berabere bitti' : isWinner ? `${winnerName} kazandı!` : `${winnerName} kazandı`}
+                                    <p className="text-gray-300 text-lg">
+                                        {isDraw ? 'Oyun berabere bitti' : isWinner ? 'Harika bir oyun!' : `Kazanan: ${winnerName}`}
                                     </p>
                                 </div>
                                 
-                                {/* Player Info */}
+                                {/* Player Cards */}
                                 <div className="grid grid-cols-2 gap-4 mb-6">
                                     {/* My Info */}
-                                    <div className={`p-4 rounded-2xl ${isDraw ? 'bg-gray-700/50' : isWinner ? 'bg-green-700/50' : 'bg-red-700/50'}`}>
-                                        <div className="text-white font-bold truncate">
+                                    <div className={`p-4 rounded-2xl ${isDraw ? 'bg-gray-700/50' : isWinner ? 'bg-green-700/50' : 'bg-red-700/50'} border-2 ${isDraw ? 'border-gray-600' : isWinner ? 'border-green-500' : 'border-red-500'}`}>
+                                        <div className="text-white font-bold text-lg truncate mb-2">
                                             {playerData?.username || 'Sen'}
                                         </div>
+                                        {playerData?.photoUrl && (
+                                            <img src={playerData.photoUrl} alt="Profile" className="w-12 h-12 rounded-full mx-auto mb-2 border-2 border-white/50" />
+                                        )}
                                         {isRanked && eloChanges && (
-                                            <div className={`text-sm font-bold mt-1 ${isWinner ? 'text-green-400' : 'text-red-400'}`}>
-                                                {isWinner ? `+${eloChanges.winner}` : `${eloChanges.loser}`}
+                                            <div className={`text-lg font-bold mt-2 ${isWinner ? 'text-green-400' : 'text-red-400'}`}>
+                                                {isWinner ? `+${eloChanges.winner} ELO` : `${eloChanges.loser} ELO`}
                                             </div>
                                         )}
+                                        <div className="text-xs text-gray-400 mt-1">
+                                            Level {playerData?.level || 1}
+                                        </div>
                                     </div>
                                     
                                     {/* Opponent Info */}
-                                    <div className={`p-4 rounded-2xl ${isDraw ? 'bg-gray-700/50' : isWinner ? 'bg-red-700/50' : 'bg-green-700/50'}`}>
-                                        <div className="text-white font-bold truncate">
+                                    <div className={`p-4 rounded-2xl ${isDraw ? 'bg-gray-700/50' : isWinner ? 'bg-red-700/50' : 'bg-green-700/50'} border-2 ${isDraw ? 'border-gray-600' : isWinner ? 'border-red-500' : 'border-green-500'}`}>
+                                        <div className="text-white font-bold text-lg truncate mb-2">
                                             {opponent?.name || 'Rakip'}
                                         </div>
+                                        {opponent?.photoUrl && (
+                                            <img src={opponent.photoUrl} alt="Opponent" className="w-12 h-12 rounded-full mx-auto mb-2 border-2 border-white/50" />
+                                        )}
                                         {isRanked && eloChanges && (
-                                            <div className={`text-sm font-bold mt-1 ${isWinner ? 'text-red-400' : 'text-green-400'}`}>
-                                                {isWinner ? `${eloChanges.loser}` : `+${eloChanges.winner}`}
+                                            <div className={`text-lg font-bold mt-2 ${isWinner ? 'text-red-400' : 'text-green-400'}`}>
+                                                {isWinner ? `${eloChanges.loser} ELO` : `+${eloChanges.winner} ELO`}
                                             </div>
                                         )}
+                                        <div className="text-xs text-gray-400 mt-1">
+                                            Level {opponent?.level || 1}
+                                        </div>
                                     </div>
                                 </div>
                                 
-                                {/* Game Type */}
+                                {/* Game Type Badge */}
                                 <div className="mb-6">
-                                    <span className={`px-4 py-2 rounded-full text-sm font-bold ${isRanked ? 'bg-blue-500/20 text-blue-300' : 'bg-gray-500/20 text-gray-300'}`}>
+                                    <span className={`px-6 py-3 rounded-full text-lg font-bold ${isRanked ? 'bg-blue-500/20 text-blue-300 border border-blue-500/50' : 'bg-gray-500/20 text-gray-300 border border-gray-500/50'}`}>
                                         {isRanked ? '🏆 DERECELİ MAÇ' : '🎮 CASUAL MAÇ'}
                                     </span>
                                 </div>
                                 
                                 {/* Auto Return Timer */}
-                                <div className="text-gray-400 text-sm mb-6">
-                                    Lobby'e dönülüyor...
+                                <div className="text-gray-400 text-sm mb-4">
+                                    10 saniye içinde lobby'e dönülüyor...
                                 </div>
                                 
                                 {/* Manual Return Button */}
@@ -1016,7 +1062,7 @@
                                             initializeTelegramAuth();
                                         }
                                     }}
-                                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white font-bold py-3 rounded-xl shadow-lg transform active:scale-95 transition-all"
+                                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all text-lg"
                                 >
                                     🔙 LOBBY'E DÖN
                                 </button>
@@ -1061,7 +1107,12 @@
                             <h1 className="text-4xl font-black text-white drop-shadow-lg mb-2">🏆 Skor Tablosu</h1>
                         </div>
 
-                        <button onClick={() => setScreen('lobby')} className="mb-4 px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold">⬅️ Geri Dön</button>
+                        <button 
+                            onClick={() => setScreen('lobby')} 
+                            className="mb-4 px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold cursor-pointer pointer-events-auto"
+                        >
+                            ⬅️ Geri Dön
+                        </button>
 
                         <div className="w-full max-w-2xl bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
                             {leaderboard.length === 0 ? (
@@ -1203,8 +1254,18 @@
                         </div>
 
                         <div className="flex gap-3 mb-6">
-                            <button onClick={() => setScreen('lobby')} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold">⬅️ Ana Menü</button>
-                            <button onClick={resetAllElo} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold">🔄 Tüm ELO'ları Sıfırla</button>
+                            <button 
+                                onClick={() => setScreen('lobby')} 
+                                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold cursor-pointer pointer-events-auto"
+                            >
+                                ⬅️ Ana Menü
+                            </button>
+                            <button 
+                                onClick={resetAllElo} 
+                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold cursor-pointer pointer-events-auto"
+                            >
+                                🔄 Tüm ELO'ları Sıfırla
+                            </button>
                         </div>
 
                         <div className="w-full max-w-4xl bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
@@ -1337,12 +1398,12 @@
                          {notification && <Toast message={notification.message} type={notification.type} />}
                         
                         {/* ÜST PANEL: Rakip */}
-                        <div className="h-16 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between px-4 z-20">
+                        <div className="h-20 bg-gradient-to-b from-black/80 to-transparent flex items-center justify-between px-4 z-20">
                             <div className="flex items-center gap-3">
                                 {opponent?.photoUrl ? (
-                                    <img src={opponent.photoUrl} alt="Rakip" className="w-10 h-10 rounded-full border-2 border-slate-600 shadow-lg" />
+                                    <img src={opponent.photoUrl} alt="Rakip" className="w-12 h-12 rounded-full border-2 border-slate-600 shadow-lg" />
                                 ) : (
-                                    <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center shadow-lg">
+                                    <div className="w-12 h-12 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center shadow-lg">
                                         👤
                                     </div>
                                 )}
@@ -1351,18 +1412,11 @@
                                     <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
                                         🎲 {Object.values(gameState.players).find(p => p.id !== myPlayerId)?.hand?.length || 0} Taş
                                     </div>
-                                    {/* AFK Timer */}
-                                    <div className="text-xs text-red-400 mt-1">
-                                        {gameState.playerLastAction && gameState.afkWarnings && (
-                                            (() => {
-                                                const currentPlayerId = gameState.currentPlayer;
-                                                const lastAction = gameState.playerLastAction[currentPlayerId];
-                                                const timeSinceLastAction = Math.floor((Date.now() - lastAction) / 1000);
-                                                const timeLeft = Math.max(0, 20 - timeSinceLastAction);
-                                                return `⏳ ${timeLeft}s`;
-                                            })()
-                                        )}
-                                    </div>
+                                    {opponent?.level && (
+                                        <div className="text-xs text-yellow-400 bg-black/40 px-2 py-0.5 rounded-full inline-block mt-1">
+                                            LVL {opponent.level}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="text-center flex flex-col items-center">
@@ -1371,34 +1425,31 @@
                                 ) : (
                                     <div className="text-gray-400 text-xs font-medium bg-black/40 px-3 py-1 rounded-full">⏳ Rakip Oynuyor...</div>
                                 )}
-                                {/* AFK Timer */}
-                                <div className="text-xs text-red-400 mt-1">
-                                    {gameState.playerLastAction && gameState.afkWarnings && (
-                                        (() => {
+                                {/* 20 Saniye Timer */}
+                                <div className="mt-1 bg-black/60 px-3 py-1 rounded-full">
+                                    <div className="text-red-400 text-xs font-bold">
+                                        {(() => {
+                                            if (!gameState.playerLastAction || !gameState.afkWarnings) return '⏳ 20s';
                                             const currentPlayerId = gameState.currentPlayer;
                                             const lastAction = gameState.playerLastAction[currentPlayerId];
+                                            if (!lastAction) return '⏳ 20s';
                                             const timeSinceLastAction = Math.floor((Date.now() - lastAction) / 1000);
                                             const timeLeft = Math.max(0, 20 - timeSinceLastAction);
                                             return `⏳ ${timeLeft}s`;
-                                        })()
-                                    )}
+                                        })()}
+                                    </div>
                                 </div>
                             </div>
                             {/* Leave Game Button */}
                             <button
                                 onClick={() => {
                                     if (window.confirm('Oyundan çıkmak istediğinize emin misiniz?')) {
-                                        // Send disconnect message to server
                                         sendMessage({ type: 'playerDisconnected' });
-                                        
-                                        // Reset all game state
                                         setScreen('lobby');
                                         setGameState(null);
                                         setRoomCode('');
                                         setSelectedTileIndex(null);
                                         setValidMoves([]);
-                                        
-                                        // Close and reconnect WebSocket
                                         wsRef.current?.close();
                                         setTimeout(() => connectToServer(), 500);
                                     }
@@ -1519,18 +1570,34 @@
                                         </span>
                                     )}
                                 </div>
-                                {isMyTurn && (
-                                    <div className="flex gap-2">
-                                        {canDrawFromMarket && !hasPlayableTiles && validMoves.length === 0 && selectedTileIndex === null && (
-                                            <button 
-                                                onClick={drawFromMarket}
-                                                className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
-                                            >
-                                                🎲 ÇEK
-                                            </button>
-                                        )}
+                                <div className="flex items-center gap-2">
+                                    {/* 20 Saniye Timer */}
+                                    <div className="bg-black/60 px-3 py-1 rounded-full">
+                                        <div className="text-red-400 text-xs font-bold">
+                                            {(() => {
+                                                if (!gameState.playerLastAction || !gameState.afkWarnings) return '⏳ 20s';
+                                                const currentPlayerId = gameState.currentPlayer;
+                                                const lastAction = gameState.playerLastAction[currentPlayerId];
+                                                if (!lastAction) return '⏳ 20s';
+                                                const timeSinceLastAction = Math.floor((Date.now() - lastAction) / 1000);
+                                                const timeLeft = Math.max(0, 20 - timeSinceLastAction);
+                                                return `⏳ ${timeLeft}s`;
+                                            })()}
+                                        </div>
                                     </div>
-                                )}
+                                    {isMyTurn && (
+                                        <div className="flex gap-2">
+                                            {canDrawFromMarket && !hasPlayableTiles && validMoves.length === 0 && selectedTileIndex === null && (
+                                                <button 
+                                                    onClick={drawFromMarket}
+                                                    className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
+                                                >
+                                                    🎲 ÇEK
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Taş Dizilimi */}
@@ -1646,8 +1713,18 @@
                         </div>
 
                         <div className="flex gap-3 mb-6">
-                            <button onClick={() => setScreen('lobby')} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold">⬅️ Ana Menü</button>
-                            <button onClick={resetAllElo} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold">🔄 Tüm ELO'ları Sıfırla</button>
+                            <button 
+                                onClick={() => setScreen('lobby')} 
+                                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold cursor-pointer pointer-events-auto"
+                            >
+                                ⬅️ Ana Menü
+                            </button>
+                            <button 
+                                onClick={resetAllElo} 
+                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold cursor-pointer pointer-events-auto"
+                            >
+                                🔄 Tüm ELO'ları Sıfırla
+                            </button>
                         </div>
 
                         <div className="w-full max-w-4xl bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
