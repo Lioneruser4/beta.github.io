@@ -568,7 +568,8 @@ wss.on('connection', (ws, req) => {
                 case 'rejoinRoom': handleRejoinRoom(ws, data); break;
                 case 'playerDisconnected': handlePlayerDisconnected(ws, data); break;
                 case 'playTile': handlePlayTile(ws, data); break;
-                case 'drawFromMarket': handleDrawFromMarket(ws); break;
+                case 'drawFromMarket': handleDrawFromMarket(ws, data); break;
+                case 'pass': handlePass(ws); break;
             }
         } catch (error) {
             console.error('Hata:', error);
@@ -619,6 +620,17 @@ const afkCheckInterval = setInterval(() => {
         }
     });
 }, 5000); // 5 saniyede bir kontrol et
+
+// Ping interval for WebSocket keep-alive
+const pingInterval = setInterval(() => {
+    wss.clients.forEach((ws) => {
+        if (!ws.isAlive) {
+            return ws.terminate();
+        }
+        ws.isAlive = false;
+        ws.ping();
+    });
+}, 30000);
 
 wss.on('close', () => {
     clearInterval(afkCheckInterval);
