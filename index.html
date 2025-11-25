@@ -433,20 +433,22 @@
                         break;
                     case 'opponentLeft':
                         // Raqib cikdiqda qalib olunur
-                        const eloChange = 25;
+                        const eloChange = data.eloChange || 15;
+                        const opponentName = data.opponentName || 'Raqib';
                         
                         // Oyun ekraninda iken bildirim goster
                         if (screen === 'game') {
-                            showNotification('🎉 Raqip cikdi! Qazandiniz! (+25 ELO)', 'success');
+                            showNotification(`🎉 ${opponentName} çıxdı! Qazandınız! (+${eloChange} ELO)`, 'success');
                         }
                         
                         // Sonuc lobisine gonder
                         setScreen('result');
                         setNotification({ 
-                            message: `🎉 Raqip cikdi! Qazandiniz! (+${eloChange} ELO)`, 
+                            message: `🎉 ${opponentName} çıxdı! Qazandınız! (+${eloChange} ELO)`, 
                             type: 'success',
                             eloChange: eloChange,
-                            isWinner: true
+                            isWinner: true,
+                            opponentName: opponentName
                         });
                         
                         setTimeout(() => { 
@@ -880,6 +882,7 @@
             if (screen === 'result') {
                 const isWinner = notification?.isWinner || false;
                 const eloChange = notification?.eloChange || 0;
+                const opponentName = notification?.opponentName || 'Raqip';
                 
                 // Rakibin bilgilerini al
                 const opponent = gameState ? Object.values(gameState.players).find(p => p.id !== myPlayerId) : null;
@@ -937,7 +940,7 @@
                                                 👤
                                             </div>
                                         )}
-                                        <div className="text-white text-sm font-bold">{opponent?.username || 'Rakip'}</div>
+                                        <div className="text-white text-sm font-bold opponent-name">{opponent?.username || opponentName}</div>
                                         {!opponent?.isGuest && (
                                             <div className="text-xs text-red-400">LVL {opponent?.level || 0}</div>
                                         )}
@@ -996,7 +999,7 @@
                                 )}
                                 <div>
                                     <div className="text-white text-sm font-bold shadow-black drop-shadow-md">
-                                        {Object.values(gameState.players).find(p => p.id !== myPlayerId)?.username || '🎯 RAIP'}
+                                        {Object.values(gameState.players).find(p => p.id !== myPlayerId)?.username || '🎯 RAKİP'}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         {!Object.values(gameState.players).find(p => p.id !== myPlayerId)?.isGuest && (
