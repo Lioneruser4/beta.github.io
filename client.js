@@ -479,7 +479,8 @@
         return null;
     };
 
-    ReactDOM.render(React.createElement(DominoGame), document.getElementById('root'));
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(DominoGame));
 </script>
 ```
 
