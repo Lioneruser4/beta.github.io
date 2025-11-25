@@ -324,6 +324,7 @@
                                 isGuest: false,
                                 photoUrl: telegramData.photoUrl || data.player.photoUrl
                             });
+                            setScreen('lobby');
                             console.log('✅ Telegram Auth başarılı:', data.player);
                         } else {
                             throw new Error('Auth failed');
@@ -341,11 +342,13 @@
                             telegramId: null
                         };
                         setPlayerData(guestData);
+                        setScreen('lobby');
                         console.log('👥 Guest mode:', guestData);
                     }
                 } catch (error) {
                     console.error('Auth error:', error);
-                    setPlayerData({ 
+                    // Her hata durumunda guest mode'a geç
+                    const guestData = { 
                         isGuest: true, 
                         username: 'Guest' + Math.floor(Math.random() * 9999), 
                         firstName: '',
@@ -354,9 +357,8 @@
                         level: 0, 
                         elo: 0,
                         telegramId: null
-                    });
-                    setScreen('lobby');
-                } finally {
+                    };
+                    setPlayerData(guestData);
                     setScreen('lobby');
                 }
             };
