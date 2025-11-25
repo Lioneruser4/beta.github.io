@@ -31,6 +31,7 @@ const playerSchema = new mongoose.Schema({
     totalGames: { type: Number, default: 0 },
     winStreak: { type: Number, default: 0 },
     bestWinStreak: { type: Number, default: 0 },
+    isVisible: { type: Boolean, default: true }, // For admin panel visibility control
     createdAt: { type: Date, default: Date.now },
     lastPlayed: { type: Date, default: Date.now }
 });
@@ -61,7 +62,7 @@ const matchQueue = [];
 const playerConnections = new Map();
 const playerSessions = new Map(); // telegramId -> player data
 
-// ELO Calculation - Win-based system
+// ELO Calculation - Win-only system (no point loss)
 function calculateElo(winnerElo, loserElo, winnerLevel) {
     // Random points between 13-20 for levels 1-5
     // Random points between 10-15 for levels 6+
@@ -72,11 +73,11 @@ function calculateElo(winnerElo, loserElo, winnerLevel) {
         winnerChange = Math.floor(Math.random() * 6) + 10; // 10-15
     }
     
-    const loserChange = -Math.floor(winnerChange * 0.7); // Loser loses 70% of winner's gain
+    const loserChange = 0; // Loser doesn't lose points, only winner gains
     
     return {
         winnerElo: winnerElo + winnerChange,
-        loserElo: Math.max(0, loserElo + loserChange),
+        loserElo: loserElo, // No change for loser
         winnerChange,
         loserChange
     };
@@ -147,7 +148,7 @@ app.post('/api/auth/telegram', async (req, res) => {
 
 app.get('/api/leaderboard', async (req, res) => {
     try {
-        const players = await Player.find()
+        const players = await Player.find({ isVisible: { $ne: false } }) // Only show visible players
             .sort({ elo: -1 })
             .limit(10) // Top 10
             .select('telegramId username firstName lastName photoUrl elo level wins losses draws totalGames winStreak');
@@ -197,6 +198,79 @@ app.get('/api/player/:telegramId/matches', async (req, res) => {
         res.json({ success: true, matches });
     } catch (error) {
         console.error('Matches error:', error);
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+// ADMIN ENDPOINTS - ONLY FOR TELEGRAM ID 976640409
+app.get('/api/admin/players', async (req, res) => {
+    const { adminId } = req.query;
+    
+    // Only allow admin with specific Telegram ID
+    if (adminId !== '976640409') {
+        return res.status(403).json({ error: 'Yetkisiz erişim' });
+    }
+    
+    try {
+        const players = await Player.find()
+            .sort({ elo: -1 })
+            .select('telegramId username firstName lastName photoUrl elo level wins losses draws totalGames isVisible');
+        
+        res.json({ success: true, players });
+    } catch (error) {
+        console.error('Admin players error:', error);
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+app.post('/api/admin/player/update', async (req, res) => {
+    const { adminId, telegramId, elo, isVisible } = req.body;
+    
+    // Only allow admin with specific Telegram ID
+    if (adminId !== '976640409') {
+        return res.status(403).json({ error: 'Yetkisiz erişim' });
+    }
+    
+    try {
+        const player = await Player.findOne({ telegramId });
+        if (!player) {
+            return res.status(404).json({ error: 'Oyuncu bulunamadı' });
+        }
+        
+        // Update ELO and visibility
+        if (elo !== undefined) {
+            player.elo = parseInt(elo);
+            player.level = calculateLevel(player.elo);
+        }
+        
+        if (isVisible !== undefined) {
+            player.isVisible = isVisible;
+        }
+        
+        await player.save();
+        
+        res.json({ success: true, player });
+    } catch (error) {
+        console.error('Admin update error:', error);
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+app.post('/api/admin/reset-elo', async (req, res) => {
+    const { adminId } = req.body;
+    
+    // Only allow admin with specific Telegram ID
+    if (adminId !== '976640409') {
+        return res.status(403).json({ error: 'Yetkisiz erişim' });
+    }
+    
+    try {
+        // Reset all players' ELO to 0
+        await Player.updateMany({}, { elo: 0, level: 1 });
+        
+        res.json({ success: true, message: 'Tüm ELO puanları sıfırlandı' });
+    } catch (error) {
+        console.error('Reset ELO error:', error);
         res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
@@ -331,29 +405,48 @@ function playTileOnBoard(tile, board, position) {
 }
 
 function checkWinner(gameState) {
-    for (const playerId in gameState.players) {
-        if (gameState.players[playerId].hand.length === 0) {
-            return playerId;
-        }
-    }
-
     const player1Id = Object.keys(gameState.players)[0];
     const player2Id = Object.keys(gameState.players)[1];
     const player1Hand = gameState.players[player1Id].hand;
     const player2Hand = gameState.players[player2Id].hand;
 
+    // WIN CONDITION 1: Player has no tiles left (finished all tiles)
+    if (player1Hand.length === 0) {
+        console.log(`🏆 ${gameState.players[player1Id].name} won by finishing all tiles!`);
+        return player1Id;
+    }
+    if (player2Hand.length === 0) {
+        console.log(`🏆 ${gameState.players[player2Id].name} won by finishing all tiles!`);
+        return player2Id;
+    }
+
+    // WIN CONDITION 2: Both players blocked (no valid moves)
     const player1CanPlay = player1Hand.some(tile => canPlayTile(tile, gameState.board));
     const player2CanPlay = player2Hand.some(tile => canPlayTile(tile, gameState.board));
 
-    if (!player1CanPlay && !player2CanPlay) {
+    // Only check blocked condition if BOTH players can't play AND market is empty
+    const marketEmpty = !gameState.market || gameState.market.length === 0;
+    
+    if (!player1CanPlay && !player2CanPlay && marketEmpty) {
+        // Calculate points in each player's hand
         const player1Sum = player1Hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
         const player2Sum = player2Hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
         
-        // Eşitlik durumunda beraberlik mantığı eklenebilir, şimdilik az puanlı kazanır
-        if (player1Sum === player2Sum) return 'DRAW'; 
-        return player1Sum < player2Sum ? player1Id : player2Id;
+        console.log(`🔒 Game blocked! Player1: ${player1Sum} points, Player2: ${player2Sum} points`);
+        
+        // Draw if equal points
+        if (player1Sum === player2Sum) {
+            console.log(`🤝 Draw - Both players have ${player1Sum} points`);
+            return 'DRAW';
+        }
+        
+        // Winner is player with FEWER points
+        const winnerId = player1Sum < player2Sum ? player1Id : player2Id;
+        console.log(`🏆 ${gameState.players[winnerId].name} wins with fewer points!`);
+        return winnerId;
     }
 
+    // Game continues
     return null;
 }
 
@@ -596,6 +689,10 @@ function handlePlayTile(ws, data) {
     player.hand.splice(data.tileIndex, 1);
     gs.moves = (gs.moves || 0) + 1;
     
+    // Track last played position for client scrolling
+    gs.lastPlayedPosition = data.position;
+    gs.lastPlayedTile = tile;
+    
     const winner = checkWinner(gs);
     if (winner) {
         handleGameEnd(ws.roomCode, winner, gs);
@@ -818,16 +915,35 @@ function handleDisconnect(ws) {
     
     if (ws.playerId) playerConnections.delete(ws.playerId);
     
+    // Remove from matchmaking queue
     const qIdx = matchQueue.findIndex(p => p.ws === ws);
     if (qIdx !== -1) {
         matchQueue.splice(qIdx, 1);
         console.log(`❌ Kuyruktan çıkarıldı - Kalan: ${matchQueue.length}`);
     }
 
+    // Handle active game disconnect
     if (ws.roomCode) {
         console.log(`🏠 Odadan ayrıldı: ${ws.roomCode}`);
-        broadcastToRoom(ws.roomCode, { type: 'playerDisconnected' });
-        rooms.delete(ws.roomCode);
+        const room = rooms.get(ws.roomCode);
+        
+        if (room && room.gameState) {
+            // Notify other player and end game
+            broadcastToRoom(ws.roomCode, { 
+                type: 'playerDisconnected',
+                message: 'Rakip oyundan ayrıldı',
+                reason: 'disconnect'
+            }, ws.playerId);
+            
+            // Clean up room after short delay to allow message delivery
+            setTimeout(() => {
+                rooms.delete(ws.roomCode);
+                console.log(`🗑️ Oda silindi: ${ws.roomCode}`);
+            }, 1000);
+        } else {
+            // No active game, just delete room
+            rooms.delete(ws.roomCode);
+        }
     }
 }
 
