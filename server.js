@@ -529,6 +529,17 @@ function sendGameState(roomCode, playerId) {
     }
 
     try {
+        // gameState'in geçerliliğini kontrol et
+        if (!room.gameState.board || !Array.isArray(room.gameState.board)) {
+            console.error('❌ Server: Invalid board in gameState');
+            return;
+        }
+        
+        if (!room.gameState.players || !room.gameState.players[playerId]) {
+            console.error('❌ Server: Player not in gameState', { playerId });
+            return;
+        }
+
         const gameStateToSend = { ...room.gameState, playerId: playerId };
         console.log('📤 Server: Sending gameState to player', {
             playerId,
@@ -542,6 +553,11 @@ function sendGameState(roomCode, playerId) {
         }));
     } catch (error) { 
         console.error('❌ Server: Error sending gameState:', error);
+        // Hata durumunda bağlantıyı temizle
+        playerConnections.delete(playerId);
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.close();
+        }
     }
 }
 
@@ -936,6 +952,18 @@ function handlePlayTile(ws, data) {
     }
 
     const gs = room.gameState;
+    
+    // GameState bütünlük kontrolü
+    if (!gs.board || !Array.isArray(gs.board)) {
+        console.error('❌ Server: Invalid board state');
+        return;
+    }
+    
+    if (!gs.players || !gs.players[ws.playerId]) {
+        console.error('❌ Server: Player not in game state');
+        return;
+    }
+    
     console.log('📊 Server: Current gameState', {
         currentPlayer: gs.currentPlayer,
         boardLength: gs.board.length,
@@ -997,8 +1025,12 @@ function handlePlayTile(ws, data) {
             gs.playerLastAction[gs.currentPlayer] = Date.now();
         }
         
-        console.log('📤 Server: Sending gameState to all players');
-        Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+        try {
+            console.log('📤 Server: Sending gameState to all players');
+            Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+        } catch (error) {
+            console.error('❌ Server: Error sending gameState after play:', error);
+        }
     }
 }
 
