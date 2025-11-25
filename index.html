@@ -265,13 +265,37 @@
             };
 
             useEffect(() => {
+                // Telegram auth'ı 5 saniye içinde tamamlanmazsa guest mode'a geç
+                const authTimeout = setTimeout(() => {
+                    if (!playerData) {
+                        setPlayerData({ 
+                            isGuest: true, 
+                            username: 'Guest' + Math.floor(Math.random() * 9999), 
+                            firstName: '',
+                            lastName: '',
+                            photoUrl: null,
+                            level: 0, 
+                            elo: 0,
+                            telegramId: null
+                        });
+                        setScreen('lobby');
+                    }
+                }, 5000);
+
                 initializeTelegramAuth();
                 connectToServer();
-                return () => { if (wsRef.current) wsRef.current.close(); };
+                
+                return () => { 
+                    if (wsRef.current) wsRef.current.close(); 
+                    clearTimeout(authTimeout);
+                };
             }, []);
 
             // Telegram Auth
             const initializeTelegramAuth = async () => {
+                // Eğer zaten playerData varsa tekrar çalıştırma
+                if (playerData) return;
+                
                 try {
                     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
                         // Telegram WebApp - Otomatik giriş
@@ -331,6 +355,7 @@
                         elo: 0,
                         telegramId: null
                     });
+                    setScreen('lobby');
                 } finally {
                     setScreen('lobby');
                 }
