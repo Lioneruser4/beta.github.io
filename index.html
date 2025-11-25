@@ -444,13 +444,20 @@
                     case 'gameUpdate':
                         console.log('🔄 Oyun güncelleniyor...', data.gameState);
                         if (data.gameState && data.gameState.board) {
-                            setGameState(prevState => ({
-                                ...prevState,
-                                ...data.gameState,
-                                playerId: prevState?.playerId || data.gameState.playerId
-                            }));
+                            // Önceki state'i koru, sadece gelen veriyi güncelle
+                            setGameState(prevState => {
+                                const newState = {
+                                    ...prevState,
+                                    ...data.gameState,
+                                    playerId: prevState?.playerId || data.gameState.playerId
+                                };
+                                console.log('📊 Yeni gameState:', newState);
+                                return newState;
+                            });
                             setSelectedTileIndex(null);
                             setValidMoves([]);
+                        } else {
+                            console.error('❌ Geçersiz gameState:', data.gameState);
                         }
                         break;
                     case 'error':
@@ -566,8 +573,16 @@
             const handleTileClick = (index, tile) => {
                 if (!isMyTurn) return;
                 
+                console.log('👆 Taşa tıklandı:', {
+                    index,
+                    tile,
+                    isMyTurn,
+                    boardLength: gameState?.board?.length
+                });
+                
                 // Zaten seçiliyse seçimi kaldır
                 if (selectedTileIndex === index) {
+                    console.log('❌ Seçim kaldırılıyor');
                     setSelectedTileIndex(null);
                     setValidMoves([]);
                     return;
@@ -576,6 +591,7 @@
                 // Geçerli hamleleri hesapla
                 if (gameState.board.length === 0) {
                     // İlk hamle her yere yapılabilir
+                    console.log('🎯 İlk hamle - taş seçildi');
                     setSelectedTileIndex(index);
                     setValidMoves(['left', 'right']); // Her iki yöne de oynanabilir
                 } else {
@@ -583,15 +599,25 @@
                     const rightEnd = gameState.board[gameState.board.length - 1][1];
                     const moves = [];
 
+                    console.log('🔍 Taş kontrol ediliyor:', {
+                        tile,
+                        leftEnd,
+                        rightEnd
+                    });
+
                     // Basit mantık: Eşleşiyor mu?
                     if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
                     if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
 
+                    console.log('📍 Mümkün hamleler:', moves);
+
                     if (moves.length > 0) {
+                        console.log('✅ Taş seçildi, hamleler:', moves);
                         setSelectedTileIndex(index);
                         setValidMoves(moves);
                         playSound('click');
                     } else {
+                        console.log('❌ Bu taş uygun değil');
                         showNotification('Bu taş uygun değil', 'warning');
                     }
                 }
@@ -601,6 +627,13 @@
             const playTile = (position) => {
                 if (selectedTileIndex === null) return;
                 
+                console.log('🎯 Taş oynanıyor:', {
+                    selectedTileIndex,
+                    position,
+                    currentTurn: gameState?.currentPlayer,
+                    myPlayerId
+                });
+                
                 // Server 'left' veya 'right' bekliyor.
                 const message = {
                     type: 'playTile',
@@ -608,10 +641,10 @@
                     position: position
                 };
                 
-                console.log('Sending playTile message:', message);
+                console.log('📤 Sending playTile message:', message);
                 sendMessage(message);
                 
-                // Seçimi temizle (Optimistik UI)
+                // Seçimi temizle ama gameState'i koru
                 setSelectedTileIndex(null);
                 setValidMoves([]);
             };
@@ -1446,6 +1479,15 @@
 
             // --- OYUN EKRANI ---
             if (screen === 'game' && gameState) {
+                // Debug log
+                console.log('🎮 Oyun ekranı render ediliyor:', {
+                    screen,
+                    gameState: !!gameState,
+                    boardLength: gameState?.board?.length,
+                    myHandLength: myHand?.length,
+                    currentPlayer: gameState?.currentPlayer
+                });
+                
                 // Tahtada görsel olarak taşları döndürmek gerekir mi?
                 // Sunucu genellikle [[1,6], [6,2]] diye sıralı atar.
                 // Biz sadece çiziyoruz.
