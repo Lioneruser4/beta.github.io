@@ -124,6 +124,11 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* AUTO SCROLL TO LAST PLAYED TILE */
+        .game-board-container {
+            scroll-behavior: smooth;
+        }
     </style>
 </head>
 <body>
@@ -417,13 +422,20 @@
                         const isRanked = data.isRanked;
                         const winMsg = `Oyun Bitti! Kazanan: ${data.winnerName}`;
                         const eloMsg = data.eloChanges ? ` (ELO: ${data.eloChanges.winner > 0 ? '+' : ''}${data.eloChanges.winner})` : '';
-                        showNotification(winMsg + (isRanked ? eloMsg : ' (Casual)'), 'info');
                         
+                        // Show the winning notification for 4 seconds
+                        setNotification({ message: winMsg + (isRanked ? eloMsg : ' (Casual)'), type: 'info' });
+                        setTimeout(() => setNotification(null), 4000);
+                        
+                        // If the current player won and it's a ranked match, show a special win message
                         if (data.winner === gameState?.playerId && isRanked) {
                             setTimeout(() => {
                                 setNotification({ message: `🏆 KAZANDINIZ! ${eloMsg}`, type: 'success' });
-                            }, 500);
+                                setTimeout(() => setNotification(null), 4000);
+                            }, 4000);
                         }
+                        
+                        // Return to lobby after 8 seconds total
                         setTimeout(() => { 
                             setScreen('lobby'); 
                             setGameState(null); 
@@ -432,7 +444,7 @@
                             if (isRanked && playerData && !playerData.isGuest) {
                                 initializeTelegramAuth();
                             }
-                        }, 4000);
+                        }, 8000);
                         break;
                     case 'searchCancelled':
                         showNotification('Arama iptal edildi', 'info');
@@ -506,7 +518,7 @@
                 if (gameState.board.length === 0) {
                     // İlk hamle her yere yapılabilir
                     setSelectedTileIndex(index);
-                    setValidMoves(['start']); 
+                    setValidMoves(['left', 'right']); // Her iki yöne de oynanabilir
                 } else {
                     const leftEnd = gameState.board[0][0];
                     const rightEnd = gameState.board[gameState.board.length - 1][1];
@@ -531,13 +543,10 @@
                 if (selectedTileIndex === null) return;
                 
                 // Server 'left' veya 'right' bekliyor.
-                // Eğer tahta boşsa server genelde fark etmez ama 'left' gönderelim.
-                const posToSend = position === 'start' ? 'left' : position;
-
                 sendMessage({
                     type: 'playTile',
                     tileIndex: selectedTileIndex,
-                    position: posToSend
+                    position: position
                 });
                 
                 // Seçimi temizle (Optimistik UI)
@@ -695,10 +704,10 @@
                                     <h2 className="text-white text-2xl font-bold">{playerData.username || playerData.firstName}</h2>
                                     {!playerData.isGuest && (
                                         <div className="flex justify-center gap-4 mt-2">
-                                            <span className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-sm font-bold">
+                                            <span className="bg-gradient-to-r from-gray-700 to-gray-900 text-white px-3 py-1 rounded-full text-sm font-bold border border-gray-600">
                                                 LVL {playerData.level}
                                             </span>
-                                            <span className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-3 py-1 rounded-full text-sm font-bold">
+                                            <span className="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-3 py-1 rounded-full text-sm font-bold border border-blue-500">
                                                 {playerData.elo} ELO
                                             </span>
                                         </div>
@@ -797,7 +806,7 @@
                         {notification && <Toast message={notification.message} type={notification.type} />}
                         
                         <div className="text-center mb-6">
-                            <h1 className="text-4xl font-black text-white drop-shadow-lg mb-2">🏆 SKOR TABLOSU 🏆</h1>
+                            <h1 className="text-4xl font-black text-white drop-shadow-lg mb-2">🏆 Skor Tablosu</h1>
                         </div>
 
                         <button onClick={() => setScreen('lobby')} className="mb-4 px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold">⬅️ Geri Dön</button>
@@ -837,7 +846,11 @@
                                                 <div className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-3 py-1 rounded-full text-sm font-bold mb-1">
                                                     {player.elo} ELO
                                                 </div>
-                                                <div className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-xs font-bold">
+                                                <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                                    player.level <= 4 ? 'bg-gray-700 text-white border border-gray-600' :
+                                                    player.level <= 6 ? 'bg-gradient-to-r from-yellow-600 to-yellow-800 text-white border border-yellow-500' :
+                                                    'bg-gradient-to-r from-purple-600 to-purple-800 text-white border border-purple-500'
+                                                }`}>
                                                     LVL {player.level}
                                                 </div>
                                             </div>
@@ -933,7 +946,7 @@
                         {notification && <Toast message={notification.message} type={notification.type} />}
                         
                         <div className="text-center mb-6">
-                            <h1 className="text-4xl font-black text-white drop-shadow-lg mb-2">🔧 ADMIN PANEL</h1>
+                            <h1 className="text-4xl font-black text-white drop-shadow-lg mb-2">🔧 Admin Panel</h1>
                             <p className="text-gray-400">Telegram ID: {playerData?.telegramId}</p>
                         </div>
 
@@ -1129,7 +1142,7 @@
                                     {/* TAHTADAKİ TAŞLAR */}
                                     {gameState.board.length === 0 ? (
                                         <div className="text-white/30 text-xl font-bold border-4 border-dashed border-white/10 rounded-3xl p-6">
-                                            {selectedTileIndex !== null ? '👇 Taşı Buraya Koy' : 'Taş Seç ve Başla'}
+                                            İlk taşı oynamak için bir taş seçin
                                         </div>
                                     ) : (
                                         gameState.board.map((tile, i) => {
@@ -1166,10 +1179,32 @@
                                     )}
                                     
                                     {/* İLK HAMLE (ORTAYA) */}
-                                    {validMoves.includes('start') && selectedTileIndex !== null && (
-                                        <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-30 animate-slide-up" onClick={() => playTile('start')}>
-                                            <div className="bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold px-8 py-4 rounded-2xl animate-glow-pulse cursor-pointer shadow-glow transform scale-110">
-                                                ✨ OYUNA BAŞLA
+                                    {validMoves.includes('left') && selectedTileIndex !== null && gameState.board.length === 0 && (
+                                        <div className="absolute inset-0 flex items-center justify-center gap-10">
+                                            <div 
+                                                className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer"
+                                                onClick={() => playTile('left')}
+                                            >
+                                                <div className="absolute inset-0 bg-green-500/30 rounded-lg animate-pulse"></div>
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-green-500/20 rounded-md border-2 border-green-500 border-dashed"></div>
+                                                </div>
+                                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-white text-xs font-bold bg-black/50 px-2 py-1 rounded">
+                                                    Sol
+                                                </div>
+                                            </div>
+                                            
+                                            <div 
+                                                className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer"
+                                                onClick={() => playTile('right')}
+                                            >
+                                                <div className="absolute inset-0 bg-green-500/30 rounded-lg animate-pulse"></div>
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-green-500/20 rounded-md border-2 border-green-500 border-dashed"></div>
+                                                </div>
+                                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-white text-xs font-bold bg-black/50 px-2 py-1 rounded">
+                                                    Sağ
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -1227,6 +1262,210 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                );
+            }
+
+            // --- ADMIN PANEL ---
+            if (screen === 'admin') {
+                const [adminPlayers, setAdminPlayers] = useState([]);
+                const [loading, setLoading] = useState(true);
+                const [selectedPlayer, setSelectedPlayer] = useState(null);
+                const [newElo, setNewElo] = useState('');
+                
+                useEffect(() => {
+                    loadAdminPlayers();
+                }, []);
+                
+                const loadAdminPlayers = async () => {
+                    try {
+                        setLoading(true);
+                        const response = await fetch(`${API_URL}/api/admin/players?adminId=${playerData?.telegramId}`);
+                        const data = await response.json();
+                        if (data.success) {
+                            setAdminPlayers(data.players);
+                        }
+                    } catch (error) {
+                        console.error('Admin players load error:', error);
+                        showNotification('Oyuncular yüklenemedi', 'error');
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                
+                const updatePlayer = async (telegramId, elo, isVisible) => {
+                    try {
+                        const response = await fetch(`${API_URL}/api/admin/player/update`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                adminId: playerData?.telegramId,
+                                telegramId,
+                                elo,
+                                isVisible
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        if (data.success) {
+                            showNotification('Oyuncu güncellendi', 'success');
+                            loadAdminPlayers(); // Refresh list
+                            setSelectedPlayer(null);
+                            setNewElo('');
+                        } else {
+                            showNotification(data.error || 'Güncelleme başarısız', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Update error:', error);
+                        showNotification('Güncelleme hatası', 'error');
+                    }
+                };
+                
+                const resetAllElo = async () => {
+                    if (!window.confirm('Tüm ELO puanlarını sıfırlamak istediğinize emin misiniz?')) return;
+                    
+                    try {
+                        const response = await fetch(`${API_URL}/api/admin/reset-elo`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ adminId: playerData?.telegramId })
+                        });
+                        
+                        const data = await response.json();
+                        if (data.success) {
+                            showNotification('Tüm ELO puanları sıfırlandı', 'success');
+                            loadAdminPlayers(); // Refresh list
+                        } else {
+                            showNotification(data.error || 'Sıfırlama başarısız', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Reset error:', error);
+                        showNotification('Sıfırlama hatası', 'error');
+                    }
+                };
+                
+                return (
+                    <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10">
+                        {notification && <Toast message={notification.message} type={notification.type} />}
+                        
+                        <div className="text-center mb-6">
+                            <h1 className="text-4xl font-black text-white drop-shadow-lg mb-2">🔧 Admin Panel</h1>
+                            <p className="text-gray-400">Telegram ID: {playerData?.telegramId}</p>
+                        </div>
+
+                        <div className="flex gap-3 mb-6">
+                            <button onClick={() => setScreen('lobby')} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold">⬅️ Ana Menü</button>
+                            <button onClick={resetAllElo} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold">🔄 Tüm ELO'ları Sıfırla</button>
+                        </div>
+
+                        <div className="w-full max-w-4xl bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
+                            <h2 className="text-2xl font-bold text-white mb-4">Oyuncu Yönetimi</h2>
+                            
+                            {loading ? (
+                                <div className="text-center py-8">
+                                    <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                                    <p className="text-white">Oyuncular yükleniyor...</p>
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-white text-left">
+                                        <thead>
+                                            <tr className="border-b border-white/20">
+                                                <th className="pb-3">Oyuncu</th>
+                                                <th className="pb-3">ELO</th>
+                                                <th className="pb-3">Level</th>
+                                                <th className="pb-3">Görünürlük</th>
+                                                <th className="pb-3">İşlemler</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {adminPlayers.map((player) => (
+                                                <tr key={player.telegramId} className="border-b border-white/10 hover:bg-white/5">
+                                                    <td className="py-3">
+                                                        <div className="flex items-center gap-3">
+                                                            {player.photoUrl && (
+                                                                <img src={player.photoUrl} alt={player.username} className="w-10 h-10 rounded-full" />
+                                                            )}
+                                                            <div>
+                                                                <div className="font-bold">{player.username || player.firstName}</div>
+                                                                <div className="text-xs text-gray-400">{player.telegramId}</div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-3">
+                                                        <span className="bg-blue-500/20 px-2 py-1 rounded">{player.elo}</span>
+                                                    </td>
+                                                    <td className="py-3">
+                                                        <span className="bg-yellow-500/20 px-2 py-1 rounded">{player.level}</span>
+                                                    </td>
+                                                    <td className="py-3">
+                                                        <button 
+                                                            onClick={() => updatePlayer(player.telegramId, undefined, !player.isVisible)}
+                                                            className={`px-3 py-1 rounded text-xs font-bold ${player.isVisible ? 'bg-green-500' : 'bg-red-500'}`}
+                                                        >
+                                                            {player.isVisible ? '✅ Görünür' : '❌ Gizli'}
+                                                        </button>
+                                                    </td>
+                                                    <td className="py-3">
+                                                        <div className="flex gap-2">
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setSelectedPlayer(player);
+                                                                    setNewElo(player.elo.toString());
+                                                                }}
+                                                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs font-bold"
+                                                            >
+                                                                Düzenle
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Edit Player Modal */}
+                        {selectedPlayer && (
+                            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                                <div className="bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10 w-full max-w-md">
+                                    <h3 className="text-xl font-bold text-white mb-4">{selectedPlayer.username} - ELO Düzenle</h3>
+                                    
+                                    <div className="mb-4">
+                                        <label className="block text-white mb-2">Yeni ELO Puanı</label>
+                                        <input 
+                                            type="number" 
+                                            value={newElo}
+                                            onChange={(e) => setNewElo(e.target.value)}
+                                            className="w-full px-4 py-2 rounded-lg bg-black/30 border border-white/10 text-white"
+                                            placeholder="ELO puanı girin"
+                                        />
+                                    </div>
+                                    
+                                    <div className="flex gap-3">
+                                        <button 
+                                            onClick={() => {
+                                                updatePlayer(selectedPlayer.telegramId, newElo, undefined);
+                                            }}
+                                            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-bold"
+                                        >
+                                            Kaydet
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                setSelectedPlayer(null);
+                                                setNewElo('');
+                                            }}
+                                            className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg font-bold"
+                                        >
+                                            İptal
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 );
             }
