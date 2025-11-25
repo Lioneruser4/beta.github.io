@@ -485,6 +485,9 @@
                             setValidMoves([]);
                         } else {
                             console.error('❌ Geçersiz gameState:', data.gameState);
+                            // Eğer gameState boş geldiyse lobby'e dön
+                            setScreen('lobby');
+                            setGameState(null);
                         }
                         break;
                     case 'error':
@@ -599,6 +602,11 @@
             // Seçim Yapma
             const handleTileClick = (index, tile) => {
                 if (!isMyTurn) return;
+                if (!gameState) {
+                    console.error('❌ GameState null, taşı seçilemez');
+                    setScreen('lobby');
+                    return;
+                }
                 
                 console.log('👆 Taşa tıklandı:', {
                     index,
@@ -653,6 +661,11 @@
             // Taşı Oynama
             const playTile = (position) => {
                 if (selectedTileIndex === null) return;
+                if (!gameState) {
+                    console.error('❌ GameState null, taşı oynanamıyor');
+                    setScreen('lobby');
+                    return;
+                }
                 
                 console.log('🎯 Taş oynanıyor:', {
                     selectedTileIndex,
@@ -1531,7 +1544,14 @@
             }
 
             // --- OYUN EKRANI ---
-            if (screen === 'game' && gameState) {
+            if (screen === 'game') {
+                // Eğer gameState null ise lobby'e dön
+                if (!gameState) {
+                    console.log('❌ GameState null, lobby\'e dönülüyor');
+                    setScreen('lobby');
+                    return null;
+                }
+                
                 // Debug log
                 console.log('🎮 Oyun ekranı render ediliyor:', {
                     screen,
