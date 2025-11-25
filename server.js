@@ -471,7 +471,7 @@ function checkWinner(gameState) {
         console.log(`🏆 ${gameState.players[player2Id].name} won by finishing all tiles!`);
         return player2Id;
     }
-
+    
     // WIN CONDITION 2: Both players blocked (no valid moves)
     const player1CanPlay = player1Hand.some(tile => canPlayTile(tile, gameState.board));
     const player2CanPlay = player2Hand.some(tile => canPlayTile(tile, gameState.board));
