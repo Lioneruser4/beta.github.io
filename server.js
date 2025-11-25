@@ -85,7 +85,11 @@ function calculateElo(winnerElo, loserElo, winnerLevel) {
 
 // Level Calculation - Every 100 points = 1 level
 function calculateLevel(elo) {
-    return Math.floor(elo / 100) + 1; // Start at level 1 (0 ELO)
+    // Level 1: 0-99 ELO
+    // Level 2: 100-199 ELO
+    // Level 3: 200-299 ELO
+    // ...
+    return Math.floor(elo / 100) + 1;
 }
 
 // API Endpoints
@@ -332,14 +336,28 @@ function initializeGame(roomCode, player1Id, player2Id) {
     let startingPlayer = player1Id;
     let highestDouble = -1;
     
-    for (let player of [player1Id, player2Id]) {
-        const hand = player === player1Id ? player1Hand : player2Hand;
-        for (let tile of hand) {
-            if (tile[0] === tile[1] && tile[0] > highestDouble) {
-                highestDouble = tile[0];
-                startingPlayer = player;
-            }
+    // Önce player1 elini kontrol et
+    for (let tile of player1Hand) {
+        if (tile[0] === tile[1] && tile[0] > highestDouble) {
+            highestDouble = tile[0];
+            startingPlayer = player1Id;
         }
+    }
+    
+    // Sonra player2 elini kontrol et
+    for (let tile of player2Hand) {
+        if (tile[0] === tile[1] && tile[0] > highestDouble) {
+            highestDouble = tile[0];
+            startingPlayer = player2Id;
+        }
+    }
+    
+    // Eğer hiç çift yoksa, player1 başlasın
+    if (highestDouble === -1) {
+        startingPlayer = player1Id;
+        console.log(`🎲 Çift taş bulunamadı, ${room.players[player1Id].name} başlıyor`);
+    } else {
+        console.log(`🎲 Başlangıç çifti: ${highestDouble}|${highestDouble} - ${room.players[startingPlayer].name} başlıyor`);
     }
     
     room.gameState = {
@@ -352,11 +370,20 @@ function initializeGame(roomCode, player1Id, player2Id) {
         currentPlayer: startingPlayer,
         turn: 1,
         lastMove: null,
-        startingDouble: highestDouble
+        startingDouble: highestDouble,
+        // AFK tracking
+        playerLastAction: {
+            [player1Id]: Date.now(),
+            [player2Id]: Date.now()
+        },
+        afkWarnings: {
+            [player1Id]: 0,
+            [player2Id]: 0
+        }
     };
 
     rooms.set(roomCode, room);
-    console.log(`🎮 Oyun başlatıldı - Başlayan: ${startingPlayer === player1Id ? room.players[player1Id].name : room.players[player2Id].name} (${highestDouble}|${highestDouble})`);
+    console.log(`🎮 Oyun başlatıldı - Başlayan: ${room.players[startingPlayer].name}`);
     return room.gameState;
 }
 
@@ -510,15 +537,51 @@ wss.on('connection', (ws, req) => {
     sendMessage(ws, { type: 'connected', message: 'Sunucuya bağlandınız' });
 });
 
-const pingInterval = setInterval(() => {
-    wss.clients.forEach((ws) => {
-        if (ws.isAlive === false) return ws.terminate();
-        ws.isAlive = false;
-        ws.ping();
+// AFK kontrolü için interval
+const afkCheckInterval = setInterval(() => {
+    const now = Date.now();
+    const afkTimeout = 20000; // 20 saniye
+    const maxAfkWarnings = 2; // 2 kez afk kalırsa kaybeder
+    
+    rooms.forEach((room, roomCode) => {
+        if (!room.gameState) return;
+        
+        const gs = room.gameState;
+        const currentPlayerId = gs.currentPlayer;
+        
+        // Sadece oyun devam ediyorsa kontrol et
+        if (gs.playerLastAction && gs.afkWarnings) {
+            const lastAction = gs.playerLastAction[currentPlayerId];
+            const timeSinceLastAction = now - lastAction;
+            
+            if (timeSinceLastAction > afkTimeout) {
+                const warnings = gs.afkWarnings[currentPlayerId] || 0;
+                
+                if (warnings >= maxAfkWarnings) {
+                    // Oyuncu 2 kez afk kaldı, oyunu kaybeder
+                    console.log(`💀 ${room.players[currentPlayerId].name} 2 kez AFK kaldı, oyunu kaybetti!`);
+                    const winnerId = Object.keys(gs.players).find(id => id !== currentPlayerId);
+                    handleGameEnd(roomCode, winnerId, gs);
+                } else {
+                    // İlk AFK uyarısı - otomatik hamle yap
+                    console.log(`⏰ ${room.players[currentPlayerId].name} AFK - Otomatik hamle yapılıyor`);
+                    
+                    // Otomatik hamle yap
+                    makeAutoMove(roomCode, currentPlayerId);
+                    
+                    // Uyarı sayısını artır
+                    gs.afkWarnings[currentPlayerId] = warnings + 1;
+                    gs.playerLastAction[currentPlayerId] = now; // Yeni eylem zamanını güncelle
+                }
+            }
+        }
     });
-}, 30000);
+}, 5000); // 5 saniyede bir kontrol et
 
-wss.on('close', () => clearInterval(pingInterval));
+wss.on('close', () => {
+    clearInterval(afkCheckInterval);
+    clearInterval(pingInterval);
+});
 
 // --- OYUN MANTIKLARI ---
 
@@ -667,6 +730,107 @@ function handleJoinRoom(ws, data) {
     }, 500);
 }
 
+function makeAutoMove(roomCode, playerId) {
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState) return;
+    
+    const gs = room.gameState;
+    const player = gs.players[playerId];
+    
+    // Önce elindeki taşlardan oynanabilir olanı bul
+    for (let i = 0; i < player.hand.length; i++) {
+        const tile = player.hand[i];
+        
+        if (gs.board.length === 0) {
+            // Tahta boşsa her taşı oynayabilir
+            player.hand.splice(i, 1);
+            gs.board.push(tile);
+            gs.turn++;
+            gs.currentPlayer = Object.keys(gs.players).find(id => id !== playerId);
+            
+            // Eylem zamanını güncelle
+            if (gs.playerLastAction) {
+                gs.playerLastAction[gs.currentPlayer] = Date.now();
+            }
+            
+            Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+            console.log(`🤖 ${room.players[playerId].name} otomatik olarak [${tile}] taşıyla oynadı`);
+            return;
+        } else {
+            // Tahta doluysa uygun yeri bul
+            const leftEnd = gs.board[0][0];
+            const rightEnd = gs.board[gs.board.length - 1][1];
+            
+            if (tile[0] === leftEnd || tile[1] === leftEnd) {
+                // Sola oynayabilir
+                player.hand.splice(i, 1);
+                if (tile[1] === leftEnd) {
+                    gs.board.unshift(tile);
+                } else {
+                    gs.board.unshift([tile[1], tile[0]]); // Yön değiştir
+                }
+                gs.turn++;
+                gs.currentPlayer = Object.keys(gs.players).find(id => id !== playerId);
+                
+                // Eylem zamanını güncelle
+                if (gs.playerLastAction) {
+                    gs.playerLastAction[gs.currentPlayer] = Date.now();
+                }
+                
+                Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+                console.log(`🤖 ${room.players[playerId].name} otomatik olarak [${tile}] taşıyla sola oynadı`);
+                return;
+            } else if (tile[0] === rightEnd || tile[1] === rightEnd) {
+                // Sağa oynayabilir
+                player.hand.splice(i, 1);
+                if (tile[0] === rightEnd) {
+                    gs.board.push(tile);
+                } else {
+                    gs.board.push([tile[1], tile[0]]); // Yön değiştir
+                }
+                gs.turn++;
+                gs.currentPlayer = Object.keys(gs.players).find(id => id !== playerId);
+                
+                // Eylem zamanını güncelle
+                if (gs.playerLastAction) {
+                    gs.playerLastAction[gs.currentPlayer] = Date.now();
+                }
+                
+                Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+                console.log(`🤖 ${room.players[playerId].name} otomatik olarak [${tile}] taşıyla sağa oynadı`);
+                return;
+            }
+        }
+    }
+    
+    // Eğer elinde oynanabilir taş yoksa, pazardan çek
+    if (gs.market && gs.market.length > 0) {
+        const drawnTile = gs.market.shift();
+        player.hand.push(drawnTile);
+        
+        // Eylem zamanını güncelle
+        if (gs.playerLastAction) {
+            gs.playerLastAction[playerId] = Date.now();
+        }
+        
+        Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+        console.log(`🤖 ${room.players[playerId].name} otomatik olarak pazardan [${drawnTile}] taşı çekti`);
+        return;
+    }
+    
+    // Pazarda taş yoksa ve oynanabilir taş yoksa, pas geç
+    console.log(`🤖 ${room.players[playerId].name} otomatik olarak pas geçti`);
+    gs.turn++;
+    gs.currentPlayer = Object.keys(gs.players).find(id => id !== playerId);
+    
+    // Eylem zamanını güncelle
+    if (gs.playerLastAction) {
+        gs.playerLastAction[gs.currentPlayer] = Date.now();
+    }
+    
+    Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+}
+
 function handlePlayTile(ws, data) {
     const room = rooms.get(ws.roomCode);
     if (!room || !room.gameState) return;
@@ -693,12 +857,23 @@ function handlePlayTile(ws, data) {
     gs.lastPlayedPosition = data.position;
     gs.lastPlayedTile = tile;
     
+    // AFK timer'ı sıfırla
+    if (gs.playerLastAction) {
+        gs.playerLastAction[ws.playerId] = Date.now();
+    }
+    
     const winner = checkWinner(gs);
     if (winner) {
         handleGameEnd(ws.roomCode, winner, gs);
     } else {
         gs.turn++;
         gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
+        
+        // Yeni oyuncunun AFK timer'ını da sıfırla
+        if (gs.playerLastAction) {
+            gs.playerLastAction[gs.currentPlayer] = Date.now();
+        }
+        
         Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
     }
 }
@@ -872,12 +1047,24 @@ function handleDrawFromMarket(ws) {
 
     const player = gs.players[ws.playerId];
     
+    // Önce elinde oynanabilir taş var mı kontrol et
+    const hasPlayable = player.hand.some(tile => canPlayTile(tile, gs.board));
+    if (hasPlayable) {
+        return sendMessage(ws, { type: 'error', message: 'Elinizde oynanabilir taş var, pazardan çekemezsiniz!' });
+    }
+    
     // Pazarda taş var mı?
     if (!gs.market || gs.market.length === 0) {
         // Pazar boş, otomatik sıra geç
         console.log(`🎲 ${player.name} pazardan çekemedi (boş) - Sıra geçiyor`);
         gs.turn++;
         gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
+        
+        // Yeni oyuncunun AFK timer'ını sıfırla
+        if (gs.playerLastAction) {
+            gs.playerLastAction[gs.currentPlayer] = Date.now();
+        }
+        
         Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
         return;
     }
@@ -885,6 +1072,11 @@ function handleDrawFromMarket(ws) {
     // Pazardan taş çek
     const drawnTile = gs.market.shift();
     player.hand.push(drawnTile);
+    
+    // AFK timer'ı sıfırla
+    if (gs.playerLastAction) {
+        gs.playerLastAction[ws.playerId] = Date.now();
+    }
     
     console.log(`🎲 ${player.name} pazardan taş çekti: [${drawnTile}] - Kalan: ${gs.market.length}`);
     
@@ -904,6 +1096,11 @@ function handleDrawFromMarket(ws) {
             console.log(`❌ ${player.name} oynanabilir taş bulamadı - Sıra geçiyor`);
             gs.turn++;
             gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
+            
+            // Yeni oyuncunun AFK timer'ını sıfırla
+            if (gs.playerLastAction) {
+                gs.playerLastAction[gs.currentPlayer] = Date.now();
+            }
         }
     }
     
