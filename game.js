@@ -123,15 +123,16 @@ socket.on('gameOver', (data) => {
 
 socket.on('opponentLeft', (data) => {
     // Raqib cikdiqda qalib olunur
-    const eloChange = data.eloChange || 25;
+    const eloChange = data.eloChange || 15;
+    const opponentName = data.opponentName || 'Raqib';
     
     // Oyun ekraninda iken bildirim goster
     if (gameState.gameStarted) {
-        showModal('🎉 Raqip cikdi! Qazandiniz! (+25 ELO)');
+        showModal(`🎉 ${opponentName} çıxdı! Qazandınız! (+${eloChange} ELO)`);
     }
     
     // Sonuc lobisine gonder
-    showResultLobby(true, eloChange);
+    showResultLobby(true, eloChange, opponentName);
 });
 
 socket.on('error', (message) => {
@@ -149,7 +150,7 @@ function showModal(message) {
     messageModal.classList.remove('hidden');
 }
 
-function showResultLobby(isWinner, eloChange) {
+function showResultLobby(isWinner, eloChange, opponentName = null) {
     const resultLobby = document.getElementById('result-lobby');
     const resultMessage = document.getElementById('result-message');
     const resultElo = document.getElementById('result-elo');
@@ -159,6 +160,11 @@ function showResultLobby(isWinner, eloChange) {
     
     resultElo.textContent = 'ELO: ' + (isWinner ? '+' : '') + eloChange;
     resultElo.className = isWinner ? 'text-2xl font-semibold text-green-300' : 'text-2xl font-semibold text-red-300';
+    
+    // Rakip ismini göster
+    if (opponentName && resultLobby.querySelector('.opponent-name')) {
+        resultLobby.querySelector('.opponent-name').textContent = opponentName;
+    }
     
     showScreen('result');
     
