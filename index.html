@@ -500,6 +500,9 @@
             const marketSize = gameState?.market?.length || 0;
             const canDrawFromMarket = marketSize > 0;
 
+            // Rakip oyuncuyu bul
+            const opponentPlayer = gameState ? Object.values(gameState.players).find(p => p.id !== myPlayerId) : null;
+
             // Elinde oynanabilir taş var mı kontrol et
             const hasValidTilesInHand = () => {
                 if (gameState.board.length === 0) return myHand.length > 0;
@@ -885,7 +888,7 @@
                 const opponentName = notification?.opponentName || 'Raqip';
                 
                 // Rakibin bilgilerini al
-                const opponent = gameState ? Object.values(gameState.players).find(p => p.id !== myPlayerId) : null;
+                const opponent = opponentPlayer || gameState ? Object.values(gameState.players).find(p => p.id !== myPlayerId) : null;
                 
                 return (
                     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6 relative overflow-hidden">
@@ -986,9 +989,9 @@
                         {/* ÜST PANEL: Rakip */}
                         <div className="h-16 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between px-4 z-20">
                             <div className="flex items-center gap-3">
-                                {Object.values(gameState.players).find(p => p.id !== myPlayerId)?.photoUrl ? (
+                                {opponentPlayer?.photoUrl ? (
                                     <img 
-                                        src={Object.values(gameState.players).find(p => p.id !== myPlayerId)?.photoUrl} 
+                                        src={opponentPlayer.photoUrl} 
                                         alt="Rakip" 
                                         className="w-10 h-10 rounded-full border-2 border-slate-600 shadow-lg"
                                     />
@@ -999,20 +1002,20 @@
                                 )}
                                 <div>
                                     <div className="text-white text-sm font-bold shadow-black drop-shadow-md">
-                                        {Object.values(gameState.players).find(p => p.id !== myPlayerId)?.username || '🎯 RAKİP'}
+                                        {opponentPlayer?.name || '🎯 RAKİP'}
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        {!Object.values(gameState.players).find(p => p.id !== myPlayerId)?.isGuest && (
+                                        {!opponentPlayer?.isGuest && (
                                             <div className="text-xs text-yellow-400 bg-black/40 px-2 py-0.5 rounded-full inline-block">
-                                                LVL {Object.values(gameState.players).find(p => p.id !== myPlayerId)?.level || 0}
+                                                LVL {opponentPlayer?.level || 0}
                                             </div>
                                         )}
                                         <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
-                                            🎲 {Object.values(gameState.players).find(p => p.id !== myPlayerId)?.hand?.length || 0} Taş
+                                            🎲 {opponentPlayer?.hand?.length || 0} Taş
                                         </div>
-                                        {!Object.values(gameState.players).find(p => p.id !== myPlayerId)?.isGuest && (
+                                        {!opponentPlayer?.isGuest && (
                                             <div className="text-xs text-blue-400 bg-black/40 px-2 py-0.5 rounded-full inline-block">
-                                                {Object.values(gameState.players).find(p => p.id !== myPlayerId)?.elo || 0} ELO
+                                                {opponentPlayer?.elo || 0} ELO
                                             </div>
                                         )}
                                     </div>
