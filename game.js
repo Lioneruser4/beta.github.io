@@ -115,8 +115,16 @@ socket.on('gameUpdate', (data) => {
 
 socket.on('gameOver', (data) => {
     const isWinner = data.winner === gameState.myColor;
-    showModal('Oyun bitdi! ' + (isWinner ? 'Siz qazandiniz!' : 'Raqib qazandi!'));
-    setTimeout(() => leaveGame(), 3000);
+    const eloChange = data.eloChange || 0;
+    
+    // Ozel sonuc lobisi goster
+    showResultLobby(isWinner, eloChange);
+});
+
+socket.on('opponentLeft', (data) => {
+    // Raqib cikdiqda qalib olunur
+    const eloChange = data.eloChange || 25;
+    showResultLobby(true, eloChange);
 });
 
 socket.on('error', (message) => {
@@ -134,12 +142,35 @@ function showModal(message) {
     messageModal.classList.remove('hidden');
 }
 
+function showResultLobby(isWinner, eloChange) {
+    const resultLobby = document.getElementById('result-lobby');
+    const resultMessage = document.getElementById('result-message');
+    const resultElo = document.getElementById('result-elo');
+    
+    resultMessage.textContent = isWinner ? '🎉 Qazandiniz!' : '😔 Uduzdunuz';
+    resultMessage.className = isWinner ? 'text-4xl font-bold text-green-400' : 'text-4xl font-bold text-red-400';
+    
+    resultElo.textContent = 'ELO: ' + (isWinner ? '+' : '') + eloChange;
+    resultElo.className = isWinner ? 'text-2xl font-semibold text-green-300' : 'text-2xl font-semibold text-red-300';
+    
+    showScreen('result');
+    
+    // 4 saniye sonra ana lobiye don
+    setTimeout(() => {
+        leaveGame();
+        showScreen('main');
+    }, 4000);
+}
+
 function showScreen(screen) {
     loader.classList.add('hidden');
     mainLobby.classList.add('hidden');
     rankedLobby.classList.add('hidden');
     friendLobby.classList.add('hidden');
     gameScreen.classList.add('hidden');
+    
+    const resultLobby = document.getElementById('result-lobby');
+    if (resultLobby) resultLobby.classList.add('hidden');
 
     if (screen === 'main') {
         mainLobby.classList.remove('hidden');
@@ -160,6 +191,9 @@ function showScreen(screen) {
         gameScreen.classList.remove('hidden');
         clearInterval(searchTimer);
         searchTimer = null;
+    } else if (screen === 'result') {
+        const resultLobby = document.getElementById('result-lobby');
+        if (resultLobby) resultLobby.classList.remove('hidden');
     } else {
         loader.classList.remove('hidden');
     }
@@ -397,7 +431,12 @@ joinRoomBtn.onclick = () => {
     socket.emit('joinRoom', { roomCode });
 };
 
-leaveGameBtn.onclick = () => leaveGame();
+leaveGameBtn.onclick = () => {
+    if (confirm('Eminmisiniz? Oyundan cikdiqda ELO itireceksiniz!')) {
+        socket.emit('leaveGame', { roomCode: gameState.roomCode });
+        leaveGame();
+    }
+};
 
 function leaveGame() {
     if (gameState.roomCode) {
