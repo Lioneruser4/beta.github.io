@@ -389,13 +389,26 @@
                         const isRanked = data.isRanked;
                         const winMsg = `Oyun Bitti! Kazanan: ${data.winnerName}`;
                         const eloMsg = data.eloChanges ? ` (ELO: ${data.eloChanges.winner > 0 ? '+' : ''}${data.eloChanges.winner})` : '';
-                        showNotification(winMsg + (isRanked ? eloMsg : ' (Casual)'), 'info');
                         
-                        if (data.winner === gameState?.playerId && isRanked) {
-                            setTimeout(() => {
-                                setNotification({ message: `🏆 KAZANDINIZ! ${eloMsg}`, type: 'success' });
-                            }, 500);
+                        // Ozel sonuc lobisi goster
+                        if (data.winner === gameState?.playerId) {
+                            setScreen('result');
+                            setNotification({ 
+                                message: `🎉 QAZANDINIZ! ${eloMsg}`, 
+                                type: 'success',
+                                eloChange: data.eloChanges?.winner || 0,
+                                isWinner: true
+                            });
+                        } else {
+                            setScreen('result');
+                            setNotification({ 
+                                message: `😔 UDUZDUNUZ ${eloMsg}`, 
+                                type: 'error',
+                                eloChange: data.eloChanges?.loser || 0,
+                                isWinner: false
+                            });
                         }
+                        
                         setTimeout(() => { 
                             setScreen('lobby'); 
                             setGameState(null); 
@@ -417,6 +430,27 @@
                         setSearchTime(0);
                         break;
                     case 'searchStatus':
+                        break;
+                    case 'opponentLeft':
+                        // Raqib cikdiqda qalib olunur
+                        const eloChange = 25;
+                        setScreen('result');
+                        setNotification({ 
+                            message: `🎉 Raqip cikdi! Qazandiniz! (+${eloChange} ELO)`, 
+                            type: 'success',
+                            eloChange: eloChange,
+                            isWinner: true
+                        });
+                        
+                        setTimeout(() => { 
+                            setScreen('lobby'); 
+                            setGameState(null); 
+                            setRoomCode(''); 
+                            setSearching(false);
+                            if (playerData && !playerData.isGuest) {
+                                initializeTelegramAuth();
+                            }
+                        }, 4000);
                         break;
                     case 'matchFound':
                         showNotification(`Rakip Bulundu! ${data.gameType === 'ranked' ? '🏆 RANKED' : '🎮 CASUAL'}`, 'success');
@@ -814,6 +848,66 @@
                 );
             }
 
+            // --- SONUC LOBISI EKRANI ---
+            if (screen === 'result') {
+                const isWinner = notification?.isWinner || false;
+                const eloChange = notification?.eloChange || 0;
+                
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6 relative overflow-hidden">
+                        {/* Animated Background */}
+                        <div className="absolute inset-0 overflow-hidden">
+                            {[...Array(20)].map((_, i) => 
+                                <div
+                                    key={i}
+                                    className="absolute animate-pulse"
+                                    style={{
+                                        left: `${Math.random() * 100}%`,
+                                        top: `${Math.random() * 100}%`,
+                                        width: `${Math.random() * 4 + 2}px`,
+                                        height: `${Math.random() * 4 + 2}px`,
+                                        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                                        borderRadius: '50%',
+                                        animationDelay: `${Math.random() * 2}s`,
+                                        animationDuration: `${Math.random() * 3 + 2}s`
+                                    }}
+                                />
+                            )}
+                        </div>
+
+                        <div className="relative z-10 max-w-md w-full">
+                            <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20 text-center">
+                                {/* Player Card */}
+                                <div className="text-center mb-8">
+                                    {playerData?.photoUrl && (
+                                        <img src={playerData.photoUrl} alt="Profile" className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 animate-pulse" />
+                                    )}
+                                    <h2 className="text-white text-2xl font-bold mb-2">{playerData?.username}</h2>
+                                </div>
+
+                                {/* Result Message */}
+                                <div className="mb-8">
+                                    <div className={`text-4xl font-bold mb-4 ${isWinner ? 'text-green-400' : 'text-red-400'}`}>
+                                        {isWinner ? '🎉 QAZANDINIZ!' : '😔 UDUZDUNUZ'}
+                                    </div>
+                                    
+                                    {/* ELO Display */}
+                                    <div className={`text-2xl font-semibold mb-6 ${isWinner ? 'text-green-300' : 'text-red-300'}`}>
+                                        ELO: {isWinner ? '+' : ''}{eloChange}
+                                    </div>
+
+                                    {/* Timer */}
+                                    <div className="bg-black/30 rounded-xl p-4 text-center mb-6">
+                                        <div className="text-white text-2xl font-mono font-bold">⏱️ 4</div>
+                                        <div className="text-white/60 text-sm mt-1">Ana lobiye donulur...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
             // --- OYUN EKRANI ---
             if (screen === 'game' && gameState) {
                 // Tahtada görsel olarak taşları döndürmek gerekir mi?
@@ -928,18 +1022,34 @@
                                         </span>
                                     )}
                                 </div>
-                                {isMyTurn && (
-                                    <div className="flex gap-2">
-                                        {canDrawFromMarket && validMoves.length === 0 && selectedTileIndex === null && (
-                                            <button 
-                                                onClick={drawFromMarket}
-                                                className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
-                                            >
-                                                🎲 ÇEK
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
+                                <div className="flex gap-2">
+                                    {/* OYUNDAN ÇIK BUTONU */}
+                                    <button 
+                                        onClick={() => {
+                                            if (confirm('Eminmisiniz? Oyundan cikdiqda ELO itireceksiniz!')) {
+                                                sendMessage({ type: 'leaveGame' });
+                                                setScreen('lobby');
+                                                setGameState(null);
+                                                setRoomCode('');
+                                            }
+                                        }}
+                                        className="bg-red-500/80 hover:bg-red-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95"
+                                    >
+                                        🚪 ÇIK
+                                    </button>
+                                    {isMyTurn && (
+                                        <div className="flex gap-2">
+                                            {canDrawFromMarket && validMoves.length === 0 && selectedTileIndex === null && (
+                                                <button 
+                                                    onClick={drawFromMarket}
+                                                    className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
+                                                >
+                                                    🎲 ÇEK
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Taş Dizilimi */}
