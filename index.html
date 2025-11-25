@@ -988,6 +988,7 @@
                                 <p className="text-xs text-gray-400 mt-2">⏳ Arkadaşın bekleniyor...</p>
                             </div>
                         )}
+                        </div>
                     </div>
                 );
             }
@@ -1011,7 +1012,7 @@
                     }, 10000);
                     
                     return () => clearTimeout(timer);
-                }, []);
+                }, [isRanked, playerData]);
                 
                 // Get opponent info
                 const opponentId = Object.keys(gameState.players).find(id => id !== myPlayerId);
