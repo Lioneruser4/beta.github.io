@@ -602,11 +602,14 @@
                 if (selectedTileIndex === null) return;
                 
                 // Server 'left' veya 'right' bekliyor.
-                sendMessage({
+                const message = {
                     type: 'playTile',
                     tileIndex: selectedTileIndex,
                     position: position
-                });
+                };
+                
+                console.log('Sending playTile message:', message);
+                sendMessage(message);
                 
                 // Seçimi temizle (Optimistik UI)
                 setSelectedTileIndex(null);
@@ -788,18 +791,18 @@
                         </div>
                         {notification && <Toast message={notification.message} type={notification.type} />}
                         
-                        <div className="text-center mb-10 animate-float">
-                            <h1 className="text-5xl font-black text-white drop-shadow-lg mb-2 tracking-tighter">
-                                🎯 DOMINO <span className="text-yellow-400">101</span> 🏆
+                        <div className="text-center mb-6 animate-float">
+                            <h1 className="text-4xl md:text-5xl font-black text-white drop-shadow-lg mb-2 tracking-tighter">
+                                🎯 <span className="text-yellow-400">DOMINO</span> 101 🏆
                             </h1>
-                            <p className="text-gray-300 text-sm tracking-widest uppercase">⚡ Profesyonel Online Oyun ⚡</p>
+                            <p className="text-gray-300 text-xs md:text-sm tracking-widest uppercase">⚡ Profesyonel Online Oyun ⚡</p>
                         </div>
 
                         {/* NAVİGASYON */}
-                        <div className="flex gap-3 mb-6">
-                            <button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold">🏆 Skor Tablosu</button>
+                        <div className="flex flex-col gap-3 mb-6">
+                            <button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold cursor-pointer pointer-events-auto">🏆 Skor Tablosu</button>
                             {playerData?.telegramId === '976640409' && (
-                                <button onClick={() => setScreen('admin')} className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold">🔧 Admin Panel</button>
+                                <button onClick={() => setScreen('admin')} className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold cursor-pointer pointer-events-auto">🔧 Admin Panel</button>
                             )}
                         </div>
 
@@ -1244,6 +1247,55 @@
                     }
                 };
                 
+                const deletePlayer = async (telegramId) => {
+                    if (!window.confirm('Bu oyuncuyu silmek istediğinize emin misiniz? Bu işlem geri alınamaz!')) return;
+                    
+                    try {
+                        const response = await fetch(`${API_URL}/api/admin/player/delete`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                adminId: playerData?.telegramId,
+                                telegramId
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        if (data.success) {
+                            showNotification('Oyuncu silindi', 'success');
+                            loadAdminPlayers(); // Refresh list
+                        } else {
+                            showNotification(data.error || 'Silme başarısız', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Delete error:', error);
+                        showNotification('Silme hatası', 'error');
+                    }
+                };
+                
+                const resetAllStats = async () => {
+                    if (!window.confirm('Tüm oyuncu istatistiklerini (ELO, galibiyet, mağlubiyet) sıfırlamak istediğinize emin misiniz?')) return;
+                    
+                    try {
+                        const response = await fetch(`${API_URL}/api/admin/reset-all-stats`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ adminId: playerData?.telegramId })
+                        });
+                        
+                        const data = await response.json();
+                        if (data.success) {
+                            showNotification('Tüm istatistikler sıfırlandı', 'success');
+                            loadAdminPlayers(); // Refresh list
+                        } else {
+                            showNotification(data.error || 'Sıfırlama başarısız', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Reset stats error:', error);
+                        showNotification('İstatistik sıfırlama hatası', 'error');
+                    }
+                };
+                
                 return (
                     <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10">
                         {notification && <Toast message={notification.message} type={notification.type} />}
@@ -1253,7 +1305,7 @@
                             <p className="text-gray-400">Telegram ID: {playerData?.telegramId}</p>
                         </div>
 
-                        <div className="flex gap-3 mb-6">
+                        <div className="flex flex-col gap-3 mb-6">
                             <button 
                                 onClick={() => setScreen('lobby')} 
                                 className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold cursor-pointer pointer-events-auto"
@@ -1265,6 +1317,12 @@
                                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold cursor-pointer pointer-events-auto"
                             >
                                 🔄 Tüm ELO'ları Sıfırla
+                            </button>
+                            <button 
+                                onClick={resetAllStats} 
+                                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-bold cursor-pointer pointer-events-auto"
+                            >
+                                🗑️ Tüm İstatistikleri Sıfırla
                             </button>
                         </div>
 
@@ -1323,9 +1381,15 @@
                                                                     setSelectedPlayer(player);
                                                                     setNewElo(player.elo.toString());
                                                                 }}
-                                                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs font-bold"
+                                                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs font-bold cursor-pointer pointer-events-auto"
                                                             >
                                                                 Düzenle
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => deletePlayer(player.telegramId)}
+                                                                className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-xs font-bold cursor-pointer pointer-events-auto"
+                                                            >
+                                                                Sil
                                                             </button>
                                                         </div>
                                                     </td>
@@ -1703,6 +1767,55 @@
                     }
                 };
                 
+                const deletePlayer = async (telegramId) => {
+                    if (!window.confirm('Bu oyuncuyu silmek istediğinize emin misiniz? Bu işlem geri alınamaz!')) return;
+                    
+                    try {
+                        const response = await fetch(`${API_URL}/api/admin/player/delete`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                adminId: playerData?.telegramId,
+                                telegramId
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        if (data.success) {
+                            showNotification('Oyuncu silindi', 'success');
+                            loadAdminPlayers(); // Refresh list
+                        } else {
+                            showNotification(data.error || 'Silme başarısız', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Delete error:', error);
+                        showNotification('Silme hatası', 'error');
+                    }
+                };
+                
+                const resetAllStats = async () => {
+                    if (!window.confirm('Tüm oyuncu istatistiklerini (ELO, galibiyet, mağlubiyet) sıfırlamak istediğinize emin misiniz?')) return;
+                    
+                    try {
+                        const response = await fetch(`${API_URL}/api/admin/reset-all-stats`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ adminId: playerData?.telegramId })
+                        });
+                        
+                        const data = await response.json();
+                        if (data.success) {
+                            showNotification('Tüm istatistikler sıfırlandı', 'success');
+                            loadAdminPlayers(); // Refresh list
+                        } else {
+                            showNotification(data.error || 'Sıfırlama başarısız', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Reset stats error:', error);
+                        showNotification('İstatistik sıfırlama hatası', 'error');
+                    }
+                };
+                
                 return (
                     <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10">
                         {notification && <Toast message={notification.message} type={notification.type} />}
@@ -1712,7 +1825,7 @@
                             <p className="text-gray-400">Telegram ID: {playerData?.telegramId}</p>
                         </div>
 
-                        <div className="flex gap-3 mb-6">
+                        <div className="flex flex-col gap-3 mb-6">
                             <button 
                                 onClick={() => setScreen('lobby')} 
                                 className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold cursor-pointer pointer-events-auto"
@@ -1724,6 +1837,12 @@
                                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold cursor-pointer pointer-events-auto"
                             >
                                 🔄 Tüm ELO'ları Sıfırla
+                            </button>
+                            <button 
+                                onClick={resetAllStats} 
+                                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-bold cursor-pointer pointer-events-auto"
+                            >
+                                🗑️ Tüm İstatistikleri Sıfırla
                             </button>
                         </div>
 
@@ -1782,9 +1901,15 @@
                                                                     setSelectedPlayer(player);
                                                                     setNewElo(player.elo.toString());
                                                                 }}
-                                                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs font-bold"
+                                                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs font-bold cursor-pointer pointer-events-auto"
                                                             >
                                                                 Düzenle
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => deletePlayer(player.telegramId)}
+                                                                className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-xs font-bold cursor-pointer pointer-events-auto"
+                                                            >
+                                                                Sil
                                                             </button>
                                                         </div>
                                                     </td>
