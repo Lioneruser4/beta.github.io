@@ -470,7 +470,7 @@
                         break;
                     case 'gameUpdate':
                         console.log('🔄 Oyun güncelleniyor...', data.gameState);
-                        if (data.gameState && data.gameState.board) {
+                        if (data.gameState && data.gameState.board && Array.isArray(data.gameState.board)) {
                             // Önceki state'i koru, sadece gelen veriyi güncelle
                             setGameState(prevState => {
                                 const newState = {
@@ -485,7 +485,8 @@
                             setValidMoves([]);
                         } else {
                             console.error('❌ Geçersiz gameState:', data.gameState);
-                            // Eğer gameState boş geldiyse lobby'e dön
+                            // Eğer gameState boş veya geçersiz geldiyse lobby'e dön
+                            showNotification('Oyun durumu geçersiz, lobby\'e dönülüyor', 'error');
                             setScreen('lobby');
                             setGameState(null);
                         }
