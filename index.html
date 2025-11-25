@@ -175,7 +175,7 @@
         }
 
         // API Base URL
-        const API_URL = 'http://localhost:10000';
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
 
         // --- BİLEŞENLER ---
 
@@ -265,30 +265,102 @@
             };
 
             useEffect(() => {
+                // Telegram auth'ı 10 saniye içinde tamamlanmazsa guest mode'a geç
+                const authTimeout = setTimeout(() => {
+                    if (!playerData) {
+                        setPlayerData({ 
+                            isGuest: true, 
+                            username: 'Guest' + Math.floor(Math.random() * 9999), 
+                            firstName: '',
+                            lastName: '',
+                            photoUrl: null,
+                            level: 0, 
+                            elo: 0,
+                            telegramId: null
+                        });
+                        setScreen('lobby');
+                    }
+                }, 10000);
+
                 initializeTelegramAuth();
                 connectToServer();
                 
                 return () => { 
                     if (wsRef.current) wsRef.current.close(); 
+                    clearTimeout(authTimeout);
                 };
             }, []);
 
-            // Telegram Auth - Geçici olarak devre dışı
+            // Telegram Auth
             const initializeTelegramAuth = async () => {
-                // Her zaman guest mode kullan
-                const guestData = { 
-                    isGuest: true, 
-                    username: 'Guest' + Math.floor(Math.random() * 9999), 
-                    firstName: '',
-                    lastName: '',
-                    photoUrl: null,
-                    level: 0,
-                    elo: 0,
-                    telegramId: null
-                };
-                setPlayerData(guestData);
-                setScreen('lobby');
-                console.log('👥 Guest mode (geçici):', guestData);
+                // Eğer zaten playerData varsa tekrar çalıştırma
+                if (playerData) return;
+                
+                try {
+                    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                        // Telegram WebApp - Otomatik giriş
+                        const user = tg.initDataUnsafe.user;
+                        const telegramData = {
+                            telegramId: user.id.toString(),
+                            username: user.username || user.first_name || 'User',
+                            firstName: user.first_name || '',
+                            lastName: user.last_name || '',
+                            photoUrl: user.photo_url || null
+                        };
+
+                        console.log('📡 Telegram kullanıcısı:', telegramData);
+
+                        // MongoDB'ye kaydet/güncelle
+                        const response = await fetch(`${API_URL}/api/auth/telegram`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(telegramData)
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            setPlayerData({
+                                ...data.player,
+                                isGuest: false,
+                                photoUrl: telegramData.photoUrl || data.player.photoUrl
+                            });
+                            setScreen('lobby');
+                            console.log('✅ Telegram Auth başarılı:', data.player);
+                        } else {
+                            throw new Error('Auth failed');
+                        }
+                    } else {
+                        // Normal tarayıcı - Guest mode
+                        const guestData = { 
+                            isGuest: true, 
+                            username: 'Guest' + Math.floor(Math.random() * 9999),
+                            firstName: '',
+                            lastName: '',
+                            photoUrl: null,
+                            level: 0,
+                            elo: 0,
+                            telegramId: null
+                        };
+                        setPlayerData(guestData);
+                        setScreen('lobby');
+                        console.log('👥 Guest mode:', guestData);
+                    }
+                } catch (error) {
+                    console.error('Auth error:', error);
+                    // Her hata durumunda guest mode'a geç
+                    const guestData = { 
+                        isGuest: true, 
+                        username: 'Guest' + Math.floor(Math.random() * 9999), 
+                        firstName: '',
+                        lastName: '',
+                        photoUrl: null,
+                        level: 0, 
+                        elo: 0,
+                        telegramId: null
+                    };
+                    setPlayerData(guestData);
+                    setScreen('lobby');
+                }
             };
 
             // Leaderboard yükle
@@ -330,7 +402,11 @@
             }, [gameState?.board, gameState?.lastPlayedPosition]);
 
             const connectToServer = () => {
-                let wsUrl = 'ws://localhost:10000';
+                let wsUrl = 'wss://beta-github-io.onrender.com';
+                // Test için Localhost kontrolü
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    wsUrl = `ws://${window.location.hostname}:10000`;
+                }
 
                 const ws = new WebSocket(wsUrl);
 
@@ -781,6 +857,16 @@
                                 🎯 <span className="text-yellow-400">DOMINO</span> 101 🏆
                             </h1>
                             <p className="text-gray-300 text-sm md:text-base tracking-widest uppercase">⚡ ONLINE OYUN ⚡</p>
+                            {/* Bağlantı Durumu */}
+                            <div className="mt-4">
+                                <span className={`px-4 py-2 rounded-full text-sm font-bold ${
+                                    connected 
+                                    ? 'bg-green-500/20 border border-green-500/30 text-green-400' 
+                                    : 'bg-red-500/20 border border-red-500/30 text-red-400 animate-pulse'
+                                }`}>
+                                    {connected ? '🟢 BAĞLI' : '🔴 BAĞLI DEĞİL'}
+                                </span>
+                            </div>
                         </div>
 
                         {/* OYUNCU BİLGİLERİ */}
@@ -818,8 +904,9 @@
                         <div className="w-full max-w-md space-y-4 mb-6">
                             <button 
                                 onClick={() => {
-                                    if(!playerData) return showNotification('İsim giriniz', 'error');
-                                    if(searching) return;
+                                    if(!connected) return showNotification('Sunucuya bağlı değilsiniz', 'error');
+                                    if(!playerData) return showNotification('Oyuncu bilgisi yok', 'error');
+                                    if(searching) return showNotification('Zaten arama yapılıyor', 'error');
                                     
                                     // Reset any existing game state
                                     setGameState(null);
@@ -846,8 +933,9 @@
                             
                             <button 
                                 onClick={() => {
-                                    if(!playerData) return showNotification('İsim giriniz', 'error');
-                                    if(roomCode) return;
+                                    if(!connected) return showNotification('Sunucuya bağlı değilsiniz', 'error');
+                                    if(!playerData) return showNotification('Oyuncu bilgisi yok', 'error');
+                                    if(roomCode) return showNotification('Zaten bir odadasınız', 'error');
                                     
                                     // Reset any existing game state
                                     setGameState(null);
@@ -874,7 +962,8 @@
                                 />
                                 <button 
                                     onClick={() => {
-                                        if(!playerData) return showNotification('İsim giriniz', 'error');
+                                        if(!connected) return showNotification('Sunucuya bağlı değilsiniz', 'error');
+                                        if(!playerData) return showNotification('Oyuncu bilgisi yok', 'error');
                                         if(!joinCode || joinCode.length !== 6) return showNotification('Geçerli oda kodu giriniz', 'error');
                                         
                                         // Reset any existing game state
@@ -899,12 +988,14 @@
                             >
                                 🏆 Skor Tablosu
                             </button>
-                            <button 
-                                onClick={() => setScreen('admin')} 
-                                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold cursor-pointer pointer-events-auto transition-colors shadow-lg"
-                            >
-                                🔧 Admin Panel
-                            </button>
+                            {playerData?.telegramId === '976640409' && (
+                                <button 
+                                    onClick={() => setScreen('admin')} 
+                                    className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold cursor-pointer pointer-events-auto transition-colors shadow-lg"
+                                >
+                                    🔧 Admin Panel
+                                </button>
+                            )}
                         </div>
 
                         {roomCode && (
