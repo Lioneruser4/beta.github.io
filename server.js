@@ -23,7 +23,7 @@ const playerSchema = new mongoose.Schema({
     firstName: { type: String },
     lastName: { type: String },
     photoUrl: { type: String },
-    elo: { type: Number, default: 1000 },
+    elo: { type: Number, default: 0 },
     level: { type: Number, default: 1 },
     wins: { type: Number, default: 0 },
     losses: { type: Number, default: 0 },
@@ -61,14 +61,18 @@ const matchQueue = [];
 const playerConnections = new Map();
 const playerSessions = new Map(); // telegramId -> player data
 
-// ELO Hesaplama Fonksiyonu (FACEIT tarzı)
-function calculateElo(winnerElo, loserElo) {
-    const K = 32; // K-factor
-    const expectedWin = 1 / (1 + Math.pow(10, (loserElo - winnerElo) / 400));
-    const expectedLose = 1 / (1 + Math.pow(10, (winnerElo - loserElo) / 400));
+// ELO Calculation - Win-based system
+function calculateElo(winnerElo, loserElo, winnerLevel) {
+    // Random points between 13-20 for levels 1-5
+    // Random points between 10-15 for levels 6+
+    let winnerChange;
+    if (winnerLevel <= 5) {
+        winnerChange = Math.floor(Math.random() * 8) + 13; // 13-20
+    } else {
+        winnerChange = Math.floor(Math.random() * 6) + 10; // 10-15
+    }
     
-    const winnerChange = Math.round(K * (1 - expectedWin));
-    const loserChange = Math.round(K * (0 - expectedLose));
+    const loserChange = -Math.floor(winnerChange * 0.7); // Loser loses 70% of winner's gain
     
     return {
         winnerElo: winnerElo + winnerChange,
@@ -78,18 +82,9 @@ function calculateElo(winnerElo, loserElo) {
     };
 }
 
-// Level Hesaplama (1-10 arası)
+// Level Calculation - Every 100 points = 1 level
 function calculateLevel(elo) {
-    if (elo < 800) return 1;
-    if (elo < 1000) return 2;
-    if (elo < 1200) return 3;
-    if (elo < 1400) return 4;
-    if (elo < 1600) return 5;
-    if (elo < 1800) return 6;
-    if (elo < 2000) return 7;
-    if (elo < 2200) return 8;
-    if (elo < 2500) return 9;
-    return 10;
+    return Math.floor(elo / 100) + 1; // Start at level 1 (0 ELO)
 }
 
 // API Endpoints
@@ -510,9 +505,14 @@ function handleFindMatch(ws, data) {
         sendMessage(p1.ws, { type: 'matchFound', roomCode, opponent: room.players[p2.playerId], gameType });
         sendMessage(p2.ws, { type: 'matchFound', roomCode, opponent: room.players[p1.playerId], gameType });
 
+        // CRITICAL FIX: Send gameStart immediately to both players
         setTimeout(() => {
-            sendGameState(roomCode, p1.playerId);
-            sendGameState(roomCode, p2.playerId);
+            const gameStartMsg = { type: 'gameStart', gameState: { ...gameState, playerId: p1.playerId } };
+            sendMessage(p1.ws, gameStartMsg);
+            
+            const gameStartMsg2 = { type: 'gameStart', gameState: { ...gameState, playerId: p2.playerId } };
+            sendMessage(p2.ws, gameStartMsg2);
+            
             console.log(`✅ Oyun başladı: ${roomCode}`);
         }, 500);
     } else {
@@ -644,7 +644,7 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
                 const winner = winnerId === player1Id ? player1 : player2;
                 const loser = winnerId === player1Id ? player2 : player1;
 
-                eloChanges = calculateElo(winner.elo, loser.elo);
+                eloChanges = calculateElo(winner.elo, loser.elo, winner.level);
 
                 winner.elo = eloChanges.winnerElo;
                 winner.level = calculateLevel(winner.elo);
