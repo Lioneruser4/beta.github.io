@@ -517,17 +517,32 @@ function broadcastToRoom(roomCode, message, excludePlayer = null) {
 
 function sendGameState(roomCode, playerId) {
     const room = rooms.get(roomCode);
-    if (!room || !room.gameState) return;
+    if (!room || !room.gameState) {
+        console.error('❌ Server: sendGameState - No room or gameState', { roomCode, playerId });
+        return;
+    }
 
     const ws = playerConnections.get(playerId);
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        console.error('❌ Server: sendGameState - WebSocket not open', { playerId, readyState: ws?.readyState });
+        return;
+    }
 
     try {
+        const gameStateToSend = { ...room.gameState, playerId: playerId };
+        console.log('📤 Server: Sending gameState to player', {
+            playerId,
+            boardLength: gameStateToSend.board.length,
+            currentPlayer: gameStateToSend.currentPlayer
+        });
+        
         ws.send(JSON.stringify({
             type: 'gameUpdate',
-            gameState: { ...room.gameState, playerId: playerId }
+            gameState: gameStateToSend
         }));
-    } catch (error) { console.error(error); }
+    } catch (error) { 
+        console.error('❌ Server: Error sending gameState:', error);
+    }
 }
 
 function sendMessage(ws, message) {
@@ -896,21 +911,45 @@ function makeAutoMove(roomCode, playerId) {
 }
 
 function handlePlayTile(ws, data) {
+    console.log('🎯 Server: handlePlayTile called', {
+        playerId: ws.playerId,
+        roomCode: ws.roomCode,
+        data: data
+    });
+    
     const room = rooms.get(ws.roomCode);
-    if (!room || !room.gameState) return;
+    if (!room || !room.gameState) {
+        console.error('❌ Server: No room or gameState found');
+        return;
+    }
 
     const gs = room.gameState;
-    if (gs.currentPlayer !== ws.playerId) return sendMessage(ws, { type: 'error', message: 'Sıra sizde değil' });
+    console.log('📊 Server: Current gameState', {
+        currentPlayer: gs.currentPlayer,
+        boardLength: gs.board.length,
+        playerHand: gs.players[ws.playerId]?.hand?.length
+    });
+    
+    if (gs.currentPlayer !== ws.playerId) {
+        console.error('❌ Server: Not player turn');
+        return sendMessage(ws, { type: 'error', message: 'Sıra sizde değil' });
+    }
 
     const player = gs.players[ws.playerId];
     const tile = player.hand[data.tileIndex];
 
-    if (!tile) return;
+    if (!tile) {
+        console.error('❌ Server: Tile not found at index', data.tileIndex);
+        return;
+    }
+
+    console.log('🎮 Server: Playing tile', tile, 'to position', data.position);
 
     const boardCopy = JSON.parse(JSON.stringify(gs.board));
     const success = playTileOnBoard(tile, gs.board, data.position);
 
     if (!success) {
+        console.error('❌ Server: Invalid move');
         return sendMessage(ws, { type: 'error', message: 'Bu hamle geçersiz (Pozisyon uyuşmuyor)' });
     }
 
@@ -921,6 +960,8 @@ function handlePlayTile(ws, data) {
     gs.lastPlayedPosition = data.position;
     gs.lastPlayedTile = tile;
     
+    console.log('✅ Server: Move successful, new board length:', gs.board.length);
+    
     // AFK timer'ı sıfırla
     if (gs.playerLastAction) {
         gs.playerLastAction[ws.playerId] = Date.now();
@@ -928,16 +969,23 @@ function handlePlayTile(ws, data) {
     
     const winner = checkWinner(gs);
     if (winner) {
+        console.log('🏆 Server: Winner found', winner);
         handleGameEnd(ws.roomCode, winner, gs);
     } else {
         gs.turn++;
         gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
+        
+        console.log('🔄 Server: Next turn', {
+            newCurrentPlayer: gs.currentPlayer,
+            turn: gs.turn
+        });
         
         // Yeni oyuncunun AFK timer'ını da sıfırla
         if (gs.playerLastAction) {
             gs.playerLastAction[gs.currentPlayer] = Date.now();
         }
         
+        console.log('📤 Server: Sending gameState to all players');
         Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
     }
 }
