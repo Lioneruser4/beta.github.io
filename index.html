@@ -268,6 +268,7 @@
                 // Telegram auth'ı 10 saniye içinde tamamlanmazsa guest mode'a geç
                 const authTimeout = setTimeout(() => {
                     if (!playerData) {
+                        console.log('⏰ Auth timeout, guest mode\'a geçiliyor');
                         setPlayerData({ 
                             isGuest: true, 
                             username: 'Guest' + Math.floor(Math.random() * 9999), 
@@ -293,8 +294,11 @@
 
             // Telegram Auth
             const initializeTelegramAuth = async () => {
-                // Eğer zaten playerData varsa tekrar çalıştırma
-                if (playerData) return;
+                // Eğer zaten playerData varsa ve guest değilse tekrar çalıştırma
+                if (playerData && !playerData.isGuest) {
+                    console.log('✅ Telegram auth zaten yapılmış:', playerData);
+                    return;
+                }
                 
                 try {
                     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
@@ -430,12 +434,10 @@
                     setConnected(false); 
                     showNotification('Bağlantı kesildi, yeniden bağlanılıyor...', 'warning');
                     
-                    // Only reconnect if we're in a game screen or searching
-                    if (screen === 'game' || screen === 'gameResult' || screen === 'searching') {
-                        setTimeout(() => {
-                            connectToServer();
-                        }, 2000);
-                    }
+                    // Her zaman yeniden bağlan - lobby dahil
+                    setTimeout(() => {
+                        connectToServer();
+                    }, 2000);
                 };
                 ws.onmessage = (e) => {
                     try {
