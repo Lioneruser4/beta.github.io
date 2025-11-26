@@ -50,14 +50,43 @@ socket.onopen = () => {
     connectionStatus.textContent = 'Servere baglandi!';
     connectionStatus.classList.remove('text-yellow-400');
     connectionStatus.classList.add('text-green-500');
-    showScreen('main');
+    
+    // Eğer daha önce bir odadaysak, odaya geri bağlanmayı dene
+    if (gameState.roomCode && gameState.gameStarted) {
+        console.log('🔄 Oyuna geri bağlanılıyor:', gameState.roomCode);
+        socket.send(JSON.stringify({ 
+            type: 'reconnectToRoom', 
+            roomCode: gameState.roomCode,
+            playerName: gameState.playerName || 'Player'
+        }));
+    } else {
+        showScreen('main');
+    }
 };
 
 socket.onclose = () => {
     connectionStatus.textContent = 'Serverle elaqe kesildi';
     connectionStatus.classList.remove('text-green-500');
     connectionStatus.classList.add('text-red-500');
-    showModal('Serverle elaqe kesildi. Səhifeni yenileyin.');
+    
+    // Otomatik yeniden bağlanma
+    console.log('🔄 3 saniye içinde yeniden bağlanılacak...');
+    setTimeout(() => {
+        if (!gameState.gameStarted) {
+            showModal('Serverle elaqe kesildi. Yeniden bağlanılıyor...');
+        }
+        // WebSocket'i yeniden oluştur
+        const newSocket = new WebSocket('wss://beta-github-io.onrender.com');
+        
+        // Event listener'ları kopyala
+        newSocket.onopen = socket.onopen;
+        newSocket.onclose = socket.onclose;
+        newSocket.onmessage = socket.onmessage;
+        
+        // Global socket değişkenini güncelle
+        window.socket = newSocket;
+        socket = newSocket;
+    }, 3000);
 };
 
 socket.onmessage = (event) => {
@@ -115,6 +144,19 @@ function handleSocketMessage(data) {
             updateGameUI();
             break;
 
+        case 'reconnectedToRoom':
+            console.log('🔄 Oyuna geri bağlanıldı:', data.gameState);
+            if (data.gameState) {
+                gameState.gameStarted = true;
+                gameState.board = data.gameState.board || [];
+                gameState.currentTurn = data.gameState.currentPlayer;
+                gameState.isMyTurn = data.gameState.currentPlayer === data.playerId;
+                showScreen('game');
+                updateGameUI();
+                showModal('🔄 Oyuna geri bağlanıldı!');
+            }
+            break;
+
         case 'gameUpdate':
             gameState.board = data.board;
             gameState.currentTurn = data.currentTurn;
@@ -122,12 +164,17 @@ function handleSocketMessage(data) {
             updateGameUI();
             break;
 
+        case 'gameEnding':
+            console.log('🏁 Oyun bitiyor:', data.message);
+            showModal(data.message);
+            break;
+
         case 'gameOver':
             const isWinner = data.winner === gameState.myColor;
             const eloChange = data.eloChange || 0;
             
             // Ozel sonuc lobisi goster
-            showResultLobby(isWinner, eloChange);
+            showResultLobby(isWinner, eloChange, data.winnerName, data.reason, data.player1Sum, data.player2Sum);
             break;
 
         case 'opponentLeft':
@@ -161,16 +208,39 @@ function showModal(message) {
     messageModal.classList.remove('hidden');
 }
 
-function showResultLobby(isWinner, eloChange, opponentName = null) {
+function showResultLobby(isWinner, eloChange, opponentName = null, reason = null, player1Sum = null, player2Sum = null) {
     const resultLobby = document.getElementById('result-lobby');
     const resultMessage = document.getElementById('result-message');
     const resultElo = document.getElementById('result-elo');
     
-    resultMessage.textContent = isWinner ? '🎉 Qazandiniz!' : '😔 Uduzdunuz';
+    let message = '';
+    if (reason === 'empty_hand') {
+        message = isWinner ? '🎉 Eli boş! Qazandiniz!' : '😔 Rakibin eli boş! Uduzdunuz';
+    } else if (reason === 'points' || reason === 'points_equal') {
+        if (reason === 'points_equal') {
+            message = '🤝 Beraberlik!';
+        } else {
+            message = isWinner ? '🎉 Daha az puan! Qazandiniz!' : '😔 Daha çok puan! Uduzdunuz';
+        }
+        // Puanları göster
+        if (player1Sum !== null && player2Sum !== null) {
+            message += `\n📊 Puanlar: ${player1Sum} - ${player2Sum}`;
+        }
+    } else {
+        message = isWinner ? '🎉 Qazandiniz!' : '😔 Uduzdunuz';
+    }
+    
+    resultMessage.textContent = message;
     resultMessage.className = isWinner ? 'text-4xl font-bold text-green-400' : 'text-4xl font-bold text-red-400';
     
-    resultElo.textContent = 'ELO: ' + (isWinner ? '+' : '') + eloChange;
-    resultElo.className = isWinner ? 'text-2xl font-semibold text-green-300' : 'text-2xl font-semibold text-red-300';
+    // ELO puanını göster
+    if (eloChange !== 0) {
+        resultElo.textContent = 'ELO: ' + (isWinner ? '+' : '') + eloChange;
+        resultElo.className = isWinner ? 'text-2xl font-semibold text-green-300' : 'text-2xl font-semibold text-red-300';
+        resultElo.style.display = 'block';
+    } else {
+        resultElo.style.display = 'none';
+    }
     
     // Rakip ismini göster
     if (opponentName && resultLobby.querySelector('.opponent-name')) {
@@ -179,11 +249,11 @@ function showResultLobby(isWinner, eloChange, opponentName = null) {
     
     showScreen('result');
     
-    // 4 saniye sonra ana lobiye don
+    // 3 saniye sonra ana lobiye don
     setTimeout(() => {
         leaveGame();
         showScreen('main');
-    }, 4000);
+    }, 3000);
 }
 
 function showScreen(screen) {
