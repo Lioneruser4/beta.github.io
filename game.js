@@ -196,18 +196,12 @@ function handleSocketMessage(data) {
             showResultLobby(isWinner, eloChange, data.winnerName, data.reason, data.player1Sum, data.player2Sum);
             break;
 
-        case 'opponentLeft':
-            // Raqib cikdiqda qalib olunur
-            const eloChangeOpp = data.eloChange || 15;
-            const opponentName = data.opponentName || 'Raqib';
+        case 'gameEnd':
+            const isWinnerEnd = data.winner === gameState.playerId;
+            const eloChangeEnd = data.eloChanges?.winner || data.eloChanges?.loser || 0;
             
-            // Oyun ekraninda iken bildirim goster
-            if (gameState.gameStarted) {
-                showModal(`🎉 ${opponentName} çıxdı! Qazandınız! (+${eloChangeOpp} ELO)`);
-            }
-            
-            // Sonuc lobisine gonder
-            showResultLobby(true, eloChangeOpp, opponentName);
+            // Ozel sonuc lobisi goster
+            showResultLobby(isWinnerEnd, eloChangeEnd, data.winnerName, data.reason, data.player1Sum, data.player2Sum);
             break;
 
         case 'error':
