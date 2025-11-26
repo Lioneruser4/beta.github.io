@@ -801,6 +801,15 @@
                         <div className="flex gap-3 mb-6">
                             <button onClick={() => setScreen('lobby')} className="px-4 py-2 bg-yellow-500 text-black rounded-lg font-bold">🏠 Ana Sayfa</button>
                             <button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold">🏆 Skor Tablosu</button>
+                            {/* Admin Butonu - Sadece Admin ID: 976640409 */}
+                            {playerData && playerData.telegramId === '976640409' && (
+                                <button 
+                                    onClick={() => window.open('/admin?id=976640409', '_blank')}
+                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold animate-pulse"
+                                >
+                                    🔐 ADMIN
+                                </button>
+                            )}
                         </div>
 
                         <div className="w-full max-w-sm bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
