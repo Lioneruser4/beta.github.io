@@ -300,6 +300,34 @@ app.get('/', (req, res) => {
     });
 });
 
+app.get('/api/reset-all-elo', async (req, res) => {
+    try {
+        // Tüm oyuncuların ELO puanlarını sıfırla
+        await Player.updateMany(
+            {}, 
+            { 
+                elo: 0, 
+                level: 1,
+                wins: 0,
+                losses: 0,
+                draws: 0,
+                totalGames: 0,
+                winStreak: 0,
+                bestWinStreak: 0
+            }
+        );
+        
+        // Tüm maçları sil
+        await Match.deleteMany({});
+        
+        console.log('🔄 Tüm ELO puanları ve istatistikler sıfırlandı!');
+        res.json({ success: true, message: 'Tüm ELO puanları sıfırlandı' });
+    } catch (error) {
+        console.error('ELO sıfırlama hatası:', error);
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
@@ -941,7 +969,8 @@ async function handleGameEnd(roomCode, winnerResult, gameState) {
                     winner: winnerId, 
                     winnerName: isDraw ? 'Beraberlik' : gameState.players[winnerId].name,
                     reason: reason,
-                    isRanked: false
+                    isRanked: false,
+                    startTime: room.startTime
                 });
                 deleteRoomFromDatabase(roomCode);
                 rooms.delete(roomCode);
@@ -987,7 +1016,7 @@ async function handleGameEnd(roomCode, winnerResult, gameState) {
                 });
                 await match.save();
 
-                console.log(`🏆 RANKED Maç bitti: ${winner.username} kazandı! ELO: ${eloChanges.winnerChange > 0 ? '+' : ''}${eloChanges.winnerChange}`);
+                console.log(`🏆 RANKED Maç bitti: ${winner.firstName || winner.username} kazandı! ELO: ${eloChanges.winnerChange > 0 ? '+' : ''}${eloChanges.winnerChange}`);
             } else {
                 player1.draws += 1;
                 player1.totalGames += 1;
@@ -1032,7 +1061,18 @@ async function handleGameEnd(roomCode, winnerResult, gameState) {
             eloChanges: eloChanges ? {
                 winner: eloChanges.winnerChange,
                 loser: eloChanges.loserChange
-            } : null
+            } : null,
+            startTime: room.startTime,
+            players: {
+                [player1Id]: {
+                    name: room.players[player1Id].name,
+                    photoUrl: room.players[player1Id].photoUrl
+                },
+                [player2Id]: {
+                    name: room.players[player2Id].name,
+                    photoUrl: room.players[player2Id].photoUrl
+                }
+            }
         });
         
         // Odayı hemen silme, 3 saniye bekle
@@ -1047,7 +1087,8 @@ async function handleGameEnd(roomCode, winnerResult, gameState) {
             winner: winnerId, 
             winnerName: winnerId === 'DRAW' ? 'Beraberlik' : gameState.players[winnerId].name,
             reason: reason,
-            isRanked: false
+            isRanked: false,
+            startTime: room?.startTime
         });
         setTimeout(() => {
             rooms.delete(roomCode);
@@ -1167,13 +1208,31 @@ function handleDisconnect(ws) {
                         eloChange = Math.floor(Math.random() * 6) + 10; // 10-15 arası
                     }
                     
-                    // Kalan oyuncuya kazanç bildirimi gönder
+                    // Anında oyun bitirme lobisi gönder
                     remainingWs.send(JSON.stringify({
-                        type: 'opponentLeft',
-                        eloChange: eloChange,
+                        type: 'gameEnd',
                         winner: remainingPlayerId,
-                        opponentName: ws.playerName || 'Bilinmeyen Oyuncu'
+                        winnerName: remainingPlayer.name,
+                        reason: 'opponent_left',
+                        isRanked: !remainingPlayer.isGuest,
+                        eloChanges: {
+                            winner: eloChange,
+                            loser: 0
+                        },
+                        startTime: room.startTime,
+                        players: {
+                            [remainingPlayerId]: {
+                                name: remainingPlayer.name,
+                                photoUrl: remainingPlayer.photoUrl
+                            },
+                            [ws.playerId]: {
+                                name: ws.playerName,
+                                photoUrl: ws.photoUrl
+                            }
+                        }
                     }));
+                    
+                    console.log(`🏆 ${remainingPlayer.name} rakip ayrıldığı için kazandı! +${eloChange} ELO`);
                 }
             }
         }
