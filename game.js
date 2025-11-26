@@ -1,5 +1,5 @@
-// Socket.io baglantisi
-const socket = io('https://mario-io-1.onrender.com');
+// WebSocket bağlantısı
+const socket = new WebSocket('wss://beta-github-io.onrender.com');
 
 // Oyun durumu
 let gameState = {
@@ -44,104 +44,115 @@ const modalCloseBtn = document.getElementById('modal-close-btn');
 
 const BOARD_SIZE = 8;
 
-// --- Socket.io Eventleri ---
-
-socket.on('connect', () => {
+// WebSocket Eventleri
+socket.onopen = () => {
     console.log('✅ Servere baglandi');
-    console.log('🔗 Socket ID:', socket.id);
     connectionStatus.textContent = 'Servere baglandi!';
     connectionStatus.classList.remove('text-yellow-400');
     connectionStatus.classList.add('text-green-500');
     showScreen('main');
-});
+};
 
-socket.on('disconnect', () => {
+socket.onclose = () => {
     connectionStatus.textContent = 'Serverle elaqe kesildi';
     connectionStatus.classList.remove('text-green-500');
     connectionStatus.classList.add('text-red-500');
     showModal('Serverle elaqe kesildi. Səhifeni yenileyin.');
-});
+};
 
-socket.on('matchFound', (data) => {
-    console.log('🎉 Raqib tapildi!', data);
-    gameState.roomCode = data.roomCode;
-    gameState.myColor = data.color;
-    gameState.gameStarted = true;
-    gameState.isSearching = false;
-    gameState.board = createInitialBoard();
-    
-    clearInterval(searchTimer);
-    searchTimer = null;
-    
-    showModal('Raqib tapildi! Siz ' + (gameState.myColor === 'red' ? 'Qirmizi' : 'Ag') + ' rengindesiniz.');
-    showScreen('game');
-    updateGameUI();
-});
-
-socket.on('searchStatus', (data) => {
-    console.log('🔍 Axtaris statusu:', data);
-    rankedStatus.textContent = data.message;
-});
-
-socket.on('searchCancelled', (data) => {
-    showModal(data.message);
-    clearInterval(searchTimer);
-    searchTimer = null;
-    showScreen('main');
-});
-
-socket.on('roomCreated', (data) => {
-    gameState.roomCode = data.roomCode;
-    gameState.myColor = 'red';
-    roomCodeOutput.textContent = data.roomCode;
-    console.log('🏠 Oda yaradildi:', data.roomCode);
-});
-
-socket.on('opponentJoined', (data) => {
-    gameState.gameStarted = true;
-    gameState.isMyTurn = gameState.myColor === 'red';
-    gameState.board = createInitialBoard();
-    console.log('👥 Raqib qosuldu! Oyun baslayir...');
-    showScreen('game');
-    updateGameUI();
-});
-
-socket.on('gameUpdate', (data) => {
-    gameState.board = data.board;
-    gameState.currentTurn = data.currentTurn;
-    gameState.isMyTurn = gameState.currentTurn === gameState.myColor;
-    updateGameUI();
-});
-
-socket.on('gameOver', (data) => {
-    const isWinner = data.winner === gameState.myColor;
-    const eloChange = data.eloChange || 0;
-    
-    // Ozel sonuc lobisi goster
-    showResultLobby(isWinner, eloChange);
-});
-
-socket.on('opponentLeft', (data) => {
-    // Raqib cikdiqda qalib olunur
-    const eloChange = data.eloChange || 15;
-    const opponentName = data.opponentName || 'Raqib';
-    
-    // Oyun ekraninda iken bildirim goster
-    if (gameState.gameStarted) {
-        showModal(`🎉 ${opponentName} çıxdı! Qazandınız! (+${eloChange} ELO)`);
+socket.onmessage = (event) => {
+    try {
+        const data = JSON.parse(event.data);
+        handleSocketMessage(data);
+    } catch (error) {
+        console.error('Mesaj parse hatası:', error);
     }
-    
-    // Sonuc lobisine gonder
-    showResultLobby(true, eloChange, opponentName);
-});
+};
 
-socket.on('error', (message) => {
-    showModal(message);
-    gameState.isSearching = false;
-    clearInterval(searchTimer);
-    searchTimer = null;
-    showScreen('main');
-});
+function handleSocketMessage(data) {
+    switch (data.type) {
+        case 'matchFound':
+            console.log('🎉 Raqib tapildi!', data);
+            gameState.roomCode = data.roomCode;
+            gameState.myColor = data.color;
+            gameState.gameStarted = true;
+            gameState.isSearching = false;
+            gameState.board = createInitialBoard();
+            
+            clearInterval(searchTimer);
+            searchTimer = null;
+            
+            showModal('Raqib tapildi! Siz ' + (gameState.myColor === 'red' ? 'Qirmizi' : 'Ag') + ' rengindesiniz.');
+            showScreen('game');
+            updateGameUI();
+            break;
+
+        case 'searchStatus':
+            console.log('🔍 Axtaris statusu:', data);
+            rankedStatus.textContent = data.message;
+            break;
+
+        case 'searchCancelled':
+            showModal(data.message);
+            clearInterval(searchTimer);
+            searchTimer = null;
+            showScreen('main');
+            break;
+
+        case 'roomCreated':
+            gameState.roomCode = data.roomCode;
+            gameState.myColor = 'red';
+            roomCodeOutput.textContent = data.roomCode;
+            console.log('🏠 Oda yaradildi:', data.roomCode);
+            break;
+
+        case 'opponentJoined':
+            gameState.gameStarted = true;
+            gameState.isMyTurn = gameState.myColor === 'red';
+            gameState.board = createInitialBoard();
+            console.log('👥 Raqib qosuldu! Oyun baslayir...');
+            showScreen('game');
+            updateGameUI();
+            break;
+
+        case 'gameUpdate':
+            gameState.board = data.board;
+            gameState.currentTurn = data.currentTurn;
+            gameState.isMyTurn = gameState.currentTurn === gameState.myColor;
+            updateGameUI();
+            break;
+
+        case 'gameOver':
+            const isWinner = data.winner === gameState.myColor;
+            const eloChange = data.eloChange || 0;
+            
+            // Ozel sonuc lobisi goster
+            showResultLobby(isWinner, eloChange);
+            break;
+
+        case 'opponentLeft':
+            // Raqib cikdiqda qalib olunur
+            const eloChangeOpp = data.eloChange || 15;
+            const opponentName = data.opponentName || 'Raqib';
+            
+            // Oyun ekraninda iken bildirim goster
+            if (gameState.gameStarted) {
+                showModal(`🎉 ${opponentName} çıxdı! Qazandınız! (+${eloChangeOpp} ELO)`);
+            }
+            
+            // Sonuc lobisine gonder
+            showResultLobby(true, eloChangeOpp, opponentName);
+            break;
+
+        case 'error':
+            showModal(data.message);
+            gameState.isSearching = false;
+            clearInterval(searchTimer);
+            searchTimer = null;
+            showScreen('main');
+            break;
+    }
+}
 
 // --- Yardimci Funksiyalar ---
 
@@ -381,11 +392,12 @@ function handleCellClick(r, c) {
         const fromC = gameState.selectedPiece.c;
 
         if (isValidMove(gameState.board, fromR, fromC, r, c, gameState.myColor)) {
-            socket.emit('makeMove', {
+            socket.send(JSON.stringify({
+                type: 'makeMove',
                 roomCode: gameState.roomCode,
                 from: { r: fromR, c: fromC },
                 to: { r, c }
-            });
+            }));
             gameState.selectedPiece = null;
         }
     }
@@ -397,7 +409,7 @@ dereceliBtn.onclick = () => {
     console.log('🎮 Dereceli butona tiklandi');
     showScreen('ranked');
     console.log('📡 findMatch gonderiliyor...');
-    socket.emit('findMatch');
+    socket.send(JSON.stringify({ type: 'findMatch', playerName: 'Player' }));
     console.log('✅ findMatch gonderildi!');
 };
 
@@ -407,14 +419,14 @@ friendBtn.onclick = () => {
 
 cancelRankedBtn.onclick = () => {
     gameState.isSearching = false;
-    socket.emit('cancelSearch');
+    socket.send(JSON.stringify({ type: 'cancelSearch' }));
 };
 
 createRoomBtn.onclick = () => {
     const roomCode = generateRoomCode();
     gameState.roomCode = roomCode;
     gameState.myColor = 'red';
-    socket.emit('createRoom', { roomCode });
+    socket.send(JSON.stringify({ type: 'createRoom', roomCode }));
 };
 
 backToMainBtn.onclick = () => {
@@ -441,19 +453,19 @@ joinRoomBtn.onclick = () => {
     
     gameState.roomCode = roomCode;
     gameState.myColor = 'white';
-    socket.emit('joinRoom', { roomCode });
+    socket.send(JSON.stringify({ type: 'joinRoom', roomCode }));
 };
 
 leaveGameBtn.onclick = () => {
     if (confirm('Eminmisiniz? Oyundan cikdiqda ELO itireceksiniz!')) {
-        socket.emit('leaveGame', { roomCode: gameState.roomCode });
+        socket.send(JSON.stringify({ type: 'leaveGame', roomCode: gameState.roomCode }));
         leaveGame();
     }
 };
 
 function leaveGame() {
     if (gameState.roomCode) {
-        socket.emit('leaveGame', { roomCode: gameState.roomCode });
+        socket.send(JSON.stringify({ type: 'leaveGame', roomCode: gameState.roomCode }));
     }
     
     gameState = {
