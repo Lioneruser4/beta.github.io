@@ -331,7 +331,20 @@
 
                 const ws = new WebSocket(wsUrl);
 
-                ws.onopen = () => { setConnected(true); showNotification('Sunucuya Bağlandı', 'success'); };
+                ws.onopen = () => { 
+                    setConnected(true); 
+                    showNotification('Sunucuya Bağlandı', 'success');
+                    
+                    // Eğer daha önce bir odadaysak, odaya geri bağlanmayı dene
+                    if (roomCode && gameState) {
+                        console.log('🔄 Oyuna geri bağlanılıyor:', roomCode);
+                        ws.send(JSON.stringify({ 
+                            type: 'reconnectToRoom', 
+                            roomCode: roomCode,
+                            playerName: playerData?.username || 'Player'
+                        }));
+                    }
+                };
                 ws.onclose = () => { setConnected(false); setTimeout(connectToServer, 3000); };
                 ws.onmessage = (e) => {
                     try {
@@ -385,10 +398,19 @@
                         }
                         setSearchTime(0);
                         break;
+                    case 'gameEnding':
+                        console.log('🏁 Oyun bitiyor:', data.message);
+                        showNotification(data.message, 'info');
+                        break;
                     case 'gameEnd':
                         const isRanked = data.isRanked;
+                        const isWinner = data.winner === gameState?.playerId;
                         const winMsg = `Oyun Bitti! Kazanan: ${data.winnerName}`;
                         const eloMsg = data.eloChanges ? ` (ELO: ${data.eloChanges.winner > 0 ? '+' : ''}${data.eloChanges.winner})` : '';
+                        
+                        // Eşleşme süresini hesapla
+                        const matchDuration = data.startTime ? Math.floor((Date.now() - data.startTime) / 1000) : 0;
+                        const durationText = matchDuration > 0 ? `${matchDuration}s` : 'Bilinmeyen';
                         
                         // Ozel sonuc lobisi goster
                         if (data.winner === gameState?.playerId) {
@@ -397,7 +419,27 @@
                                 message: `🎉 QAZANDINIZ! ${eloMsg}`, 
                                 type: 'success',
                                 eloChange: data.eloChanges?.winner || 0,
-                                isWinner: true
+                                isWinner: true,
+                                reason: data.reason,
+                                player1Sum: data.player1Sum,
+                                player2Sum: data.player2Sum,
+                                duration: durationText,
+                                opponentName: data.players && data.players[Object.keys(data.players).find(id => id !== gameState?.playerId)]?.name,
+                                opponentPhoto: data.players && data.players[Object.keys(data.players).find(id => id !== gameState?.playerId)]?.photoUrl
+                            });
+                        } else if (data.winner === 'DRAW') {
+                            setScreen('result');
+                            setNotification({ 
+                                message: `🤝 BERABERLIK!`, 
+                                type: 'info',
+                                eloChange: 0,
+                                isWinner: false,
+                                reason: data.reason,
+                                player1Sum: data.player1Sum,
+                                player2Sum: data.player2Sum,
+                                duration: durationText,
+                                opponentName: data.players && data.players[Object.keys(data.players).find(id => id !== gameState?.playerId)]?.name,
+                                opponentPhoto: data.players && data.players[Object.keys(data.players).find(id => id !== gameState?.playerId)]?.photoUrl
                             });
                         } else {
                             setScreen('result');
@@ -405,7 +447,13 @@
                                 message: `😔 UDUZDUNUZ ${eloMsg}`, 
                                 type: 'error',
                                 eloChange: data.eloChanges?.loser || 0,
-                                isWinner: false
+                                isWinner: false,
+                                reason: data.reason,
+                                player1Sum: data.player1Sum,
+                                player2Sum: data.player2Sum,
+                                duration: durationText,
+                                opponentName: data.players && data.players[Object.keys(data.players).find(id => id !== gameState?.playerId)]?.name,
+                                opponentPhoto: data.players && data.players[Object.keys(data.players).find(id => id !== gameState?.playerId)]?.photoUrl
                             });
                         }
                         
@@ -417,7 +465,17 @@
                             if (isRanked && playerData && !playerData.isGuest) {
                                 initializeTelegramAuth();
                             }
-                        }, 4000);
+                        }, 3000);
+                        break;
+                    case 'reconnectedToRoom':
+                        console.log('🔄 Oyuna geri bağlanıldı:', data.gameState);
+                        if (data.gameState) {
+                            setGameState(data.gameState);
+                            setScreen('game');
+                            setSelectedTileIndex(null);
+                            setValidMoves([]);
+                            showNotification('🔄 Oyuna geri bağlanıldı!', 'success');
+                        }
                         break;
                     case 'searchCancelled':
                         showNotification('Arama iptal edildi', 'info');
@@ -957,13 +1015,31 @@
                                     </div>
                                     
                                     {/* ELO Display */}
-                                    <div className={`text-2xl font-semibold mb-6 ${isWinner ? 'text-green-300' : 'text-red-300'}`}>
-                                        ELO: {isWinner ? '+' : ''}{eloChange}
+                                    {eloChange !== 0 && (
+                                        <div className={`text-2xl font-semibold mb-4 ${isWinner ? 'text-green-300' : 'text-red-300'}`}>
+                                            ELO: {isWinner ? '+' : ''}{eloChange}
+                                        </div>
+                                    )}
+
+                                    {/* Match Info */}
+                                    <div className="bg-black/30 rounded-xl p-4 text-center mb-6">
+                                        <div className="text-white text-lg font-semibold mb-2">
+                                            🎮 {notification?.duration || 'Bilinmeyen'} • {notification?.opponentName || 'Rakip'}
+                                        </div>
+                                        {notification?.reason && (
+                                            <div className="text-white/60 text-sm">
+                                                {notification.reason === 'empty_hand' ? 'Eli boş!' :
+                                                 notification.reason === 'points' ? 'Daha az puan!' :
+                                                 notification.reason === 'points_equal' ? 'Beraberlik!' :
+                                                 notification.reason === 'opponent_left' ? 'Rakip ayrıldı!' :
+                                                 'Oyun bitti!'}
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Timer */}
-                                    <div className="bg-black/30 rounded-xl p-4 text-center mb-6">
-                                        <div className="text-white text-2xl font-mono font-bold">⏱️ 4</div>
+                                    <div className="bg-black/30 rounded-xl p-4 text-center">
+                                        <div className="text-white text-2xl font-mono font-bold">⏱️ 3</div>
                                         <div className="text-white/60 text-sm mt-1">Ana lobiye donulur...</div>
                                     </div>
                                 </div>
