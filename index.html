@@ -1,726 +1,89 @@
 <!DOCTYPE html>
-<html lang="az">
+<html lang="tr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Domino - ELO Sistemi ilə Dominoes</title>
-  <script async src="https://telegram.org/js/telegram-web-app.js"></script>
+  <title>DOMINO PRO</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Roboto:wght@700&display=swap">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: 'Inter', 'Poppins', sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      color: #333;
-      overflow-x: hidden;
+    * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+    body { background: #0a1a0a; color:#fff; font-family:'Roboto',sans-serif; overflow:hidden; height:100vh; }
+    
+    #lobby {
+      position:fixed; inset:0; background:linear-gradient(135deg,#0f380f,#000);
+      display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:10;
     }
-    .container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 20px; }
-    
-    /* Lobby */
-    .lobby { display: none; text-align: center; animation: fadeIn 0.5s; }
-    .lobby.active { display: block; }
-    .lobby h1 { color: white; font-size: 3em; margin-bottom: 10px; text-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-    .lobby p { color: rgba(255,255,255,0.8); margin-bottom: 30px; font-size: 1.1em; }
-    
-    .status-bar {
-      background: rgba(255,255,255,0.1);
-      color: white;
-      padding: 12px 20px;
-      border-radius: 8px;
-      margin-bottom: 30px;
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.2);
+    h1 { font-family:'Orbitron',sans-serif; font-size:5rem; background:linear-gradient(45deg,#00ff9d,#00ffff);
+      -webkit-background-clip:text; color:transparent; text-shadow:0 0 40px #00ff8850; animation:glow 3s infinite alternate; }
+    @keyframes glow { from { text-shadow:0 0 40px #00ff88; } to { text-shadow:0 0 80px #00ffff; } }
+
+    .btn {
+      margin:15px; padding:20px 50px; font-size:1.8rem; background:#00ff88; color:#000; border:none;
+      border-radius:20px; cursor:pointer; box-shadow:0 10px 30px #00ff8840; transition:all 0.4s;
+      position:relative; overflow:hidden; font-weight:bold;
     }
-    
-    .user-info {
-      background: rgba(255,255,255,0.15);
-      color: white;
-      padding: 15px 20px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.2);
+    .btn:hover { transform:translateY(-10px) scale(1.1); box-shadow:0 20px 50px #00ff88; }
+    .btn:active { transform:translateY(-5px); }
+
+    #roomInput { padding:20px; font-size:1.8rem; width:350px; border-radius:20px; border:none; text-align:center; margin:20px; }
+
+    #game {
+      position:fixed; inset:0; background:url('https://i.imgur.com/8Z5kX5p.jpg') center/cover no-repeat;
+      display:none; flex-direction:column;
     }
-    
-    .user-stats { display: flex; gap: 20px; }
-    .stat { text-align: center; }
-    .stat-label { font-size: 0.9em; opacity: 0.8; }
-    .stat-value { font-size: 1.5em; font-weight: bold; margin-top: 5px; }
-    
-    .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px; }
-    
-    .btn { 
-      padding: 16px 24px;
-      font-size: 16px;
-      font-weight: 600;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.3s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      min-height: 50px;
+    #turnIndicator {
+      position:absolute; top:15px; left:50%; transform:translateX(-50%);
+      background:#000000cc; padding:12px 40px; border-radius:50px; font-size:2rem; font-weight:bold;
+      box-shadow:0 0 30px #00ff88; z-index:100;
     }
-    .btn-primary { 
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-      color: white;
-      box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+    #board {
+      position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+      width:95%; max-width:1200px; min-height:280px; background:rgba(0,40,0,0.8);
+      border-radius:25px; box-shadow:0 0 60px #00ff88 inset; display:flex; align-items:center; justify-content:center;
+      flex-wrap:wrap; gap:10px; padding:20px;
     }
-    .btn-primary:hover { 
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(245, 87, 108, 0.6);
-    }
-    .btn-leaderboard {
-      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-      color: white;
-      margin-top: 20px;
-    }
-    .btn-leaderboard:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(79, 172, 254, 0.6);
-    }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    
-    /* Modal */
-    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; }
-    .modal.active { display: flex; animation: fadeIn 0.3s; }
-    .modal-content { 
-      background: white; 
-      padding: 40px; 
-      border-radius: 16px; 
-      max-width: 400px;
-      width: 90%;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-      animation: slideUp 0.3s;
-    }
-    .modal h2 { color: #667eea; margin-bottom: 20px; font-size: 1.8em; }
-    .input-group { margin-bottom: 20px; }
-    .input-group label { display: block; margin-bottom: 8px; color: #333; font-weight: 600; }
-    .input-group input { 
-      width: 100%;
-      padding: 12px;
-      border: 2px solid #ddd;
-      border-radius: 8px;
-      font-size: 16px;
-      transition: border-color 0.3s;
-    }
-    .input-group input:focus { outline: none; border-color: #667eea; }
-    
-    .code-display { 
-      background: #f0f0f0; 
-      padding: 20px; 
-      border-radius: 8px; 
-      font-family: 'Roboto Mono', monospace;
-      font-size: 2em;
-      font-weight: bold;
-      color: #667eea;
-      margin: 20px 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-    }
-    
-    .copy-btn { 
-      background: #667eea; 
-      color: white; 
-      border: none; 
-      padding: 10px 16px; 
-      border-radius: 6px; 
-      cursor: pointer;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-    .copy-btn:hover { background: #5568d3; }
-    
-    .btn-secondary { background: white; color: #667eea; box-shadow: 0 4px 15px rgba(255,255,255,0.3); }
-    .btn-secondary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255,255,255,0.5); }
-    .cancel-btn { background: #ddd; color: #333; margin-top: 10px; width: 100%; }
-    
-    .button-group { display: flex; gap: 10px; margin-top: 30px; }
-    .button-group .btn { flex: 1; }
-    
-    /* Game */
-    .game { display: none; color: white; }
-    .game.active { display: block; }
-    
-    .game-header { 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center;
-      margin-bottom: 30px;
-      background: rgba(255,255,255,0.1);
-      padding: 20px;
-      border-radius: 12px;
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.2);
-      flex-wrap: wrap;
-      gap: 20px;
-    }
-    
-    .player-info { display: flex; gap: 30px; flex-wrap: wrap; }
-    .player { 
-      padding: 15px 20px;
-      border-radius: 8px;
-      background: rgba(255,255,255,0.1);
-      min-width: 200px;
-      text-align: center;
-      transition: all 0.3s;
-    }
-    .player.active { 
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-      font-weight: bold;
-      box-shadow: 0 0 20px rgba(245, 87, 108, 0.6);
-      transform: scale(1.05);
-    }
-    
-    .player-level {
-      font-size: 1.5em;
-      margin-top: 5px;
-    }
-    
-    .level-sarı { color: #ffd700; }
-    .level-mavi { color: #87ceeb; }
-    .level-qızıl { color: #ff6b6b; animation: pulse 2s infinite; }
-    
-    .game-board {
-      background: rgba(255,255,255,0.05);
-      padding: 30px;
-      border-radius: 16px;
-      border: 2px solid rgba(255,255,255,0.1);
-      margin-bottom: 30px;
-      min-height: 300px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-around;
-    }
-    
-    .table {
-      background: rgba(0,100,0,0.3);
-      padding: 20px;
-      border-radius: 12px;
-      border: 2px dashed rgba(255,255,255,0.3);
-      margin: 20px 0;
-      min-height: 100px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-    
-    .domino {
-      width: 50px;
-      height: 100px;
-      background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
-      border-radius: 6px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: space-around;
-      color: white;
-      font-weight: bold;
-      font-size: 1.1em;
-      cursor: pointer;
-      transition: all 0.3s;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      border: 2px solid rgba(255,255,255,0.3);
-    }
-    
-    .domino.playable {
-      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-      border: 2px solid #00f2fe;
-    }
-    
-    .domino.playable:hover {
-      transform: scale(1.15) translateY(-8px);
-      box-shadow: 0 6px 20px rgba(0, 242, 254, 0.8);
-    }
-    
     .hand {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: center;
-      margin-top: 20px;
+      position:absolute; left:50%; transform:translateX(-50%); display:flex; flex-wrap:wrap;
+      justify-content:center; gap:12px; padding:15px; border-radius:25px; background:rgba(0,100,0,0.4);
+      max-width:95%;
     }
-    
-    .actions {
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-      margin-top: 20px;
+    #myHand { bottom:10px; }
+    #oppHand { top:10px; transform:translateX(-50%) rotate(180deg); }
+
+    .tile, .back {
+      width:78px; height:118px; border-radius:12px; background:#fff; box-shadow:0 8px 25px #000000cc;
+      display:flex; flex-direction:column; justify-content:space-between; padding:8px; cursor:pointer;
+      transition:all 0.3s; position:relative; font-weight:bold; font-size:1.4rem;
     }
-    
-    /* Leaderboard */
-    .leaderboard { display: none; color: white; }
-    .leaderboard.active { display: block; }
-    .leaderboard h2 { color: white; margin-bottom: 30px; font-size: 2em; text-align: center; }
-    
-    .lb-container {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px;
-      margin-bottom: 30px;
-    }
-    
-    .lb-card {
-      background: rgba(255,255,255,0.1);
-      padding: 20px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.2);
-      text-align: center;
-      transition: all 0.3s;
-      backdrop-filter: blur(10px);
-    }
-    
-    .lb-rank-1 {
-      grid-column: 1 / -1;
-      background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
-      color: #333;
-      padding: 30px;
-      font-size: 1.2em;
-      animation: bounce 2s infinite;
-    }
-    
-    .lb-rank-2 {
-      background: linear-gradient(135deg, #c0c0c0 0%, #e8e8e8 100%);
-      color: #333;
-      padding: 25px;
-      font-size: 1.1em;
-    }
-    
-    .lb-rank-3 {
-      background: linear-gradient(135deg, #cd7f32 0%, #e5a76a 100%);
-      color: #fff;
-      padding: 25px;
-      font-size: 1.1em;
-    }
-    
-    .lb-rank {
-      font-weight: bold;
-      font-size: 2em;
-      margin-bottom: 10px;
-    }
-    
-    .lb-name {
-      font-size: 1.5em;
-      font-weight: bold;
-      margin: 10px 0;
-    }
-    
-    .lb-level {
-      font-size: 2em;
-      margin: 10px 0;
-    }
-    
-    .lb-elo {
-      font-size: 1.3em;
-      font-weight: bold;
-      margin-top: 10px;
-    }
-    
-    .lb-stats {
-      font-size: 0.9em;
-      opacity: 0.8;
-      margin-top: 10px;
-    }
-    
-    .lb-current {
-      background: rgba(100,200,255,0.2);
-      padding: 15px;
-      border-radius: 8px;
-      margin-top: 30px;
-      border: 2px solid rgba(100,200,255,0.4);
-      text-align: center;
-    }
-    
-    .back-btn { background: rgba(255,255,255,0.2); color: white; margin-top: 20px; }
-    .back-btn:hover { background: rgba(255,255,255,0.3); }
-    
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
-    @keyframes bounce { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
-    
-    .searching { animation: pulse 1.5s infinite; }
-    
-    .tip {
-      background: rgba(255,255,255,0.1);
-      border: 1px solid rgba(255,255,255,0.2);
-      padding: 15px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      font-size: 0.95em;
-      backdrop-filter: blur(10px);
-    }
-    
-    .info-message {
-      background: rgba(255,255,255,0.15);
-      padding: 15px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      text-align: center;
-      border: 1px solid rgba(255,255,255,0.2);
-    }
+    .tile::after { content:''; position:absolute; top:50%; left:8px; right:8px; height:2px; background:#000; transform:translateY(-50%); }
+    .back { background:linear-gradient(45deg,#800000,#400000); color:#fff; font-size:2.5rem; display:flex; align-items:center; justify-content:center; }
+
+    .dot { width:16px; height:16px; background:#000; border-radius:50%; }
+    .glow { animation:glowTile 1.5s infinite; z-index:10; }
+    @keyframes glowTile { 0%,100% { box-shadow:0 0 30px #00ff88; } 50% { box-shadow:0 0 60px #00ffff; } }
+    .valid-spot { animation:pulseSpot 1s infinite; }
+    @keyframes pulseSpot { 0%,100% { box-shadow:0 0 30px #00ff88; } 50% { box-shadow:0 0 50px #00ffff; } }
   </style>
 </head>
 <body>
-  <div class="container">
-    <!-- Lobby -->
-    <div class="lobby active" id="lobby">
-      <h1>🎯 Domino</h1>
-      <p>ELO sistemi ilə çoxoyunculu dominoes oyunu</p>
-      
-      <div class="status-bar" id="statusBar">Sunucuya bağlanılıyor...</div>
-      
-      <div class="user-info" id="userInfo" style="display: none;">
-        <div>
-          <strong id="userName">Oyuncu</strong>
-        </div>
-        <div class="user-stats">
-          <div class="stat">
-            <div class="stat-label">Səviyyə</div>
-            <div class="stat-value" id="userLevel">1</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">ELO</div>
-            <div class="stat-value" id="userElo">1000</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Qalibiyyətlər</div>
-            <div class="stat-value" id="userWins">0</div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="tip">
-        💡 <strong>Dereceli Oynama Haqqında:</strong><br>
-        Dereceli oyunlarda hər qələbə üçün 12-20 ELO puan qazanacaqsınız. 
-        100 puan = 1 səviyyə artırma. Maks səviyyə 10-dur.
-        Oyunun ortasında çıxsanız, 10 puan itirəcəksiniz.
-      </div>
-      
-      <div class="modes">
-        <button class="btn btn-primary" id="btnRanked">
-          ⭐ Dereceli Maç<br><small>ELO qazanın</small>
-        </button>
-        <button class="btn btn-primary" id="btnFriend">
-          👥 Dostla Oyna<br><small>Oda yaradın</small>
-        </button>
-        <button class="btn btn-primary" id="btnJoin">
-          🔗 Odaya Qatılın<br><small>Kod daxil edin</small>
-        </button>
-      </div>
-      
-      <button class="btn btn-leaderboard" id="btnLeaderboard">📊 Liderlik Cədvəli</button>
-      <button class="btn btn-primary" id="btnLogin" style="margin-top: 20px;">🔐 Telegram ilə Daxil Olun</button>
-    </div>
 
-    <!-- Create Room Modal -->
-    <div class="modal" id="createRoomModal">
-      <div class="modal-content">
-        <h2>Oda Yaradın</h2>
-        <button class="btn btn-primary" style="width: 100%; margin-top: 20px;" id="btnCreateRoom">Oda Yaradın</button>
-        <button class="btn cancel-btn" id="btnCloseCreate">Ləğv Et</button>
-      </div>
-    </div>
+<div id="lobby">
+  <h1>DOMINO PRO</h1>
+  <button class="btn" id="rankedBtn">DEREÇELİ OYNA</button>
+  <button class="btn" id="createBtn">ARKADAŞLA OYNA</button>
+  <input type="text" id="roomInput" placeholder="ODA KODU GİR (4 rakam)" maxlength="4">
+  <button class="btn" id="joinBtn">ODAYA KATIL</button>
+  <div id="status" style="margin-top:30px; font-size:1.8rem; min-height:60px;"></div>
+</div>
 
-    <!-- Room Code Modal -->
-    <div class="modal" id="roomCodeModal">
-      <div class="modal-content">
-        <h2>Oda Kodu</h2>
-        <p style="color: #999; margin-bottom: 20px;">Kodu dostunuza göndərin</p>
-        <div class="code-display">
-          <span id="roomCode">----</span>
-          <button class="copy-btn" id="btnCopyCode">Kopyala</button>
-        </div>
-        <p style="color: #999; text-align: center; margin-top: 20px;">Gözləyin... <span class="searching">●</span></p>
-        <button class="btn cancel-btn" id="btnCloseRoom">Ləğv Et</button>
-      </div>
-    </div>
+<div id="game">
+  <div id="turnIndicator">SIRANIZ</div>
+  <div id="board"></div>
+  <div id="myHand" class="hand"></div>
+  <div id="oppHand" class="hand"></div>
+</div>
 
-    <!-- Join Room Modal -->
-    <div class="modal" id="joinRoomModal">
-      <div class="modal-content">
-        <h2>Odaya Qatılın</h2>
-        <div class="input-group">
-          <label>Oda Kodu (4 Rəqəm)</label>
-          <input type="text" id="roomCode2" placeholder="0000" maxlength="4">
-        </div>
-        <button class="btn btn-primary" style="width: 100%; margin-top: 20px;" id="btnJoinRoomConfirm">Qatılın</button>
-        <button class="btn cancel-btn" id="btnCloseJoin">Ləğv Et</button>
-      </div>
-    </div>
-
-    <!-- Game -->
-    <div class="game" id="game">
-      <div class="game-header">
-        <div class="player-info">
-          <div class="player" id="player0">
-            <div>Oyuncu 1</div>
-            <div class="player-level level-sarı" id="player0Level">⭐ Səv: 1</div>
-            <div style="font-size: 0.9em; margin-top: 5px;">Taş: <span id="player0Hand">7</span></div>
-          </div>
-          <div class="player" id="player1">
-            <div>Oyuncu 2</div>
-            <div class="player-level level-sarı" id="player1Level">⭐ Səv: 1</div>
-            <div style="font-size: 0.9em; margin-top: 5px;">Taş: <span id="player1Hand">7</span></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="game-board">
-        <h3>Masa</h3>
-        <div class="table" id="table"></div>
-        <h3>Sizin Taşlarınız</h3>
-        <div class="hand" id="hand"></div>
-      </div>
-
-      <div class="actions">
-        <button class="btn btn-primary" id="btnPass">Keç (Pass)</button>
-      </div>
-      
-      <button class="btn back-btn" id="btnBackToLobby" style="width: 100%; margin-top: 20px;">Lobby'ye Dön</button>
-    </div>
-
-    <!-- Leaderboard -->
-    <div class="leaderboard" id="leaderboard">
-      <h2>📊 Liderlik Cədvəli (Top 10)</h2>
-      
-      <div class="lb-container" id="lbContainer"></div>
-      
-      <div class="lb-current" id="lbCurrent" style="display: none;">
-        <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 10px;">Sizin Mövqeyiniz</div>
-        <div id="myRankDisplay"></div>
-      </div>
-      
-      <button class="btn back-btn" id="btnBackLb" style="width: 100%;">Lobby'ye Dön</button>
-    </div>
-  </div>
-
-  <script>
-    let ws = null;
-    let currentUser = null;
-    let myIndex = null;
-    let gameState = null;
-
-    function connectWS() {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      ws = new WebSocket(`${protocol}//${window.location.hostname}:${window.location.port}`);
-      ws.onopen = () => {
-        document.getElementById('statusBar').textContent = '✅ Sunucuya bağlandı';
-        document.getElementById('statusBar').style.borderColor = 'rgba(0, 255, 0, 0.4)';
-      };
-      ws.onmessage = e => handleMessage(JSON.parse(e.data));
-      ws.onerror = () => {
-        document.getElementById('statusBar').textContent = '❌ Sunucu xətası';
-        document.getElementById('statusBar').style.borderColor = 'rgba(255, 0, 0, 0.4)';
-      };
-      ws.onclose = () => {
-        document.getElementById('statusBar').textContent = '⏳ Bağlantı kəsildi - 3s sonra yenidən...';
-        setTimeout(connectWS, 3000);
-      };
-    }
-
-    function handleMessage(msg) {
-      if (msg.type === 'auth_ok') {
-        currentUser = msg.user;
-        document.getElementById('userInfo').style.display = 'flex';
-        document.getElementById('btnLogin').style.display = 'none';
-        updateUserUI();
-      } else if (msg.type === 'game_start') {
-        gameState = msg;
-        myIndex = msg.players.findIndex(p => p.id === currentUser.telegramId.toString());
-        document.getElementById('lobby').classList.remove('active');
-        document.getElementById('game').classList.add('active');
-        updateGameUI();
-      } else if (msg.type === 'move_played') {
-        updateGameUI(msg);
-      } else if (msg.type === 'game_end') {
-        alert(`🎉 ${msg.winnerName} qalibdir! ELO: ${msg.eloChange > 0 ? '+' : ''}${msg.eloChange}`);
-        document.getElementById('game').classList.remove('active');
-        document.getElementById('lobby').classList.add('active');
-        if (msg.winner === currentUser.telegramId.toString()) {
-          currentUser.elo += msg.eloChange;
-          currentUser.wins++;
-          updateUserUI();
-        }
-      } else if (msg.type === 'leaderboard') {
-        displayLeaderboard(msg.data);
-      } else if (msg.type === 'my_rank') {
-        document.getElementById('myRankDisplay').innerHTML = `
-          <strong>#${msg.rank}</strong> - Siz
-        `;
-      } else if (msg.type === 'status') {
-        document.getElementById('statusBar').textContent = msg.message;
-      } else if (msg.type === 'error') {
-        alert('❌ ' + msg.message);
-      } else if (msg.type === 'room_created') {
-        document.getElementById('roomCode').textContent = msg.code;
-      }
-    }
-
-    function updateUserUI() {
-      if (!currentUser) return;
-      const level = Math.min(Math.floor(currentUser.elo / 100), 10);
-      document.getElementById('userName').textContent = currentUser.firstName;
-      document.getElementById('userLevel').textContent = level;
-      document.getElementById('userElo').textContent = currentUser.elo;
-      document.getElementById('userWins').textContent = currentUser.wins;
-    }
-
-    function updateGameUI(msg = gameState) {
-      if (!msg) return;
-      const players = msg.players || gameState.players;
-      const turn = msg.currentTurn !== undefined ? msg.currentTurn : gameState.currentTurn;
-      const hand = msg.myHand || gameState.myHand;
-      const table = msg.table || gameState.table;
-
-      for (let i = 0; i < 2; i++) {
-        const playerEl = document.getElementById(`player${i}`);
-        const level = players[i].level || 1;
-        const levelClass = level <= 3 ? 'level-sarı' : level <= 6 ? 'level-mavi' : 'level-qızıl';
-        playerEl.innerHTML = `
-          <div>${players[i].name}</div>
-          <div class="player-level ${levelClass}">${players[i].levelIcon || '⭐'} Səv: ${level}</div>
-          <div style="font-size: 0.9em; margin-top: 5px;">Taş: <span id="player${i}Hand">${msg.playerHands ? msg.playerHands[i] : 7}</span></div>
-        `;
-        if (turn === i) playerEl.classList.add('active');
-        else playerEl.classList.remove('active');
-      }
-
-      document.getElementById('table').innerHTML = table.map(d => `
-        <div class="domino">
-          <span>${d.left}</span>
-          <span>|</span>
-          <span>${d.right}</span>
-        </div>
-      `).join('');
-
-      document.getElementById('hand').innerHTML = hand.map((d, idx) => `
-        <div class="domino playable" onclick="playDomino(${idx})">
-          <span>${d.left}</span>
-          <span>|</span>
-          <span>${d.right}</span>
-        </div>
-      `).join('');
-    }
-
-    function playDomino(idx) {
-      if (gameState && gameState.currentTurn === myIndex) {
-        ws.send(JSON.stringify({
-          type: 'play_domino',
-          domino: gameState.myHand[idx],
-          atEnd: true
-        }));
-      }
-    }
-
-    function displayLeaderboard(data) {
-      const html = data.slice(0, 3).map((u, i) => {
-        const levelClass = u.level <= 3 ? 'level-sarı' : u.level <= 6 ? 'level-mavi' : 'level-qızıl';
-        const rankClass = `lb-rank-${i + 1}`;
-        const medals = ['🥇', '🥈', '🥉'];
-        return `
-          <div class="lb-card ${rankClass}">
-            <div class="lb-rank">${medals[i]} #${i + 1}</div>
-            <div class="lb-name">${u.name}</div>
-            <div class="lb-level ${levelClass}">${u.levelIcon} Səv: ${u.level}</div>
-            <div class="lb-elo">${u.elo} ELO</div>
-            <div class="lb-stats">Qalibiyyət: ${u.wins} | Məğlubiyyət: ${u.losses}</div>
-          </div>
-        `;
-      }).join('');
-
-      const otherHtml = data.slice(3).map((u, i) => `
-        <div class="lb-card">
-          <div>#${i + 4}</div>
-          <div style="font-weight: bold; margin: 10px 0;">${u.name}</div>
-          <div style="font-size: 1.2em;">${u.levelIcon} Səv: ${u.level}</div>
-          <div style="margin-top: 10px;">${u.elo} ELO</div>
-        </div>
-      `).join('');
-
-      document.getElementById('lbContainer').innerHTML = html + otherHtml;
-      document.getElementById('leaderboard').classList.add('active');
-      document.getElementById('lobby').classList.remove('active');
-      ws.send(JSON.stringify({ type: 'get_leaderboard' }));
-    }
-
-    // Event listeners
-    document.getElementById('btnLogin').onclick = () => {
-      window.Telegram.WebApp.ready();
-      const user = window.Telegram.WebApp.initData;
-      if (user) {
-        const userData = JSON.parse(window.Telegram.WebApp.initData.split('user=')[1].split('&')[0]);
-        ws.send(JSON.stringify({ type: 'auth', data: userData }));
-      } else {
-        alert('Lütfən Telegram'dan açın');
-      }
-    };
-
-    document.getElementById('btnRanked').onclick = () => {
-      if (!currentUser) return alert('Əvvəlcə Telegram ilə daxil olun');
-      ws.send(JSON.stringify({ type: 'join_matchmaking' }));
-    };
-
-    document.getElementById('btnFriend').onclick = () => {
-      if (!currentUser) return alert('Əvvəlcə Telegram ilə daxil olun');
-      document.getElementById('createRoomModal').classList.add('active');
-    };
-
-    document.getElementById('btnCreateRoom').onclick = () => {
-      ws.send(JSON.stringify({ type: 'create_room', playerName: currentUser.firstName }));
-      document.getElementById('createRoomModal').classList.remove('active');
-      document.getElementById('roomCodeModal').classList.add('active');
-    };
-
-    document.getElementById('btnJoin').onclick = () => {
-      document.getElementById('joinRoomModal').classList.add('active');
-    };
-
-    document.getElementById('btnJoinRoomConfirm').onclick = () => {
-      const code = document.getElementById('roomCode2').value;
-      if (code.length !== 4) return alert('Kod 4 rəqəmlı olmalıdır');
-      ws.send(JSON.stringify({ type: 'join_room', code, playerName: currentUser.firstName }));
-      document.getElementById('joinRoomModal').classList.remove('active');
-    };
-
-    document.getElementById('btnCopyCode').onclick = () => {
-      navigator.clipboard.writeText(document.getElementById('roomCode').textContent);
-      alert('✅ Kodu kopyaladım!');
-    };
-
-    document.getElementById('btnLeaderboard').onclick = () => {
-      ws.send(JSON.stringify({ type: 'get_leaderboard' }));
-    };
-
-    document.getElementById('btnBackToLobby').onclick = () => {
-      document.getElementById('game').classList.remove('active');
-      document.getElementById('lobby').classList.add('active');
-    };
-
-    document.getElementById('btnBackLb').onclick = () => {
-      document.getElementById('leaderboard').classList.remove('active');
-      document.getElementById('lobby').classList.add('active');
-    };
-
-    document.getElementById('btnPass').onclick = () => {
-      ws.send(JSON.stringify({ type: 'pass' }));
-    };
-
-    ['Close', 'CloseRoom', 'CloseJoin', 'CloseCreate'].forEach(id => {
-      const el = document.getElementById('btnClose' + id);
-      if (el) el.onclick = () => document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
-    });
-
-    connectWS();
-  </script>
+<script src="game.js"></script>
 </body>
 </html>
