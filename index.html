@@ -345,7 +345,30 @@
                         }));
                     }
                 };
-                ws.onclose = () => { setConnected(false); setTimeout(connectToServer, 3000); };
+                ws.onclose = () => { 
+                    setConnected(false); 
+                    
+                    // Eğer oyundaysak ve rakibe kazanç vermemişsek, manuel oyun bitir
+                    if (gameState && roomCode && !notification?.isWinner) {
+                        console.log('🔌 Sayfa kapatıldı - oyun bitiriliyor...');
+                        // Server'a disconnect bildirimi gönder
+                        try {
+                            const tempWs = new WebSocket('wss://beta-github-io.onrender.com');
+                            tempWs.onopen = () => {
+                                tempWs.send(JSON.stringify({
+                                    type: 'forceDisconnect',
+                                    roomCode: roomCode,
+                                    playerName: playerData?.firstName || playerData?.username || 'Player'
+                                }));
+                                setTimeout(() => tempWs.close(), 1000);
+                            };
+                        } catch (e) {
+                            console.error('Disconnect mesajı gönderilemedi:', e);
+                        }
+                    }
+                    
+                    setTimeout(connectToServer, 3000); 
+                };
                 ws.onmessage = (e) => {
                     try {
                         const data = JSON.parse(e.data);
@@ -1190,10 +1213,18 @@
                                     <button 
                                         onClick={() => {
                                             if (confirm('Eminmisiniz? Oyundan cikdiqda ELO itireceksiniz!')) {
-                                                sendMessage({ type: 'leaveGame' });
+                                                // Server'a oyun bitirme bildirimi gönder
+                                                sendMessage({ 
+                                                    type: 'forceDisconnect',
+                                                    roomCode: roomCode,
+                                                    playerName: playerData?.firstName || playerData?.username || 'Player'
+                                                });
+                                                
+                                                // Anında ekranı değiştir
                                                 setScreen('lobby');
                                                 setGameState(null);
                                                 setRoomCode('');
+                                                setSearching(false);
                                             }
                                         }}
                                         className="bg-red-500/80 hover:bg-red-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95"
