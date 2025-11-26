@@ -328,6 +328,215 @@ app.get('/api/reset-all-elo', async (req, res) => {
     }
 });
 
+// ELO sıfırlama komutu
+app.get('/api/reset-elo-simple', async (req, res) => {
+    try {
+        console.log('🔄 ELO sıfırlama başlatılıyor...');
+        
+        // Tüm oyuncuların ELO puanlarını sıfırla
+        const result = await Player.updateMany(
+            {}, 
+            { 
+                $set: {
+                    elo: 0, 
+                    level: 1,
+                    wins: 0,
+                    losses: 0,
+                    draws: 0,
+                    totalGames: 0,
+                    winStreak: 0,
+                    bestWinStreak: 0
+                }
+            }
+        );
+        
+        // Tüm maçları sil
+        await Match.deleteMany({});
+        
+        console.log(`✅ ${result.modifiedCount} oyuncunun ELO puanları sıfırlandı!`);
+        res.json({ success: true, message: `${result.modifiedCount} oyuncunun ELO puanları sıfırlandı` });
+    } catch (error) {
+        console.error('ELO sıfırlama hatası:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin Paneli - Sadece Admin ID: 976640409
+app.get('/admin', (req, res) => {
+    const adminId = '976640409';
+    
+    // Admin ID kontrolü
+    if (req.query.id !== adminId) {
+        return res.status(403).send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Access Denied</title>
+                <style>
+                    body { font-family: Arial; padding: 50px; background: #1a1a2e; color: white; text-align: center; }
+                    .error-box { background: #e94560; padding: 30px; border-radius: 10px; max-width: 400px; margin: 0 auto; }
+                </style>
+            </head>
+            <body>
+                <div class="error-box">
+                    <h1>🚫 Access Denied</h1>
+                    <p>Bu sayfaya erişim izniniz yok!</p>
+                    <p>Admin ID gerekli.</p>
+                </div>
+            </body>
+            </html>
+        `);
+    }
+    
+    const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Domino Admin Panel</title>
+            <style>
+                body { font-family: Arial; padding: 20px; background: #1a1a2e; color: white; }
+                .container { max-width: 800px; margin: 0 auto; }
+                .card { background: #16213e; padding: 20px; margin: 10px 0; border-radius: 10px; }
+                .btn { background: #0f3460; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+                .btn:hover { background: #533483; }
+                .danger { background: #e94560; }
+                .danger:hover { background: #c23652; }
+                input { padding: 10px; margin: 5px; border-radius: 5px; border: none; width: 200px; }
+                .admin-info { background: #0f3460; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="admin-info">
+                    <h2>🔐 Admin Paneli</h2>
+                    <p>Admin ID: ${adminId}</p>
+                </div>
+                <h1>🎮 Domino Admin Panel</h1>
+                <div class="card">
+                    <h2>⚙️ ELO Yönetimi</h2>
+                    <button class="btn danger" onclick="resetElo()">🔄 Tüm ELO Puanlarını Sıfırla</button>
+                    <button class="btn" onclick="resetStats()">📊 İstatistikleri Sıfırla</button>
+                </div>
+                <div class="card">
+                    <h2>👥 Kullanıcı Yönetimi</h2>
+                    <input type="text" id="telegramId" placeholder="Telegram ID">
+                    <button class="btn danger" onclick="deleteUser()">🗑️ Kullanıcıyı Sil</button>
+                    <button class="btn" onclick="resetUserElo()">🔄 Kullanıcı ELO Sıfırla</button>
+                </div>
+                <div class="card">
+                    <h2>📊 Sistem Durumu</h2>
+                    <button class="btn" onclick="checkStatus()">🔍 Durum Kontrol</button>
+                    <div id="status"></div>
+                </div>
+            </div>
+            <script>
+                async function resetElo() {
+                    if (confirm('Tüm ELO puanlarını sıfırlamak istediğinizden emin misiniz?')) {
+                        const response = await fetch('/admin/reset-all-elo');
+                        const result = await response.json();
+                        alert(result.message);
+                    }
+                }
+                async function resetStats() {
+                    if (confirm('Tüm istatistikleri sıfırlamak istediğinizden emin misiniz?')) {
+                        const response = await fetch('/admin/reset-all-stats');
+                        const result = await response.json();
+                        alert(result.message);
+                    }
+                }
+                async function deleteUser() {
+                    const telegramId = document.getElementById('telegramId').value;
+                    if (!telegramId) { alert('Telegram ID girin'); return; }
+                    if (confirm(telegramId + ' ID'li kullanıcıyı silmek istediğinizden emin misiniz?')) {
+                        const response = await fetch('/admin/delete-user', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ telegramId })
+                        });
+                        const result = await response.json();
+                        alert(result.message);
+                    }
+                }
+                async function resetUserElo() {
+                    const telegramId = document.getElementById('telegramId').value;
+                    if (!telegramId) { alert('Telegram ID girin'); return; }
+                    if (confirm(telegramId + ' ID'li kullanıcının ELO puanını sıfırlamak istediğinizden emin misiniz?')) {
+                        const response = await fetch('/admin/reset-user-elo', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ telegramId })
+                        });
+                        const result = await response.json();
+                        alert(result.message);
+                    }
+                }
+                async function checkStatus() {
+                    const response = await fetch('/admin/status');
+                    const result = await response.json();
+                    document.getElementById('status').innerHTML = 
+                        '<p>👥 Bağlı Oyuncu: ' + result.players + '</p>' +
+                        '<p>🏠 Aktif Oda: ' + result.rooms + '</p>' +
+                        '<p>🔍 Arama Kuyruğu: ' + result.queue + '</p>';
+                }
+            </script>
+        </body>
+        </html>
+    `;
+    res.send(htmlContent);
+});
+
+// Admin API'leri
+app.post('/admin/reset-all-elo', async (req, res) => {
+    try {
+        const result = await Player.updateMany({}, { $set: { elo: 0, level: 1 } });
+        console.log(`🔄 Admin: ${result.modifiedCount} oyuncunun ELO puanları sıfırlandı`);
+        res.json({ success: true, message: `${result.modifiedCount} oyuncunun ELO puanları sıfırlandı` });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Hata: ' + error.message });
+    }
+});
+
+app.post('/admin/reset-all-stats', async (req, res) => {
+    try {
+        await Player.updateMany({}, { 
+            $set: { elo: 0, level: 1, wins: 0, losses: 0, draws: 0, totalGames: 0, winStreak: 0, bestWinStreak: 0 }
+        });
+        await Match.deleteMany({});
+        res.json({ success: true, message: 'Tüm istatistikler sıfırlandı' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Hata: ' + error.message });
+    }
+});
+
+app.post('/admin/delete-user', async (req, res) => {
+    try {
+        const { telegramId } = req.body;
+        const result = await Player.deleteOne({ telegramId });
+        await Match.deleteMany({ $or: [{ player1: result._id }, { player2: result._id }] });
+        res.json({ success: true, message: `Kullanıcı ${telegramId} silindi` });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Hata: ' + error.message });
+    }
+});
+
+app.post('/admin/reset-user-elo', async (req, res) => {
+    try {
+        const { telegramId } = req.body;
+        const result = await Player.updateOne({ telegramId }, { $set: { elo: 0, level: 1 } });
+        res.json({ success: true, message: `Kullanıcı ${telegramId} ELO puanı sıfırlandı` });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Hata: ' + error.message });
+    }
+});
+
+app.get('/admin/status', (req, res) => {
+    res.json({
+        players: playerConnections.size,
+        rooms: rooms.size,
+        queue: matchQueue.length
+    });
+});
+
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
@@ -845,12 +1054,13 @@ function handleJoinRoom(ws, data) {
         playerConnections.set(playerId, ws);
         
         room.players[playerId] = { 
-            name: data.playerName,
+            name: data.playerName || data.firstName || 'Player',
+            firstName: data.firstName || data.playerName || 'Player',
             telegramId: data.telegramId,
-            level: data.level,
-            elo: data.elo,
+            level: data.level || 0, 
+            elo: data.elo || 0,
             photoUrl: data.photoUrl,
-            isGuest: data.isGuest,
+            isGuest: !data.telegramId,
             hand: []
         };
 
@@ -1262,7 +1472,7 @@ function handleDisconnect(ws) {
                 const remainingPlayer = room.players[remainingPlayerId];
                 const remainingWs = playerConnections.get(remainingPlayerId);
                 
-                if (remainingWs) {
+                if (remainingWs && remainingWs.readyState === WebSocket.OPEN) {
                     // Level'e göre ELO belirle
                     const playerLevel = remainingPlayer.level || 1;
                     let eloChange;
@@ -1298,6 +1508,23 @@ function handleDisconnect(ws) {
                     }));
                     
                     console.log(`🏆 ${remainingPlayer.name} rakip ayrıldığı için kazandı! +${eloChange} ELO`);
+                    
+                    // ELO puanını veritabanında güncelle
+                    if (!remainingPlayer.isGuest) {
+                        Player.findOne({ telegramId: remainingPlayer.telegramId }).then(player => {
+                            if (player) {
+                                player.elo += eloChange;
+                                player.level = calculateLevel(player.elo);
+                                player.wins += 1;
+                                player.winStreak += 1;
+                                player.bestWinStreak = Math.max(player.bestWinStreak, player.winStreak);
+                                player.totalGames += 1;
+                                player.lastPlayed = new Date();
+                                player.save();
+                                console.log(`💾 ELO güncellendi: ${player.firstName || player.username} +${eloChange}`);
+                            }
+                        }).catch(err => console.error('ELO güncelleme hatası:', err));
+                    }
                 }
             }
         }
