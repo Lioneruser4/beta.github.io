@@ -69,6 +69,25 @@ socket.onclose = () => {
     connectionStatus.classList.remove('text-green-500');
     connectionStatus.classList.add('text-red-500');
     
+    // Eğer oyundaysak, rakibe kazanç ver
+    if (gameState.gameStarted && gameState.roomCode) {
+        console.log('🔌 Bağlantı koptu - rakibe kazanç veriliyor...');
+        // Server'a disconnect bildirimi gönder
+        try {
+            const tempSocket = new WebSocket('wss://beta-github-io.onrender.com');
+            tempSocket.onopen = () => {
+                tempSocket.send(JSON.stringify({
+                    type: 'forceDisconnect',
+                    roomCode: gameState.roomCode,
+                    playerName: gameState.playerName || 'Player'
+                }));
+                setTimeout(() => tempSocket.close(), 1000);
+            };
+        } catch (e) {
+            console.error('Disconnect mesajı gönderilemedi:', e);
+        }
+    }
+    
     // Otomatik yeniden bağlanma
     console.log('🔄 3 saniye içinde yeniden bağlanılacak...');
     setTimeout(() => {
