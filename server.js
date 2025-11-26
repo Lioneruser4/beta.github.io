@@ -555,6 +555,7 @@ wss.on('connection', (ws, req) => {
                 case 'reconnectToRoom': handleReconnectToRoom(ws, data); break;
                 case 'playTile': handlePlayTile(ws, data); break;
                 case 'drawFromMarket': handleDrawFromMarket(ws); break;
+                case 'forceDisconnect': handleForceDisconnect(ws, data); break;
             }
         } catch (error) {
             console.error('Hata:', error);
@@ -1053,7 +1054,7 @@ async function handleGameEnd(roomCode, winnerResult, gameState) {
         broadcastToRoom(roomCode, { 
             type: 'gameEnd', 
             winner: winnerId, 
-            winnerName: isDraw ? 'Beraberlik' : gameState.players[winnerId].name,
+            winnerName: isDraw ? 'Beraberlik' : (gameState.players[winnerId].firstName || gameState.players[winnerId].name),
             reason: reason,
             player1Sum: winnerResult.player1Sum,
             player2Sum: winnerResult.player2Sum,
@@ -1065,11 +1066,11 @@ async function handleGameEnd(roomCode, winnerResult, gameState) {
             startTime: room.startTime,
             players: {
                 [player1Id]: {
-                    name: room.players[player1Id].name,
+                    name: room.players[player1Id].firstName || room.players[player1Id].name,
                     photoUrl: room.players[player1Id].photoUrl
                 },
                 [player2Id]: {
-                    name: room.players[player2Id].name,
+                    name: room.players[player2Id].firstName || room.players[player2Id].name,
                     photoUrl: room.players[player2Id].photoUrl
                 }
             }
@@ -1093,6 +1094,70 @@ async function handleGameEnd(roomCode, winnerResult, gameState) {
         setTimeout(() => {
             rooms.delete(roomCode);
         }, 3000);
+    }
+}
+
+function handleForceDisconnect(ws, data) {
+    const { roomCode, playerName } = data;
+    
+    if (!roomCode) return;
+    
+    const room = rooms.get(roomCode);
+    if (!room) return;
+    
+    // Oyuncuyu bul ve çıkar
+    for (const playerId in room.players) {
+        if (room.players[playerId].name === playerName || room.players[playerId].firstName === playerName) {
+            const remainingPlayerId = Object.keys(room.players).find(id => id !== playerId);
+            
+            if (remainingPlayerId) {
+                const remainingPlayer = room.players[remainingPlayerId];
+                const remainingWs = playerConnections.get(remainingPlayerId);
+                
+                if (remainingWs) {
+                    // Level'e göre ELO belirle
+                    const playerLevel = remainingPlayer.level || 1;
+                    let eloChange;
+                    
+                    if (playerLevel <= 5) {
+                        eloChange = Math.floor(Math.random() * 6) + 15; // 15-20 arası
+                    } else {
+                        eloChange = Math.floor(Math.random() * 6) + 10; // 10-15 arası
+                    }
+                    
+                    // Anında oyun bitirme lobisi gönder
+                    remainingWs.send(JSON.stringify({
+                        type: 'gameEnd',
+                        winner: remainingPlayerId,
+                        winnerName: remainingPlayer.firstName || remainingPlayer.name,
+                        reason: 'opponent_left',
+                        isRanked: !remainingPlayer.isGuest,
+                        eloChanges: {
+                            winner: eloChange,
+                            loser: 0
+                        },
+                        startTime: room.startTime,
+                        players: {
+                            [remainingPlayerId]: {
+                                name: remainingPlayer.firstName || remainingPlayer.name,
+                                photoUrl: remainingPlayer.photoUrl
+                            },
+                            [playerId]: {
+                                name: playerName,
+                                photoUrl: null
+                            }
+                        }
+                    }));
+                    
+                    console.log(`🏆 ${remainingPlayer.name} rakip ayrıldığı için kazandı! +${eloChange} ELO`);
+                }
+            }
+            
+            // Odayı sil
+            deleteRoomFromDatabase(roomCode);
+            rooms.delete(roomCode);
+            break;
+        }
     }
 }
 
@@ -1212,7 +1277,7 @@ function handleDisconnect(ws) {
                     remainingWs.send(JSON.stringify({
                         type: 'gameEnd',
                         winner: remainingPlayerId,
-                        winnerName: remainingPlayer.name,
+                        winnerName: remainingPlayer.firstName || remainingPlayer.name,
                         reason: 'opponent_left',
                         isRanked: !remainingPlayer.isGuest,
                         eloChanges: {
@@ -1222,11 +1287,11 @@ function handleDisconnect(ws) {
                         startTime: room.startTime,
                         players: {
                             [remainingPlayerId]: {
-                                name: remainingPlayer.name,
+                                name: remainingPlayer.firstName || remainingPlayer.name,
                                 photoUrl: remainingPlayer.photoUrl
                             },
                             [ws.playerId]: {
-                                name: ws.playerName,
+                                name: ws.firstName || ws.playerName,
                                 photoUrl: ws.photoUrl
                             }
                         }
