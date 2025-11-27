@@ -26,6 +26,14 @@ let gameState = {
     gameStarted: false
 };
 
+// Rakip oyuncu bilgileri
+let opponentInfo = {
+    name: 'Rakip',
+    photoUrl: 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png',
+    elo: 0,
+    level: 1
+};
+
 // Timer
 let searchTimer = null;
 let searchTime = 0;
@@ -524,18 +532,22 @@ function handleCellClick(r, c) {
 
 // Oyundan çıkış işlemi
 function handleLeaveGame() {
-    if (confirm('Oyundan çıkmak istediğinize emin misiniz? Bu işlem geri alınamaz.')) {
+    if (confirm('Oyundan çıkmak istediğinize emin misiniz? Rakibiniz otomatik olarak kazanacak.')) {
         // Sunucuya oyundan çıkış isteği gönder
         if (socket && socket.connected) {
-            socket.emit('leaveGame');
+            // Oyun durumunu güncelle
+            gameState.gameStarted = false;
+            
+            // Sunucuya çıkış isteğini gönder
+            socket.emit('leaveGame', { roomCode: gameState.roomCode });
             
             // Kullanıcıya geri bildirim göster
             showMessage('Oyundan çıkılıyor...', false);
             
-            // 1 saniye sonra ana menüye dön
+            // Hemen ana menüye dön (sunucu diğer oyuncuya bilgi verecek)
             setTimeout(() => {
                 window.location.href = '/';
-            }, 1000);
+            }, 500);
         } else {
             // Eğer bağlantı yoksa doğrudan yönlendir
             window.location.href = '/';
@@ -552,6 +564,59 @@ socket.on('playerLeft', (data) => {
         }, 3000);
     }
 });
+
+// Rakip bağlandığında
+socket.on('opponentConnected', (playerData) => {
+    opponentInfo = {
+        name: playerData.name || 'Rakip',
+        photoUrl: playerData.photoUrl || 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png',
+        elo: playerData.elo || 0,
+        level: playerData.level || 1
+    };
+    updateOpponentInfo();
+    showMessage(`${opponentInfo.name} oyuna katıldı!`, false);
+});
+
+// Oyun başladığında
+socket.on('gameStart', (data) => {
+    gameState.gameStarted = true;
+    gameState.myColor = data.color;
+    gameState.isMyTurn = data.isMyTurn;
+    gameState.roomCode = data.roomCode;
+    gameState.players = data.players;
+    
+    // Rakip bilgilerini güncelle
+    const opponentId = Object.keys(data.players).find(id => id !== socket.id);
+    if (opponentId && data.players[opponentId]) {
+        opponentInfo = {
+            name: data.players[opponentId].name || 'Rakip',
+            photoUrl: data.players[opponentId].photoUrl || 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png',
+            elo: data.players[opponentId].elo || 0,
+            level: data.players[opponentId].level || 1
+        };
+        updateOpponentInfo();
+    }
+    
+    showScreen('game');
+    renderBoard();
+    updateTurnDisplay();
+});
+
+// Rakip bilgilerini güncelle
+function updateOpponentInfo() {
+    const opponentNameEl = document.getElementById('opponent-name');
+    const opponentPhotoEl = document.getElementById('opponent-photo');
+    const opponentEloEl = document.getElementById('opponent-elo');
+    const opponentLevelEl = document.getElementById('opponent-level');
+    
+    if (opponentNameEl) opponentNameEl.textContent = opponentInfo.name;
+    if (opponentPhotoEl) {
+        opponentPhotoEl.src = opponentInfo.photoUrl;
+        opponentPhotoEl.alt = opponentInfo.name;
+    }
+    if (opponentEloEl) opponentEloEl.textContent = `ELO: ${opponentInfo.elo}`;
+    if (opponentLevelEl) opponentLevelEl.textContent = `Seviye ${opponentInfo.level}`;
+}
 
 // Oyun sonu mesajı
 socket.on('gameEnd', (data) => {
