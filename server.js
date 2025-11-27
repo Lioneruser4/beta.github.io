@@ -413,11 +413,29 @@ async function handleLeaveGame(ws) {
         const room = rooms.get(ws.roomCode);
         const gameState = room?.gameState;
         
-        if (gameState && gameState.status === 'playing') {
-            // Oyun devam ederken ayrılıyorsa, diğer oyuncu kazanır
+        if (gameState) {
             const remainingPlayerId = Object.keys(gameState.players).find(id => id !== ws.playerId);
             
             if (remainingPlayerId) {
+                // Oyun durumunu güncelle
+                gameState.status = 'game_over';
+                gameState.winner = remainingPlayerId;
+                
+                // Diğer oyuncuya kazandığını bildir
+                broadcastToRoom(ws.roomCode, { 
+                    type: 'gameEnd', 
+                    winner: remainingPlayerId, 
+                    winnerName: gameState.players[remainingPlayerId]?.name || 'Rakibiniz',
+                    isRanked: room.type === 'ranked',
+                    reason: 'Rakibiniz oyundan ayrıldı'
+                });
+                
+                // Oyunu sonlandır
+                await handleGameEnd(ws.roomCode, remainingPlayerId, gameState);
+            } else {
+                // Eğer oda boşsa doğrudan sil
+                rooms.delete(ws.roomCode);
+            }
                 console.log(`🏆 ${ws.playerName} oyundan ayrıldı, kazanan: ${gameState.players[remainingPlayerId].name}`);
                 await handleGameEnd(ws.roomCode, remainingPlayerId, gameState);
             }
@@ -930,6 +948,15 @@ function handleDrawFromMarket(ws) {
 
     const player = gs.players[ws.playerId];
     
+    // Oyuncunun elinde oynayabileceği taş var mı kontrol et
+    const hasPlayableTile = player.hand.some(tile => canPlayTile(tile, gs.board));
+    if (hasPlayableTile) {
+        return sendMessage(ws, { 
+            type: 'error', 
+            message: 'Elinizde oynanabilir taş varken piyasadan taş çekemezsiniz' 
+        });
+    }
+    
     // Pazarda taş var mı?
     if (!gs.market || gs.market.length === 0) {
         // Pazar boş, otomatik sıra geç
@@ -949,61 +976,33 @@ function handleDrawFromMarket(ws) {
     // Çekilen taş oynanabilir mi kontrol et
     const canPlayDrawn = canPlayTile(drawnTile, gs.board);
     
-    if (!canPlayDrawn) {
-        // Oynanamıyor, tekrar çekmeli mi yoksa sıra geçmeli mi?
-        // Domino kurallarına göre: Oynanabilir taş bulana kadar çeker
-        const hasPlayable = player.hand.some(tile => canPlayTile(tile, gs.board));
-        
-        if (!hasPlayable && gs.market.length > 0) {
-            // Hala oynanabilir taş yok ve pazar doluysa, oyuncu tekrar çekebilir
-            sendMessage(ws, { type: 'info', message: 'Taş oynanamıyor, tekrar çekin veya bekleyin' });
-        } else if (!hasPlayable && gs.market.length === 0) {
-            // Pazar bitti ve hala oynanabilir taş yok - sıra geç
-            console.log(`❌ ${player.name} oynanabilir taş bulamadı - Sıra geçiyor`);
-            gs.turn++;
-            gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
-        }
+    if (canPlayDrawn) {
+        // Eğer çekilen taş oynanabilir durumdaysa, oyuncuya bildir
+        sendMessage(ws, { 
+            type: 'info', 
+            message: `[${drawnTile}] taşını oynayabilirsiniz` 
+        });
+    } else if (gs.market.length === 0) {
+        // Pazar bitti ve çekilen taş oynanamıyor - sıra geç
+        console.log(`❌ ${player.name} oynanabilir taş bulamadı - Sıra geçiyor`);
+        gs.turn++;
+        gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
+    } else {
+        // Pazardan taş çekmeye devam et
+        sendMessage(ws, { 
+            type: 'info', 
+            message: 'Çekilen taş oynanamıyor, tekrar çekin' 
+        });
     }
     
     Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
 }
 
 async function handleDisconnect(ws) {
-    console.log(`🔌 Oyuncu ayrıldı: ${ws.playerName || 'Bilinmeyen'}`);
+    console.log(`🔌 Oyuncu ayrıldı: ${ws.playerId || 'Bilinmeyen'}`);
     
-    if (ws.playerId) {
-        // Eğer oyuncu bir oyundaysa, diğer oyuncuya kazandır
-        if (ws.roomCode && rooms.has(ws.roomCode)) {
-            const room = rooms.get(ws.roomCode);
-            const gameState = room.gameState;
-            
-            if (gameState && gameState.status === 'playing') {
-                // Oyun devam ederken ayrılan oyuncunun rakibini kazanan ilan et
-                const remainingPlayerId = Object.keys(gameState.players).find(id => id !== ws.playerId);
-                
-                if (remainingPlayerId) {
-                    console.log(`🏆 ${ws.playerName} oyundan ayrıldı, kazanan: ${gameState.players[remainingPlayerId].name}`);
-                    await handleGameEnd(ws.roomCode, remainingPlayerId, gameState);
-                } else {
-                    console.log('❌ Oyun durumu geçersiz, oda kapatılıyor');
-                    broadcastToRoom(ws.roomCode, { 
-                        type: 'gameEnd', 
-                        winner: null, 
-                        winnerName: 'Oyun iptal edildi',
-                        isRanked: false
-                    });
-                    rooms.delete(ws.roomCode);
-                }
-                // Oyun bitti, fonksiyondan çık
-                playerConnections.delete(ws.playerId);
-                return;
-            }
-        }
-        
-        // Eğer oyunda değilse veya oyun zaten bitmişse sadece bağlantıyı sil
-        playerConnections.delete(ws.playerId);
-    }
-    
+    if (!ws.playerId) return;
+
     // Eşleşme kuyruğundan çıkar
     const qIdx = matchQueue.findIndex(p => p.ws === ws);
     if (qIdx !== -1) {
@@ -1016,18 +1015,27 @@ async function handleDisconnect(ws) {
         const room = rooms.get(ws.roomCode);
         
         // Eğer oyun başlamışsa, diğer oyuncuya bildir
-        if (room && room.gameState) {
+        if (room?.gameState?.status === 'playing') {
             const otherPlayerId = Object.keys(room.gameState.players).find(id => id !== ws.playerId);
             if (otherPlayerId) {
                 const otherPlayerWs = playerConnections.get(otherPlayerId)?.ws;
                 if (otherPlayerWs) {
+                    // Oyun durumunu güncelle
+                    room.gameState.status = 'game_over';
+                    room.gameState.winner = otherPlayerId;
+                    
+                    // Diğer oyuncuya kazandığını bildir
                     sendMessage(otherPlayerWs, { 
                         type: 'gameEnd', 
                         winner: otherPlayerId, 
-                        winnerName: room.gameState.players[otherPlayerId].name,
+                        winnerName: room.gameState.players[otherPlayerId]?.name || 'Rakibiniz',
                         isRanked: room.type === 'ranked',
-                        reason: 'Rakibiniz oyundan ayrıldı'
+                        reason: 'Rakibiniz bağlantıyı kesti',
+                        forceEnd: true
                     });
+                    
+                    // Oyunu sonlandır
+                    await handleGameEnd(ws.roomCode, otherPlayerId, room.gameState);
                 }
             }
         }
@@ -1035,6 +1043,9 @@ async function handleDisconnect(ws) {
         console.log(`🏠 Odadan ayrıldı: ${ws.roomCode}`);
         rooms.delete(ws.roomCode);
     }
+    
+    // Oyuncu bağlantısını sil
+    playerConnections.delete(ws.playerId);
 }
 
 const PORT = process.env.PORT || 10000;
