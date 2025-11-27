@@ -391,10 +391,60 @@ function sendMessage(ws, message) {
     }
 }
 
+// Oda yönetimi için yardımcı fonksiyonlar
+function getPlayerRoom(playerId) {
+    for (const [roomCode, room] of rooms.entries()) {
+        if (room.players[playerId]) {
+            return { roomCode, room };
+        }
+    }
+    return { roomCode: null, room: null };
+}
+
 // --- WEBSOCKET EVENTLERİ ---
 
 wss.on('connection', (ws, req) => {
     ws.isAlive = true;
+    let playerId = null;
+    
+    // Oyuncunun yeniden bağlanma isteği
+    ws.on('rejoinGame', async (data) => {
+        try {
+            const { roomCode } = data;
+            if (!roomCode || !rooms.has(roomCode)) {
+                sendMessage(ws, { type: 'error', message: 'Oyun bulunamadı' });
+                return;
+            }
+            
+            const room = rooms.get(roomCode);
+            const gameState = room.gameState;
+            
+            // Oyuncuyu bul
+            const player = Object.values(room.players).find(p => p.ws === ws);
+            if (!player) {
+                sendMessage(ws, { type: 'error', message: 'Oyuncu bulunamadı' });
+                return;
+            }
+            
+            playerId = player.id;
+            playerConnections.set(playerId, { ws, roomCode });
+            
+            // Oyun durumunu gönder
+            sendMessage(ws, {
+                type: 'gameState',
+                ...gameState,
+                isMyTurn: gameState.currentPlayer === playerId,
+                myColor: gameState.players[playerId]?.color,
+                gameStarted: true
+            });
+            
+            console.log(`🔄 ${playerId} oyuna yeniden bağlandı (Oda: ${roomCode})`);
+            
+        } catch (error) {
+            console.error('Yeniden bağlanma hatası:', error);
+            sendMessage(ws, { type: 'error', message: 'Yeniden bağlanırken hata oluştu' });
+        }
+    });
     ws.on('pong', () => ws.isAlive = true);
 
     ws.on('message', (message) => {
