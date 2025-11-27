@@ -35,7 +35,7 @@ const playerSchema = new mongoose.Schema({
     lastPlayed: { type: Date, default: Date.now }
 });
 
-const matchSchema = new mongoose.Schema({
+const matchSchema = new mongoose.Schema({tur
     player1: { type: mongoose.Schema.Types.ObjectId, ref: 'DominoPlayer' },
     player2: { type: mongoose.Schema.Types.ObjectId, ref: 'DominoPlayer' },
     winner: { type: mongoose.Schema.Types.ObjectId, ref: 'DominoPlayer' },
@@ -403,6 +403,50 @@ function getPlayerRoom(playerId) {
 
 // --- WEBSOCKET EVENTLERİ ---
 
+// Oyundan çıkış işlemini yöneten fonksiyon
+async function handleLeaveGame(ws) {
+    if (!ws.playerId) return;
+
+    console.log(`🚪 ${ws.playerName} oyundan ayrılmak istiyor`);
+
+    if (ws.roomCode && rooms.has(ws.roomCode)) {
+        const room = rooms.get(ws.roomCode);
+        const gameState = room?.gameState;
+        
+        if (gameState && gameState.status === 'playing') {
+            // Oyun devam ederken ayrılıyorsa, diğer oyuncu kazanır
+            const remainingPlayerId = Object.keys(gameState.players).find(id => id !== ws.playerId);
+            
+            if (remainingPlayerId) {
+                console.log(`🏆 ${ws.playerName} oyundan ayrıldı, kazanan: ${gameState.players[remainingPlayerId].name}`);
+                await handleGameEnd(ws.roomCode, remainingPlayerId, gameState);
+            }
+        } else {
+            // Oyun başlamadıysa sadece odayı kapat
+            broadcastToRoom(ws.roomCode, {
+                type: 'playerLeft',
+                playerId: ws.playerId,
+                message: 'Rakibiniz oyundan ayrıldı'
+            });
+            rooms.delete(ws.roomCode);
+        }
+    }
+
+    // Kullanıcıyı bağlantılardan kaldır
+    playerConnections.delete(ws.playerId);
+    
+    // Eğer kullanıcı oturumdaysa, oturumu kapat
+    if (ws.telegramId) {
+        const session = playerSessions.get(ws.telegramId);
+        if (session && session.ws === ws) {
+            playerSessions.delete(ws.telegramId);
+        }
+    }
+
+    // WebSocket bağlantısını kapat
+    ws.close(1000, 'Kullanıcı çıkış yaptı');
+}
+
 wss.on('connection', (ws, req) => {
     ws.isAlive = true;
     let playerId = null;
@@ -457,6 +501,7 @@ wss.on('connection', (ws, req) => {
                 case 'joinRoom': handleJoinRoom(ws, data); break;
                 case 'playTile': handlePlayTile(ws, data); break;
                 case 'drawFromMarket': handleDrawFromMarket(ws); break;
+                case 'leaveGame': handleLeaveGame(ws); break;
             }
         } catch (error) {
             console.error('Hata:', error);
