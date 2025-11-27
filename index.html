@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 
 <html lang="tr">
 <head>
@@ -620,6 +620,52 @@
                             })
                         )
                     )
+                )
+            );
+        }
+
+        // Yeni eklenen sonuç ekranı bileşeni
+        function ResultScreen({ isWinner, eloChange, reason, exitType }) {
+            let message = '';
+            if (exitType === 'exit') {
+                message = 'Oyundan Çıkıldı';
+            } else if (reason === 'empty_hand') {
+                message = isWinner ? '🎉 Eli boş! Qazandiniz!' : '😔 Rakibin eli boş! Uduzdunuz';
+            } else if (reason === 'points' || reason === 'points_equal') {
+                if (reason === 'points_equal') {
+                    message = '🤝 Beraberlik!';
+                } else {
+                    message = isWinner ? '🎉 Daha az puan! Qazandiniz!' : '😔 Daha çok puan! Uduzdunuz';
+                }
+            } else {
+                message = isWinner ? '🎉 Qazandiniz!' : '😔 Uduzdunuz';
+            }
+
+            return React.createElement('div', { 
+                className: 'min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4 overflow-hidden relative',
+                id: 'result-lobby'
+            },
+                React.createElement('div', { className: 'bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20 max-w-2xl w-full text-center' },
+                    React.createElement('h1', { 
+                        className: `text-5xl font-black mb-6 ${
+                            isWinner ? 'text-green-400' : 'text-red-400'
+                        }`
+                    }, message),
+                    
+                    eloChange !== 0 && React.createElement('div', {
+                        className: `text-3xl font-bold mb-8 ${
+                            isWinner ? 'text-green-300' : 'text-red-300'
+                        }`
+                    }, 'ELO: ', isWinner ? '+' : '', eloChange),
+                    
+                    React.createElement('div', { className: 'text-white text-xl mb-8' },
+                        'Ana menüye dönülüyor...'
+                    ),
+                    
+                    React.createElement('button', {
+                        onClick: () => setScreen('lobby'),
+                        className: 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-4 rounded-xl font-bold text-xl hover:from-purple-700 hover:to-indigo-700 transition-all transform hover:scale-105 active:scale-95 shadow-2xl'
+                    }, 'Ana Menüye Dön')
                 )
             );
         }
