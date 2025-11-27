@@ -1,1768 +1,977 @@
-﻿﻿<!DOCTYPE html>
-
+<!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎮 Profesyonel Domino Oyunu</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1b4d3e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Domino 101 Pro - Telegram Game</title>
+    
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Roboto', 'sans-serif'] },
+                    colors: {
+                        table: { 
+                            base: '#1b4d3e', // Klasik Yeşil Masa
+                            dark: '#0f2b23',
+                            light: '#2c6b58'
+                        },
+                        bone: {
+                            face: '#fdfdfd',
+                            side: '#e2e2e2',
+                            shadow: '#00000040'
+                        }
+                    },
+                    boxShadow: {
+                        '3d': '0px 4px 0px #c7c7c7, 0px 6px 6px rgba(0,0,0,0.4)', // Taşın 3D kalınlığı
+                        '3d-active': '0px 2px 0px #c7c7c7, 0px 3px 3px rgba(0,0,0,0.4)',
+                        'inner-pip': 'inset 0 1px 2px rgba(0,0,0,0.6)',
+                        'glow': '0 0 15px #fbbf24, 0 0 5px #fbbf24' // İpucu parlaması
+                    },
+                    animation: {
+                        'slide-up': 'slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 3s ease-in-out infinite',
+                        'slide-in': 'slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+                        'celebrate': 'celebrate 1s ease-out',
+                        'glow-pulse': 'glowPulse 2s ease-in-out infinite',
+                        'shake': 'shake 0.5s ease-in-out'
+                    },
+                    keyframes: {
+                        slideUp: { '0%': { transform: 'translateY(100%)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
+                        float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-5px)' } },
+                        slideIn: { '0%': { transform: 'scale(0) rotate(180deg)', opacity: '0' }, '100%': { transform: 'scale(1) rotate(0)', opacity: '1' } },
+                        celebrate: { 
+                            '0%': { transform: 'scale(1) rotate(0deg)' },
+                            '25%': { transform: 'scale(1.2) rotate(-10deg)' },
+                            '50%': { transform: 'scale(1.3) rotate(10deg)' },
+                            '75%': { transform: 'scale(1.2) rotate(-5deg)' },
+                            '100%': { transform: 'scale(1) rotate(0deg)' }
+                        },
+                        glowPulse: {
+                            '0%, 100%': { boxShadow: '0 0 20px rgba(251, 191, 36, 0.8), 0 0 40px rgba(251, 191, 36, 0.4)' },
+                            '50%': { boxShadow: '0 0 30px rgba(251, 191, 36, 1), 0 0 60px rgba(251, 191, 36, 0.6)' }
+                        },
+                        shake: {
+                            '0%, 100%': { transform: 'translateX(0)' },
+                            '25%': { transform: 'translateX(-10px)' },
+                            '75%': { transform: 'translateX(10px)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
     <style>
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        /* Yeşil Çuha Masa Dokusu */
+        body { 
+            background-color: #1b4d3e;
+            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23153d31' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z'/%3E%3C/g%3E%3C/svg%3E");
+            overflow: hidden; 
+            touch-action: pan-y pinch-zoom;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
         }
-        .animate-fadeIn {
-            animation: fadeIn 1s ease-out;
+        
+        .pip-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 100%; padding: 2px; }
+        .pip { background-color: #111; border-radius: 50%; width: 5px; height: 5px; margin: auto; box-shadow: inset 0 1px 1px rgba(255,255,255,0.2); }
+        /* Kırmızı noktalar (bazı setlerde olur ama burada siyah klasik yaptık) */
+        
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Parlaklık Efekti */
+        .valid-zone {
+            position: relative;
+            animation: pulse-glow 1.5s infinite;
         }
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        .valid-zone::before {
+            content: '';
+            position: absolute;
+            inset: -8px;
+            background: linear-gradient(45deg, transparent, rgba(251, 191, 36, 0.3), transparent);
+            border-radius: 12px;
+            animation: rotate 3s linear infinite;
         }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            overflow-x: hidden;
+        .valid-zone::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            background: rgba(251, 191, 36, 0.2);
+            border-radius: 10px;
+            filter: blur(10px);
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.6), 0 0 40px rgba(251, 191, 36, 0.3); }
+            50% { box-shadow: 0 0 30px rgba(251, 191, 36, 0.9), 0 0 60px rgba(251, 191, 36, 0.5); }
+        }
+        @keyframes rotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
-<script>
-    const { useState, useEffect, useRef } = React;
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
 
-    const API_URL = 'https://mario-io-1.onrender.com';
-    const WS_URL = 'wss://mario-io-1.onrender.com';
+        // Telegram WebApp Initialization
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
 
-    const DominoGame = () => {
-        const [screen, setScreen] = useState('lobby');
-        const [connected, setConnected] = useState(false);
-        const [playerName, setPlayerName] = useState('');
-        const [playerData, setPlayerData] = useState(null); // Oyuncu verilerini saklamak için
-        const [roomCode, setRoomCode] = useState('');
-        const [joinRoomCode, setJoinRoomCode] = useState('');
-        const [gameState, setGameState] = useState(null);
-        const [selectedTile, setSelectedTile] = useState(null);
-        const [validMoves, setValidMoves] = useState([]);
-        const [searching, setSearching] = useState(false);
-        const [copied, setCopied] = useState(false);
-        const [notification, setNotification] = useState('');
-        const [gameEndData, setGameEndData] = useState(null);
-        const wsRef = useRef(null);
+        // API Base URL
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
 
-        // --- ADMIN STATE ---
-        const [isAdmin, setIsAdmin] = useState(false);
-        const [adminScreen, setAdminScreen] = useState(false);
+        // --- BİLEŞENLER ---
 
-        useEffect(() => {
-            connectToServer();
-            return () => {
-                if (wsRef.current) {
-                    wsRef.current.close();
+        // 1. Domino Noktaları (Pips)
+        const RenderPips = ({ number }) => {
+            const layouts = {
+                0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8],
+                4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8]
+            };
+            const activePips = layouts[number] || [];
+            return (
+                <div className="pip-grid">
+                    {[...Array(9)].map((_, i) => (
+                        <div key={i} className="pip" style={{ opacity: activePips.includes(i) ? 1 : 0 }}></div>
+                    ))}
+                </div>
+            );
+        };
+
+        // 2. Domino Taşı (3D Tasarım)
+        const DominoTile = ({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false }) => {
+            const baseClasses = `
+                relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
+                transition-all duration-300 select-none
+                ${vertical ? 'flex-col w-9 h-[4.5rem] sm:w-10 sm:h-20' : 'flex-row w-[4.5rem] h-9 sm:w-20 sm:h-10'}
+                ${isGhost ? 'opacity-0 pointer-events-none' : 'shadow-3d'}
+                ${isSelected ? '-translate-y-4 shadow-3d-active ring-2 ring-yellow-500 z-10 animate-celebrate' : ''}
+                ${animateIn ? 'animate-slide-in' : ''}
+                ${!disabled && !isGhost ? 'cursor-pointer active:translate-y-1 active:shadow-3d-active hover:brightness-110' : ''}
+                ${disabled ? 'brightness-90 cursor-default' : ''}
+            `;
+
+            return (
+                <div 
+                    onClick={onClick}
+                    className={baseClasses}
+                    style={{ transform: isSelected ? 'translateY(-15px) scale(1.1)' : `scale(${scale})` }}
+                >
+                    <div className={`flex-1 flex items-center justify-center ${vertical ? 'border-b' : 'border-r'} border-gray-300`}>
+                        <RenderPips number={values[0]} />
+                    </div>
+                    <div className="flex-1 flex items-center justify-center">
+                        <RenderPips number={values[1]} />
+                    </div>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-400 border border-gray-500 shadow-inner z-10"></div>
+                </div>
+            );
+        };
+
+        // 3. Bildirim Toast
+        const Toast = ({ message, type }) => {
+            const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600', warning: 'bg-yellow-600' };
+            return (
+                <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-2 rounded-full shadow-lg text-white font-medium text-sm animate-slide-up flex items-center gap-2 ${colors[type] || colors.info}`}>
+                    <span>{type === 'success' ? '✓' : type === 'error' ? '!' : 'i'}</span>
+                    {message}
+                </div>
+            );
+        };
+
+        // --- ANA OYUN ---
+
+        const DominoGame = () => {
+            const [screen, setScreen] = useState('loading'); // loading, lobby, searching, game, leaderboard
+            const [connected, setConnected] = useState(false);
+            const [playerData, setPlayerData] = useState(null); // Telegram user data
+            const [leaderboard, setLeaderboard] = useState([]);
+            const [roomCode, setRoomCode] = useState('');
+            const [joinCode, setJoinCode] = useState('');
+            const [gameState, setGameState] = useState(null);
+            const [searchTime, setSearchTime] = useState(0);
+            
+            // Oyun İçi State
+            const [selectedTileIndex, setSelectedTileIndex] = useState(null);
+            const [validMoves, setValidMoves] = useState([]); // ['left', 'right', 'both']
+            const [notification, setNotification] = useState(null);
+            const [searching, setSearching] = useState(false);
+            
+            const wsRef = useRef(null);
+            const boardScrollRef = useRef(null);
+            const searchTimerRef = useRef(null);
+
+            // Ses Efektleri (Opsiyonel - Tarayıcı izin verirse çalışır)
+            const playSound = (type) => {
+                // Basit bip sesleri veya mp3 eklenebilir. Şimdilik boş bırakıyorum hata vermesin diye.
+            };
+
+            useEffect(() => {
+                initializeTelegramAuth();
+                connectToServer();
+                return () => { if (wsRef.current) wsRef.current.close(); };
+            }, []);
+
+            // Telegram Auth
+            const initializeTelegramAuth = async () => {
+                try {
+                    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                        // Telegram WebApp - Otomatik giriş
+                        const user = tg.initDataUnsafe.user;
+                        const telegramData = {
+                            telegramId: user.id.toString(),
+                            username: user.username || user.first_name || 'User',
+                            firstName: user.first_name || '',
+                            lastName: user.last_name || '',
+                            photoUrl: user.photo_url || null
+                        };
+
+                        console.log('📡 Telegram kullanıcısı:', telegramData);
+
+                        // MongoDB'ye kaydet/güncelle
+                        const response = await fetch(`${API_URL}/api/auth/telegram`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(telegramData)
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            setPlayerData({
+                                ...data.player,
+                                isGuest: false,
+                                photoUrl: telegramData.photoUrl || data.player.photoUrl
+                            });
+                            console.log('✅ Telegram Auth başarılı:', data.player);
+                        } else {
+                            throw new Error('Auth failed');
+                        }
+                    } else {
+                        // Normal tarayıcı - Guest mode
+                        const guestData = { 
+                            isGuest: true, 
+                            username: 'Guest' + Math.floor(Math.random() * 9999),
+                            firstName: '',
+                            lastName: '',
+                            photoUrl: null,
+                            level: 0,
+                            elo: 0,
+                            telegramId: null
+                        };
+                        setPlayerData(guestData);
+                        console.log('👥 Guest mode:', guestData);
+                    }
+                } catch (error) {
+                    console.error('Auth error:', error);
+                    setPlayerData({ 
+                        isGuest: true, 
+                        username: 'Guest' + Math.floor(Math.random() * 9999), 
+                        firstName: '',
+                        lastName: '',
+                        photoUrl: null,
+                        level: 0, 
+                        elo: 0,
+                        telegramId: null
+                    });
+                } finally {
+                    setScreen('lobby');
                 }
             };
-        }, []);
 
-        // Telegram'dan gelen veriyi almak için
-        useEffect(() => {
-            if (window.Telegram && window.Telegram.WebApp) {
-                const tg = window.Telegram.WebApp;
-                tg.ready();
-                const user = tg.initDataUnsafe?.user;
-                if (user) {
-                    const name = user.first_name || user.username;
-                    setPlayerName(name);
-                    // Sunucuya oyuncu verisini gönderip doğrula
-                    fetch(`${API_URL}/api/auth/telegram`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ telegramId: user.id.toString(), username: user.username, firstName: user.first_name, lastName: user.last_name, photoUrl: user.photo_url })
-                    }).then(res => res.json()).then(data => {
-                        if (data.success) {
-                            setPlayerData(data.player);
-                            if (data.player.isAdmin) setIsAdmin(true);
+            // Leaderboard yükle
+            const loadLeaderboard = async () => {
+                try {
+                    const response = await fetch(`${API_URL}/api/leaderboard`);
+                    const data = await response.json();
+                    if (data.success) {
+                        setLeaderboard(data.leaderboard);
+                    }
+                } catch (error) {
+                    console.error('Leaderboard error:', error);
+                }
+            };
+
+            // Otomatik Kaydırma: Oyun güncellendiğinde tahtayı ortala veya sona git
+            useEffect(() => {
+                if (gameState && boardScrollRef.current) {
+                    const scrollWidth = boardScrollRef.current.scrollWidth;
+                    const clientWidth = boardScrollRef.current.clientWidth;
+                    boardScrollRef.current.scrollLeft = (scrollWidth - clientWidth) / 2;
+                }
+            }, [gameState?.board]);
+
+            const connectToServer = () => {
+                let wsUrl = 'wss://beta-github-io.onrender.com';
+                // Test için Localhost kontrolü
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    wsUrl = `ws://${window.location.hostname}:10000`;
+                }
+
+                const ws = new WebSocket(wsUrl);
+
+                ws.onopen = () => { setConnected(true); showNotification('Sunucuya Bağlandı', 'success'); };
+                ws.onclose = () => { setConnected(false); setTimeout(connectToServer, 3000); };
+                ws.onmessage = (e) => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        handleServerMessage(data);
+                    } catch(err) { console.error(err); }
+                };
+                wsRef.current = ws;
+            };
+
+            const handleServerMessage = (data) => {
+                console.log('📨 Server mesajı:', data.type, data);
+                
+                switch(data.type) {
+                    case 'roomCreated':
+                        setRoomCode(data.roomCode);
+                        break;
+                    case 'gameStart':
+                        console.log('🎮 Oyun başlıyor...', data.gameState);
+                        setGameState(data.gameState);
+                        setScreen('game');
+                        setSelectedTileIndex(null);
+                        setValidMoves([]);
+                        setSearching(false);
+                        // Timer durdur
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
                         }
-                    });
-                }
-            }
-        }, []);
-
-        const connectToServer = () => {
-            try {
-                console.log('🔌 Sunucuya bağlanılıyor:', WS_URL);
-                
-                const ws = new WebSocket(WS_URL);
-                
-                ws.onopen = () => {
-                    console.log('✅ WebSocket bağlantısı açıldı');
-                    setConnected(true);
-                    showNotification('✅ Sunucuya bağlanıldı!', 'success');
-                    wsRef.current = ws;
-                };
-
-                ws.onclose = (event) => {
-                    console.log('❌ WebSocket bağlantısı kapandı:', event.code, event.reason);
-                    setConnected(false);
-                    // Eğer oyuncu bir odada değilse ve lobi ekranındaysa yeniden bağlanma mesajı göster
-                    if (screen === 'lobby' && !roomCode && !searching) {
-                        showNotification('❌ Bağlantı kesildi, yeniden bağlanıyor...', 'error');
-                    } else {
-                        // Oyuncu oyun veya arama ekranındaysa, sunucu zaten durumu yönetecek.
-                    }
-                    setTimeout(connectToServer, 3000);
-                };
-
-                ws.onerror = (error) => {
-                    console.error('⚠️ WebSocket hatası:', error);
-                    setConnected(false);
-                    showNotification('⚠️ Bağlantı hatası', 'error');
-                };
-
-                ws.onmessage = (event) => {
-                    console.log('📨 Mesaj alındı:', event.data);
-                    try {
-                        const data = JSON.parse(event.data);
-                        handleServerMessage(data);
-                    } catch (error) {
-                        console.error('❌ Mesaj parse hatası:', error);
-                    }
-                };
-            } catch (error) {
-                console.error('❌ Bağlantı hatası:', error);
-                showNotification('⚠️ Sunucuya bağlanılamadı', 'error');
-                setTimeout(connectToServer, 5000);
-            }
-        };
-
-        const showNotification = (message, type = 'info') => {
-            setNotification({ message, type });
-            setTimeout(() => setNotification(''), 3000);
-        };
-
-        const handleServerMessage = (data) => {
-            switch (data.type) {
-                case 'roomCreated':
-                    setRoomCode(data.roomCode);
-                    showNotification('🎮 Oda oluşturuldu!', 'success');
-                    break;
-                case 'gameStart':
-                    setGameState(data.gameState);
-                    setScreen('game');
-                    showNotification('🎯 Oyun başladı!', 'success');
-                    break;
-                case 'gameUpdate':
-                    setGameState(data.gameState);
-                    break;
-                case 'matchFound':
-                    showNotification('✨ Rakip bulundu!', 'success');
-                    break;
-                case 'playerDisconnected':
-                    showNotification(`🏆 Rakip oyundan ayrıldı! Kazanan: ${data.winnerName}.`, 'info');
-                    // Oyun sonu durumunu ayarla ve lobiye dön
-                    setGameEndData(data);
-                    setTimeout(() => {
-                        setScreen('lobby');
-                        setGameState(null);
-                        setRoomCode('');
-                        setJoinRoomCode('');
-                        setSelectedTile(null);
-                        setGameEndData(null);
-                    }, 3000);
-                    break;
-                case 'gameEnd':
-                    showNotification(`🏆 Oyun bitti! Kazanan: ${data.winnerName}. ELO Değişimleri: Kazanan ${data.eloChanges.winner > 0 ? '+' : ''}${data.eloChanges.winner}, Kaybeden ${data.eloChanges.loser}`, 'success');
-                    setGameEndData(data);
-                    setTimeout(() => {
-                        setScreen('lobby');
-                        setGameState(null);
-                        setRoomCode('');
-                        setJoinRoomCode('');
-                        setSelectedTile(null);
-                        setGameEndData(null);
-                    }, 3000);
-                    break;
-                case 'error':
-                    showNotification('❌ ' + data.message, 'error');
-                    setSearching(false);
-                    break;
-            }
-        };
-
-        const sendMessage = (data) => {
-            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                wsRef.current.send(JSON.stringify(data));
-            }
-        };
-
-        const startRankedMatch = () => {
-            if (!playerName.trim()) {
-                showNotification('⚠️ Lütfen isminizi girin', 'warning');
-                return;
-            }
-            setSearching(true);
-            sendMessage({ 
-                type: 'findMatch', 
-                telegramId: playerData?.telegramId,
-                firstName: playerData?.firstName,
-                photoUrl: playerData?.photoUrl,
-                level: playerData?.level
-            });
-            showNotification('🔍 Rakip aranıyor...', 'info');
-        };
-
-        const cancelSearch = () => {
-            setSearching(false);
-            sendMessage({ type: 'cancelSearch' });
-            showNotification('❌ Arama iptal edildi', 'info');
-        };
-
-        const createRoom = () => {
-            if (!playerName.trim()) {
-                showNotification('⚠️ Lütfen isminizi girin', 'warning');
-                return;
-            }
-            sendMessage({ 
-                type: 'createRoom', 
-                telegramId: playerData?.telegramId,
-                firstName: playerData?.firstName,
-                photoUrl: playerData?.photoUrl,
-                level: playerData?.level
-            });
-        };
-
-        const joinRoom = () => {
-            if (!playerName.trim() || !joinRoomCode.trim()) {
-                showNotification('⚠️ İsim ve oda kodu gerekli', 'warning');
-                return;
-            }
-            sendMessage({ 
-                type: 'joinRoom', 
-                roomCode: joinRoomCode, 
-                telegramId: playerData?.telegramId,
-                firstName: playerData?.firstName,
-                photoUrl: playerData?.photoUrl,
-                level: playerData?.level
-            });
-        };
-
-        const copyRoomCode = () => {
-            navigator.clipboard.writeText(roomCode);
-            setCopied(true);
-            showNotification('📋 Oda kodu kopyalandı!', 'success');
-            setTimeout(() => setCopied(false), 2000);
-        };
-
-        const selectTile = (tile, index) => {
-            if (gameState?.currentPlayer !== gameState?.playerId) return;
-            
-            setSelectedTile({ tile, index });
-            const moves = calculateValidMoves(tile);
-            setValidMoves(moves);
-        };
-
-        const calculateValidMoves = (tile) => {
-            if (!gameState?.board.length) return ['both'];
-            
-            const leftEnd = gameState.board[0][0];
-            const rightEnd = gameState.board[gameState.board.length - 1][1];
-            const moves = [];
-            
-            if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
-            if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
-            
-            return moves;
-        };
-
-        const playTile = (position) => {
-            if (!selectedTile || !validMoves.includes(position)) return;
-            
-            sendMessage({
-                type: 'playTile',
-                tileIndex: selectedTile.index,
-                position
-            });
-            
-            setSelectedTile(null);
-            setValidMoves([]);
-        };
-
-        const passTurn = () => {
-            sendMessage({ type: 'pass' });
-        };
-
-        // --- ADMIN FONKSİYONLARI ---
-        const handleAdminAction = async (action, targetTelegramId, amount = 0) => {
-            if (!isAdmin) return;
-            const endpoint = `${API_URL}/api/admin/${action}`;
-            try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        adminId: playerData.telegramId,
-                        targetTelegramId,
-                        amount
-                    })
-                });
-                const result = await response.json();
-                if (result.success) {
-                    showNotification(result.message, 'success');
-                } else {
-                    showNotification(result.error, 'error');
-                }
-            } catch (error) {
-                showNotification('Admin işlemi başarısız oldu.', 'error');
-            }
-        };
-
-        const AdminPanel = () => {
-            // Bu kısım, admin paneli için bir arayüz oluşturur.
-            // Basitlik adına, şimdilik sadece bir geri butonu ekliyorum.
-            // Gerçek bir projede, burada oyuncu listesi, ELO değiştirme formları vb. olurdu.
-            const [targetId, setTargetId] = useState('');
-            const [eloAmount, setEloAmount] = useState(0);
-
-            return React.createElement('div', { className: 'bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20 mt-8' },
-                React.createElement('h2', { className: 'text-3xl font-bold text-white text-center mb-6' }, '🔐 Admin Paneli'),
-                React.createElement('div', { className: 'space-y-4' },
-                    React.createElement('input', { type: 'text', placeholder: 'Hedef Oyuncu Telegram ID', value: targetId, onChange: e => setTargetId(e.target.value), className: 'w-full px-4 py-2 rounded-lg bg-white/20 text-white' }),
-                    React.createElement('input', { type: 'number', placeholder: 'ELO Miktarı (+/-)', value: eloAmount, onChange: e => setEloAmount(parseInt(e.target.value, 10)), className: 'w-full px-4 py-2 rounded-lg bg-white/20 text-white' }),
-                    React.createElement('button', { onClick: () => handleAdminAction('modify-elo', targetId, eloAmount), className: 'w-full bg-blue-500 text-white py-2 rounded-lg' }, 'ELO Değiştir'),
-                    React.createElement('button', { onClick: () => handleAdminAction('toggle-visibility', targetId), className: 'w-full bg-yellow-500 text-white py-2 rounded-lg' }, 'Gizle/Göster'),
-                    React.createElement('button', { onClick: () => handleAdminAction('delete-user', targetId), className: 'w-full bg-red-500 text-white py-2 rounded-lg' }, 'Kullanıcıyı Sil'),
-                    React.createElement('button', { onClick: () => setAdminScreen(false), className: 'w-full bg-gray-600 text-white py-2 rounded-lg mt-4' }, 'Geri')
-                )
-            );
-        };
-
-        if (screen === 'lobby') {
-            return React.createElement('div', { 
-                className: 'min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4 overflow-hidden relative' 
-            },
-                React.createElement('div', { className: 'absolute inset-0 overflow-hidden' },
-                    [...Array(20)].map((_, i) => 
-                        React.createElement('div', {
-                            key: i,
-                            className: 'absolute animate-pulse',
-                            style: {
-                                left: `${Math.random() * 100}%`,
-                                top: `${Math.random() * 100}%`,
-                                width: `${Math.random() * 4 + 2}px`,
-                                height: `${Math.random() * 4 + 2}px`,
-                                backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                                borderRadius: '50%',
-                                animationDelay: `${Math.random() * 2}s`,
-                                animationDuration: `${Math.random() * 3 + 2}s`
+                        setSearchTime(0);
+                        showNotification('Oyun Başladı!', 'success');
+                        break;
+                    case 'gameUpdate':
+                        console.log('🔄 Oyun güncelleniyor...', data.gameState);
+                        if (data.gameState && data.gameState.board) {
+                            setGameState(prevState => ({
+                                ...prevState,
+                                ...data.gameState,
+                                playerId: prevState?.playerId || data.gameState.playerId
+                            }));
+                            setSelectedTileIndex(null);
+                            setValidMoves([]);
+                        }
+                        break;
+                    case 'error':
+                        showNotification(data.message, 'error');
+                        setSearching(false);
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
+                        break;
+                    case 'gameEnd':
+                        const isRanked = data.isRanked;
+                        const winMsg = `Oyun Bitti! Kazanan: ${data.winnerName}`;
+                        const eloMsg = data.eloChanges ? ` (ELO: ${data.eloChanges.winner > 0 ? '+' : ''}${data.eloChanges.winner})` : '';
+                        showNotification(winMsg + (isRanked ? eloMsg : ' (Casual)'), 'info');
+                        
+                        if (data.winner === gameState?.playerId && isRanked) {
+                            setTimeout(() => {
+                                setNotification({ message: `🏆 KAZANDINIZ! ${eloMsg}`, type: 'success' });
+                            }, 500);
+                        }
+                        setTimeout(() => { 
+                            setScreen('lobby'); 
+                            setGameState(null); 
+                            setRoomCode(''); 
+                            setSearching(false);
+                            if (isRanked && playerData && !playerData.isGuest) {
+                                initializeTelegramAuth();
                             }
-                        })
-                    )
-                ),
+                        }, 4000);
+                        break;
+                    case 'searchCancelled':
+                        showNotification('Arama iptal edildi', 'info');
+                        setSearching(false);
+                        setScreen('lobby');
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
+                        break;
+                    case 'searchStatus':
+                        break;
+                    case 'matchFound':
+                        showNotification(`Rakip Bulundu! ${data.gameType === 'ranked' ? '🏆 RANKED' : '🎮 CASUAL'}`, 'success');
+                        setSearching(false);
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
+                        break;
+                }
+            };
 
-                notification && React.createElement('div', { 
-                    className: `fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-2xl animate-bounce ${
-                        notification.type === 'success' ? 'bg-green-500' :
-                        notification.type === 'error' ? 'bg-red-500' :
-                        notification.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
-                    } text-white font-bold` 
-                }, notification.message),
+            const sendMessage = (msg) => {
+                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                    wsRef.current.send(JSON.stringify(msg));
+                }
+            };
 
-                React.createElement('div', { className: 'absolute top-4 right-4 flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20' },
-                    connected ? 
-                        React.createElement('div', { className: 'flex items-center gap-2' },
-                            React.createElement('div', { className: 'w-3 h-3 bg-green-400 rounded-full animate-pulse' }),
-                            React.createElement('span', { className: 'text-white font-semibold' }, 'Bağlı')
-                        ) :
-                        React.createElement('div', { className: 'flex items-center gap-2' },
-                            React.createElement('div', { className: 'w-3 h-3 bg-red-400 rounded-full animate-pulse' }),
-                            React.createElement('span', { className: 'text-white font-semibold' }, 'Bağlanıyor...')
-                        )
-                ),
+            const showNotification = (msg, type = 'info') => {
+                setNotification({ message: msg, type });
+                setTimeout(() => setNotification(null), 3000);
+            };
 
-                React.createElement('div', { className: 'relative z-10 max-w-2xl w-full' },
-                    React.createElement('div', { className: 'text-center mb-8 animate-fadeIn' },
-                        React.createElement('h1', { 
-                            className: 'text-7xl font-black text-white mb-4 drop-shadow-2xl animate-bounce',
-                            style: { textShadow: '0 0 30px rgba(255,255,255,0.5)' }
-                        }, '🎮 DOMİNO'),
-                        React.createElement('p', { className: 'text-2xl text-purple-200 font-semibold animate-pulse' }, 'Profesyonel Online Oyun')
-                    ),
+            // --- OYUN MANTIĞI ---
 
-                    adminScreen ? React.createElement(AdminPanel) :
-                        React.createElement('div', { className: 'bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20' },
-                            React.createElement('input', {
-                                type: 'text',
-                                placeholder: '👤 İsminizi girin...',
-                                value: playerName,
-                                onChange: (e) => setPlayerName(e.target.value),
-                                readOnly: !!playerData, // Telegram'dan geldiyse değiştirilemez
-                                className: 'w-full px-6 py-4 rounded-xl bg-white/20 backdrop-blur-sm border-2 border-white/30 text-white placeholder-white/60 text-lg font-semibold mb-6 focus:outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-400/50 transition-all'
-                            }),
+            const myPlayerId = gameState?.playerId;
+            const isMyTurn = gameState?.currentPlayer === myPlayerId;
+            const myHand = gameState?.players[myPlayerId]?.hand || [];
+            const marketSize = gameState?.market?.length || 0;
+            const canDrawFromMarket = marketSize > 0;
 
-                            React.createElement('div', { className: 'space-y-4' },
-                                searching ? 
-                                    React.createElement('div', { className: 'bg-gradient-to-r from-yellow-500 to-orange-500 p-6 rounded-2xl shadow-xl animate-pulse' },
-                                        React.createElement('div', { className: 'flex items-center justify-between mb-4' },
-                                            React.createElement('div', { className: 'flex items-center gap-3' },
-                                                React.createElement('div', { className: 'w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin' }),
-                                                React.createElement('span', { className: 'text-white text-xl font-bold' }, 'Rakip Aranıyor...')
-                                            )
-                                        ),
-                                        React.createElement('button', {
-                                            onClick: cancelSearch,
-                                            className: 'w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-bold text-lg transition-all transform hover:scale-105 active:scale-95'
-                                        }, '❌ İptal Et')
-                                    ) :
-                                    React.createElement('button', {
-                                        onClick: startRankedMatch,
-                                        disabled: !connected || !playerData,
-                                        className: 'w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 disabled:from-gray-500 disabled:to-gray-600 text-white py-6 rounded-2xl font-black text-xl shadow-xl transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-3 border-4 border-white/30'
-                                    }, '👑 🏆 DERECELİ MAÇ'),
+            // calculateValidMoves fonksiyonu - EKSİKTİ!
+            const calculateValidMoves = (tile) => {
+                if (!gameState || gameState.board.length === 0) return ['start'];
+                
+                const leftEnd = gameState.board[0][0];
+                const rightEnd = gameState.board[gameState.board.length - 1][1];
+                const moves = [];
+                
+                if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
+                if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
+                
+                return moves;
+            };
+            
+            // Seçim Yapma
+            const handleTileClick = (index, tile) => {
+                if (!isMyTurn) return;
+                
+                // Zaten seçiliyse seçimi kaldır
+                if (selectedTileIndex === index) {
+                    setSelectedTileIndex(null);
+                    setValidMoves([]);
+                    return;
+                }
 
-                                roomCode ? 
-                                    React.createElement('div', { className: 'bg-gradient-to-r from-green-500 to-emerald-500 p-6 rounded-2xl shadow-xl border-4 border-white/30' },
-                                        React.createElement('div', { className: 'flex items-center justify-between mb-4' },
-                                            React.createElement('span', { className: 'text-white text-lg font-bold' }, '📱 Oda Kodu:'),
-                                            React.createElement('div', { className: 'flex items-center gap-2' },
-                                                React.createElement('span', { className: 'text-white text-3xl font-black tracking-wider' }, roomCode),
-                                                React.createElement('button', {
-                                                    onClick: copyRoomCode,
-                                                    className: 'bg-white/30 hover:bg-white/50 p-3 rounded-lg transition-all transform hover:scale-110 active:scale-95'
-                                                }, copied ? '✓' : '📋')
-                                            )
-                                        ),
-                                        React.createElement('p', { className: 'text-white/90 text-center font-semibold animate-pulse' }, 'Arkadaşın katılmasını bekleyin...')
-                                    ) :
-                                    React.createElement('button', {
-                                        onClick: createRoom,
-                                        disabled: !connected || !playerData,
-                                        className: 'w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:from-gray-500 disabled:to-gray-600 text-white py-6 rounded-2xl font-black text-xl shadow-xl transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-3 border-4 border-white/30'
-                                    }, '👥 ARKADAŞLA OYNA'),
+                // Geçerli hamleleri hesapla
+                if (gameState.board.length === 0) {
+                    // İlk hamle her yere yapılabilir
+                    setSelectedTileIndex(index);
+                    setValidMoves(['start']); 
+                } else {
+                    const leftEnd = gameState.board[0][0];
+                    const rightEnd = gameState.board[gameState.board.length - 1][1];
+                    const moves = [];
 
-                                React.createElement('div', { className: 'bg-white/10 backdrop-blur-sm p-6 rounded-2xl border-2 border-white/20' },
-                                    React.createElement('input', {
-                                        type: 'text',
-                                        placeholder: '📝 Oda kodunu girin...',
-                                        value: joinRoomCode,
-                                        onChange: (e) => setJoinRoomCode(e.target.value.toUpperCase()),
-                                        maxLength: 4,
-                                        className: 'w-full px-6 py-4 rounded-xl bg-white/20 border-2 border-white/30 text-white placeholder-white/60 text-center text-2xl font-black mb-4 focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-400/50 transition-all tracking-wider'
-                                    }),
-                                    React.createElement('button', {
-                                        onClick: joinRoom,
-                                        disabled: !connected || !playerData,
-                                        className: 'w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:from-gray-500 disabled:to-gray-600 text-white py-5 rounded-xl font-black text-xl shadow-xl transition-all transform hover:scale-105 active:scale-95 border-4 border-white/30'
-                                    }, '🚪 ODAYA KATIL')
-                                ),
-                                isAdmin && React.createElement('button', {
-                                    onClick: () => setAdminScreen(true),
-                                    className: 'w-full mt-4 bg-purple-600 text-white py-3 rounded-xl font-bold'
-                                }, '🔐 Admin Paneli')
-                            )
-                        )
-                )
-            );
-        }
+                    // Basit mantık: Eşleşiyor mu?
+                    if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
+                    if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
 
-        if (screen === 'game' && gameState) {
-            const isMyTurn = gameState.currentPlayer === gameState.playerId;
-            const myHand = gameState.players[gameState.playerId]?.hand || [];
-            const opponentId = Object.keys(gameState.players).find(id => id !== gameState.playerId);
-            const opponent = gameState.players[opponentId];
-            const me = gameState.players[gameState.playerId];
-
-            return React.createElement('div', { className: 'min-h-screen bg-gradient-to-br from-green-800 via-green-700 to-emerald-900 p-4 relative overflow-hidden' },
-                React.createElement('div', { 
-                    className: 'absolute inset-0 opacity-10',
-                    style: {
-                        backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)',
-                        backgroundSize: '50px 50px'
+                    if (moves.length > 0) {
+                        setSelectedTileIndex(index);
+                        setValidMoves(moves);
+                        playSound('click');
+                    } else {
+                        showNotification('Bu taş uygun değil', 'warning');
                     }
-                }),
+                }
+            };
 
-                notification && React.createElement('div', { 
-                    className: `fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-2xl animate-bounce ${
-                        notification.type === 'success' ? 'bg-green-500' :
-                        notification.type === 'error' ? 'bg-red-500' :
-                        notification.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
-                    } text-white font-bold` 
-                }, notification.message),
+            // Taşı Oynama
+            const playTile = (position) => {
+                if (selectedTileIndex === null) return;
+                
+                // Server 'left' veya 'right' bekliyor.
+                // Eğer tahta boşsa server genelde fark etmez ama 'left' gönderelim.
+                const posToSend = position === 'start' ? 'left' : position;
 
-                React.createElement('div', { className: 'max-w-7xl mx-auto relative z-10' },
-                    React.createElement('div', { className: 'bg-white/10 backdrop-blur-md rounded-2xl p-4 mb-4 flex justify-between items-center border border-white/20 shadow-2xl' },
-                        React.createElement('div', { 
-                            className: `flex items-center gap-3 px-6 py-3 rounded-xl ${!isMyTurn ? 'bg-purple-500 animate-pulse shadow-lg shadow-purple-500/50' : 'bg-white/20'} transition-all` 
-                        },
-                            opponent?.photoUrl ? 
-                                React.createElement('img', { src: opponent.photoUrl, className: 'w-10 h-10 rounded-full border-2 border-white' }) :
-                                React.createElement('span', { className: 'text-2xl' }, '👤'),
-                            React.createElement('div', { className: 'flex flex-col' },
-                                React.createElement('span', { className: 'text-white font-bold text-lg' }, opponent?.name || 'Rakip'),
-                                React.createElement('span', { className: 'text-yellow-300 font-semibold' }, `Lv. ${opponent?.level || 1}`)
-                            ),
-                            React.createElement('span', { className: 'text-white font-bold' }, `(${opponent?.hand?.length || 0} taş)`)
-                        ),
+                sendMessage({
+                    type: 'playTile',
+                    tileIndex: selectedTileIndex,
+                    position: posToSend
+                });
+                
+                // Seçimi temizle (Optimistik UI)
+                setSelectedTileIndex(null);
+                setValidMoves([]);
+            };
 
-                        React.createElement('div', { className: 'bg-white/20 px-6 py-3 rounded-xl backdrop-blur-sm flex items-center' },
-                            React.createElement('span', { className: 'text-2xl' }, '⏱️'),
-                            React.createElement('span', { className: 'text-white font-bold text-lg ml-2' }, `Tur: ${gameState.turn || 1}`),
-                            React.createElement('span', { className: 'text-white font-bold text-lg ml-4' }, `Pazar: ${gameState.market?.length || 0}`),
-                            React.createElement('button', {
-                                onClick: () => { 
-                                    if(confirm('Oyundan çıkmak istediğinize emin misiniz? Dereceli maç ise ELO kaybedebilirsiniz.')) { 
-                                        sendMessage({ 
-                                            type: 'forceEndGame', 
-                                            roomCode: gameState.roomCode,
-                                            playerId: gameState.playerId
-                                        });
-                                        // Direkt lobiye dön ve tüm verileri sıfırla
+            const passTurn = () => {
+                sendMessage({ type: 'pass' });
+            };
+
+            const drawFromMarket = () => {
+                if (!isMyTurn || !canDrawFromMarket) return;
+                sendMessage({ type: 'drawFromMarket' });
+                showNotification('🎲 Pazardan taş çekiliyor...', 'info');
+            };
+
+            // --- SEARCHING LOBBY ---
+            if (screen === 'searching') {
+                const minutes = Math.floor(searchTime / 60);
+                const seconds = searchTime % 60;
+                const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6 relative overflow-hidden">
+                        {/* Animated Background */}
+                        <div className="absolute inset-0 overflow-hidden">
+                            {[...Array(20)].map((_, i) => 
+                                <div
+                                    key={i}
+                                    className="absolute animate-pulse"
+                                    style={{
+                                        left: `${Math.random() * 100}%`,
+                                        top: `${Math.random() * 100}%`,
+                                        width: `${Math.random() * 4 + 2}px`,
+                                        height: `${Math.random() * 4 + 2}px`,
+                                        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                                        borderRadius: '50%',
+                                        animationDelay: `${Math.random() * 2}s`,
+                                        animationDuration: `${Math.random() * 3 + 2}s`
+                                    }}
+                                />
+                            )}
+                        </div>
+
+                        {notification && <Toast message={notification.message} type={notification.type} />}
+
+                        <div className="relative z-10 max-w-md w-full">
+                            <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20">
+                                {/* Player Card */}
+                                <div className="text-center mb-8">
+                                    {playerData?.photoUrl && (
+                                        <img src={playerData.photoUrl} alt="Profile" className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 animate-pulse" />
+                                    )}
+                                    <h2 className="text-white text-2xl font-bold mb-2">{playerData?.username}</h2>
+                                    {!playerData?.isGuest && (
+                                        <div className="flex justify-center gap-3">
+                                            <span className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-4 py-1 rounded-full text-sm font-bold">
+                                                LVL {playerData?.level}
+                                            </span>
+                                            <span className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-4 py-1 rounded-full text-sm font-bold">
+                                                {playerData?.elo} ELO
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Searching Animation */}
+                                <div className="mb-8">
+                                    <div className="w-32 h-32 mx-auto relative">
+                                        <div className="absolute inset-0 border-8 border-yellow-400/30 rounded-full"></div>
+                                        <div className="absolute inset-0 border-8 border-t-yellow-400 rounded-full animate-spin"></div>
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <span className="text-5xl">🎯</span>
+                                        </div>
+                                    </div>
+                                    <h3 className="text-white text-2xl font-bold text-center mt-6 mb-2">🔍 RAIP ARANIYOR...</h3>
+                                    <p className="text-white/70 text-center text-sm mb-4">
+                                        {!playerData?.isGuest ? '⚔️ DERECELİ MAÇ' : '🎮 CASUAL MAÇ'}
+                                    </p>
+                                    
+                                    {/* Timer */}
+                                    <div className="bg-black/30 rounded-xl p-4 text-center mb-6">
+                                        <div className="text-white text-4xl font-mono font-bold">⏱️ {timeString}</div>
+                                        <div className="text-white/60 text-sm mt-1">⏳ Geçen Süre</div>
+                                    </div>
+
+                                    {/* İpucu */}
+                                    <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-3 mb-4 text-center">
+                                        <p className="text-blue-300 text-xs">💡 İpucu: Dereceli maçlarda ELO puanınız değişir!</p>
+                                    </div>
+                                </div>
+
+                                {/* Cancel Button */}
+                                <button
+                                    onClick={() => {
+                                        setSearching(false);
                                         setScreen('lobby');
-                                        setGameState(null);
-                                        setRoomCode('');
-                                        setJoinRoomCode('');
-                                        setSelectedTile(null);
-                                        setValidMoves([]);
-                                        setGameEndData(null);
-                                    } 
-                                },
-                                className: 'ml-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition-all transform hover:scale-105 active:scale-95 shadow-lg'
-                            }, 'ÇIK')
-                        ),
+                                        if (searchTimerRef.current) {
+                                            clearInterval(searchTimerRef.current);
+                                            searchTimerRef.current = null;
+                                        }
+                                        setSearchTime(0);
+                                        sendMessage({ type: 'cancelSearch' });
+                                    }}
+                                    className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all"
+                                >
+                                    ❌ ARAMADI İPTAL ET
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
 
-                        React.createElement('div', { 
-                            className: `flex items-center gap-3 px-6 py-3 rounded-xl ${isMyTurn ? 'bg-green-500 animate-pulse shadow-lg shadow-green-500/50' : 'bg-white/20'} transition-all` 
-                        },
-                            me?.photoUrl ?
-                                React.createElement('img', { src: me.photoUrl, className: 'w-10 h-10 rounded-full border-2 border-white' }) :
-                                React.createElement('span', { className: 'text-2xl' }, '👤'),
-                            React.createElement('div', { className: 'flex flex-col' },
-                                React.createElement('span', { className: 'text-white font-bold text-lg' }, me?.name || 'Sen'),
-                                React.createElement('span', { className: 'text-yellow-300 font-semibold' }, `Lv. ${me?.level || 1}`)
-                            ),
-                            React.createElement('span', { className: 'text-white font-bold' }, `(${myHand.length} taş)`)
-                        )
-                    ),
+            // --- LOBBY EKRANI ---
+            if (screen === 'loading') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                            <p className="text-white text-xl font-bold">Yükleniyor...</p>
+                        </div>
+                    </div>
+                );
+            }
 
-                    React.createElement('div', { 
-                        className: 'bg-gradient-to-br from-amber-900/80 to-amber-800/80 backdrop-blur-md rounded-3xl p-8 mb-6 min-h-[300px] flex items-center justify-center border-4 border-amber-700 shadow-2xl relative overflow-hidden' 
-                    },
-                        React.createElement('div', { className: 'absolute inset-0 bg-gradient-to-br from-yellow-900/20 to-transparent' }),
+            if (screen === 'lobby') {
+                return (
+                    <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10">
+                        {notification && <Toast message={notification.message} type={notification.type} />}
                         
-                        validMoves.includes('left') && React.createElement('button', {
-                            onClick: () => playTile('left'),
-                            className: 'absolute left-4 top-1/2 -translate-y-1/2 bg-green-500 hover:bg-green-600 text-white p-4 rounded-full shadow-xl animate-pulse z-20 transform hover:scale-110 transition-all text-2xl'
-                        }, '⬅️'),
+                        <div className="text-center mb-10 animate-float">
+                            <h1 className="text-5xl font-black text-white drop-shadow-lg mb-2 tracking-tighter">
+                                🎯 DOMINO <span className="text-yellow-400">101</span> 🏆
+                            </h1>
+                            <p className="text-gray-300 text-sm tracking-widest uppercase">⚡ Profesyonel Online Oyun ⚡</p>
+                        </div>
 
-                        validMoves.includes('right') && React.createElement('button', {
-                            onClick: () => playTile('right'),
-                            className: 'absolute right-4 top-1/2 -translate-y-1/2 bg-green-500 hover:bg-green-600 text-white p-4 rounded-full shadow-xl animate-pulse z-20 transform hover:scale-110 transition-all text-2xl'
-                        }, '➡️'),
+                        {/* NAVİGASYON */}
+                        <div className="flex gap-3 mb-6">
+                            <button onClick={() => setScreen('lobby')} className="px-4 py-2 bg-yellow-500 text-black rounded-lg font-bold">🏠 Ana Sayfa</button>
+                            <button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold">🏆 Skor Tablosu</button>
+                        </div>
 
-                        React.createElement('div', { className: 'flex items-center gap-2 flex-wrap justify-center relative z-10' },
-                            gameState.board.length === 0 ? 
-                                React.createElement('div', { className: 'text-white/50 text-2xl font-bold' }, 'Oyun tahtası boş') :
-                                gameState.board.map((tile, idx) =>
-                                    React.createElement('div', {
-                                        key: idx,
-                                        className: 'bg-white rounded-lg p-3 shadow-xl transform hover:scale-105 transition-all border-4 border-gray-300',
-                                        style: { minWidth: '60px' }
-                                    },
-                                        React.createElement('div', { className: 'flex flex-col items-center gap-1' },
-                                            React.createElement('div', { className: 'w-10 h-10 flex items-center justify-center' },
-                                                React.createElement('span', { className: 'text-3xl font-black text-gray-800' }, tile[0])
-                                            ),
-                                            React.createElement('div', { className: 'w-full h-1 bg-gray-800 rounded' }),
-                                            React.createElement('div', { className: 'w-10 h-10 flex items-center justify-center' },
-                                                React.createElement('span', { className: 'text-3xl font-black text-gray-800' }, tile[1])
-                                            )
-                                        )
-                                    )
-                                )
-                        )
-                    ),
+                        <div className="w-full max-w-sm bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
+                            {/* Player Info */}
+                            {playerData && (
+                                <div className="mb-6 text-center">
+                                    {playerData.photoUrl && (
+                                        <img src={playerData.photoUrl} alt="Profile" className="w-20 h-20 rounded-full mx-auto mb-3 border-4 border-yellow-400" />
+                                    )}
+                                    <h2 className="text-white text-2xl font-bold">{playerData.username || playerData.firstName}</h2>
+                                    {!playerData.isGuest && (
+                                        <div className="flex justify-center gap-4 mt-2">
+                                            <span className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-sm font-bold">
+                                                LVL {playerData.level}
+                                            </span>
+                                            <span className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-3 py-1 rounded-full text-sm font-bold">
+                                                {playerData.elo} ELO
+                                            </span>
+                                        </div>
+                                    )}
+                                    {playerData.isGuest && (
+                                        <p className="text-yellow-400 text-sm mt-2">👥 Guest Mode (ELO sistemi yok)</p>
+                                    )}
+                                </div>
+                            )}
 
-                    React.createElement('div', { className: 'bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 shadow-2xl' },
-                        React.createElement('div', { className: 'flex items-center justify-between mb-4' },
-                            React.createElement('h3', { className: 'text-white font-bold text-xl' }, '🎲 Taşlarınız'),
-                            isMyTurn && React.createElement('button', {
-                                onClick: passTurn,
-                                className: 'bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-bold transition-all transform hover:scale-105 active:scale-95 shadow-lg'
-                            }, '⏭️ Pas Geç')
-                        ),
+                            <button 
+                                onClick={() => {
+                                    if(!playerData) return showNotification('İsim giriniz', 'error');
+                                    if(searching) return;
+                                    
+                                    // Özel arama ekranına geç
+                                    setScreen('searching');
+                                    setSearching(true);
+                                    setSearchTime(0);
+                                    
+                                    // Timer başlat
+                                    searchTimerRef.current = setInterval(() => {
+                                        setSearchTime(prev => prev + 1);
+                                    }, 1000);
+                                    
+                                    // Server'a gönder
+                                    sendMessage({ 
+                                        type: 'findMatch', 
+                                        ...playerData,
+                                        playerName: playerData.username
+                                    });
+                                }}
+                                disabled={!connected || searching}
+                                className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4 flex items-center justify-center gap-2"
+                            >
+                                <span>🏆</span> {!playerData?.isGuest ? '⚔️ DERECELİ MAÇ ARA' : '🎮 MAÇ ARA (CASUAL)'}
+                            </button>
 
-                        React.createElement('div', { className: 'flex gap-3 flex-wrap justify-center' },
-                            myHand.map((tile, idx) => {
-                                const isSelected = selectedTile?.index === idx;
-                                const canPlay = isMyTurn && (gameState.board.length === 0 || calculateValidMoves(tile).length > 0);
-                                
-                                return React.createElement('button', {
-                                    key: idx,
-                                    onClick: () => selectTile(tile, idx),
-                                    disabled: !isMyTurn,
-                                    className: `bg-white rounded-xl p-4 shadow-xl transition-all transform hover:scale-110 active:scale-95 border-4 ${
-                                        isSelected ? 'border-yellow-400 shadow-yellow-400/50 scale-110' :
-                                        canPlay ? 'border-green-400 shadow-green-400/50 animate-pulse' :
-                                        'border-gray-300'
-                                    } ${!isMyTurn ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`,
-                                    style: { minWidth: '80px' }
-                                },
-                                    React.createElement('div', { className: 'flex flex-col items-center gap-2' },
-                                        React.createElement('div', { className: 'w-12 h-12 flex items-center justify-center' },
-                                            React.createElement('span', { className: 'text-4xl font-black text-gray-800' }, tile[0])
-                                        ),
-                                        React.createElement('div', { className: 'w-full h-1 bg-gray-800 rounded' }),
-                                        React.createElement('div', { className: 'w-12 h-12 flex items-center justify-center' },
-                                            React.createElement('span', { className: 'text-4xl font-black text-gray-800' }, tile[1])
-                                        )
-                                    )
-                                );
-                            })
-                        )
-                    )
-                )
-            );
-        }
+                            <div className="flex items-center gap-2 my-4">
+                                <div className="h-px bg-white/10 flex-1"></div>
+                                <span className="text-xs text-gray-500 uppercase">veya</span>
+                                <div className="h-px bg-white/10 flex-1"></div>
+                            </div>
 
-        // Yeni eklenen sonuç ekranı bileşeni
-        function ResultScreen({ isWinner, eloChange, reason, exitType }) {
-            let message = '';
-            if (exitType === 'exit') {
-                message = 'Oyundan Çıkıldı';
-            } else if (reason === 'empty_hand') {
-                message = isWinner ? '🎉 Eli boş! Qazandiniz!' : '😔 Rakibin eli boş! Uduzdunuz';
-            } else if (reason === 'points' || reason === 'points_equal') {
-                if (reason === 'points_equal') {
-                    message = '🤝 Beraberlik!';
-                } else {
-                    message = isWinner ? '🎉 Daha az puan! Qazandiniz!' : '😔 Daha çok puan! Uduzdunuz';
-                }
-            } else {
-                message = isWinner ? '🎉 Qazandiniz!' : '😔 Uduzdunuz';
+                            <div className="grid grid-cols-2 gap-3">
+                                <button 
+                                    onClick={() => {
+                                        if(!playerData) return showNotification('İsim giriniz', 'error');
+                                        if(roomCode) return;
+                                        sendMessage({ type: 'createRoom', ...playerData, playerName: playerData.username });
+                                    }}
+                                    disabled={roomCode !== ''}
+                                    className="bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-semibold transition-colors"
+                                >
+                                    🏠 ODA KUR
+                                </button>
+                                <div className="relative">
+                                    <input 
+                                        value={joinCode}
+                                        onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                                        placeholder="KOD"
+                                        maxLength={4}
+                                        className="w-full h-full bg-black/30 border border-white/10 rounded-xl px-2 text-center text-white font-mono uppercase focus:ring-1 focus:ring-yellow-400"
+                                    />
+                                    <button 
+                                        onClick={() => sendMessage({ type: 'joinRoom', roomCode: joinCode, ...playerData, playerName: playerData.username })}
+                                        className="absolute right-1 top-1 bottom-1 bg-yellow-500 text-white px-3 rounded-lg hover:bg-yellow-400"
+                                    >
+                                        ➔
+                                    </button>
+                                </div>
+                            </div>
+
+                            {roomCode && (
+                                <div className="mt-4 p-4 bg-green-500/20 border border-green-500/30 rounded-xl text-center animate-pulse">
+                                    <p className="text-green-400 text-xs mb-1">📱 ODA KODU</p>
+                                    <p className="text-3xl font-mono text-white font-bold tracking-widest cursor-pointer" onClick={() => { navigator.clipboard.writeText(roomCode); showNotification('📋 Kod kopyalandı!', 'success'); }}>{roomCode}</p>
+                                    <p className="text-xs text-gray-400 mt-2">⏳ Arkadaşın bekleniyor...</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
             }
 
-            return React.createElement('div', { 
-                className: 'min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4 overflow-hidden relative',
-                id: 'result-lobby'
-            },
-                React.createElement('div', { className: 'bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20 max-w-2xl w-full text-center' },
-                    React.createElement('h1', { 
-                        className: `text-5xl font-black mb-6 ${
-                            isWinner ? 'text-green-400' : 'text-red-400'
-                        }`
-                    }, message),
-                    
-                    eloChange !== 0 && React.createElement('div', {
-                        className: `text-3xl font-bold mb-8 ${
-                            isWinner ? 'text-green-300' : 'text-red-300'
-                        }`
-                    }, 'ELO: ', isWinner ? '+' : '', eloChange),
-                    
-                    React.createElement('div', { className: 'text-white text-xl mb-8' },
-                        'Ana menüye dönülüyor...'
-                    ),
-                    
-                    React.createElement('button', {
-                        onClick: () => setScreen('lobby'),
-                        className: 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-4 rounded-xl font-bold text-xl hover:from-purple-700 hover:to-indigo-700 transition-all transform hover:scale-105 active:scale-95 shadow-2xl'
-                    }, 'Ana Menüye Dön')
-                )
-            );
-        }
-
-        return null;
-    };
-
-    ReactDOM.render(React.createElement(DominoGame), document.getElementById('root'));
-</script>
-
-</body>
-</html>
-                ws.onclose = (event) => {
-                    console.log('❌ WebSocket bağlantısı kapandı:', event.code, event.reason);
-                    setConnected(false);
-                    // Eğer oyuncu bir odada değilse ve lobi ekranındaysa yeniden bağlanma mesajı göster
-                    if (screen === 'lobby' && !roomCode && !searching) {
-                        showNotification('❌ Bağlantı kesildi, yeniden bağlanıyor...', 'error');
-                    } else {
-                        // Oyuncu oyun veya arama ekranındaysa, sunucu zaten durumu yönetecek.
-                    }
-                    setTimeout(connectToServer, 3000);
-                };
-
-                ws.onerror = (error) => {
-                    console.error('⚠️ WebSocket hatası:', error);
-                    setConnected(false);
-                    showNotification('⚠️ Bağlantı hatası', 'error');
-                };
-
-                ws.onmessage = (event) => {
-                    console.log('📨 Mesaj alındı:', event.data);
-                    try {
-                        const data = JSON.parse(event.data);
-                        handleServerMessage(data);
-                    } catch (error) {
-                        console.error('❌ Mesaj parse hatası:', error);
-                    }
-                };
-            } catch (error) {
-                console.error('❌ Bağlantı hatası:', error);
-                showNotification('⚠️ Sunucuya bağlanılamadı', 'error');
-                setTimeout(connectToServer, 5000);
-            }
-        };
-
-        const showNotification = (message, type = 'info') => {
-            setNotification({ message, type });
-            setTimeout(() => setNotification(''), 3000);
-        };
-
-        const handleServerMessage = (data) => {
-            switch (data.type) {
-                case 'roomCreated':
-                    setRoomCode(data.roomCode);
-                    showNotification('🎮 Oda oluşturuldu!', 'success');
-                    break;
-                case 'gameStart':
-                    setGameState(data.gameState);
-                    setScreen('game');
-                    showNotification('🎯 Oyun başladı!', 'success');
-                    break;
-                case 'gameUpdate':
-                    setGameState(data.gameState);
-                    break;
-                case 'matchFound':
-                    showNotification('✨ Rakip bulundu!', 'success');
-                    break;
-                case 'playerDisconnected':
-                    showNotification(`🏆 Oyun bitti! Rakip ayrıldı. Kazanan: ${data.winnerName || 'Siz'}. ELO: ${data.isRanked ? (data.eloChanges?.winner > 0 ? '+' : '') + (data.eloChanges?.winner || 0) : 'N/A'}`, 'info');
-                    setTimeout(() => {
-                        setScreen('lobby');
-                        setGameState(null);
-                        setRoomCode('');
-                        setJoinRoomCode('');
-                        setSelectedTile(null);
-                        setValidMoves([]);
-                    }, 3000);
-                    break;
-                case 'gameEnd':
-                    showNotification(`🏆 Oyun bitti! Kazanan: ${data.winnerName || 'Bilinmiyor'}. ELO: ${data.isRanked ? (data.eloChanges?.winner > 0 ? '+' : '') + (data.eloChanges?.winner || 0) : 'N/A'}`, 'success');
-                    // Reset all game states after showing the result
-                    setTimeout(() => {
-                        setScreen('lobby');
-                        setGameState(null);
-                        setRoomCode('');
-                        setJoinRoomCode('');
-                        setSelectedTile(null);
-                        setValidMoves([]);
-                    }, 3000);
-                    break;
-                case 'error':
-                    showNotification('❌ ' + data.message, 'error');
-                    setSearching(false);
-                    break;
-            }
-        };
-
-        const sendMessage = (data) => {
-            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                wsRef.current.send(JSON.stringify(data));
-            }
-        };
-
-        const startRankedMatch = () => {
-            if (!playerName.trim()) {
-                showNotification('⚠️ Lütfen isminizi girin', 'warning');
-                return;
-            }
-            setSearching(true);
-            sendMessage({ 
-                type: 'findMatch', 
-                telegramId: playerData?.telegramId,
-                firstName: playerData?.firstName,
-                photoUrl: playerData?.photoUrl,
-                level: playerData?.level
-            });
-            showNotification('🔍 Rakip aranıyor...', 'info');
-        };
-
-        const cancelSearch = () => {
-            setSearching(false);
-            sendMessage({ type: 'cancelSearch' });
-            showNotification('❌ Arama iptal edildi', 'info');
-        };
-
-        const createRoom = () => {
-            if (!playerName.trim()) {
-                showNotification('⚠️ Lütfen isminizi girin', 'warning');
-                return;
-            }
-            sendMessage({ 
-                type: 'createRoom', 
-                telegramId: playerData?.telegramId,
-                firstName: playerData?.firstName,
-                photoUrl: playerData?.photoUrl,
-                level: playerData?.level
-            });
-        };
-
-        const joinRoom = () => {
-            if (!playerName.trim() || !joinRoomCode.trim()) {
-                showNotification('⚠️ İsim ve oda kodu gerekli', 'warning');
-                return;
-            }
-            sendMessage({ 
-                type: 'joinRoom', 
-                roomCode: joinRoomCode, 
-                telegramId: playerData?.telegramId,
-                firstName: playerData?.firstName,
-                photoUrl: playerData?.photoUrl,
-                level: playerData?.level
-            });
-        };
-
-        const copyRoomCode = () => {
-            navigator.clipboard.writeText(roomCode);
-            setCopied(true);
-            showNotification('📋 Oda kodu kopyalandı!', 'success');
-            setTimeout(() => setCopied(false), 2000);
-        };
-
-        const selectTile = (tile, index) => {
-            if (gameState?.currentPlayer !== gameState?.playerId) return;
-            
-            setSelectedTile({ tile, index });
-            const moves = calculateValidMoves(tile);
-            setValidMoves(moves);
-        };
-
-        const calculateValidMoves = (tile) => {
-            if (!gameState?.board.length) return ['both'];
-            
-            const leftEnd = gameState.board[0][0];
-            const rightEnd = gameState.board[gameState.board.length - 1][1];
-            const moves = [];
-            
-            if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
-            if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
-            
-            return moves;
-        };
-
-        const playTile = (position) => {
-            if (!selectedTile || !validMoves.includes(position)) return;
-            
-            sendMessage({
-                type: 'playTile',
-                tileIndex: selectedTile.index,
-                position
-            });
-            
-            setSelectedTile(null);
-            setValidMoves([]);
-        };
-
-        const passTurn = () => {
-            sendMessage({ type: 'pass' });
-        };
-
-        // --- ADMIN FONKSİYONLARI ---
-        const handleAdminAction = async (action, targetTelegramId, amount = 0) => {
-            if (!isAdmin) return;
-            const endpoint = `http://localhost:10000/api/admin/${action}`;
-            try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        adminId: playerData.telegramId,
-                        targetTelegramId,
-                        amount
-                    })
-                });
-                const result = await response.json();
-                if (result.success) {
-                    showNotification(result.message, 'success');
-                } else {
-                    showNotification(result.error, 'error');
-                }
-            } catch (error) {
-                showNotification('Admin işlemi başarısız oldu.', 'error');
-            }
-        };
-
-        const AdminPanel = () => {
-            // Bu kısım, admin paneli için bir arayüz oluşturur.
-            // Basitlik adına, şimdilik sadece bir geri butonu ekliyorum.
-            // Gerçek bir projede, burada oyuncu listesi, ELO değiştirme formları vb. olurdu.
-            const [targetId, setTargetId] = useState('');
-            const [eloAmount, setEloAmount] = useState(0);
-
-            return React.createElement('div', { className: 'bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20 mt-8' },
-                React.createElement('h2', { className: 'text-3xl font-bold text-white text-center mb-6' }, '🔐 Admin Paneli'),
-                React.createElement('div', { className: 'space-y-4' },
-                    React.createElement('input', { type: 'text', placeholder: 'Hedef Oyuncu Telegram ID', value: targetId, onChange: e => setTargetId(e.target.value), className: 'w-full px-4 py-2 rounded-lg bg-white/20 text-white' }),
-                    React.createElement('input', { type: 'number', placeholder: 'ELO Miktarı (+/-)', value: eloAmount, onChange: e => setEloAmount(parseInt(e.target.value, 10)), className: 'w-full px-4 py-2 rounded-lg bg-white/20 text-white' }),
-                    React.createElement('button', { onClick: () => handleAdminAction('modify-elo', targetId, eloAmount), className: 'w-full bg-blue-500 text-white py-2 rounded-lg' }, 'ELO Değiştir'),
-                    React.createElement('button', { onClick: () => handleAdminAction('toggle-visibility', targetId), className: 'w-full bg-yellow-500 text-white py-2 rounded-lg' }, 'Gizle/Göster'),
-                    React.createElement('button', { onClick: () => handleAdminAction('delete-user', targetId), className: 'w-full bg-red-500 text-white py-2 rounded-lg' }, 'Kullanıcıyı Sil'),
-                    React.createElement('button', { onClick: () => setAdminScreen(false), className: 'w-full bg-gray-600 text-white py-2 rounded-lg mt-4' }, 'Geri')
-                )
-            );
-        };
-
-        if (screen === 'lobby') {
-            return React.createElement('div', { 
-                className: 'min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4 overflow-hidden relative' 
-            },
-                React.createElement('div', { className: 'absolute inset-0 overflow-hidden' },
-                    [...Array(20)].map((_, i) => 
-                        React.createElement('div', {
-                            key: i,
-                            className: 'absolute animate-pulse',
-                            style: {
-                                left: `${Math.random() * 100}%`,
-                                top: `${Math.random() * 100}%`,
-                                width: `${Math.random() * 4 + 2}px`,
-                                height: `${Math.random() * 4 + 2}px`,
-                                backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                                borderRadius: '50%',
-                                animationDelay: `${Math.random() * 2}s`,
-                                animationDuration: `${Math.random() * 3 + 2}s`
-                            }
-                        })
-                    )
-                ),
-
-                notification && React.createElement('div', { 
-                    className: `fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-2xl animate-bounce ${
-                        notification.type === 'success' ? 'bg-green-500' :
-                        notification.type === 'error' ? 'bg-red-500' :
-                        notification.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
-                    } text-white font-bold` 
-                }, notification.message),
-
-                React.createElement('div', { className: 'absolute top-4 right-4 flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20' },
-                    connected ? 
-                        React.createElement('div', { className: 'flex items-center gap-2' },
-                            React.createElement('div', { className: 'w-3 h-3 bg-green-400 rounded-full animate-pulse' }),
-                            React.createElement('span', { className: 'text-white font-semibold' }, 'Bağlı')
-                        ) :
-                        React.createElement('div', { className: 'flex items-center gap-2' },
-                            React.createElement('div', { className: 'w-3 h-3 bg-red-400 rounded-full animate-pulse' }),
-                            React.createElement('span', { className: 'text-white font-semibold' }, 'Bağlanıyor...')
-                        )
-                ),
-
-                React.createElement('div', { className: 'relative z-10 max-w-2xl w-full' },
-                    React.createElement('div', { className: 'text-center mb-8 animate-fadeIn' },
-                        React.createElement('h1', { 
-                            className: 'text-7xl font-black text-white mb-4 drop-shadow-2xl animate-bounce',
-                            style: { textShadow: '0 0 30px rgba(255,255,255,0.5)' }
-                        }, '🎮 DOMİNO'),
-                        React.createElement('p', { className: 'text-2xl text-purple-200 font-semibold animate-pulse' }, 'Profesyonel Online Oyun')
-                    ),
-
-                    adminScreen ? React.createElement(AdminPanel) :
-                        React.createElement('div', { className: 'bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20' },
-                            React.createElement('input', {
-                                type: 'text',
-                                placeholder: '👤 İsminizi girin...',
-                                value: playerName,
-                                onChange: (e) => setPlayerName(e.target.value),
-                                readOnly: !!playerData, // Telegram'dan geldiyse değiştirilemez
-                                className: 'w-full px-6 py-4 rounded-xl bg-white/20 backdrop-blur-sm border-2 border-white/30 text-white placeholder-white/60 text-lg font-semibold mb-6 focus:outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-400/50 transition-all'
-                            }),
-
-                            React.createElement('div', { className: 'space-y-4' },
-                                searching ? 
-                                    React.createElement('div', { className: 'bg-gradient-to-r from-yellow-500 to-orange-500 p-6 rounded-2xl shadow-xl animate-pulse' },
-                                        React.createElement('div', { className: 'flex items-center justify-between mb-4' },
-                                            React.createElement('div', { className: 'flex items-center gap-3' },
-                                                React.createElement('div', { className: 'w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin' }),
-                                                React.createElement('span', { className: 'text-white text-xl font-bold' }, 'Rakip Aranıyor...')
-                                            )
-                                        ),
-                                        React.createElement('button', {
-                                            onClick: cancelSearch,
-                                            className: 'w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-bold text-lg transition-all transform hover:scale-105 active:scale-95'
-                                        }, '❌ İptal Et')
-                                    ) :
-                                    React.createElement('button', {
-                                        onClick: startRankedMatch,
-                                        disabled: !connected || !playerData,
-                                        className: 'w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 disabled:from-gray-500 disabled:to-gray-600 text-white py-6 rounded-2xl font-black text-xl shadow-xl transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-3 border-4 border-white/30'
-                                    }, '👑 🏆 DERECELİ MAÇ'),
-
-                                roomCode ? 
-                                    React.createElement('div', { className: 'bg-gradient-to-r from-green-500 to-emerald-500 p-6 rounded-2xl shadow-xl border-4 border-white/30' },
-                                        React.createElement('div', { className: 'flex items-center justify-between mb-4' },
-                                            React.createElement('span', { className: 'text-white text-lg font-bold' }, '📱 Oda Kodu:'),
-                                            React.createElement('div', { className: 'flex items-center gap-2' },
-                                                React.createElement('span', { className: 'text-white text-3xl font-black tracking-wider' }, roomCode),
-                                                React.createElement('button', {
-                                                    onClick: copyRoomCode,
-                                                    className: 'bg-white/30 hover:bg-white/50 p-3 rounded-lg transition-all transform hover:scale-110 active:scale-95'
-                                                }, copied ? '✓' : '📋')
-                                            )
-                                        ),
-                                        React.createElement('p', { className: 'text-white/90 text-center font-semibold animate-pulse' }, 'Arkadaşın katılmasını bekleyin...')
-                                    ) :
-                                    React.createElement('button', {
-                                        onClick: createRoom,
-                                        disabled: !connected || !playerData,
-                                        className: 'w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:from-gray-500 disabled:to-gray-600 text-white py-6 rounded-2xl font-black text-xl shadow-xl transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-3 border-4 border-white/30'
-                                    }, '👥 ARKADAŞLA OYNA'),
-
-                                React.createElement('div', { className: 'bg-white/10 backdrop-blur-sm p-6 rounded-2xl border-2 border-white/20' },
-                                    React.createElement('input', {
-                                        type: 'text',
-                                        placeholder: '📝 Oda kodunu girin...',
-                                        value: joinRoomCode,
-                                        onChange: (e) => setJoinRoomCode(e.target.value.toUpperCase()),
-                                        maxLength: 4,
-                                        className: 'w-full px-6 py-4 rounded-xl bg-white/20 border-2 border-white/30 text-white placeholder-white/60 text-center text-2xl font-black mb-4 focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-400/50 transition-all tracking-wider'
-                                    }),
-                                    React.createElement('button', {
-                                        onClick: joinRoom,
-                                        disabled: !connected || !playerData,
-                                        className: 'w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:from-gray-500 disabled:to-gray-600 text-white py-5 rounded-xl font-black text-xl shadow-xl transition-all transform hover:scale-105 active:scale-95 border-4 border-white/30'
-                                    }, '🚪 ODAYA KATIL')
-                                ),
-                                isAdmin && React.createElement('button', {
-                                    onClick: () => setAdminScreen(true),
-                                    className: 'w-full mt-4 bg-purple-600 text-white py-3 rounded-xl font-bold'
-                                }, '🔐 Admin Paneli')
-                            )
-                        )
-                )
-            );
-        }
-
-        if (screen === 'game' && gameState) {
-            const isMyTurn = gameState.currentPlayer === gameState.playerId;
-            const myHand = gameState.players[gameState.playerId]?.hand || [];
-            const opponentId = Object.keys(gameState.players).find(id => id !== gameState.playerId);
-            const opponent = gameState.players[opponentId];
-            const me = gameState.players[gameState.playerId];
-
-            return React.createElement('div', { className: 'min-h-screen bg-gradient-to-br from-green-800 via-green-700 to-emerald-900 p-4 relative overflow-hidden' },
-                React.createElement('div', { 
-                    className: 'absolute inset-0 opacity-10',
-                    style: {
-                        backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)',
-                        backgroundSize: '50px 50px'
-                    }
-                }),
-
-                notification && React.createElement('div', { 
-                    className: `fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-2xl animate-bounce ${
-                        notification.type === 'success' ? 'bg-green-500' :
-                        notification.type === 'error' ? 'bg-red-500' :
-                        notification.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
-                    } text-white font-bold` 
-                }, notification.message),
-
-                React.createElement('div', { className: 'max-w-7xl mx-auto relative z-10' },
-                    React.createElement('div', { className: 'bg-white/10 backdrop-blur-md rounded-2xl p-4 mb-4 flex justify-between items-center border border-white/20 shadow-2xl' },
-                        React.createElement('div', { 
-                            className: `flex items-center gap-3 px-6 py-3 rounded-xl ${!isMyTurn ? 'bg-purple-500 animate-pulse shadow-lg shadow-purple-500/50' : 'bg-white/20'} transition-all` 
-                        },
-                            opponent?.photoUrl ? 
-                                React.createElement('img', { src: opponent.photoUrl, className: 'w-10 h-10 rounded-full border-2 border-white' }) :
-                                React.createElement('span', { className: 'text-2xl' }, '👤'),
-                            React.createElement('div', { className: 'flex flex-col' },
-                                React.createElement('span', { className: 'text-white font-bold text-lg' }, opponent?.name || 'Rakip'),
-                                React.createElement('span', { className: 'text-yellow-300 font-semibold' }, `Lv. ${opponent?.level || 1}`)
-                            ),
-                            React.createElement('span', { className: 'text-white font-bold' }, `(${opponent?.hand?.length || 0} taş)`)
-                        ),
-
-                        React.createElement('div', { className: 'bg-white/20 px-6 py-3 rounded-xl backdrop-blur-sm' },
-                            React.createElement('span', { className: 'text-2xl' }, '⏱️'),
-                            React.createElement('span', { className: 'text-white font-bold text-lg ml-2' }, `Tur: ${gameState.turn || 1}`),
-                            React.createElement('span', { className: 'text-white font-bold text-lg ml-4' }, `Pazar: ${gameState.market?.length || 0}`),
-                            React.createElement('button', {
-                                onClick: () => { 
-                                    if(confirm('Oyundan çıkmak istediğinize emin misiniz? Dereceli maç ise ELO kaybedebilirsiniz.')) { 
-                                        sendMessage({ 
-                                            type: 'forceDisconnect', 
-                                            roomCode: gameState.roomCode,
-                                            playerId: gameState.playerId
-                                        });
-                                        // Don't reset state here, let the server handle it
-                                    } 
-                                },
-                                className: 'ml-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition-all transform hover:scale-105 active:scale-95 shadow-lg'
-                            }, 'ÇIK')
-                        ),
-
-                        React.createElement('div', { 
-                            className: `flex items-center gap-3 px-6 py-3 rounded-xl ${isMyTurn ? 'bg-green-500 animate-pulse shadow-lg shadow-green-500/50' : 'bg-white/20'} transition-all` 
-                        },
-                            me?.photoUrl ?
-                                React.createElement('img', { src: me.photoUrl, className: 'w-10 h-10 rounded-full border-2 border-white' }) :
-                                React.createElement('span', { className: 'text-2xl' }, '👤'),
-                            React.createElement('div', { className: 'flex flex-col' },
-                                React.createElement('span', { className: 'text-white font-bold text-lg' }, me?.name || 'Sen'),
-                                React.createElement('span', { className: 'text-yellow-300 font-semibold' }, `Lv. ${me?.level || 1}`)
-                            ),
-                            React.createElement('span', { className: 'text-white font-bold' }, `(${myHand.length} taş)`)
-                        )
-                    ),
-
-                    React.createElement('div', { 
-                        className: 'bg-gradient-to-br from-amber-900/80 to-amber-800/80 backdrop-blur-md rounded-3xl p-8 mb-6 min-h-[300px] flex items-center justify-center border-4 border-amber-700 shadow-2xl relative overflow-hidden' 
-                    },
-                        React.createElement('div', { className: 'absolute inset-0 bg-gradient-to-br from-yellow-900/20 to-transparent' }),
+            // --- LEADERBOARD EKRANI (YENİ) ---
+            if (screen === 'leaderboard') {
+                return (
+                    <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10">
+                        {notification && <Toast message={notification.message} type={notification.type} />}
                         
-                        validMoves.includes('left') && React.createElement('button', {
-                            onClick: () => playTile('left'),
-                            className: 'absolute left-4 top-1/2 -translate-y-1/2 bg-green-500 hover:bg-green-600 text-white p-4 rounded-full shadow-xl animate-pulse z-20 transform hover:scale-110 transition-all text-2xl'
-                        }, '⬅️'),
+                        <div className="text-center mb-6">
+                            <h1 className="text-4xl font-black text-white drop-shadow-lg mb-2">🏆 SKOR TABLOSU 🏆</h1>
+                        </div>
 
-                        validMoves.includes('right') && React.createElement('button', {
-                            onClick: () => playTile('right'),
-                            className: 'absolute right-4 top-1/2 -translate-y-1/2 bg-green-500 hover:bg-green-600 text-white p-4 rounded-full shadow-xl animate-pulse z-20 transform hover:scale-110 transition-all text-2xl'
-                        }, '➡️'),
+                        <button onClick={() => setScreen('lobby')} className="mb-4 px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold">⬅️ Geri Dön</button>
 
-                        React.createElement('div', { className: 'flex items-center gap-2 flex-wrap justify-center relative z-10' },
-                            gameState.board.length === 0 ? 
-                                React.createElement('div', { className: 'text-white/50 text-2xl font-bold' }, 'Oyun tahtası boş') :
-                                gameState.board.map((tile, idx) =>
-                                    React.createElement('div', {
-                                        key: idx,
-                                        className: 'bg-white rounded-lg p-3 shadow-xl transform hover:scale-105 transition-all border-4 border-gray-300',
-                                        style: { minWidth: '60px' }
-                                    },
-                                        React.createElement('div', { className: 'flex flex-col items-center gap-1' },
-                                            React.createElement('div', { className: 'w-10 h-10 flex items-center justify-center' },
-                                                React.createElement('span', { className: 'text-3xl font-black text-gray-800' }, tile[0])
-                                            ),
-                                            React.createElement('div', { className: 'w-full h-1 bg-gray-800 rounded' }),
-                                            React.createElement('div', { className: 'w-10 h-10 flex items-center justify-center' },
-                                                React.createElement('span', { className: 'text-3xl font-black text-gray-800' }, tile[1])
-                                            )
-                                        )
-                                    )
-                                )
-                        )
-                    ),
-
-                    React.createElement('div', { className: 'bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 shadow-2xl' },
-                        React.createElement('div', { className: 'flex items-center justify-between mb-4' },
-                            React.createElement('h3', { className: 'text-white font-bold text-xl' }, '🎲 Taşlarınız'),
-                            isMyTurn && React.createElement('button', {
-                                onClick: passTurn,
-                                className: 'bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-bold transition-all transform hover:scale-105 active:scale-95 shadow-lg'
-                            }, '⏭️ Pas Geç')
-                        ),
-
-                        React.createElement('div', { className: 'flex gap-3 flex-wrap justify-center' },
-                            myHand.map((tile, idx) => {
-                                const isSelected = selectedTile?.index === idx;
-                                const canPlay = isMyTurn && (gameState.board.length === 0 || calculateValidMoves(tile).length > 0);
-                                
-                                return React.createElement('button', {
-                                    key: idx,
-                                    onClick: () => selectTile(tile, idx),
-                                    disabled: !isMyTurn,
-                                    className: `bg-white rounded-xl p-4 shadow-xl transition-all transform hover:scale-110 active:scale-95 border-4 ${
-                                        isSelected ? 'border-yellow-400 shadow-yellow-400/50 scale-110' :
-                                        canPlay ? 'border-green-400 shadow-green-400/50 animate-pulse' :
-                                        'border-gray-300'
-                                    } ${!isMyTurn ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`,
-                                    style: { minWidth: '80px' }
-                                },
-                                    React.createElement('div', { className: 'flex flex-col items-center gap-2' },
-                                        React.createElement('div', { className: 'w-12 h-12 flex items-center justify-center' },
-                                            React.createElement('span', { className: 'text-4xl font-black text-gray-800' }, tile[0])
-                                        ),
-                                        React.createElement('div', { className: 'w-full h-1 bg-gray-800 rounded' }),
-                                        React.createElement('div', { className: 'w-12 h-12 flex items-center justify-center' },
-                                            React.createElement('span', { className: 'text-4xl font-black text-gray-800' }, tile[1])
-                                        )
-                                    )
-                                );
-                            })
-                        )
-                    )
-                )
-            );
-        }
-
-        // Yeni eklenen sonuç ekranı bileşeni
-        function ResultScreen({ isWinner, eloChange, reason, exitType }) {
-            let message = '';
-            if (exitType === 'exit') {
-                message = 'Oyundan Çıkıldı';
-            } else if (reason === 'empty_hand') {
-                message = isWinner ? '🎉 Eli boş! Qazandiniz!' : '😔 Rakibin eli boş! Uduzdunuz';
-            } else if (reason === 'points' || reason === 'points_equal') {
-                if (reason === 'points_equal') {
-                    message = '🤝 Beraberlik!';
-                } else {
-                    message = isWinner ? '🎉 Daha az puan! Qazandiniz!' : '😔 Daha çok puan! Uduzdunuz';
-                }
-            } else {
-                message = isWinner ? '🎉 Qazandiniz!' : '😔 Uduzdunuz';
+                        <div className="w-full max-w-2xl bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
+                            {leaderboard.length === 0 ? (
+                                <div className="text-center text-gray-400 py-8">
+                                    <p className="text-xl">📊 Skor tablosu yükleniyor...</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {leaderboard.map((player, index) => (
+                                        <div key={player._id} className={`flex items-center gap-4 p-4 rounded-xl ${
+                                            index === 0 ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-2 border-yellow-500' :
+                                            index === 1 ? 'bg-gradient-to-r from-gray-400/20 to-gray-500/20 border-2 border-gray-400' :
+                                            index === 2 ? 'bg-gradient-to-r from-orange-600/20 to-orange-700/20 border-2 border-orange-600' :
+                                            'bg-white/5 border border-white/10'
+                                        }`}>
+                                            <div className="text-3xl font-black text-white w-10 text-center">
+                                                {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
+                                            </div>
+                                            
+                                            {player.photoUrl && (
+                                                <img src={player.photoUrl} alt={player.username} className="w-12 h-12 rounded-full border-2 border-white/30" />
+                                            )}
+                                            
+                                            <div className="flex-1">
+                                                <div className="text-white font-bold text-lg">{player.username || player.firstName}</div>
+                                                <div className="flex gap-2 text-sm">
+                                                    <span className="text-green-400">✓ {player.wins}</span>
+                                                    <span className="text-red-400">✗ {player.losses}</span>
+                                                    <span className="text-yellow-400">🔥 {player.winStreak}</span>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="text-right">
+                                                <div className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-3 py-1 rounded-full text-sm font-bold mb-1">
+                                                    {player.elo} ELO
+                                                </div>
+                                                <div className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-xs font-bold">
+                                                    LVL {player.level}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
             }
 
-            return React.createElement('div', { 
-                className: 'min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4 overflow-hidden relative',
-                id: 'result-lobby'
-            },
-                React.createElement('div', { className: 'bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20 max-w-2xl w-full text-center' },
-                    React.createElement('h1', { 
-                        className: `text-5xl font-black mb-6 ${
-                            isWinner ? 'text-green-400' : 'text-red-400'
-                        }`
-                    }, message),
-                    
-                    eloChange !== 0 && React.createElement('div', {
-                        className: `text-3xl font-bold mb-8 ${
-                            isWinner ? 'text-green-300' : 'text-red-300'
-                        }`
-                    }, 'ELO: ', isWinner ? '+' : '', eloChange),
-                    
-                    React.createElement('div', { className: 'text-white text-xl mb-8' },
-                        'Ana menüye dönülüyor...'
-                    ),
-                    
-                    React.createElement('button', {
-                        onClick: () => setScreen('lobby'),
-                        className: 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-4 rounded-xl font-bold text-xl hover:from-purple-700 hover:to-indigo-700 transition-all transform hover:scale-105 active:scale-95 shadow-2xl'
-                    }, 'Ana Menüye Dön')
-                )
-            );
-        }
+            // --- OYUN EKRANI ---
+            if (screen === 'game' && gameState) {
+                // Tahtada görsel olarak taşları döndürmek gerekir mi?
+                // Sunucu genellikle [[1,6], [6,2]] diye sıralı atar.
+                // Biz sadece çiziyoruz.
+                
+                // Elimizdeki taş sayısı 7'den fazla mı?
+                const isHandCrowded = myHand.length > 7;
 
-        return null;
-    };
-
-    ReactDOM.render(React.createElement(DominoGame), document.getElementById('root'));
-</script>
-
-</body>
-</html>
-                ws.onclose = (event) => {
-                    console.log('❌ WebSocket bağlantısı kapandı:', event.code, event.reason);
-                    setConnected(false);
-                    // Eğer oyuncu bir odada değilse ve lobi ekranındaysa yeniden bağlanma mesajı göster
-                    if (screen === 'lobby' && !roomCode && !searching) {
-                        showNotification('❌ Bağlantı kesildi, yeniden bağlanıyor...', 'error');
-                    } else {
-                        // Oyuncu oyun veya arama ekranındaysa, sunucu zaten durumu yönetecek.
-                    }
-                    setTimeout(connectToServer, 3000);
-                };
-
-                ws.onerror = (error) => {
-                    console.error('⚠️ WebSocket hatası:', error);
-                    setConnected(false);
-                    showNotification('⚠️ Bağlantı hatası', 'error');
-                };
-
-                ws.onmessage = (event) => {
-                    console.log('📨 Mesaj alındı:', event.data);
-                    try {
-                        const data = JSON.parse(event.data);
-                        handleServerMessage(data);
-                    } catch (error) {
-                        console.error('❌ Mesaj parse hatası:', error);
-                    }
-                };
-            } catch (error) {
-                console.error('❌ Bağlantı hatası:', error);
-                showNotification('⚠️ Sunucuya bağlanılamadı', 'error');
-                setTimeout(connectToServer, 5000);
-            }
-        };
-
-        const showNotification = (message, type = 'info') => {
-            setNotification({ message, type });
-            setTimeout(() => setNotification(''), 3000);
-        };
-
-        const handleServerMessage = (data) => {
-            switch (data.type) {
-                case 'roomCreated':
-                    setRoomCode(data.roomCode);
-                    showNotification('🎮 Oda oluşturuldu!', 'success');
-                    break;
-                case 'gameStart':
-                    setGameState(data.gameState);
-                    setScreen('game');
-                    showNotification('🎯 Oyun başladı!', 'success');
-                    break;
-                case 'gameUpdate':
-                    setGameState(data.gameState);
-                    break;
-                case 'matchFound':
-                    showNotification('✨ Rakip bulundu!', 'success');
-                    break;
-                case 'playerDisconnected':
-                    showNotification(`🏆 Oyun bitti! Rakip ayrıldı. Kazanan: ${data.winnerName || 'Siz'}. ELO: ${data.isRanked ? (data.eloChanges?.winner > 0 ? '+' : '') + (data.eloChanges?.winner || 0) : 'N/A'}`, 'info');
-                    setTimeout(() => {
-                        setScreen('lobby');
-                        setGameState(null);
-                        setRoomCode('');
-                        setJoinRoomCode('');
-                        setSelectedTile(null);
-                        setValidMoves([]);
-                    }, 3000);
-                    break;
-                case 'gameEnd':
-                    showNotification(`🏆 Oyun bitti! Kazanan: ${data.winnerName || 'Bilinmiyor'}. ELO: ${data.isRanked ? (data.eloChanges?.winner > 0 ? '+' : '') + (data.eloChanges?.winner || 0) : 'N/A'}`, 'success');
-                    // Reset all game states after showing the result
-                    setTimeout(() => {
-                        setScreen('lobby');
-                        setGameState(null);
-                        setRoomCode('');
-                        setJoinRoomCode('');
-                        setSelectedTile(null);
-                        setValidMoves([]);
-                    }, 3000);
-                    break;
-                case 'error':
-                    showNotification('❌ ' + data.message, 'error');
-                    setSearching(false);
-                    break;
-            }
-        };
-
-        const sendMessage = (data) => {
-            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                wsRef.current.send(JSON.stringify(data));
-            }
-        };
-
-        const startRankedMatch = () => {
-            if (!playerName.trim()) {
-                showNotification('⚠️ Lütfen isminizi girin', 'warning');
-                return;
-            }
-            setSearching(true);
-            sendMessage({ 
-                type: 'findMatch', 
-                telegramId: playerData?.telegramId,
-                firstName: playerData?.firstName,
-                photoUrl: playerData?.photoUrl,
-                level: playerData?.level
-            });
-            showNotification('🔍 Rakip aranıyor...', 'info');
-        };
-
-        const cancelSearch = () => {
-            setSearching(false);
-            sendMessage({ type: 'cancelSearch' });
-            showNotification('❌ Arama iptal edildi', 'info');
-        };
-
-        const createRoom = () => {
-            if (!playerName.trim()) {
-                showNotification('⚠️ Lütfen isminizi girin', 'warning');
-                return;
-            }
-            sendMessage({ 
-                type: 'createRoom', 
-                telegramId: playerData?.telegramId,
-                firstName: playerData?.firstName,
-                photoUrl: playerData?.photoUrl,
-                level: playerData?.level
-            });
-        };
-
-        const joinRoom = () => {
-            if (!playerName.trim() || !joinRoomCode.trim()) {
-                showNotification('⚠️ İsim ve oda kodu gerekli', 'warning');
-                return;
-            }
-            sendMessage({ 
-                type: 'joinRoom', 
-                roomCode: joinRoomCode, 
-                telegramId: playerData?.telegramId,
-                firstName: playerData?.firstName,
-                photoUrl: playerData?.photoUrl,
-                level: playerData?.level
-            });
-        };
-
-        const copyRoomCode = () => {
-            navigator.clipboard.writeText(roomCode);
-            setCopied(true);
-            showNotification('📋 Oda kodu kopyalandı!', 'success');
-            setTimeout(() => setCopied(false), 2000);
-        };
-
-        const selectTile = (tile, index) => {
-            if (gameState?.currentPlayer !== gameState?.playerId) return;
-            
-            setSelectedTile({ tile, index });
-            const moves = calculateValidMoves(tile);
-            setValidMoves(moves);
-        };
-
-        const calculateValidMoves = (tile) => {
-            if (!gameState?.board.length) return ['both'];
-            
-            const leftEnd = gameState.board[0][0];
-            const rightEnd = gameState.board[gameState.board.length - 1][1];
-            const moves = [];
-            
-            if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
-            if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
-            
-            return moves;
-        };
-
-        const playTile = (position) => {
-            if (!selectedTile || !validMoves.includes(position)) return;
-            
-            sendMessage({
-                type: 'playTile',
-                tileIndex: selectedTile.index,
-                position
-            });
-            
-            setSelectedTile(null);
-            setValidMoves([]);
-        };
-
-        const passTurn = () => {
-            sendMessage({ type: 'pass' });
-        };
-
-        // --- ADMIN FONKSİYONLARI ---
-        const handleAdminAction = async (action, targetTelegramId, amount = 0) => {
-            if (!isAdmin) return;
-            const endpoint = `http://localhost:10000/api/admin/${action}`;
-            try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        adminId: playerData.telegramId,
-                        targetTelegramId,
-                        amount
-                    })
-                });
-                const result = await response.json();
-                if (result.success) {
-                    showNotification(result.message, 'success');
-                } else {
-                    showNotification(result.error, 'error');
-                }
-            } catch (error) {
-                showNotification('Admin işlemi başarısız oldu.', 'error');
-            }
-        };
-
-        const AdminPanel = () => {
-            // Bu kısım, admin paneli için bir arayüz oluşturur.
-            // Basitlik adına, şimdilik sadece bir geri butonu ekliyorum.
-            // Gerçek bir projede, burada oyuncu listesi, ELO değiştirme formları vb. olurdu.
-            const [targetId, setTargetId] = useState('');
-            const [eloAmount, setEloAmount] = useState(0);
-
-            return React.createElement('div', { className: 'bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20 mt-8' },
-                React.createElement('h2', { className: 'text-3xl font-bold text-white text-center mb-6' }, '🔐 Admin Paneli'),
-                React.createElement('div', { className: 'space-y-4' },
-                    React.createElement('input', { type: 'text', placeholder: 'Hedef Oyuncu Telegram ID', value: targetId, onChange: e => setTargetId(e.target.value), className: 'w-full px-4 py-2 rounded-lg bg-white/20 text-white' }),
-                    React.createElement('input', { type: 'number', placeholder: 'ELO Miktarı (+/-)', value: eloAmount, onChange: e => setEloAmount(parseInt(e.target.value, 10)), className: 'w-full px-4 py-2 rounded-lg bg-white/20 text-white' }),
-                    React.createElement('button', { onClick: () => handleAdminAction('modify-elo', targetId, eloAmount), className: 'w-full bg-blue-500 text-white py-2 rounded-lg' }, 'ELO Değiştir'),
-                    React.createElement('button', { onClick: () => handleAdminAction('toggle-visibility', targetId), className: 'w-full bg-yellow-500 text-white py-2 rounded-lg' }, 'Gizle/Göster'),
-                    React.createElement('button', { onClick: () => handleAdminAction('delete-user', targetId), className: 'w-full bg-red-500 text-white py-2 rounded-lg' }, 'Kullanıcıyı Sil'),
-                    React.createElement('button', { onClick: () => setAdminScreen(false), className: 'w-full bg-gray-600 text-white py-2 rounded-lg mt-4' }, 'Geri')
-                )
-            );
-        };
-
-        if (screen === 'lobby') {
-            return React.createElement('div', { 
-                className: 'min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4 overflow-hidden relative' 
-            },
-                React.createElement('div', { className: 'absolute inset-0 overflow-hidden' },
-                    [...Array(20)].map((_, i) => 
-                        React.createElement('div', {
-                            key: i,
-                            className: 'absolute animate-pulse',
-                            style: {
-                                left: `${Math.random() * 100}%`,
-                                top: `${Math.random() * 100}%`,
-                                width: `${Math.random() * 4 + 2}px`,
-                                height: `${Math.random() * 4 + 2}px`,
-                                backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                                borderRadius: '50%',
-                                animationDelay: `${Math.random() * 2}s`,
-                                animationDuration: `${Math.random() * 3 + 2}s`
-                            }
-                        })
-                    )
-                ),
-
-                notification && React.createElement('div', { 
-                    className: `fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-2xl animate-bounce ${
-                        notification.type === 'success' ? 'bg-green-500' :
-                        notification.type === 'error' ? 'bg-red-500' :
-                        notification.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
-                    } text-white font-bold` 
-                }, notification.message),
-
-                React.createElement('div', { className: 'absolute top-4 right-4 flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20' },
-                    connected ? 
-                        React.createElement('div', { className: 'flex items-center gap-2' },
-                            React.createElement('div', { className: 'w-3 h-3 bg-green-400 rounded-full animate-pulse' }),
-                            React.createElement('span', { className: 'text-white font-semibold' }, 'Bağlı')
-                        ) :
-                        React.createElement('div', { className: 'flex items-center gap-2' },
-                            React.createElement('div', { className: 'w-3 h-3 bg-red-400 rounded-full animate-pulse' }),
-                            React.createElement('span', { className: 'text-white font-semibold' }, 'Bağlanıyor...')
-                        )
-                ),
-
-                React.createElement('div', { className: 'relative z-10 max-w-2xl w-full' },
-                    React.createElement('div', { className: 'text-center mb-8 animate-fadeIn' },
-                        React.createElement('h1', { 
-                            className: 'text-7xl font-black text-white mb-4 drop-shadow-2xl animate-bounce',
-                            style: { textShadow: '0 0 30px rgba(255,255,255,0.5)' }
-                        }, '🎮 DOMİNO'),
-                        React.createElement('p', { className: 'text-2xl text-purple-200 font-semibold animate-pulse' }, 'Profesyonel Online Oyun')
-                    ),
-
-                    adminScreen ? React.createElement(AdminPanel) :
-                        React.createElement('div', { className: 'bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20' },
-                            React.createElement('input', {
-                                type: 'text',
-                                placeholder: '👤 İsminizi girin...',
-                                value: playerName,
-                                onChange: (e) => setPlayerName(e.target.value),
-                                readOnly: !!playerData, // Telegram'dan geldiyse değiştirilemez
-                                className: 'w-full px-6 py-4 rounded-xl bg-white/20 backdrop-blur-sm border-2 border-white/30 text-white placeholder-white/60 text-lg font-semibold mb-6 focus:outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-400/50 transition-all'
-                            }),
-
-                            React.createElement('div', { className: 'space-y-4' },
-                                searching ? 
-                                    React.createElement('div', { className: 'bg-gradient-to-r from-yellow-500 to-orange-500 p-6 rounded-2xl shadow-xl animate-pulse' },
-                                        React.createElement('div', { className: 'flex items-center justify-between mb-4' },
-                                            React.createElement('div', { className: 'flex items-center gap-3' },
-                                                React.createElement('div', { className: 'w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin' }),
-                                                React.createElement('span', { className: 'text-white text-xl font-bold' }, 'Rakip Aranıyor...')
-                                            )
-                                        ),
-                                        React.createElement('button', {
-                                            onClick: cancelSearch,
-                                            className: 'w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-bold text-lg transition-all transform hover:scale-105 active:scale-95'
-                                        }, '❌ İptal Et')
-                                    ) :
-                                    React.createElement('button', {
-                                        onClick: startRankedMatch,
-                                        disabled: !connected || !playerData,
-                                        className: 'w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 disabled:from-gray-500 disabled:to-gray-600 text-white py-6 rounded-2xl font-black text-xl shadow-xl transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-3 border-4 border-white/30'
-                                    }, '👑 🏆 DERECELİ MAÇ'),
-
-                                roomCode ? 
-                                    React.createElement('div', { className: 'bg-gradient-to-r from-green-500 to-emerald-500 p-6 rounded-2xl shadow-xl border-4 border-white/30' },
-                                        React.createElement('div', { className: 'flex items-center justify-between mb-4' },
-                                            React.createElement('span', { className: 'text-white text-lg font-bold' }, '📱 Oda Kodu:'),
-                                            React.createElement('div', { className: 'flex items-center gap-2' },
-                                                React.createElement('span', { className: 'text-white text-3xl font-black tracking-wider' }, roomCode),
-                                                React.createElement('button', {
-                                                    onClick: copyRoomCode,
-                                                    className: 'bg-white/30 hover:bg-white/50 p-3 rounded-lg transition-all transform hover:scale-110 active:scale-95'
-                                                }, copied ? '✓' : '📋')
-                                            )
-                                        ),
-                                        React.createElement('p', { className: 'text-white/90 text-center font-semibold animate-pulse' }, 'Arkadaşın katılmasını bekleyin...')
-                                    ) :
-                                    React.createElement('button', {
-                                        onClick: createRoom,
-                                        disabled: !connected || !playerData,
-                                        className: 'w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:from-gray-500 disabled:to-gray-600 text-white py-6 rounded-2xl font-black text-xl shadow-xl transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-3 border-4 border-white/30'
-                                    }, '👥 ARKADAŞLA OYNA'),
-
-                                React.createElement('div', { className: 'bg-white/10 backdrop-blur-sm p-6 rounded-2xl border-2 border-white/20' },
-                                    React.createElement('input', {
-                                        type: 'text',
-                                        placeholder: '📝 Oda kodunu girin...',
-                                        value: joinRoomCode,
-                                        onChange: (e) => setJoinRoomCode(e.target.value.toUpperCase()),
-                                        maxLength: 4,
-                                        className: 'w-full px-6 py-4 rounded-xl bg-white/20 border-2 border-white/30 text-white placeholder-white/60 text-center text-2xl font-black mb-4 focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-400/50 transition-all tracking-wider'
-                                    }),
-                                    React.createElement('button', {
-                                        onClick: joinRoom,
-                                        disabled: !connected || !playerData,
-                                        className: 'w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:from-gray-500 disabled:to-gray-600 text-white py-5 rounded-xl font-black text-xl shadow-xl transition-all transform hover:scale-105 active:scale-95 border-4 border-white/30'
-                                    }, '🚪 ODAYA KATIL')
-                                ),
-                                isAdmin && React.createElement('button', {
-                                    onClick: () => setAdminScreen(true),
-                                    className: 'w-full mt-4 bg-purple-600 text-white py-3 rounded-xl font-bold'
-                                }, '🔐 Admin Paneli')
-                            )
-                        )
-                )
-            );
-        }
-
-        if (screen === 'game' && gameState) {
-            const isMyTurn = gameState.currentPlayer === gameState.playerId;
-            const myHand = gameState.players[gameState.playerId]?.hand || [];
-            const opponentId = Object.keys(gameState.players).find(id => id !== gameState.playerId);
-            const opponent = gameState.players[opponentId];
-            const me = gameState.players[gameState.playerId];
-
-            return React.createElement('div', { className: 'min-h-screen bg-gradient-to-br from-green-800 via-green-700 to-emerald-900 p-4 relative overflow-hidden' },
-                React.createElement('div', { 
-                    className: 'absolute inset-0 opacity-10',
-                    style: {
-                        backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)',
-                        backgroundSize: '50px 50px'
-                    }
-                }),
-
-                notification && React.createElement('div', { 
-                    className: `fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-2xl animate-bounce ${
-                        notification.type === 'success' ? 'bg-green-500' :
-                        notification.type === 'error' ? 'bg-red-500' :
-                        notification.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
-                    } text-white font-bold` 
-                }, notification.message),
-
-                React.createElement('div', { className: 'max-w-7xl mx-auto relative z-10' },
-                    React.createElement('div', { className: 'bg-white/10 backdrop-blur-md rounded-2xl p-4 mb-4 flex justify-between items-center border border-white/20 shadow-2xl' },
-                        React.createElement('div', { 
-                            className: `flex items-center gap-3 px-6 py-3 rounded-xl ${!isMyTurn ? 'bg-purple-500 animate-pulse shadow-lg shadow-purple-500/50' : 'bg-white/20'} transition-all` 
-                        },
-                            opponent?.photoUrl ? 
-                                React.createElement('img', { src: opponent.photoUrl, className: 'w-10 h-10 rounded-full border-2 border-white' }) :
-                                React.createElement('span', { className: 'text-2xl' }, '👤'),
-                            React.createElement('div', { className: 'flex flex-col' },
-                                React.createElement('span', { className: 'text-white font-bold text-lg' }, opponent?.name || 'Rakip'),
-                                React.createElement('span', { className: 'text-yellow-300 font-semibold' }, `Lv. ${opponent?.level || 1}`)
-                            ),
-                            React.createElement('span', { className: 'text-white font-bold' }, `(${opponent?.hand?.length || 0} taş)`)
-                        ),
-
-                        React.createElement('div', { className: 'bg-white/20 px-6 py-3 rounded-xl backdrop-blur-sm' },
-                            React.createElement('span', { className: 'text-2xl' }, '⏱️'),
-                            React.createElement('span', { className: 'text-white font-bold text-lg ml-2' }, `Tur: ${gameState.turn || 1}`),
-                            React.createElement('span', { className: 'text-white font-bold text-lg ml-4' }, `Pazar: ${gameState.market?.length || 0}`),
-                            React.createElement('button', {
-                                onClick: () => { 
-                                    if(confirm('Oyundan çıkmak istediğinize emin misiniz? Dereceli maç ise ELO kaybedebilirsiniz.')) { 
-                                        sendMessage({ 
-                                            type: 'forceDisconnect', 
-                                            roomCode: gameState.roomCode,
-                                            playerId: gameState.playerId
-                                        });
-                                        // Don't reset state here, let the server handle it
-                                    } 
-                                },
-                                className: 'ml-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition-all transform hover:scale-105 active:scale-95 shadow-lg'
-                            }, 'ÇIK')
-                        ),
-
-                        React.createElement('div', { 
-                            className: `flex items-center gap-3 px-6 py-3 rounded-xl ${isMyTurn ? 'bg-green-500 animate-pulse shadow-lg shadow-green-500/50' : 'bg-white/20'} transition-all` 
-                        },
-                            me?.photoUrl ?
-                                React.createElement('img', { src: me.photoUrl, className: 'w-10 h-10 rounded-full border-2 border-white' }) :
-                                React.createElement('span', { className: 'text-2xl' }, '👤'),
-                            React.createElement('div', { className: 'flex flex-col' },
-                                React.createElement('span', { className: 'text-white font-bold text-lg' }, me?.name || 'Sen'),
-                                React.createElement('span', { className: 'text-yellow-300 font-semibold' }, `Lv. ${me?.level || 1}`)
-                            ),
-                            React.createElement('span', { className: 'text-white font-bold' }, `(${myHand.length} taş)`)
-                        )
-                    ),
-
-                    React.createElement('div', { 
-                        className: 'bg-gradient-to-br from-amber-900/80 to-amber-800/80 backdrop-blur-md rounded-3xl p-8 mb-6 min-h-[300px] flex items-center justify-center border-4 border-amber-700 shadow-2xl relative overflow-hidden' 
-                    },
-                        React.createElement('div', { className: 'absolute inset-0 bg-gradient-to-br from-yellow-900/20 to-transparent' }),
+                return (
+                    <div className="fixed inset-0 flex flex-col h-full w-full">
+                         {notification && <Toast message={notification.message} type={notification.type} />}
                         
-                        validMoves.includes('left') && React.createElement('button', {
-                            onClick: () => playTile('left'),
-                            className: 'absolute left-4 top-1/2 -translate-y-1/2 bg-green-500 hover:bg-green-600 text-white p-4 rounded-full shadow-xl animate-pulse z-20 transform hover:scale-110 transition-all text-2xl'
-                        }, '⬅️'),
+                        {/* ÜST PANEL: Rakip */}
+                        <div className="h-16 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between px-4 z-20">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center shadow-lg">
+                                    👤
+                                </div>
+                                <div>
+                                    <div className="text-white text-sm font-bold shadow-black drop-shadow-md">🎯 RAIP</div>
+                                    <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
+                                        🎲 {Object.values(gameState.players).find(p => p.id !== myPlayerId)?.hand?.length || 0} Taş
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="text-center">
+                                {isMyTurn ? (
+                                    <div className="bg-yellow-500 text-black text-xs font-bold px-4 py-1 rounded-full animate-pulse shadow-glow">⚡ SENİN SIRAN ⚡</div>
+                                ) : (
+                                    <div className="text-gray-400 text-xs font-medium bg-black/40 px-3 py-1 rounded-full">⏳ Rakip Oynuyor...</div>
+                                )}
+                            </div>
+                        </div>
 
-                        validMoves.includes('right') && React.createElement('button', {
-                            onClick: () => playTile('right'),
-                            className: 'absolute right-4 top-1/2 -translate-y-1/2 bg-green-500 hover:bg-green-600 text-white p-4 rounded-full shadow-xl animate-pulse z-20 transform hover:scale-110 transition-all text-2xl'
-                        }, '➡️'),
+                        {/* ORTA PANEL: Masa ve Board */}
+                        <div className="flex-1 relative overflow-hidden flex items-center justify-center w-full">
+                            {/* Yatay Kaydırma Alanı */}
+                            <div 
+                                ref={boardScrollRef}
+                                className="w-full h-full overflow-x-auto overflow-y-hidden hide-scrollbar flex items-center px-8"
+                                style={{ scrollBehavior: 'smooth' }}
+                            >
+                                <div className="flex items-center gap-1 mx-auto min-w-max py-10">
+                                    
+                                    {/* SOL IŞIKLI GÖSTERGE */}
+                                    {validMoves.includes('left') && selectedTileIndex !== null && gameState.board.length > 0 && (
+                                        <div className="mr-2 sm:mr-3 flex items-center" onClick={() => playTile('left')}>
+                                            <div className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer">
+                                                <div className="absolute inset-0 bg-yellow-400/20 rounded-lg valid-zone"></div>
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-yellow-400/10 rounded-md border-2 border-yellow-400 border-dashed animate-glow-pulse"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
 
-                        React.createElement('div', { className: 'flex items-center gap-2 flex-wrap justify-center relative z-10' },
-                            gameState.board.length === 0 ? 
-                                React.createElement('div', { className: 'text-white/50 text-2xl font-bold' }, 'Oyun tahtası boş') :
-                                gameState.board.map((tile, idx) =>
-                                    React.createElement('div', {
-                                        key: idx,
-                                        className: 'bg-white rounded-lg p-3 shadow-xl transform hover:scale-105 transition-all border-4 border-gray-300',
-                                        style: { minWidth: '60px' }
-                                    },
-                                        React.createElement('div', { className: 'flex flex-col items-center gap-1' },
-                                            React.createElement('div', { className: 'w-10 h-10 flex items-center justify-center' },
-                                                React.createElement('span', { className: 'text-3xl font-black text-gray-800' }, tile[0])
-                                            ),
-                                            React.createElement('div', { className: 'w-full h-1 bg-gray-800 rounded' }),
-                                            React.createElement('div', { className: 'w-10 h-10 flex items-center justify-center' },
-                                                React.createElement('span', { className: 'text-3xl font-black text-gray-800' }, tile[1])
-                                            )
-                                        )
-                                    )
-                                )
-                        )
-                    ),
+                                    {/* TAHTADAKİ TAŞLAR */}
+                                    {gameState.board.length === 0 ? (
+                                        <div className="text-white/30 text-xl font-bold border-4 border-dashed border-white/10 rounded-3xl p-6">
+                                            {selectedTileIndex !== null ? '👇 Taşı Buraya Koy' : 'Taş Seç ve Başla'}
+                                        </div>
+                                    ) : (
+                                        gameState.board.map((tile, i) => (
+                                            <DominoTile 
+                                                key={i} 
+                                                values={tile} 
+                                                vertical={tile[0] === tile[1]}
+                                                disabled={true}
+                                                scale={0.95}
+                                                animateIn={i === gameState.board.length - 1 || i === 0}
+                                            />
+                                        ))
+                                    )}
 
-                    React.createElement('div', { className: 'bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 shadow-2xl' },
-                        React.createElement('div', { className: 'flex items-center justify-between mb-4' },
-                            React.createElement('h3', { className: 'text-white font-bold text-xl' }, '🎲 Taşlarınız'),
-                            isMyTurn && React.createElement('button', {
-                                onClick: passTurn,
-                                className: 'bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-bold transition-all transform hover:scale-105 active:scale-95 shadow-lg'
-                            }, '⏭️ Pas Geç')
-                        ),
+                                    {/* SAĞ IŞIKLI GÖSTERGE */}
+                                    {validMoves.includes('right') && selectedTileIndex !== null && gameState.board.length > 0 && (
+                                        <div className="ml-2 sm:ml-3 flex items-center" onClick={() => playTile('right')}>
+                                            <div className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer">
+                                                <div className="absolute inset-0 bg-yellow-400/20 rounded-lg valid-zone"></div>
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-yellow-400/10 rounded-md border-2 border-yellow-400 border-dashed animate-glow-pulse"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {/* İLK HAMLE (ORTAYA) */}
+                                    {validMoves.includes('start') && selectedTileIndex !== null && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-30 animate-slide-up" onClick={() => playTile('start')}>
+                                            <div className="bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold px-8 py-4 rounded-2xl animate-glow-pulse cursor-pointer shadow-glow transform scale-110">
+                                                ✨ OYUNA BAŞLA
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
 
-                        React.createElement('div', { className: 'flex gap-3 flex-wrap justify-center' },
-                            myHand.map((tile, idx) => {
-                                const isSelected = selectedTile?.index === idx;
-                                const canPlay = isMyTurn && (gameState.board.length === 0 || calculateValidMoves(tile).length > 0);
-                                
-                                return React.createElement('button', {
-                                    key: idx,
-                                    onClick: () => selectTile(tile, idx),
-                                    disabled: !isMyTurn,
-                                    className: `bg-white rounded-xl p-4 shadow-xl transition-all transform hover:scale-110 active:scale-95 border-4 ${
-                                        isSelected ? 'border-yellow-400 shadow-yellow-400/50 scale-110' :
-                                        canPlay ? 'border-green-400 shadow-green-400/50 animate-pulse' :
-                                        'border-gray-300'
-                                    } ${!isMyTurn ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`,
-                                    style: { minWidth: '80px' }
-                                },
-                                    React.createElement('div', { className: 'flex flex-col items-center gap-2' },
-                                        React.createElement('div', { className: 'w-12 h-12 flex items-center justify-center' },
-                                            React.createElement('span', { className: 'text-4xl font-black text-gray-800' }, tile[0])
-                                        ),
-                                        React.createElement('div', { className: 'w-full h-1 bg-gray-800 rounded' }),
-                                        React.createElement('div', { className: 'w-12 h-12 flex items-center justify-center' },
-                                            React.createElement('span', { className: 'text-4xl font-black text-gray-800' }, tile[1])
-                                        )
-                                    )
-                                );
-                            })
-                        )
-                    )
-                )
-            );
-        }
+                        {/* ALT PANEL: Oyuncu Eli */}
+                        <div className="bg-gradient-to-t from-black/90 via-table-dark to-transparent pb-6 pt-2 px-2 z-20">
+                            
+                            {/* Kontrol Butonları */}
+                            <div className="flex justify-between items-center px-4 mb-2">
+                                <div className="flex items-center gap-3">
+                                    <span className="text-white text-xs font-bold tracking-widest opacity-70">
+                                        🎴 ELİNİZ ({myHand.length})
+                                    </span>
+                                    {marketSize > 0 && (
+                                        <span className="text-yellow-400 text-xs font-bold bg-black/40 px-2 py-1 rounded-full">
+                                            🎲 PAZAR: {marketSize}
+                                        </span>
+                                    )}
+                                </div>
+                                {isMyTurn && (
+                                    <div className="flex gap-2">
+                                        {canDrawFromMarket && validMoves.length === 0 && selectedTileIndex === null && (
+                                            <button 
+                                                onClick={drawFromMarket}
+                                                className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
+                                            >
+                                                🎲 ÇEK
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
 
-        return null;
-    };
+                            {/* Taş Dizilimi */}
+                            <div className="w-full max-w-4xl mx-auto overflow-y-auto max-h-[40vh] p-2">
+                                <div className="flex justify-center gap-2 flex-wrap">
+                                    {myHand.map((tile, index) => {
+                                        const canPlay = isMyTurn && (gameState.board.length === 0 || calculateValidMoves(tile).length > 0);
+                                        
+                                        return (
+                                            <DominoTile 
+                                                key={index}
+                                                values={tile}
+                                                onClick={() => handleTileClick(index, tile)}
+                                                disabled={!isMyTurn}
+                                                isSelected={selectedTileIndex === index}
+                                                vertical={true}
+                                                animateIn={true}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
 
-    ReactDOM.render(React.createElement(DominoGame), document.getElementById('root'));
-</script>
+            return null;
+        };
 
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<DominoGame />);
+    </script>
 </body>
 </html>
