@@ -52,6 +52,33 @@ const matchSchema = new mongoose.Schema({
 
 const Player = mongoose.model('DominoPlayer', playerSchema);
 const Match = mongoose.model('DominoMatch', matchSchema);
+const RoomState = mongoose.model('RoomState', new mongoose.Schema({
+    roomCode: { type: String, required: true, unique: true },
+    players: [{
+        playerId: String,
+        ws: String, // WebSocket ID placeholder
+        playerName: String,
+        telegramId: String,
+        level: Number,
+        elo: Number,
+        photoUrl: String,
+        isGuest: Boolean,
+        hand: [[Number]], // Domino tiles
+        connected: Boolean
+    }],
+    gameState: {
+        board: [[Number]],
+        currentPlayer: String,
+        market: [[Number]],
+        gameStarted: Boolean,
+        gameType: String,
+        createdAt: Date,
+        lastMove: Date
+    },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+}, { collection: 'room_states' }));
+
 
 app.use(cors());
 app.use(express.json());
@@ -64,33 +91,7 @@ const playerSessions = new Map(); // telegramId -> player data
 // Oda durumunu MongoDB'ye kaydetme ve yükleme
 async function saveRoomToDatabase(roomCode, roomData) {
     try {
-        const RoomState = mongoose.model('RoomState', new mongoose.Schema({
-            roomCode: { type: String, required: true, unique: true },
-            players: [{
-                playerId: String,
-                ws: String, // WebSocket ID placeholder
-                playerName: String,
-                telegramId: String,
-                level: Number,
-                elo: Number,
-                photoUrl: String,
-                isGuest: Boolean,
-                hand: [[Number]], // Domino tiles
-                connected: Boolean
-            }],
-            gameState: {
-                board: [[Number]],
-                currentPlayer: String,
-                market: [[Number]],
-                gameStarted: Boolean,
-                gameType: String,
-                createdAt: Date,
-                lastMove: Date
-            },
-            createdAt: { type: Date, default: Date.now },
-            updatedAt: { type: Date, default: Date.now }
-        }, { collection: 'room_states' }));
-        
+        // Model artık dışarıda tanımlı
         await RoomState.findOneAndUpdate(
             { roomCode },
             { 
@@ -121,14 +122,6 @@ async function saveRoomToDatabase(roomCode, roomData) {
 
 async function loadRoomFromDatabase(roomCode) {
     try {
-        const RoomState = mongoose.model('RoomState', new mongoose.Schema({
-            roomCode: String,
-            players: [mongoose.Schema.Types.Mixed],
-            gameState: mongoose.Schema.Types.Mixed,
-            createdAt: Date,
-            updatedAt: Date
-        }), { collection: 'room_states' });
-        
         const roomData = await RoomState.findOne({ roomCode });
         if (roomData) {
             console.log(`📂 Oda ${roomCode} veritabanından yüklendi`);
@@ -143,7 +136,6 @@ async function loadRoomFromDatabase(roomCode) {
 
 async function deleteRoomFromDatabase(roomCode) {
     try {
-        const RoomState = mongoose.model('RoomState', new mongoose.Schema({}, { collection: 'room_states' }));
         await RoomState.deleteOne({ roomCode });
         console.log(`🗑️ Oda ${roomCode} veritabanından silindi`);
     } catch (error) {
@@ -1478,7 +1470,7 @@ function handleDisconnect(ws) {
     
     const qIdx = matchQueue.findIndex(p => p.ws === ws);
     if (qIdx !== -1) {
-        matchQueue.splice(qIdx, 1);
+        matchQueue.splice(qIdx, 1); // Kuyruktan kaldır
         console.log(`❌ Kuyruktan çıkarıldı - Kalan: ${matchQueue.length}`);
         // Eğer oyuncu arama ekranındaysa ve bağlantısı koparsa,
         // istemci tarafında arayüzün takılı kalmaması için bir mesaj gönderilebilir.
@@ -1488,7 +1480,7 @@ function handleDisconnect(ws) {
     }
 
     if (ws.roomCode) {
-        console.log(`🏠 Odadan ayrıldı: ${ws.roomCode}`);
+        console.log(`🏠 Oyuncu ${ws.playerName} odadan ayrıldı: ${ws.roomCode}`);
         
         // Oyuncu odadan ayrıldığında diğer oyuncuya kazanç ver
         const room = rooms.get(ws.roomCode);
@@ -1501,13 +1493,16 @@ function handleDisconnect(ws) {
                 const remainingWs = playerConnections.get(remainingPlayerId);
                 
                 if (remainingWs && remainingWs.readyState === WebSocket.OPEN) {
-                    const isRankedMatch = room.type === 'ranked' && !remainingPlayer.isGuest && !(room.players[ws.playerId]?.isGuest);
+                    const disconnectedPlayer = room.players[ws.playerId] || { isGuest: true, elo: 0 };
+                    const isRankedMatch = room.type === 'ranked' && !remainingPlayer.isGuest && !disconnectedPlayer.isGuest;
                     let eloChange = 0;
 
                     // Level'e göre ELO belirle
                     if (isRankedMatch) {
-                        const playerLevel = remainingPlayer.level || 1;
-                        if (playerLevel <= 5) {
+                        const winnerLevel = remainingPlayer.level || 1;
+                        const eloResult = calculateElo(remainingPlayer.elo, disconnectedPlayer.elo, winnerLevel);
+                        eloChange = eloResult.winnerChange;
+                        if (winnerLevel <= 5) {
                             eloChange = Math.floor(Math.random() * 6) + 15; // 15-20 arası
                         } else {
                             eloChange = Math.floor(Math.random() * 6) + 10; // 10-15 arası
@@ -1518,7 +1513,7 @@ function handleDisconnect(ws) {
                     remainingWs.send(JSON.stringify({
                         type: 'gameEnd',
                         winner: remainingPlayerId,
-                        winnerName: remainingPlayer.firstName || remainingPlayer.name,
+                        winnerName: remainingPlayer.name,
                         reason: 'opponent_left',
                         isRanked: isRankedMatch,
                         eloChanges: {
@@ -1528,11 +1523,11 @@ function handleDisconnect(ws) {
                         startTime: room.startTime,
                         players: {
                             [remainingPlayerId]: {
-                                name: remainingPlayer.firstName || remainingPlayer.name,
+                                name: remainingPlayer.name,
                                 photoUrl: remainingPlayer.photoUrl
                             },
                             [ws.playerId]: {
-                                name: ws.playerName,
+                                name: ws.playerName || 'Ayrılan Oyuncu',
                                 photoUrl: ws.photoUrl
                             }
                         }
