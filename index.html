@@ -436,16 +436,25 @@
                 }
             };
 
-            const handleExitGame = () => {
-                if (confirm('Oyundan çıkmak istediğinize emin misiniz?')) {
+            const handleExitGame = async () => {
+                if (confirm('Oyundan çıkmak istediğinize emin misiniz? Rakibiniz kazanan ilan edilecektir.')) {
                     // Sunucuya oyundan çıkış bildir
-                    if (wsRef.current) {
-                        wsRef.current.send(JSON.stringify({ type: 'leaveGame', roomCode: gameState?.roomCode }));
+                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                        wsRef.current.send(JSON.stringify({ 
+                            type: 'leaveGame', 
+                            roomCode: gameState?.roomCode 
+                        }));
+                        
+                        // Hemen lobiye dön
+                        setScreen('lobby');
+                        setGameState(null);
+                        setSelectedTileIndex(null);
+                        setValidMoves([]);
+                    } else {
+                        // Eğer bağlantı yoksa direkt çık
+                        setScreen('lobby');
+                        setGameState(null);
                     }
-                    setScreen('lobby');
-                    setGameState(null);
-                    setSelectedTileIndex(null);
-                    setValidMoves([]);
                 }
             };
 
