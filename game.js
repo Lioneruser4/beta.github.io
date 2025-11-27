@@ -630,10 +630,40 @@ function showResultScreen(isWinner, eloChange, reason, exitType) {
         }
     }
     
+    // ELO'yu sıfırla (sadece oyundan çıkıldığında)
+    if (exitType === 'exit') {
+        resetPlayerElo();
+    }
+    
     // 3 saniye sonra ana menüye dön
     setTimeout(() => {
         showScreen('main');
     }, 3000);
+}
+
+// Yeni fonksiyon: Oyuncunun ELO puanını sıfırla
+function resetPlayerElo() {
+    // Sunucuya ELO sıfırlama isteği gönder
+    fetch('https://mario-io-1.onrender.com/api/reset-player-elo', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            telegramId: gameState.playerId // Bu kısmı uygun şekilde güncellemek gerekebilir
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('ELO puanı sıfırlandı');
+        } else {
+            console.error('ELO sıfırlama hatası:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('ELO sıfırlama isteği hatası:', error);
+    });
 }
 
 modalCloseBtn.onclick = () => {
