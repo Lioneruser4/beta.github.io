@@ -541,8 +541,15 @@ joinRoomBtn.onclick = () => {
 
 leaveGameBtn.onclick = () => {
     if (confirm('Eminmisiniz? Oyundan cikdiqda ELO itireceksiniz!')) {
-        socket.send(JSON.stringify({ type: 'leaveGame', roomCode: gameState.roomCode }));
-        leaveGame();
+        // Oyundan çıkma isteğini sunucuya gönder
+        socket.send(JSON.stringify({ 
+            type: 'leaveGame', 
+            roomCode: gameState.roomCode,
+            playerId: gameState.playerId
+        }));
+        
+        // Oyunu bitir ve sonuç ekranını göster
+        endGameWithResult(false, 0, 'Oyundan Çıkıldı', 'exit');
     }
 };
 
@@ -563,6 +570,70 @@ function leaveGame() {
     };
     
     showScreen('main');
+}
+
+// Yeni fonksiyon: Oyunu bitir ve sonuç ekranını göster
+function endGameWithResult(isWinner, eloChange, reason, exitType = 'normal') {
+    // Oyun durumunu sıfırla
+    gameState = {
+        board: [],
+        currentTurn: 'red',
+        selectedPiece: null,
+        myColor: null,
+        isMyTurn: false,
+        roomCode: null,
+        isSearching: false,
+        gameStarted: false
+    };
+    
+    // Sonuç ekranını göster
+    showResultScreen(isWinner, eloChange, reason, exitType);
+}
+
+// Yeni fonksiyon: Sonuç ekranını göster
+function showResultScreen(isWinner, eloChange, reason, exitType) {
+    // Mevcut ekranları gizle
+    showScreen('result'); // Bu zaten var
+    
+    // Sonuç mesajını oluştur
+    let message = '';
+    if (exitType === 'exit') {
+        message = 'Oyundan Çıkıldı';
+    } else if (reason === 'empty_hand') {
+        message = isWinner ? '🎉 Eli boş! Qazandiniz!' : '😔 Rakibin eli boş! Uduzdunuz';
+    } else if (reason === 'points' || reason === 'points_equal') {
+        if (reason === 'points_equal') {
+            message = '🤝 Beraberlik!';
+        } else {
+            message = isWinner ? '🎉 Daha az puan! Qazandiniz!' : '😔 Daha çok puan! Uduzdunuz';
+        }
+    } else {
+        message = isWinner ? '🎉 Qazandiniz!' : '😔 Uduzdunuz';
+    }
+    
+    // Sonuç mesajını güncelle
+    const resultMessage = document.getElementById('result-message');
+    if (resultMessage) {
+        resultMessage.textContent = message;
+        resultMessage.className = isWinner ? 'text-4xl font-bold text-green-400' : 'text-4xl font-bold text-red-400';
+    }
+    
+    // ELO puanını göster
+    const resultElo = document.getElementById('result-elo');
+    if (resultElo) {
+        if (eloChange !== 0) {
+            resultElo.textContent = 'ELO: ' + (isWinner ? '+' : '') + eloChange;
+            resultElo.className = isWinner ? 'text-2xl font-semibold text-green-300' : 'text-2xl font-semibold text-red-300';
+            resultElo.style.display = 'block';
+        } else {
+            resultElo.style.display = 'none';
+        }
+    }
+    
+    // 3 saniye sonra ana menüye dön
+    setTimeout(() => {
+        showScreen('main');
+    }, 3000);
 }
 
 modalCloseBtn.onclick = () => {
