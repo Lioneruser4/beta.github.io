@@ -958,7 +958,7 @@ function handleReconnectToRoom(ws, data) {
         
         // Oyuncuyu odaya ekle
         room.players[playerId] = { 
-            name: ws.playerName,
+            name: ws.playerName || 'Bilinmeyen',
             telegramId: existingPlayer?.telegramId || null,
             level: existingPlayer?.level || 0,
             elo: existingPlayer?.elo || 0,
@@ -966,6 +966,7 @@ function handleReconnectToRoom(ws, data) {
             isGuest: existingPlayer?.isGuest || true,
             hand: existingPlayer?.hand || []
         };
+        saveRoomToDatabase(roomCode, room); // Odayı güncelle
 
         console.log(`🔄 ${ws.playerName} odaya geri bağlandı: ${roomCode}`);
         
