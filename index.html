@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 
 <html lang="tr">
 <head>
@@ -33,6 +33,9 @@
 <script>
     const { useState, useEffect, useRef } = React;
 
+    const API_URL = 'https://mario-io-1.onrender.com';
+    const WS_URL = 'wss://mario-io-1.onrender.com';
+
     const DominoGame = () => {
         const [screen, setScreen] = useState('lobby');
         const [connected, setConnected] = useState(false);
@@ -46,6 +49,7 @@
         const [searching, setSearching] = useState(false);
         const [copied, setCopied] = useState(false);
         const [notification, setNotification] = useState('');
+        const [gameEndData, setGameEndData] = useState(null);
         const wsRef = useRef(null);
 
         // --- ADMIN STATE ---
@@ -70,9 +74,8 @@
                 if (user) {
                     const name = user.first_name || user.username;
                     setPlayerName(name);
-                    const apiUrl = 'https://mario-io-1.onrender.com';
                     // Sunucuya oyuncu verisini gönderip doğrula
-                    fetch(`${apiUrl}/api/auth/telegram`, {
+                    fetch(`${API_URL}/api/auth/telegram`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ telegramId: user.id.toString(), username: user.username, firstName: user.first_name, lastName: user.last_name, photoUrl: user.photo_url })
@@ -88,10 +91,9 @@
 
         const connectToServer = () => {
             try {
-                const wsUrl = 'wss://mario-io-1.onrender.com';
-                console.log('🔌 Sunucuya bağlanılıyor:', wsUrl);
+                console.log('🔌 Sunucuya bağlanılıyor:', WS_URL);
                 
-                const ws = new WebSocket(wsUrl);
+                const ws = new WebSocket(WS_URL);
                 
                 ws.onopen = () => {
                     console.log('✅ WebSocket bağlantısı açıldı');
@@ -165,9 +167,14 @@
                     break;
                 case 'gameEnd':
                     showNotification(`🏆 Oyun bitti! Kazanan: ${data.winnerName || 'Bilinmiyor'}. ELO: ${data.isRanked ? (data.eloChanges?.winner > 0 ? '+' : '') + (data.eloChanges?.winner || 0) : 'N/A'}`, 'success');
+                    // Reset all game states after showing the result
                     setTimeout(() => {
                         setScreen('lobby');
                         setGameState(null);
+                        setRoomCode('');
+                        setJoinRoomCode('');
+                        setSelectedTile(null);
+                        setValidMoves([]);
                     }, 3000);
                     break;
                 case 'error':
@@ -282,8 +289,7 @@
         // --- ADMIN FONKSİYONLARI ---
         const handleAdminAction = async (action, targetTelegramId, amount = 0) => {
             if (!isAdmin) return;
-            const apiUrl = 'https://mario-io-1.onrender.com';
-            const endpoint = `${apiUrl}/admin/${action}`; // API endpoint'i /api/admin/ değil, /admin/ olarak düzeltildi
+            const endpoint = `${API_URL}/admin/${action}`; // API endpoint'i /api/admin/ değil, /admin/ olarak düzeltildi
             try {
                 const response = await fetch(endpoint, {
                     method: 'POST',
@@ -497,7 +503,16 @@
                             React.createElement('span', { className: 'text-white font-bold text-lg ml-2' }, `Tur: ${gameState.turn || 1}`),
                             React.createElement('span', { className: 'text-white font-bold text-lg ml-4' }, `Pazar: ${gameState.market?.length || 0}`),
                             React.createElement('button', {
-                                onClick: () => { if(confirm('Oyundan çıkmak istediğinize emin misiniz? Dereceli maç ise ELO kaybedebilirsiniz.')) { sendMessage({ type: 'forceDisconnect', roomCode: gameState.roomCode }); setScreen('lobby'); setGameState(null); } },
+                                onClick: () => { 
+                                    if(confirm('Oyundan çıkmak istediğinize emin misiniz? Dereceli maç ise ELO kaybedebilirsiniz.')) { 
+                                        sendMessage({ 
+                                            type: 'forceDisconnect', 
+                                            roomCode: gameState.roomCode,
+                                            playerId: gameState.playerId
+                                        });
+                                        // Don't reset state here, let the server handle it
+                                    } 
+                                },
                                 className: 'ml-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition-all transform hover:scale-105 active:scale-95 shadow-lg'
                             }, 'ÇIK')
                         ),
@@ -669,9 +684,14 @@
                     break;
                 case 'gameEnd':
                     showNotification(`🏆 Oyun bitti! Kazanan: ${data.winnerName || 'Bilinmiyor'}. ELO: ${data.isRanked ? (data.eloChanges?.winner > 0 ? '+' : '') + (data.eloChanges?.winner || 0) : 'N/A'}`, 'success');
+                    // Reset all game states after showing the result
                     setTimeout(() => {
                         setScreen('lobby');
                         setGameState(null);
+                        setRoomCode('');
+                        setJoinRoomCode('');
+                        setSelectedTile(null);
+                        setValidMoves([]);
                     }, 3000);
                     break;
                 case 'error':
@@ -1000,7 +1020,16 @@
                             React.createElement('span', { className: 'text-white font-bold text-lg ml-2' }, `Tur: ${gameState.turn || 1}`),
                             React.createElement('span', { className: 'text-white font-bold text-lg ml-4' }, `Pazar: ${gameState.market?.length || 0}`),
                             React.createElement('button', {
-                                onClick: () => { if(confirm('Oyundan çıkmak istediğinize emin misiniz? Dereceli maç ise ELO kaybedebilirsiniz.')) { sendMessage({ type: 'forceDisconnect', roomCode: gameState.roomCode }); setScreen('lobby'); setGameState(null); } },
+                                onClick: () => { 
+                                    if(confirm('Oyundan çıkmak istediğinize emin misiniz? Dereceli maç ise ELO kaybedebilirsiniz.')) { 
+                                        sendMessage({ 
+                                            type: 'forceDisconnect', 
+                                            roomCode: gameState.roomCode,
+                                            playerId: gameState.playerId
+                                        });
+                                        // Don't reset state here, let the server handle it
+                                    } 
+                                },
                                 className: 'ml-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition-all transform hover:scale-105 active:scale-95 shadow-lg'
                             }, 'ÇIK')
                         ),
@@ -1190,9 +1219,14 @@
                     break;
                 case 'gameEnd':
                     showNotification(`🏆 Oyun bitti! Kazanan: ${data.winnerName || 'Bilinmiyor'}. ELO: ${data.isRanked ? (data.eloChanges?.winner > 0 ? '+' : '') + (data.eloChanges?.winner || 0) : 'N/A'}`, 'success');
+                    // Reset all game states after showing the result
                     setTimeout(() => {
                         setScreen('lobby');
                         setGameState(null);
+                        setRoomCode('');
+                        setJoinRoomCode('');
+                        setSelectedTile(null);
+                        setValidMoves([]);
                     }, 3000);
                     break;
                 case 'error':
@@ -1521,7 +1555,16 @@
                             React.createElement('span', { className: 'text-white font-bold text-lg ml-2' }, `Tur: ${gameState.turn || 1}`),
                             React.createElement('span', { className: 'text-white font-bold text-lg ml-4' }, `Pazar: ${gameState.market?.length || 0}`),
                             React.createElement('button', {
-                                onClick: () => { if(confirm('Oyundan çıkmak istediğinize emin misiniz? Dereceli maç ise ELO kaybedebilirsiniz.')) { sendMessage({ type: 'forceDisconnect', roomCode: gameState.roomCode }); setScreen('lobby'); setGameState(null); } },
+                                onClick: () => { 
+                                    if(confirm('Oyundan çıkmak istediğinize emin misiniz? Dereceli maç ise ELO kaybedebilirsiniz.')) { 
+                                        sendMessage({ 
+                                            type: 'forceDisconnect', 
+                                            roomCode: gameState.roomCode,
+                                            playerId: gameState.playerId
+                                        });
+                                        // Don't reset state here, let the server handle it
+                                    } 
+                                },
                                 className: 'ml-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition-all transform hover:scale-105 active:scale-95 shadow-lg'
                             }, 'ÇIK')
                         ),
