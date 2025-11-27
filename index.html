@@ -103,7 +103,12 @@
                 ws.onclose = (event) => {
                     console.log('❌ WebSocket bağlantısı kapandı:', event.code, event.reason);
                     setConnected(false);
-                    showNotification('❌ Bağlantı kesildi, yeniden bağlanıyor...', 'error');
+                    // Eğer oyuncu bir odada değilse ve lobi ekranındaysa yeniden bağlanma mesajı göster
+                    if (screen === 'lobby' && !roomCode && !searching) {
+                        showNotification('❌ Bağlantı kesildi, yeniden bağlanıyor...', 'error');
+                    } else {
+                        // Oyuncu oyun veya arama ekranındaysa, sunucu zaten durumu yönetecek.
+                    }
                     setTimeout(connectToServer, 3000);
                 };
 
@@ -491,8 +496,8 @@
                             React.createElement('span', { className: 'text-white font-bold text-lg ml-2' }, `Tur: ${gameState.turn || 1}`),
                             React.createElement('span', { className: 'text-white font-bold text-lg ml-4' }, `Pazar: ${gameState.market?.length || 0}`),
                             React.createElement('button', {
-                                onClick: () => { if(confirm('Oyundan çıkmak istediğinize emin misiniz? ELO kaybedebilirsiniz.')) sendMessage({ type: 'forceDisconnect', roomCode: gameState.roomCode }); setScreen('lobby'); setGameState(null); },
-                                className: 'ml-4 bg-red-600 text-white px-3 py-1 rounded-lg text-sm font-bold'
+                                onClick: () => { if(confirm('Oyundan çıkmak istediğinize emin misiniz? Dereceli maç ise ELO kaybedebilirsiniz.')) { sendMessage({ type: 'forceDisconnect', roomCode: gameState.roomCode }); setScreen('lobby'); setGameState(null); } },
+                                className: 'ml-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition-all transform hover:scale-105 active:scale-95 shadow-lg'
                             }, 'ÇIK')
                         ),
 
