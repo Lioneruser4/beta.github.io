@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 
 <html lang="tr">
 <head>
@@ -159,22 +159,28 @@
                     showNotification('✨ Rakip bulundu!', 'success');
                     break;
                 case 'playerDisconnected':
-                    showNotification('❌ Rakip oyundan ayrıldı', 'error');
-                    setTimeout(() => {
-                        setScreen('lobby');
-                        setGameState(null);
-                    }, 2000);
-                    break;
-                case 'gameEnd':
-                    showNotification(`🏆 Oyun bitti! Kazanan: ${data.winnerName || 'Bilinmiyor'}. ELO: ${data.isRanked ? (data.eloChanges?.winner > 0 ? '+' : '') + (data.eloChanges?.winner || 0) : 'N/A'}`, 'success');
-                    // Reset all game states after showing the result
+                    showNotification(`🏆 Rakip oyundan ayrıldı! Kazanan: ${data.winnerName}.`, 'info');
+                    // Oyun sonu durumunu ayarla ve lobiye dön
+                    setGameEndData(data);
                     setTimeout(() => {
                         setScreen('lobby');
                         setGameState(null);
                         setRoomCode('');
                         setJoinRoomCode('');
                         setSelectedTile(null);
-                        setValidMoves([]);
+                        setGameEndData(null);
+                    }, 3000);
+                    break;
+                case 'gameEnd':
+                    showNotification(`🏆 Oyun bitti! Kazanan: ${data.winnerName}. ELO Değişimleri: Kazanan ${data.eloChanges.winner > 0 ? '+' : ''}${data.eloChanges.winner}, Kaybeden ${data.eloChanges.loser}`, 'success');
+                    setGameEndData(data);
+                    setTimeout(() => {
+                        setScreen('lobby');
+                        setGameState(null);
+                        setRoomCode('');
+                        setJoinRoomCode('');
+                        setSelectedTile(null);
+                        setGameEndData(null);
                     }, 3000);
                     break;
                 case 'error':
@@ -289,7 +295,7 @@
         // --- ADMIN FONKSİYONLARI ---
         const handleAdminAction = async (action, targetTelegramId, amount = 0) => {
             if (!isAdmin) return;
-            const endpoint = `${API_URL}/admin/${action}`; // API endpoint'i /api/admin/ değil, /admin/ olarak düzeltildi
+            const endpoint = `${API_URL}/api/admin/${action}`;
             try {
                 const response = await fetch(endpoint, {
                     method: 'POST',
@@ -506,11 +512,18 @@
                                 onClick: () => { 
                                     if(confirm('Oyundan çıkmak istediğinize emin misiniz? Dereceli maç ise ELO kaybedebilirsiniz.')) { 
                                         sendMessage({ 
-                                            type: 'forceDisconnect', 
+                                            type: 'forceEndGame', 
                                             roomCode: gameState.roomCode,
                                             playerId: gameState.playerId
                                         });
-                                        // Don't reset state here, let the server handle it
+                                        // Direkt lobiye dön ve tüm verileri sıfırla
+                                        setScreen('lobby');
+                                        setGameState(null);
+                                        setRoomCode('');
+                                        setJoinRoomCode('');
+                                        setSelectedTile(null);
+                                        setValidMoves([]);
+                                        setGameEndData(null);
                                     } 
                                 },
                                 className: 'ml-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition-all transform hover:scale-105 active:scale-95 shadow-lg'
@@ -676,11 +689,15 @@
                     showNotification('✨ Rakip bulundu!', 'success');
                     break;
                 case 'playerDisconnected':
-                    showNotification('❌ Rakip oyundan ayrıldı', 'error');
+                    showNotification(`🏆 Oyun bitti! Rakip ayrıldı. Kazanan: ${data.winnerName || 'Siz'}. ELO: ${data.isRanked ? (data.eloChanges?.winner > 0 ? '+' : '') + (data.eloChanges?.winner || 0) : 'N/A'}`, 'info');
                     setTimeout(() => {
                         setScreen('lobby');
                         setGameState(null);
-                    }, 2000);
+                        setRoomCode('');
+                        setJoinRoomCode('');
+                        setSelectedTile(null);
+                        setValidMoves([]);
+                    }, 3000);
                     break;
                 case 'gameEnd':
                     showNotification(`🏆 Oyun bitti! Kazanan: ${data.winnerName || 'Bilinmiyor'}. ELO: ${data.isRanked ? (data.eloChanges?.winner > 0 ? '+' : '') + (data.eloChanges?.winner || 0) : 'N/A'}`, 'success');
@@ -1128,20 +1145,48 @@
             );
         }
 
-        return null;
-    };
+        // Yeni eklenen sonuç ekranı bileşeni
+        function ResultScreen({ isWinner, eloChange, reason, exitType }) {
+            let message = '';
+            if (exitType === 'exit') {
+                message = 'Oyundan Çıkıldı';
+            } else if (reason === 'empty_hand') {
+                message = isWinner ? '🎉 Eli boş! Qazandiniz!' : '😔 Rakibin eli boş! Uduzdunuz';
+            } else if (reason === 'points' || reason === 'points_equal') {
+                if (reason === 'points_equal') {
+                    message = '🤝 Beraberlik!';
+                } else {
+                    message = isWinner ? '🎉 Daha az puan! Qazandiniz!' : '😔 Daha çok puan! Uduzdunuz';
+                }
+            } else {
+                message = isWinner ? '🎉 Qazandiniz!' : '😔 Uduzdunuz';
+            }
 
-    ReactDOM.render(React.createElement(DominoGame), document.getElementById('root'));
-</script>
-
-</body>
-</html>                                     React.createElement('span', { className: 'text-4xl font-black text-gray-800' }, tile[1])
-                                        )
-                                    )
-                                );
-                            })
-                        )
-                    )
+            return React.createElement('div', { 
+                className: 'min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4 overflow-hidden relative',
+                id: 'result-lobby'
+            },
+                React.createElement('div', { className: 'bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20 max-w-2xl w-full text-center' },
+                    React.createElement('h1', { 
+                        className: `text-5xl font-black mb-6 ${
+                            isWinner ? 'text-green-400' : 'text-red-400'
+                        }`
+                    }, message),
+                    
+                    eloChange !== 0 && React.createElement('div', {
+                        className: `text-3xl font-bold mb-8 ${
+                            isWinner ? 'text-green-300' : 'text-red-300'
+                        }`
+                    }, 'ELO: ', isWinner ? '+' : '', eloChange),
+                    
+                    React.createElement('div', { className: 'text-white text-xl mb-8' },
+                        'Ana menüye dönülüyor...'
+                    ),
+                    
+                    React.createElement('button', {
+                        onClick: () => setScreen('lobby'),
+                        className: 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-4 rounded-xl font-bold text-xl hover:from-purple-700 hover:to-indigo-700 transition-all transform hover:scale-105 active:scale-95 shadow-2xl'
+                    }, 'Ana Menüye Dön')
                 )
             );
         }
@@ -1211,11 +1256,15 @@
                     showNotification('✨ Rakip bulundu!', 'success');
                     break;
                 case 'playerDisconnected':
-                    showNotification('❌ Rakip oyundan ayrıldı', 'error');
+                    showNotification(`🏆 Oyun bitti! Rakip ayrıldı. Kazanan: ${data.winnerName || 'Siz'}. ELO: ${data.isRanked ? (data.eloChanges?.winner > 0 ? '+' : '') + (data.eloChanges?.winner || 0) : 'N/A'}`, 'info');
                     setTimeout(() => {
                         setScreen('lobby');
                         setGameState(null);
-                    }, 2000);
+                        setRoomCode('');
+                        setJoinRoomCode('');
+                        setSelectedTile(null);
+                        setValidMoves([]);
+                    }, 3000);
                     break;
                 case 'gameEnd':
                     showNotification(`🏆 Oyun bitti! Kazanan: ${data.winnerName || 'Bilinmiyor'}. ELO: ${data.isRanked ? (data.eloChanges?.winner > 0 ? '+' : '') + (data.eloChanges?.winner || 0) : 'N/A'}`, 'success');
