@@ -522,6 +522,53 @@ function handleCellClick(r, c) {
     }
 }
 
+// Oyundan çıkış işlemi
+function handleLeaveGame() {
+    if (confirm('Oyundan çıkmak istediğinize emin misiniz? Bu işlem geri alınamaz.')) {
+        // Sunucuya oyundan çıkış isteği gönder
+        if (socket && socket.connected) {
+            socket.emit('leaveGame');
+            
+            // Kullanıcıya geri bildirim göster
+            showMessage('Oyundan çıkılıyor...', false);
+            
+            // 1 saniye sonra ana menüye dön
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1000);
+        } else {
+            // Eğer bağlantı yoksa doğrudan yönlendir
+            window.location.href = '/';
+        }
+    }
+}
+
+// Sunucudan gelen oyundan atılma/çıkış mesajlarını dinle
+socket.on('playerLeft', (data) => {
+    if (data.playerId !== socket.id) { // Kendi çıkışımız değilse
+        showMessage('Rakibiniz oyundan ayrıldı. Ana menüye yönlendiriliyorsunuz...', false);
+        setTimeout(() => {
+            window.location.href = '/';
+        }, 3000);
+    }
+});
+
+// Oyun sonu mesajı
+socket.on('gameEnd', (data) => {
+    // Eğer kazanan yoksa (beraberlik veya oyun iptali)
+    if (!data.winner) {
+        showMessage(data.winnerName || 'Oyun sona erdi', false);
+    } else {
+        const winnerName = data.winnerName || (data.winner === socket.id ? 'Siz' : 'Rakibiniz');
+        showMessage(`Oyun bitti! Kazanan: ${winnerName}`, false);
+    }
+    
+    // 3 saniye sonra ana menüye dön
+    setTimeout(() => {
+        window.location.href = '/';
+    }, 3000);
+});
+
 // --- Button Eventleri ---
 
 dereceliBtn.onclick = () => {
@@ -600,8 +647,12 @@ modalCloseBtn.onclick = () => {
     messageModal.classList.add('hidden');
 };
 
-// Baslangic
+// Çıkış butonuna event listener ekle
 document.addEventListener('DOMContentLoaded', () => {
+    const leaveGameBtn = document.getElementById('leave-game-btn');
+    if (leaveGameBtn) {
+        leaveGameBtn.addEventListener('click', handleLeaveGame);
+    }
     connectionStatus.textContent = 'Servere qosulur...';
     connectionStatus.classList.add('text-yellow-400', 'animate-pulse');
 });
