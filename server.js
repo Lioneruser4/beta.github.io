@@ -32,7 +32,8 @@ const playerSchema = new mongoose.Schema({
     winStreak: { type: Number, default: 0 },
     bestWinStreak: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now },
-    lastPlayed: { type: Date, default: Date.now }
+    lastPlayed: { type: Date, default: Date.now },
+    isHidden: { type: Boolean, default: false } // Admin paneli için eklendi
 });
 
 const matchSchema = new mongoose.Schema({
@@ -205,6 +206,7 @@ app.post('/api/auth/telegram', async (req, res) => {
             player.lastName = lastName;
             player.photoUrl = photoUrl;
             player.lastPlayed = new Date();
+            // Admin ID'si ile giriş yapılıp yapılmadığını kontrol et
             await player.save();
         }
 
@@ -214,6 +216,7 @@ app.post('/api/auth/telegram', async (req, res) => {
             success: true,
             player: {
                 id: player._id,
+                isAdmin: player.telegramId === '976640409', // Admin kontrolü
                 telegramId: player.telegramId,
                 username: player.username,
                 firstName: player.firstName,
@@ -238,7 +241,7 @@ app.post('/api/auth/telegram', async (req, res) => {
 app.get('/api/leaderboard', async (req, res) => {
     try {
         const players = await Player.find()
-            .sort({ elo: -1 })
+            .where({ isHidden: { $ne: true } }).sort({ elo: -1 }) // Gizli oyuncuları filtrele
             .limit(10) // Top 10
             .select('telegramId username firstName lastName photoUrl elo level wins losses draws totalGames winStreak');
         
@@ -298,6 +301,57 @@ app.get('/', (req, res) => {
         players: playerConnections.size,
         rooms: rooms.size
     });
+});
+
+// YENİ ADMIN API'LERİ
+const ADMIN_ID = '976640409';
+
+// Admin kontrol middleware'i
+const isAdmin = (req, res, next) => {
+    const { adminId } = req.body;
+    if (adminId !== ADMIN_ID) {
+        return res.status(403).json({ error: 'Yetkisiz erişim' });
+    }
+    next();
+};
+
+app.post('/api/admin/modify-elo', isAdmin, async (req, res) => {
+    try {
+        const { targetTelegramId, amount } = req.body;
+        const player = await Player.findOne({ telegramId: targetTelegramId });
+        if (!player) return res.status(404).json({ error: 'Oyuncu bulunamadı' });
+
+        player.elo = Math.max(0, (player.elo || 0) + parseInt(amount, 10));
+        player.level = calculateLevel(player.elo);
+        await player.save();
+        res.json({ success: true, message: `${player.firstName}'ın yeni ELO'su: ${player.elo}` });
+    } catch (error) {
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+app.post('/api/admin/toggle-visibility', isAdmin, async (req, res) => {
+    try {
+        const { targetTelegramId } = req.body;
+        const player = await Player.findOne({ telegramId: targetTelegramId });
+        if (!player) return res.status(404).json({ error: 'Oyuncu bulunamadı' });
+
+        player.isHidden = !player.isHidden;
+        await player.save();
+        res.json({ success: true, message: `${player.firstName} şimdi ${player.isHidden ? 'gizli' : 'görünür'}` });
+    } catch (error) {
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+app.post('/api/admin/delete-user', isAdmin, async (req, res) => {
+    try {
+        const { targetTelegramId } = req.body;
+        await Player.deleteOne({ telegramId: targetTelegramId });
+        res.json({ success: true, message: `Oyuncu ${targetTelegramId} silindi.` });
+    } catch (error) {
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
 });
 
 app.get('/api/reset-all-elo', async (req, res) => {
@@ -598,8 +652,20 @@ function initializeGame(roomCode, player1Id, player2Id) {
     room.gameState = {
         board: [],
         players: {
-            [player1Id]: { hand: player1Hand, name: room.players[player1Id].name },
-            [player2Id]: { hand: player2Hand, name: room.players[player2Id].name }
+            [player1Id]: { 
+                hand: player1Hand, 
+                name: room.players[player1Id].name,
+                photoUrl: room.players[player1Id].photoUrl,
+                level: room.players[player1Id].level,
+                elo: room.players[player1Id].elo
+            },
+            [player2Id]: { 
+                hand: player2Hand, 
+                name: room.players[player2Id].name,
+                photoUrl: room.players[player2Id].photoUrl,
+                level: room.players[player2Id].level,
+                elo: room.players[player2Id].elo
+            }
         },
         market: market,
         currentPlayer: startingPlayer,
@@ -800,12 +866,13 @@ function handleFindMatch(ws, data) {
 
     const playerId = ws.playerId || generateRoomCode();
     ws.playerId = playerId;
-    ws.playerName = data.playerName || data.username || 'Guest';
+    // İsim olarak `firstName` kullan, yoksa `username`
+    ws.playerName = data.firstName || data.username || 'Guest';
     ws.telegramId = data.telegramId || null; // null ise guest
     ws.photoUrl = data.photoUrl || null;
-    ws.level = data.level || 0; // 0 = guest
+    ws.level = data.level || 1;
     ws.elo = data.elo || 0; // 0 = guest
-    ws.isGuest = !data.telegramId; // Telegram yoksa guest
+    ws.isGuest = !data.telegramId;
     
     playerConnections.set(playerId, ws);
     matchQueue.push({ 
@@ -1264,8 +1331,16 @@ async function handleGameEnd(roomCode, winnerResult, gameState) {
         broadcastToRoom(roomCode, { 
             type: 'gameEnd', 
             winner: winnerId, 
-            winnerName: isDraw ? 'Beraberlik' : (gameState.players[winnerId].firstName || gameState.players[winnerId].name),
+            winnerName: isDraw ? 'Beraberlik' : (room.players[winnerId].name),
             reason: reason,
+            // Kazanan oyuncunun detaylarını ekle
+            winnerDetails: !isDraw ? {
+                name: room.players[winnerId].firstName || room.players[winnerId].name,
+                photoUrl: room.players[winnerId].photoUrl,
+                telegramId: room.players[winnerId].telegramId,
+                level: room.players[winnerId].level,
+                elo: room.players[winnerId].elo
+            } : null,
             player1Sum: winnerResult.player1Sum,
             player2Sum: winnerResult.player2Sum,
             isRanked: isRankedMatch,
@@ -1341,7 +1416,7 @@ function handleForceDisconnect(ws, data) {
                         winner: remainingPlayerId,
                         winnerName: remainingPlayer.firstName || remainingPlayer.name,
                         reason: 'opponent_left',
-                        isRanked: !remainingPlayer.isGuest,
+                        isRanked: isRankedMatch,
                         eloChanges: {
                             winner: eloChange,
                             loser: 0
@@ -1458,6 +1533,11 @@ function handleDisconnect(ws) {
     if (qIdx !== -1) {
         matchQueue.splice(qIdx, 1);
         console.log(`❌ Kuyruktan çıkarıldı - Kalan: ${matchQueue.length}`);
+        // Eğer oyuncu arama ekranındaysa ve bağlantısı koparsa,
+        // istemci tarafında arayüzün takılı kalmaması için bir mesaj gönderilebilir.
+        // Ancak bu durumda ws zaten kapalı olduğu için doğrudan mesaj gönderilemez.
+        // İstemci tarafındaki 'onclose' eventi bu durumu yönetmelidir.
+        return; // Odada değilse işlemi bitir.
     }
 
     if (ws.roomCode) {
@@ -1465,22 +1545,26 @@ function handleDisconnect(ws) {
         
         // Oyuncu odadan ayrıldığında diğer oyuncuya kazanç ver
         const room = rooms.get(ws.roomCode);
-        if (room && room.players) {
-            // players object formatında çalış
+        // Oyunun başlamış olduğundan emin ol (gameState var mı?)
+        if (room && room.players && room.gameState) {
             const remainingPlayerId = Object.keys(room.players).find(playerId => playerId !== ws.playerId);
+            
             if (remainingPlayerId) {
                 const remainingPlayer = room.players[remainingPlayerId];
                 const remainingWs = playerConnections.get(remainingPlayerId);
                 
                 if (remainingWs && remainingWs.readyState === WebSocket.OPEN) {
+                    const isRankedMatch = room.type === 'ranked' && !remainingPlayer.isGuest && !(room.players[ws.playerId]?.isGuest);
+                    let eloChange = 0;
+
                     // Level'e göre ELO belirle
-                    const playerLevel = remainingPlayer.level || 1;
-                    let eloChange;
-                    
-                    if (playerLevel <= 5) {
-                        eloChange = Math.floor(Math.random() * 6) + 15; // 15-20 arası
-                    } else {
-                        eloChange = Math.floor(Math.random() * 6) + 10; // 10-15 arası
+                    if (isRankedMatch) {
+                        const playerLevel = remainingPlayer.level || 1;
+                        if (playerLevel <= 5) {
+                            eloChange = Math.floor(Math.random() * 6) + 15; // 15-20 arası
+                        } else {
+                            eloChange = Math.floor(Math.random() * 6) + 10; // 10-15 arası
+                        }
                     }
                     
                     // Anında oyun bitirme lobisi gönder
@@ -1489,7 +1573,7 @@ function handleDisconnect(ws) {
                         winner: remainingPlayerId,
                         winnerName: remainingPlayer.firstName || remainingPlayer.name,
                         reason: 'opponent_left',
-                        isRanked: !remainingPlayer.isGuest,
+                        isRanked: isRankedMatch,
                         eloChanges: {
                             winner: eloChange,
                             loser: 0
@@ -1501,7 +1585,7 @@ function handleDisconnect(ws) {
                                 photoUrl: remainingPlayer.photoUrl
                             },
                             [ws.playerId]: {
-                                name: ws.firstName || ws.playerName,
+                                name: ws.playerName,
                                 photoUrl: ws.photoUrl
                             }
                         }
@@ -1509,29 +1593,32 @@ function handleDisconnect(ws) {
                     
                     console.log(`🏆 ${remainingPlayer.name} rakip ayrıldığı için kazandı! +${eloChange} ELO`);
                     
-                    // ELO puanını veritabanında güncelle
-                    if (!remainingPlayer.isGuest) {
+                    // ELO puanını ve diğer istatistikleri veritabanında güncelle
+                    if (isRankedMatch) {
                         Player.findOne({ telegramId: remainingPlayer.telegramId }).then(player => {
                             if (player) {
                                 player.elo += eloChange;
                                 player.level = calculateLevel(player.elo);
                                 player.wins += 1;
                                 player.winStreak += 1;
-                                player.bestWinStreak = Math.max(player.bestWinStreak, player.winStreak);
+                                if (player.winStreak > player.bestWinStreak) {
+                                    player.bestWinStreak = player.winStreak;
+                                }
                                 player.totalGames += 1;
                                 player.lastPlayed = new Date();
                                 player.save();
                                 console.log(`💾 ELO güncellendi: ${player.firstName || player.username} +${eloChange}`);
                             }
-                        }).catch(err => console.error('ELO güncelleme hatası:', err));
+                        }).catch(err => console.error('Rakip ayrıldıktan sonra ELO güncelleme hatası:', err));
                     }
                 }
             }
         }
         
-        broadcastToRoom(ws.roomCode, { type: 'playerDisconnected' });
+        // Odayı ve veritabanı kaydını temizle
         deleteRoomFromDatabase(ws.roomCode);
         rooms.delete(ws.roomCode);
+        console.log(`🗑️ Oda ${ws.roomCode} oyuncu ayrıldığı için silindi.`);
     }
 }
 
