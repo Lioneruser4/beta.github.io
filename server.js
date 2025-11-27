@@ -484,11 +484,71 @@ wss.on('connection', (ws, req) => {
             
             console.log(`🔄 ${playerId} oyuna yeniden bağlandı (Oda: ${roomCode})`);
             
+            // İkinci oyuncu bağlandı
+            if (Object.keys(room.players).length === 2) {
+                const playerIds = Object.keys(room.players);
+                const player1 = room.players[playerIds[0]];
+                const player2 = room.players[playerIds[1]];
+                
+                // Oyunu başlat
+                const gameState = initializeGame(roomCode, player1.id, player2.id);
+                room.gameState = gameState;
+                
+                // İlk oyuncuya kırmızı, ikinci oyuncuya mavi rengi ata
+                player1.color = 'red';
+                player2.color = 'blue';
+                
+                // Rakip bilgilerini hazırla
+                const player1Info = {
+                    name: player1.name,
+                    photoUrl: player1.photoUrl,
+                    elo: player1.elo || 0,
+                    level: player1.level || 1
+                };
+                
+                const player2Info = {
+                    name: player2.name,
+                    photoUrl: player2.photoUrl,
+                    elo: player2.elo || 0,
+                    level: player2.level || 1
+                };
+                
+                // Her iki oyuncuya da rakip bilgisini gönder
+                player1.ws.send(JSON.stringify({
+                    type: 'opponentConnected',
+                    ...player2Info
+                }));
+                
+                player2.ws.send(JSON.stringify({
+                    type: 'opponentConnected',
+                    ...player1Info
+                }));
+                
+                // Her iki oyuncuya da oyun başladı bilgisini gönder
+                player1.ws.send(JSON.stringify({
+                    type: 'gameStart',
+                    color: 'red',
+                    isMyTurn: true,
+                    roomCode,
+                    players: room.players
+                }));
+                
+                player2.ws.send(JSON.stringify({
+                    type: 'gameStart',
+                    color: 'blue',
+                    isMyTurn: false,
+                    roomCode,
+                    players: room.players
+                }));
+                
+                console.log(`🎮 Oyun başladı: ${roomCode} (${player1.name} vs ${player2.name})`);
+            }    
         } catch (error) {
             console.error('Yeniden bağlanma hatası:', error);
             sendMessage(ws, { type: 'error', message: 'Yeniden bağlanırken hata oluştu' });
         }
     });
+    // ...
     ws.on('pong', () => ws.isAlive = true);
 
     ws.on('message', (message) => {
