@@ -32,8 +32,7 @@ const playerSchema = new mongoose.Schema({
     winStreak: { type: Number, default: 0 },
     bestWinStreak: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now },
-    lastPlayed: { type: Date, default: Date.now },
-    isHidden: { type: Boolean, default: false } // Admin paneli için eklendi
+    lastPlayed: { type: Date, default: Date.now }
 });
 
 const matchSchema = new mongoose.Schema({
@@ -154,16 +153,17 @@ async function deleteRoomFromDatabase(roomCode) {
 
 // ELO Calculation - Win-based system
 function calculateElo(winnerElo, loserElo, winnerLevel) {
-    // Random points between 13-20 for levels 1-5
-    // Random points between 10-15 for levels 6+
+    // İsteğe göre güncellendi:
+    // Seviye 1-5 arası: 15-20 ELO
+    // Seviye 6+ arası: 10-15 ELO
     let winnerChange;
     if (winnerLevel <= 5) {
-        winnerChange = Math.floor(Math.random() * 8) + 13; // 13-20
+        winnerChange = Math.floor(Math.random() * 6) + 15; // 15-20
     } else {
         winnerChange = Math.floor(Math.random() * 6) + 10; // 10-15
     }
     
-    const loserChange = -Math.floor(winnerChange * 0.7); // Loser loses 70% of winner's gain
+    const loserChange = -Math.floor(winnerChange * 0.75); // Kaybeden, kazananın %75'i kadar ELO kaybeder
     
     return {
         winnerElo: winnerElo + winnerChange,
@@ -206,7 +206,6 @@ app.post('/api/auth/telegram', async (req, res) => {
             player.lastName = lastName;
             player.photoUrl = photoUrl;
             player.lastPlayed = new Date();
-            // Admin ID'si ile giriş yapılıp yapılmadığını kontrol et
             await player.save();
         }
 
@@ -216,7 +215,6 @@ app.post('/api/auth/telegram', async (req, res) => {
             success: true,
             player: {
                 id: player._id,
-                isAdmin: player.telegramId === '976640409', // Admin kontrolü
                 telegramId: player.telegramId,
                 username: player.username,
                 firstName: player.firstName,
@@ -241,7 +239,7 @@ app.post('/api/auth/telegram', async (req, res) => {
 app.get('/api/leaderboard', async (req, res) => {
     try {
         const players = await Player.find()
-            .where({ isHidden: { $ne: true } }).sort({ elo: -1 }) // Gizli oyuncuları filtrele
+            .sort({ elo: -1 })
             .limit(10) // Top 10
             .select('telegramId username firstName lastName photoUrl elo level wins losses draws totalGames winStreak');
         
@@ -301,57 +299,6 @@ app.get('/', (req, res) => {
         players: playerConnections.size,
         rooms: rooms.size
     });
-});
-
-// YENİ ADMIN API'LERİ
-const ADMIN_ID = '976640409';
-
-// Admin kontrol middleware'i
-const isAdmin = (req, res, next) => {
-    const { adminId } = req.body;
-    if (adminId !== ADMIN_ID) {
-        return res.status(403).json({ error: 'Yetkisiz erişim' });
-    }
-    next();
-};
-
-app.post('/api/admin/modify-elo', isAdmin, async (req, res) => {
-    try {
-        const { targetTelegramId, amount } = req.body;
-        const player = await Player.findOne({ telegramId: targetTelegramId });
-        if (!player) return res.status(404).json({ error: 'Oyuncu bulunamadı' });
-
-        player.elo = Math.max(0, (player.elo || 0) + parseInt(amount, 10));
-        player.level = calculateLevel(player.elo);
-        await player.save();
-        res.json({ success: true, message: `${player.firstName}'ın yeni ELO'su: ${player.elo}` });
-    } catch (error) {
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
-
-app.post('/api/admin/toggle-visibility', isAdmin, async (req, res) => {
-    try {
-        const { targetTelegramId } = req.body;
-        const player = await Player.findOne({ telegramId: targetTelegramId });
-        if (!player) return res.status(404).json({ error: 'Oyuncu bulunamadı' });
-
-        player.isHidden = !player.isHidden;
-        await player.save();
-        res.json({ success: true, message: `${player.firstName} şimdi ${player.isHidden ? 'gizli' : 'görünür'}` });
-    } catch (error) {
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
-
-app.post('/api/admin/delete-user', isAdmin, async (req, res) => {
-    try {
-        const { targetTelegramId } = req.body;
-        await Player.deleteOne({ telegramId: targetTelegramId });
-        res.json({ success: true, message: `Oyuncu ${targetTelegramId} silindi.` });
-    } catch (error) {
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
 });
 
 app.get('/api/reset-all-elo', async (req, res) => {
