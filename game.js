@@ -1,5 +1,18 @@
-// Socket.io baglantisi
-const socket = io('https://mario-io-1.onrender.com');
+// Socket.io bağlantısı
+const socket = io('https://mario-io-1.onrender.com', {
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 20000
+});
+
+// Bağlantı durumu
+let isConnected = false;
+let isReconnecting = false;
+let lastGameState = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
 
 // Oyun durumu
 let gameState = {
@@ -45,6 +58,171 @@ const modalCloseBtn = document.getElementById('modal-close-btn');
 const BOARD_SIZE = 8;
 
 // --- Socket.io Eventleri ---
+
+// Bağlantı durumu takibi
+socket.on('connect', () => {
+    console.log('✅ Sunucuya bağlandı');
+    isConnected = true;
+    isReconnecting = false;
+    reconnectAttempts = 0;
+    updateConnectionStatus(true);
+    
+    // Eğer önceki bir oyun durumu varsa, sunucudan güncel durumu iste
+    if (gameState.roomCode) {
+        console.log('Önceki oyun durumu kurtarılıyor...');
+        socket.emit('rejoinGame', { roomCode: gameState.roomCode });
+    }
+});
+
+socket.on('disconnect', (reason) => {
+    console.log('❌ Sunucu bağlantısı kesildi:', reason);
+    isConnected = false;
+    updateConnectionStatus(false);
+    
+    if (gameState.gameStarted && !isReconnecting && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        isReconnecting = true;
+        showMessage('Sunucuya bağlanılıyor...', false);
+        attemptReconnect();
+    }
+});
+
+socket.on('reconnect', (attemptNumber) => {
+    console.log(`✅ Tekrar bağlanıldı (${attemptNumber}. deneme)`);
+    isConnected = true;
+    isReconnecting = false;
+    updateConnectionStatus(true);
+    hideMessage();
+    
+    // Oyun durumunu senkronize et
+    if (gameState.roomCode) {
+        socket.emit('rejoinGame', { roomCode: gameState.roomCode });
+    }
+});
+
+socket.on('reconnect_failed', () => {
+    console.error('❌ Tekrar bağlanma başarısız oldu');
+    isReconnecting = false;
+    updateConnectionStatus(false);
+    showMessage('Sunucuya bağlanılamadı. Lütfen sayfayı yenileyin.', true);
+});
+
+// Oyun durumunu senkronize etme
+socket.on('gameState', (state) => {
+    console.log('Oyun durumu güncellendi:', state);
+    gameState = { ...gameState, ...state };
+    updateGameUI();
+});
+
+// Oyun durumunu güncelle
+function updateGameUI() {
+    if (gameState.gameStarted) {
+        renderBoard();
+        updateTurnDisplay();
+    }
+}
+
+// Bağlantı durumunu güncelle
+function updateConnectionStatus(connected) {
+    if (connected) {
+        connectionStatus.textContent = 'Çevrimiçi';
+        connectionStatus.className = 'text-green-500';
+    } else {
+        connectionStatus.textContent = 'Çevrimdışı';
+        connectionStatus.className = 'text-red-500';
+    }
+}
+
+// Tekrar bağlanmayı dene
+function attemptReconnect() {
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        showMessage('Sunucuya bağlanılamadı. Lütfen sayfayı yenileyin.', true);
+        return;
+    }
+    
+    reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // Exponential backoff
+    
+    console.log(`Tekrar bağlanılıyor... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+    
+    setTimeout(() => {
+        if (!isConnected) {
+            socket.connect();
+            attemptReconnect();
+        }
+    }, delay);
+}
+
+// Mesaj göster
+function showMessage(message, isError = false) {
+    modalMessage.textContent = message;
+    modalMessage.className = isError ? 'text-red-500' : 'text-white';
+    messageModal.classList.remove('hidden');
+}
+
+// Mesajı gizle
+function hideMessage() {
+    messageModal.classList.add('hidden');
+}
+
+// Oyun tahtasını çiz
+function renderBoard() {
+    // Mevcut tahtayı temizle
+    boardElement.innerHTML = '';
+    
+    // Tahtayı çiz
+    for (let row = 0; row < BOARD_SIZE; row++) {
+        for (let col = 0; col < BOARD_SIZE; col++) {
+            const cell = document.createElement('div');
+            cell.className = 'w-12 h-12 border border-gray-700 flex items-center justify-center';
+            
+            // Hücrenin durumuna göre stil ekle
+            const piece = gameState.board[row]?.[col];
+            if (piece) {
+                cell.innerHTML = `<div class="w-10 h-10 rounded-full ${piece === 'red' ? 'bg-red-500' : 'bg-blue-500'}"></div>`;
+            }
+            
+            // Tıklama olayı ekle
+            cell.addEventListener('click', () => handleCellClick(row, col));
+            
+            boardElement.appendChild(cell);
+        }
+    }
+}
+
+// Sıra göstergesini güncelle
+function updateTurnDisplay() {
+    if (gameState.isMyTurn) {
+        turnText.textContent = 'Sıra Sizde';
+        turnText.className = 'text-green-400';
+    } else {
+        turnText.textContent = 'Rakibin Sırası';
+        turnText.className = 'text-red-400';
+    }
+}
+
+// Hücre tıklama işleyicisi
+function handleCellClick(row, col) {
+    if (!gameState.isMyTurn || !gameState.gameStarted) return;
+    
+    // Hamle yap
+    socket.emit('makeMove', {
+        row,
+        col,
+        roomCode: gameState.roomCode
+    });
+}
+
+// Oyun sonu işleyicisi
+socket.on('gameOver', (data) => {
+    gameState.gameStarted = false;
+    showMessage(`Oyun bitti! Kazanan: ${data.winner}`, false);
+});
+
+// Hata işleyicisi
+socket.on('error', (error) => {
+    console.error('Hata:', error);
+    showMessage(`Hata: ${error.message}`, true);
+});
 
 socket.on('connect', () => {
     console.log('✅ Servere baglandi');
