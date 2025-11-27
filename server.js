@@ -52,33 +52,6 @@ const matchSchema = new mongoose.Schema({
 
 const Player = mongoose.model('DominoPlayer', playerSchema);
 const Match = mongoose.model('DominoMatch', matchSchema);
-const RoomState = mongoose.model('RoomState', new mongoose.Schema({
-    roomCode: { type: String, required: true, unique: true },
-    players: [{
-        playerId: String,
-        ws: String, // WebSocket ID placeholder
-        playerName: String,
-        telegramId: String,
-        level: Number,
-        elo: Number,
-        photoUrl: String,
-        isGuest: Boolean,
-        hand: [[Number]], // Domino tiles
-        connected: Boolean
-    }],
-    gameState: {
-        board: [[Number]],
-        currentPlayer: String,
-        market: [[Number]],
-        gameStarted: Boolean,
-        gameType: String,
-        createdAt: Date,
-        lastMove: Date
-    },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
-}, { collection: 'room_states' }));
-
 
 app.use(cors());
 app.use(express.json());
@@ -88,74 +61,18 @@ const matchQueue = [];
 const playerConnections = new Map();
 const playerSessions = new Map(); // telegramId -> player data
 
-// Oda durumunu MongoDB'ye kaydetme ve yükleme
-async function saveRoomToDatabase(roomCode, roomData) {
-    try {
-        // Model artık dışarıda tanımlı
-        await RoomState.findOneAndUpdate(
-            { roomCode },
-            { 
-                roomCode,
-                players: roomData.players.map(p => ({
-                    playerId: p.playerId,
-                    ws: '',
-                    playerName: p.playerName,
-                    telegramId: p.telegramId,
-                    level: p.level,
-                    elo: p.elo,
-                    photoUrl: p.photoUrl,
-                    isGuest: p.isGuest,
-                    hand: p.hand || [],
-                    connected: true
-                })),
-                gameState: roomData.gameState,
-                updatedAt: new Date()
-            },
-            { upsert: true, new: true }
-        );
-        
-        console.log(`💾 Oda ${roomCode} veritabanına kaydedildi`);
-    } catch (error) {
-        console.error('❌ Oda kaydetme hatası:', error);
-    }
-}
-
-async function loadRoomFromDatabase(roomCode) {
-    try {
-        const roomData = await RoomState.findOne({ roomCode });
-        if (roomData) {
-            console.log(`📂 Oda ${roomCode} veritabanından yüklendi`);
-            return roomData;
-        }
-        return null;
-    } catch (error) {
-        console.error('❌ Oda yükleme hatası:', error);
-        return null;
-    }
-}
-
-async function deleteRoomFromDatabase(roomCode) {
-    try {
-        await RoomState.deleteOne({ roomCode });
-        console.log(`🗑️ Oda ${roomCode} veritabanından silindi`);
-    } catch (error) {
-        console.error('❌ Oda silme hatası:', error);
-    }
-}
-
 // ELO Calculation - Win-based system
 function calculateElo(winnerElo, loserElo, winnerLevel) {
-    // İsteğe göre güncellendi:
-    // Seviye 1-5 arası: 15-20 ELO
-    // Seviye 6+ arası: 10-15 ELO
+    // Random points between 13-20 for levels 1-5
+    // Random points between 10-15 for levels 6+
     let winnerChange;
     if (winnerLevel <= 5) {
-        winnerChange = Math.floor(Math.random() * 6) + 15; // 15-20
+        winnerChange = Math.floor(Math.random() * 8) + 13; // 13-20
     } else {
         winnerChange = Math.floor(Math.random() * 6) + 10; // 10-15
     }
     
-    const loserChange = -Math.floor(winnerChange * 0.75); // Kaybeden, kazananın %75'i kadar ELO kaybeder
+    const loserChange = -Math.floor(winnerChange * 0.7); // Loser loses 70% of winner's gain
     
     return {
         winnerElo: winnerElo + winnerChange,
@@ -168,40 +85,6 @@ function calculateElo(winnerElo, loserElo, winnerLevel) {
 // Level Calculation - Every 100 points = 1 level
 function calculateLevel(elo) {
     return Math.floor(elo / 100) + 1; // Start at level 1 (0 ELO)
-}
-
-/**
- * Oyuncu istatistiklerini veritabanında günceller.
- * @param {string} telegramId - Güncellenecek oyuncunun Telegram ID'si.
- * @param {object} stats - Güncellenecek istatistikler: { elo, level, wins, losses, draws, winStreak, bestWinStreak, totalGames }
- */
-async function updatePlayerStats(telegramId, stats) {
-    if (!telegramId) return;
-
-    try {
-        const player = await Player.findOne({ telegramId });
-        if (!player) return;
-
-        if (stats.elo !== undefined) player.elo = stats.elo;
-        if (stats.level !== undefined) player.level = stats.level;
-        if (stats.wins) player.wins += 1;
-        if (stats.losses) player.losses += 1;
-        if (stats.draws) player.draws += 1;
-        
-        if (stats.winStreak !== undefined) {
-            player.winStreak = stats.winStreak;
-            if (player.winStreak > player.bestWinStreak) {
-                player.bestWinStreak = player.winStreak;
-            }
-        }
-
-        player.totalGames += 1;
-        player.lastPlayed = new Date();
-        await player.save();
-        console.log(`💾 İstatistikler güncellendi: ${player.username} (ELO: ${player.elo})`);
-    } catch (error) {
-        console.error(`❌ Oyuncu istatistiklerini güncelleme hatası (${telegramId}):`, error);
-    }
 }
 
 // API Endpoints
@@ -327,226 +210,6 @@ app.get('/', (req, res) => {
     });
 });
 
-// Yeni endpoint: Belirli bir oyuncunun ELO puanını sıfırla
-app.post('/api/reset-player-elo', async (req, res) => {
-    try {
-        const { telegramId } = req.body;
-        
-        if (!telegramId) {
-            return res.status(400).json({ error: 'Telegram ID gerekli' });
-        }
-        
-        // Oyuncunun ELO puanını sıfırla
-        const result = await Player.updateOne(
-            { telegramId }, 
-            { 
-                elo: 0, 
-                level: 1,
-                wins: 0,
-                losses: 0,
-                draws: 0,
-                totalGames: 0,
-                winStreak: 0,
-                bestWinStreak: 0
-            }
-        );
-        
-        if (result.modifiedCount === 0) {
-            return res.status(404).json({ error: 'Oyuncu bulunamadı' });
-        }
-        
-        console.log(`🔄 Oyuncu ${telegramId} ELO puanı sıfırlandı!`);
-        res.json({ success: true, message: 'Oyuncu ELO puanı sıfırlandı' });
-    } catch (error) {
-        console.error('Oyuncu ELO sıfırlama hatası:', error);
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
-
-// Tüm istatistikleri ve maçları sıfırlama endpoint'i
-app.get('/api/reset-all-stats', async (req, res) => {
-    try {
-        console.log('🔄 Tüm istatistikleri ve maçları sıfırlama başlatılıyor...');
-        
-        // Tüm oyuncuların istatistiklerini sıfırla
-        const playerUpdateResult = await Player.updateMany({}, { 
-            $set: { 
-                elo: 0, level: 1, wins: 0, losses: 0, draws: 0, 
-                totalGames: 0, winStreak: 0, bestWinStreak: 0 
-            }
-        });
-        
-        // Tüm maçları sil
-        await Match.deleteMany({});
-        
-        const message = `${playerUpdateResult.modifiedCount} oyuncunun tüm istatistikleri sıfırlandı ve tüm maç kayıtları silindi.`;
-        console.log(`✅ ${message}`);
-        res.json({ success: true, message });
-    } catch (error) {
-        console.error('Tüm istatistikleri sıfırlama hatası:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Admin Paneli - Sadece Admin ID: 976640409
-app.get('/admin', (req, res) => {
-    const adminId = '976640409';
-    
-    // Admin ID kontrolü
-    if (req.query.id !== adminId) {
-        return res.status(403).send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Access Denied</title>
-                <style>
-                    body { font-family: Arial; padding: 50px; background: #1a1a2e; color: white; text-align: center; }
-                    .error-box { background: #e94560; padding: 30px; border-radius: 10px; max-width: 400px; margin: 0 auto; }
-                </style>
-            </head>
-            <body>
-                <div class="error-box">
-                    <h1>🚫 Access Denied</h1>
-                    <p>Bu sayfaya erişim izniniz yok!</p>
-                    <p>Admin ID gerekli.</p>
-                </div>
-            </body>
-            </html>
-        `);
-    }
-    
-    const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Domino Admin Panel</title>
-            <style>
-                body { font-family: Arial; padding: 20px; background: #1a1a2e; color: white; }
-                .container { max-width: 800px; margin: 0 auto; }
-                .card { background: #16213e; padding: 20px; margin: 10px 0; border-radius: 10px; }
-                .btn { background: #0f3460; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
-                .btn:hover { background: #533483; }
-                .danger { background: #e94560; }
-                .danger:hover { background: #c23652; }
-                input { padding: 10px; margin: 5px; border-radius: 5px; border: none; width: 200px; }
-                .admin-info { background: #0f3460; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="admin-info">
-                    <h2>🔐 Admin Paneli</h2>
-                    <p>Admin ID: ${adminId}</p>
-                </div>
-                <h1>🎮 Domino Admin Panel</h1>
-                <div class="card">
-                    <h2>⚙️ ELO Yönetimi</h2>
-                    <button class="btn danger" onclick="resetAllStats()">🔄 Tüm İstatistikleri ve Maçları Sıfırla</button>
-                </div>
-                <div class="card">
-                    <h2>👥 Kullanıcı Yönetimi</h2>
-                    <input type="text" id="telegramId" placeholder="Telegram ID">
-                    <button class="btn danger" onclick="deleteUser()">🗑️ Kullanıcıyı Sil</button>
-                    <button class="btn" onclick="resetUserElo()">🔄 Kullanıcı ELO Sıfırla</button>
-                </div>
-                <div class="card">
-                    <h2>📊 Sistem Durumu</h2>
-                    <button class="btn" onclick="checkStatus()">🔍 Durum Kontrol</button>
-                    <div id="status"></div>
-                </div>
-            </div>
-            <script>
-                async function resetAllStats() {
-                    if (confirm('DİKKAT: Tüm oyuncu istatistiklerini (ELO, seviye, galibiyet vb.) sıfırlamak ve tüm maç geçmişini silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!')) {
-                        const response = await fetch('/api/reset-all-stats'); // Genel API'yi kullan
-                        const result = await response.json();
-                        alert(result.message);
-                    }
-                }
-                async function deleteUser() {
-                    const telegramId = document.getElementById('telegramId').value;
-                    if (!telegramId) { alert('Telegram ID girin'); return; }
-                    if (confirm(telegramId + ' ID'li kullanıcıyı silmek istediğinizden emin misiniz?')) {
-                        const response = await fetch('/admin/delete-user', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ telegramId })
-                        });
-                        const result = await response.json();
-                        alert(result.message);
-                    }
-                }
-                async function resetUserElo() {
-                    const telegramId = document.getElementById('telegramId').value;
-                    if (!telegramId) { alert('Telegram ID girin'); return; }
-                    if (confirm(telegramId + ' ID'li kullanıcının ELO puanını sıfırlamak istediğinizden emin misiniz?')) {
-                        const response = await fetch('/admin/reset-user-elo', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ telegramId })
-                        });
-                        const result = await response.json();
-                        alert(result.message);
-                    }
-                }
-                async function checkStatus() {
-                    const response = await fetch('/admin/status');
-                    const result = await response.json();
-                    document.getElementById('status').innerHTML = 
-                        '<p>👥 Bağlı Oyuncu: ' + result.players + '</p>' +
-                        '<p>🏠 Aktif Oda: ' + result.rooms + '</p>' +
-                        '<p>🔍 Arama Kuyruğu: ' + result.queue + '</p>';
-                }
-            </script>
-        </body>
-        </html>
-    `;
-    res.send(htmlContent);
-});
-
-// Admin API'leri
-app.post('/admin/reset-all-stats', async (req, res) => {
-    try {
-        await Player.updateMany({}, { 
-            $set: { elo: 0, level: 1, wins: 0, losses: 0, draws: 0, totalGames: 0, winStreak: 0, bestWinStreak: 0 }
-        });
-        await Match.deleteMany({});
-        console.log('🔄 Admin: Tüm istatistikler ve maçlar sıfırlandı.');
-        res.json({ success: true, message: 'Tüm istatistikler sıfırlandı' });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Hata: ' + error.message });
-    }
-});
-
-app.post('/admin/delete-user', async (req, res) => {
-    try {
-        const { telegramId } = req.body;
-        const result = await Player.deleteOne({ telegramId });
-        await Match.deleteMany({ $or: [{ player1: result._id }, { player2: result._id }] });
-        res.json({ success: true, message: `Kullanıcı ${telegramId} silindi` });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Hata: ' + error.message });
-    }
-});
-
-app.post('/admin/reset-user-elo', async (req, res) => {
-    try {
-        const { telegramId } = req.body;
-        const result = await Player.updateOne({ telegramId }, { $set: { elo: 0, level: 1 } });
-        res.json({ success: true, message: `Kullanıcı ${telegramId} ELO puanı sıfırlandı` });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Hata: ' + error.message });
-    }
-});
-
-app.get('/admin/status', (req, res) => {
-    res.json({
-        players: playerConnections.size,
-        rooms: rooms.size,
-        queue: matchQueue.length
-    });
-});
-
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
@@ -608,20 +271,8 @@ function initializeGame(roomCode, player1Id, player2Id) {
     room.gameState = {
         board: [],
         players: {
-            [player1Id]: { 
-                hand: player1Hand, 
-                name: room.players[player1Id].name,
-                photoUrl: room.players[player1Id].photoUrl,
-                level: room.players[player1Id].level,
-                elo: room.players[player1Id].elo
-            },
-            [player2Id]: { 
-                hand: player2Hand, 
-                name: room.players[player2Id].name,
-                photoUrl: room.players[player2Id].photoUrl,
-                level: room.players[player2Id].level,
-                elo: room.players[player2Id].elo
-            }
+            [player1Id]: { hand: player1Hand, name: room.players[player1Id].name },
+            [player2Id]: { hand: player2Hand, name: room.players[player2Id].name }
         },
         market: market,
         currentPlayer: startingPlayer,
@@ -631,7 +282,6 @@ function initializeGame(roomCode, player1Id, player2Id) {
     };
 
     rooms.set(roomCode, room);
-    saveRoomToDatabase(roomCode, room);
     console.log(`🎮 Oyun başlatıldı - Başlayan: ${startingPlayer === player1Id ? room.players[player1Id].name : room.players[player2Id].name} (${highestDouble}|${highestDouble})`);
     return room.gameState;
 }
@@ -681,55 +331,27 @@ function playTileOnBoard(tile, board, position) {
 }
 
 function checkWinner(gameState) {
-    // 1. Bir oyuncunun eli boş mu kontrol et
     for (const playerId in gameState.players) {
         if (gameState.players[playerId].hand.length === 0) {
-            console.log(`🏆 ${playerId} kazandı - eli boş!`);
-            return { winner: playerId, reason: 'empty_hand' };
+            return playerId;
         }
     }
 
-    const playerIds = Object.keys(gameState.players);
-    if (playerIds.length < 2) return null;
-    
-    const player1Id = playerIds[0];
-    const player2Id = playerIds[1];
+    const player1Id = Object.keys(gameState.players)[0];
+    const player2Id = Object.keys(gameState.players)[1];
     const player1Hand = gameState.players[player1Id].hand;
     const player2Hand = gameState.players[player2Id].hand;
 
-    // 2. Pazarda taş var mı ve herkes oynayabiliyor mu kontrol et
-    const marketEmpty = !gameState.market || gameState.market.length === 0;
     const player1CanPlay = player1Hand.some(tile => canPlayTile(tile, gameState.board));
     const player2CanPlay = player2Hand.some(tile => canPlayTile(tile, gameState.board));
 
-    // Pazar boşsa VE kimse oynayamıyorsa oyun bitmeli
-    if (marketEmpty && (!player1CanPlay || !player2CanPlay)) {
-        const player1Sum = player1Hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
-        const player2Sum = player2Hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
-        
-        console.log(`🔒 Oyun kapandı - Pazar boş, oynanabilir taş yok`);
-        console.log(`📊 Puanlar: ${player1Id}: ${player1Sum}, ${player2Id}: ${player2Sum}`);
-        
-        if (player1Sum === player2Sum) {
-            return { winner: 'DRAW', reason: 'points_equal', player1Sum, player2Sum };
-        }
-        const winner = player1Sum < player2Sum ? player1Id : player2Id;
-        return { winner, reason: 'points', player1Sum, player2Sum };
-    }
-
-    // Pazar dolu ama kimse oynayamıyorsa (normal oyun durumu)
     if (!player1CanPlay && !player2CanPlay) {
         const player1Sum = player1Hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
         const player2Sum = player2Hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
         
-        console.log(`🔒 Oyun kapandı - İki oyuncu da oynayamaz`);
-        console.log(`📊 Puanlar: ${player1Id}: ${player1Sum}, ${player2Id}: ${player2Sum}`);
-        
-        if (player1Sum === player2Sum) {
-            return { winner: 'DRAW', reason: 'points_equal', player1Sum, player2Sum };
-        }
-        const winner = player1Sum < player2Sum ? player1Id : player2Id;
-        return { winner, reason: 'points', player1Sum, player2Sum };
+        // Eşitlik durumunda beraberlik mantığı eklenebilir, şimdilik az puanlı kazanır
+        if (player1Sum === player2Sum) return 'DRAW'; 
+        return player1Sum < player2Sum ? player1Id : player2Id;
     }
 
     return null;
@@ -783,10 +405,8 @@ wss.on('connection', (ws, req) => {
                 case 'cancelSearch': handleCancelSearch(ws); break;
                 case 'createRoom': handleCreateRoom(ws, data); break;
                 case 'joinRoom': handleJoinRoom(ws, data); break;
-                case 'reconnectToRoom': handleReconnectToRoom(ws, data); break;
                 case 'playTile': handlePlayTile(ws, data); break;
                 case 'drawFromMarket': handleDrawFromMarket(ws); break;
-                case 'forceDisconnect': handleForceDisconnect(ws, data); break;
             }
         } catch (error) {
             console.error('Hata:', error);
@@ -822,13 +442,12 @@ function handleFindMatch(ws, data) {
 
     const playerId = ws.playerId || generateRoomCode();
     ws.playerId = playerId;
-    // İsim olarak `firstName` kullan, yoksa `username`
-    ws.playerName = data.firstName || data.username || 'Guest';
+    ws.playerName = data.playerName || data.username || 'Guest';
     ws.telegramId = data.telegramId || null; // null ise guest
     ws.photoUrl = data.photoUrl || null;
-    ws.level = data.level || 1;
+    ws.level = data.level || 0; // 0 = guest
     ws.elo = data.elo || 0; // 0 = guest
-    ws.isGuest = !data.telegramId;
+    ws.isGuest = !data.telegramId; // Telegram yoksa guest
     
     playerConnections.set(playerId, ws);
     matchQueue.push({ 
@@ -878,7 +497,6 @@ function handleFindMatch(ws, data) {
         };
 
         rooms.set(roomCode, room);
-        saveRoomToDatabase(roomCode, room);
         p1.ws.roomCode = roomCode;
         p2.ws.roomCode = roomCode;
 
@@ -911,110 +529,6 @@ function handleCancelSearch(ws) {
     }
 }
 
-function handleReconnectToRoom(ws, data) {
-    const { roomCode, playerName } = data;
-    
-    if (!roomCode) {
-        return sendMessage(ws, { type: 'error', message: 'Oda kodu gerekli' });
-    }
-
-    // Önce veritabanından oda durumunu kontrol et
-    loadRoomFromDatabase(roomCode).then(async (savedRoom) => {
-        let room = rooms.get(roomCode);
-        
-        if (savedRoom && !room) {
-            // Sunucu restart olmuş, odayı veritabanından geri yükle
-            console.log(`🔄 Oda ${roomCode} veritabanından geri yükleniyor (reconnect)...`);
-            
-            room = {
-                host: savedRoom.players[0]?.playerId || 'host',
-                players: {},
-                gameState: savedRoom.gameState || { board: [], currentPlayer: null, market: [], gameStarted: false },
-                type: savedRoom.gameState?.gameType || 'private'
-            };
-            
-            // Oyuncuları geri ekle (WebSocket bağlantıları olmadan)
-            savedRoom.players.forEach(player => {
-                room.players[player.playerId] = {
-                    name: player.playerName,
-                    telegramId: player.telegramId,
-                    level: player.level,
-                    elo: player.elo,
-                    photoUrl: player.photoUrl,
-                    isGuest: player.isGuest,
-                    hand: player.hand || []
-                };
-            });
-            
-            rooms.set(roomCode, room);
-            saveRoomToDatabase(roomCode, room);
-        }
-        
-        room = rooms.get(roomCode);
-        if (!room) {
-            return sendMessage(ws, { type: 'error', message: 'Oda bulunamadı' });
-        }
-
-        // Yeni playerId oluştur
-        const playerId = generateRoomCode();
-        ws.playerId = playerId;
-        ws.playerName = playerName || 'Player';
-        ws.roomCode = roomCode;
-        playerConnections.set(playerId, ws);
-        
-        // Eğer bu oyuncu odada daha önce varsa, onu güncelle
-        let existingPlayer = null;
-        for (const existingId in room.players) {
-            if (room.players[existingId].name === ws.playerName) {
-                existingPlayer = room.players[existingId];
-                // Eski oyuncuyu sil ve yenisini ekle
-                delete room.players[existingId];
-                break;
-            }
-        }
-        
-        // Oyuncuyu odaya ekle
-        room.players[playerId] = { 
-            name: ws.playerName || 'Bilinmeyen',
-            telegramId: existingPlayer?.telegramId || null,
-            level: existingPlayer?.level || 0,
-            elo: existingPlayer?.elo || 0,
-            photoUrl: existingPlayer?.photoUrl || null,
-            isGuest: existingPlayer?.isGuest || true,
-            hand: existingPlayer?.hand || []
-        };
-        saveRoomToDatabase(roomCode, room); // Odayı güncelle
-
-        console.log(`🔄 ${ws.playerName} odaya geri bağlandı: ${roomCode}`);
-        
-        // Oyun durumunu gönder
-        if (room.gameState && room.gameState.gameStarted) {
-            // Oyuncunun IDsini gameState'e ekle
-            const gameStateWithPlayer = { ...room.gameState, playerId };
-            
-            setTimeout(() => {
-                sendMessage(ws, { 
-                    type: 'reconnectedToRoom', 
-                    gameState: gameStateWithPlayer,
-                    playerId: playerId
-                });
-                
-                // Diğer oyunculara bildir
-                Object.keys(room.players).forEach(pid => {
-                    if (pid !== playerId) {
-                        const otherWs = playerConnections.get(pid);
-                        if (otherWs) {
-                            sendGameState(roomCode, pid);
-                        }
-                    }
-                });
-            }, 500);
-        } else {
-            sendMessage(ws, { type: 'error', message: 'Oyun bulunamadı' });
-        }
-    });
-}
-
 function handleCreateRoom(ws, data) {
     const roomCode = generateRoomCode();
     const playerId = generateRoomCode();
@@ -1034,89 +548,30 @@ function handleCreateRoom(ws, data) {
 }
 
 function handleJoinRoom(ws, data) {
-    // Önce veritabanından oda durumunu kontrol et
-    loadRoomFromDatabase(data.roomCode).then(async (savedRoom) => {
-        let room = rooms.get(data.roomCode);
-        
-        if (savedRoom && !room) {
-            // Sunucu restart olmuş, odayı veritabanından geri yükle
-            console.log(`🔄 Oda ${data.roomCode} veritabanından geri yükleniyor...`);
-            
-            room = {
-                host: savedRoom.players[0]?.playerId || 'host',
-                players: {},
-                gameState: savedRoom.gameState || { board: [], currentPlayer: null, market: [], gameStarted: false },
-                type: savedRoom.gameState?.gameType || 'private'
-            };
-            
-            // Oyuncuları geri ekle (WebSocket bağlantıları olmadan)
-            savedRoom.players.forEach(player => {
-                room.players[player.playerId] = {
-                    name: player.playerName,
-                    telegramId: player.telegramId,
-                    level: player.level,
-                    elo: player.elo,
-                    photoUrl: player.photoUrl,
-                    isGuest: player.isGuest,
-                    hand: player.hand || []
-                };
-            });
-            
-            rooms.set(data.roomCode, room);
-            saveRoomToDatabase(data.roomCode, room);
-        }
-        
-        room = rooms.get(data.roomCode);
-        if (!room || Object.keys(room.players).length >= 2) {
-            return sendMessage(ws, { type: 'error', message: 'Oda bulunamadı veya dolu' });
-        }
+    const room = rooms.get(data.roomCode);
+    if (!room || Object.keys(room.players).length >= 2) {
+        return sendMessage(ws, { type: 'error', message: 'Oda bulunamadı veya dolu' });
+    }
 
-        const playerId = generateRoomCode();
-        ws.playerId = playerId;
-        ws.playerName = data.playerName;
-        ws.roomCode = data.roomCode;
-        playerConnections.set(playerId, ws);
-        
-        room.players[playerId] = { 
-            name: data.playerName || data.firstName || 'Player',
-            firstName: data.firstName || data.playerName || 'Player',
-            telegramId: data.telegramId,
-            level: data.level || 0, 
-            elo: data.elo || 0,
-            photoUrl: data.photoUrl,
-            isGuest: !data.telegramId,
-            hand: []
-        };
+    const playerId = generateRoomCode();
+    ws.playerId = playerId;
+    ws.playerName = data.playerName;
+    ws.roomCode = data.roomCode;
+    playerConnections.set(playerId, ws);
+    room.players[playerId] = { name: data.playerName };
 
-        const hostId = room.host;
-        
-        // Eğer oyun zaten başlamışsa, oyun durumunu gönder
-        if (room.gameState && room.gameState.gameStarted) {
-            // Yeni gelen oyuncuya mevcut oyun durumunu gönder
-            setTimeout(() => {
-                sendGameState(data.roomCode, hostId);
-                sendGameState(data.roomCode, playerId);
-                
-                ws.send(JSON.stringify({ 
-                    type: 'gameStart', 
-                    gameState: {...room.gameState, playerId: playerId} 
-                }));
-            }, 500);
-        } else {
-            // Yeni oyun başlat
-            const gameState = initializeGame(data.roomCode, hostId, playerId);
-            
-            setTimeout(() => {
-                sendGameState(data.roomCode, hostId);
-                sendGameState(data.roomCode, playerId);
-                // Herkese oyunun başladığını bildir
-                [hostId, playerId].forEach(pid => {
-                    const socket = playerConnections.get(pid);
-                    if(socket) socket.send(JSON.stringify({ type: 'gameStart', gameState: {...gameState, playerId: pid} }));
-                });
-            }, 500);
-        }
-    });
+    const hostId = room.host;
+    const gameState = initializeGame(data.roomCode, hostId, playerId);
+
+    setTimeout(() => {
+        sendGameState(data.roomCode, hostId);
+        sendGameState(data.roomCode, playerId);
+        // Herkese oyunun başladığını bildir
+        [hostId, playerId].forEach(pid => {
+            const socket = playerConnections.get(pid);
+            if(socket) socket.send(JSON.stringify({ type: 'gameStart', gameState: {...gameState, playerId: pid} }));
+        });
+    }, 500);
 }
 
 function handlePlayTile(ws, data) {
@@ -1140,31 +595,10 @@ function handlePlayTile(ws, data) {
 
     player.hand.splice(data.tileIndex, 1);
     gs.moves = (gs.moves || 0) + 1;
-    gs.lastMove = new Date();
-    
-    // Oda durumunu veritabanına kaydet
-    if (room) {
-        saveRoomToDatabase(ws.roomCode, room);
-    }
     
     const winner = checkWinner(gs);
     if (winner) {
-        // Oyun sonu bildirimini tüm oyunculara gönder
-        broadcastToRoom(ws.roomCode, { 
-            type: 'gameEnding', 
-            reason: winner.reason,
-            message: winner.reason === 'empty_hand' ? 'Oyun bitti - Bir oyuncunun eli boş!' :
-                     winner.reason === 'points' ? 'Oyun kapandı - Taşlar hesaplanıyor...' :
-                     winner.reason === 'points_equal' ? 'Oyun kapandı - Beraberlik! Taşlar hesaplanıyor...' :
-                     'Oyun bitti!',
-            player1Sum: winner.player1Sum,
-            player2Sum: winner.player2Sum
-        });
-        
-        // 3 saniye bekle ve oyunu bitir
-        setTimeout(() => {
-            handleGameEnd(ws.roomCode, winner, gs);
-        }, 3000);
+        handleGameEnd(ws.roomCode, winner, gs);
     } else {
         gs.turn++;
         gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
@@ -1172,13 +606,10 @@ function handlePlayTile(ws, data) {
     }
 }
 
-async function handleGameEnd(roomCode, winnerResult, gameState) {
+async function handleGameEnd(roomCode, winnerId, gameState) {
     const room = rooms.get(roomCode);
     if (!room) return;
 
-    const winnerId = winnerResult.winner;
-    const reason = winnerResult.reason;
-    
     try {
         const playerIds = Object.keys(gameState.players);
         const player1Id = playerIds[0];
@@ -1203,11 +634,8 @@ async function handleGameEnd(roomCode, winnerResult, gameState) {
                     type: 'gameEnd', 
                     winner: winnerId, 
                     winnerName: isDraw ? 'Beraberlik' : gameState.players[winnerId].name,
-                    reason: reason,
-                    isRanked: false,
-                    startTime: room.startTime
+                    isRanked: false
                 });
-                deleteRoomFromDatabase(roomCode);
                 rooms.delete(roomCode);
                 return;
             }
@@ -1218,21 +646,23 @@ async function handleGameEnd(roomCode, winnerResult, gameState) {
 
                 eloChanges = calculateElo(winner.elo, loser.elo, winner.level);
 
-                // Kazananın istatistiklerini güncelle
-                await updatePlayerStats(winner.telegramId, {
-                    elo: eloChanges.winnerElo,
-                    level: calculateLevel(eloChanges.winnerElo),
-                    wins: 1,
-                    winStreak: winner.winStreak + 1
-                });
+                winner.elo = eloChanges.winnerElo;
+                winner.level = calculateLevel(winner.elo);
+                winner.wins += 1;
+                winner.winStreak += 1;
+                winner.bestWinStreak = Math.max(winner.bestWinStreak, winner.winStreak);
+                winner.totalGames += 1;
+                winner.lastPlayed = new Date();
 
-                // Kaybedenin istatistiklerini güncelle
-                await updatePlayerStats(loser.telegramId, {
-                    elo: eloChanges.loserElo,
-                    level: calculateLevel(eloChanges.loserElo),
-                    losses: 1,
-                    winStreak: 0
-                });
+                loser.elo = eloChanges.loserElo;
+                loser.level = calculateLevel(loser.elo);
+                loser.losses += 1;
+                loser.winStreak = 0;
+                loser.totalGames += 1;
+                loser.lastPlayed = new Date();
+
+                await winner.save();
+                await loser.save();
 
                 const match = new Match({
                     player1: player1._id,
@@ -1249,11 +679,20 @@ async function handleGameEnd(roomCode, winnerResult, gameState) {
                 });
                 await match.save();
 
-                console.log(`🏆 RANKED Maç bitti: ${winner.firstName || winner.username} kazandı! ELO: ${eloChanges.winnerChange > 0 ? '+' : ''}${eloChanges.winnerChange}`);
+                console.log(`🏆 RANKED Maç bitti: ${winner.username} kazandı! ELO: ${eloChanges.winnerChange > 0 ? '+' : ''}${eloChanges.winnerChange}`);
             } else {
-                // Beraberlik durumunda her iki oyuncunun istatistiklerini güncelle
-                await updatePlayerStats(player1.telegramId, { draws: 1, winStreak: 0 });
-                await updatePlayerStats(player2.telegramId, { draws: 1, winStreak: 0 });
+                player1.draws += 1;
+                player1.totalGames += 1;
+                player1.winStreak = 0;
+                player1.lastPlayed = new Date();
+
+                player2.draws += 1;
+                player2.totalGames += 1;
+                player2.winStreak = 0;
+                player2.lastPlayed = new Date();
+
+                await player1.save();
+                await player2.save();
 
                 const match = new Match({
                     player1: player1._id,
@@ -1271,128 +710,29 @@ async function handleGameEnd(roomCode, winnerResult, gameState) {
             }
         } else {
             // Casual (Guest) maç - ELO guncellenmez
-            console.log(`🎮 CASUAL Maç bitti: ${isDraw ? 'Beraberlik' : gameState.players[winnerId].name}`);
+            console.log(`🎮 CASUAL Maç bitti: ${isDraw ? 'Beraberlik' : gameState.players[winnerId].name + ' kazandı'}`);
         }
 
         broadcastToRoom(roomCode, { 
             type: 'gameEnd', 
             winner: winnerId, 
-            winnerName: isDraw ? 'Beraberlik' : (room.players[winnerId].name),
-            reason: reason,
-            // Kazanan oyuncunun detaylarını ekle
-            winnerDetails: !isDraw ? {
-                name: room.players[winnerId].firstName || room.players[winnerId].name,
-                photoUrl: room.players[winnerId].photoUrl,
-                telegramId: room.players[winnerId].telegramId,
-                level: room.players[winnerId].level,
-                elo: room.players[winnerId].elo
-            } : null,
-            player1Sum: winnerResult.player1Sum,
-            player2Sum: winnerResult.player2Sum,
+            winnerName: isDraw ? 'Beraberlik' : gameState.players[winnerId].name,
             isRanked: isRankedMatch,
             eloChanges: eloChanges ? {
                 winner: eloChanges.winnerChange,
                 loser: eloChanges.loserChange
-            } : null,
-            startTime: room.startTime,
-            players: {
-                [player1Id]: {
-                    name: room.players[player1Id].firstName || room.players[player1Id].name,
-                    photoUrl: room.players[player1Id].photoUrl
-                },
-                [player2Id]: {
-                    name: room.players[player2Id].firstName || room.players[player2Id].name,
-                    photoUrl: room.players[player2Id].photoUrl
-                }
-            }
+            } : null
         });
-        
-        // Odayı hemen silme, 3 saniye bekle
-        setTimeout(() => {
-            deleteRoomFromDatabase(roomCode);
-            rooms.delete(roomCode);
-        }, 3000);
+        rooms.delete(roomCode);
     } catch (error) {
         console.error('❌ Game end error:', error);
         broadcastToRoom(roomCode, { 
             type: 'gameEnd', 
             winner: winnerId, 
             winnerName: winnerId === 'DRAW' ? 'Beraberlik' : gameState.players[winnerId].name,
-            reason: reason,
-            isRanked: false,
-            startTime: room?.startTime
+            isRanked: false
         });
-        setTimeout(() => {
-            rooms.delete(roomCode);
-        }, 3000);
-    }
-}
-
-function handleForceDisconnect(ws, data) {
-    const { roomCode, playerName } = data;
-    
-    if (!roomCode) return;
-    
-    const room = rooms.get(roomCode);
-    if (!room) return;
-    
-    // Oyuncuyu bul ve çıkar
-    const isRankedMatch = room.type === 'ranked'; // Bu değişkenin tanımlanması gerekiyordu
-    for (const playerId in room.players) {
-        if (room.players[playerId].name === playerName || room.players[playerId].firstName === playerName) {
-            const remainingPlayerId = Object.keys(room.players).find(id => id !== playerId);
-            
-            if (remainingPlayerId) {
-                const remainingPlayer = room.players[remainingPlayerId];
-                const remainingWs = playerConnections.get(remainingPlayerId);
-                
-                if (remainingWs) {
-                    const disconnectedPlayer = room.players[playerId] || { elo: 0 };
-                    const eloResult = calculateElo(remainingPlayer.elo, disconnectedPlayer.elo, remainingPlayer.level);
-                    const eloChange = isRankedMatch ? eloResult.winnerChange : 0;
-                    // Anında oyun bitirme lobisi gönder
-                    remainingWs.send(JSON.stringify({
-                        type: 'gameEnd',
-                        winner: remainingPlayerId,
-                        winnerName: remainingPlayer.firstName || remainingPlayer.name,
-                        reason: 'opponent_left',
-                        isRanked: isRankedMatch,
-                        eloChanges: {
-                            winner: eloChange,
-                            loser: 0
-                        },
-                        startTime: room.startTime,
-                        players: {
-                            [remainingPlayerId]: {
-                                name: remainingPlayer.firstName || remainingPlayer.name,
-                                photoUrl: remainingPlayer.photoUrl
-                            },
-                            [playerId]: {
-                                name: playerName,
-                                photoUrl: null
-                            }
-                        }
-                    }));
-                    
-                    console.log(`🏆 ${remainingPlayer.name} rakip ayrıldığı için kazandı! +${eloChange} ELO`);
-
-                    // Kazananın istatistiklerini güncelle
-                    if (isRankedMatch) {
-                        await updatePlayerStats(remainingPlayer.telegramId, {
-                            elo: eloResult.winnerElo,
-                            level: calculateLevel(eloResult.winnerElo),
-                            wins: 1,
-                            winStreak: (await Player.findOne({ telegramId: remainingPlayer.telegramId })).winStreak + 1
-                        });
-                    }
-                }
-            }
-            
-            // Odayı sil
-            deleteRoomFromDatabase(roomCode);
-            rooms.delete(roomCode);
-            break;
-        }
+        rooms.delete(roomCode);
     }
 }
 
@@ -1420,7 +760,6 @@ function handlePass(ws) {
             winner, 
             winnerName: winner === 'DRAW' ? 'Beraberlik' : gs.players[winner].name 
         });
-        deleteRoomFromDatabase(ws.roomCode);
         rooms.delete(ws.roomCode);
     } else {
         Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
@@ -1474,89 +813,72 @@ function handleDrawFromMarket(ws) {
     Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
 }
 
-function handleDisconnect(ws) {
+async function handleDisconnect(ws) {
     console.log(`🔌 Oyuncu ayrıldı: ${ws.playerName || 'Bilinmeyen'}`);
     
-    if (ws.playerId) playerConnections.delete(ws.playerId);
+    if (ws.playerId) {
+        // Eğer oyuncu bir oyundaysa, diğer oyuncuya kazandır
+        if (ws.roomCode && rooms.has(ws.roomCode)) {
+            const room = rooms.get(ws.roomCode);
+            const gameState = room.gameState;
+            
+            if (gameState && gameState.status === 'playing') {
+                // Oyun devam ederken ayrılan oyuncunun rakibini kazanan ilan et
+                const remainingPlayerId = Object.keys(gameState.players).find(id => id !== ws.playerId);
+                
+                if (remainingPlayerId) {
+                    console.log(`🏆 ${ws.playerName} oyundan ayrıldı, kazanan: ${gameState.players[remainingPlayerId].name}`);
+                    await handleGameEnd(ws.roomCode, remainingPlayerId, gameState);
+                } else {
+                    console.log('❌ Oyun durumu geçersiz, oda kapatılıyor');
+                    broadcastToRoom(ws.roomCode, { 
+                        type: 'gameEnd', 
+                        winner: null, 
+                        winnerName: 'Oyun iptal edildi',
+                        isRanked: false
+                    });
+                    rooms.delete(ws.roomCode);
+                }
+                // Oyun bitti, fonksiyondan çık
+                playerConnections.delete(ws.playerId);
+                return;
+            }
+        }
+        
+        // Eğer oyunda değilse veya oyun zaten bitmişse sadece bağlantıyı sil
+        playerConnections.delete(ws.playerId);
+    }
     
+    // Eşleşme kuyruğundan çıkar
     const qIdx = matchQueue.findIndex(p => p.ws === ws);
     if (qIdx !== -1) {
-        matchQueue.splice(qIdx, 1); // Kuyruktan kaldır
+        matchQueue.splice(qIdx, 1);
         console.log(`❌ Kuyruktan çıkarıldı - Kalan: ${matchQueue.length}`);
-        // Eğer oyuncu arama ekranındaysa ve bağlantısı koparsa,
-        // istemci tarafında arayüzün takılı kalmaması için bir mesaj gönderilebilir.
-        // Ancak bu durumda ws zaten kapalı olduğu için doğrudan mesaj gönderilemez.
-        // İstemci tarafındaki 'onclose' eventi bu durumu yönetmelidir.
-        return; // Odada değilse işlemi bitir.
     }
 
-    if (ws.roomCode) {
-        console.log(`🏠 Oyuncu ${ws.playerName} odadan ayrıldı: ${ws.roomCode}`);
-        
-        // Oyuncu odadan ayrıldığında diğer oyuncuya kazanç ver
+    // Oda bilgisini temizle
+    if (ws.roomCode && rooms.has(ws.roomCode)) {
         const room = rooms.get(ws.roomCode);
-        // Oyunun başlamış olduğundan emin ol (gameState var mı?)
-        if (room && room.players && room.gameState) {
-            const remainingPlayerId = Object.keys(room.players).find(playerId => playerId !== ws.playerId);
-            
-            if (remainingPlayerId) {
-                const remainingPlayer = room.players[remainingPlayerId];
-                const remainingWs = playerConnections.get(remainingPlayerId);
-                
-                if (remainingWs && remainingWs.readyState === WebSocket.OPEN) {
-                    const disconnectedPlayer = room.players[ws.playerId] || { isGuest: true, elo: 0 };
-                    const isRankedMatch = room.type === 'ranked' && !remainingPlayer.isGuest && !disconnectedPlayer.isGuest;
-                    
-                    // Merkezi ELO hesaplama fonksiyonunu kullan
-                    const eloResult = calculateElo(remainingPlayer.elo, disconnectedPlayer.elo, remainingPlayer.level);
-                    const eloChange = isRankedMatch ? eloResult.winnerChange : 0;
-                    
-                    // Anında oyun bitirme lobisi gönder
-                    remainingWs.send(JSON.stringify({
-                        type: 'gameEnd',
-                        winner: remainingPlayerId,
-                        winnerName: remainingPlayer.name,
-                        reason: 'opponent_left',
-                        isRanked: isRankedMatch,
-                        eloChanges: {
-                            winner: eloChange,
-                            loser: 0
-                        },
-                        startTime: room.startTime,
-                        players: {
-                            [remainingPlayerId]: {
-                                name: remainingPlayer.name,
-                                photoUrl: remainingPlayer.photoUrl
-                            },
-                            [ws.playerId]: {
-                                name: ws.playerName || 'Ayrılan Oyuncu',
-                                photoUrl: ws.photoUrl
-                            }
-                        }
-                    }));
-                    
-                    console.log(`🏆 ${remainingPlayer.name} rakip ayrıldığı için kazandı! +${eloChange} ELO`);
-                    
-                    // ELO puanını ve diğer istatistikleri veritabanında güncelle
-                    if (isRankedMatch) {
-                        // Yeni merkezi fonksiyonu kullan
-                        Player.findOne({ telegramId: remainingPlayer.telegramId }).then(async (player) => {
-                            await updatePlayerStats(remainingPlayer.telegramId, {
-                                elo: eloResult.winnerElo,
-                                level: calculateLevel(eloResult.winnerElo),
-                                wins: 1,
-                                winStreak: player.winStreak + 1
-                            });
-                        });
-                    }
+        
+        // Eğer oyun başlamışsa, diğer oyuncuya bildir
+        if (room && room.gameState) {
+            const otherPlayerId = Object.keys(room.gameState.players).find(id => id !== ws.playerId);
+            if (otherPlayerId) {
+                const otherPlayerWs = playerConnections.get(otherPlayerId)?.ws;
+                if (otherPlayerWs) {
+                    sendMessage(otherPlayerWs, { 
+                        type: 'gameEnd', 
+                        winner: otherPlayerId, 
+                        winnerName: room.gameState.players[otherPlayerId].name,
+                        isRanked: room.type === 'ranked',
+                        reason: 'Rakibiniz oyundan ayrıldı'
+                    });
                 }
             }
         }
         
-        // Odayı ve veritabanı kaydını temizle
-        deleteRoomFromDatabase(ws.roomCode);
+        console.log(`🏠 Odadan ayrıldı: ${ws.roomCode}`);
         rooms.delete(ws.roomCode);
-        console.log(`🗑️ Oda ${ws.roomCode} oyuncu ayrıldığı için silindi.`);
     }
 }
 
