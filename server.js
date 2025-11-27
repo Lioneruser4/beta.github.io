@@ -170,6 +170,40 @@ function calculateLevel(elo) {
     return Math.floor(elo / 100) + 1; // Start at level 1 (0 ELO)
 }
 
+/**
+ * Oyuncu istatistiklerini veritabanında günceller.
+ * @param {string} telegramId - Güncellenecek oyuncunun Telegram ID'si.
+ * @param {object} stats - Güncellenecek istatistikler: { elo, level, wins, losses, draws, winStreak, bestWinStreak, totalGames }
+ */
+async function updatePlayerStats(telegramId, stats) {
+    if (!telegramId) return;
+
+    try {
+        const player = await Player.findOne({ telegramId });
+        if (!player) return;
+
+        if (stats.elo !== undefined) player.elo = stats.elo;
+        if (stats.level !== undefined) player.level = stats.level;
+        if (stats.wins) player.wins += 1;
+        if (stats.losses) player.losses += 1;
+        if (stats.draws) player.draws += 1;
+        
+        if (stats.winStreak !== undefined) {
+            player.winStreak = stats.winStreak;
+            if (player.winStreak > player.bestWinStreak) {
+                player.bestWinStreak = player.winStreak;
+            }
+        }
+
+        player.totalGames += 1;
+        player.lastPlayed = new Date();
+        await player.save();
+        console.log(`💾 İstatistikler güncellendi: ${player.username} (ELO: ${player.elo})`);
+    } catch (error) {
+        console.error(`❌ Oyuncu istatistiklerini güncelleme hatası (${telegramId}):`, error);
+    }
+}
+
 // API Endpoints
 app.post('/api/auth/telegram', async (req, res) => {
     try {
@@ -293,11 +327,18 @@ app.get('/', (req, res) => {
     });
 });
 
-app.get('/api/reset-all-elo', async (req, res) => {
+// Yeni endpoint: Belirli bir oyuncunun ELO puanını sıfırla
+app.post('/api/reset-player-elo', async (req, res) => {
     try {
-        // Tüm oyuncuların ELO puanlarını sıfırla
-        await Player.updateMany(
-            {}, 
+        const { telegramId } = req.body;
+        
+        if (!telegramId) {
+            return res.status(400).json({ error: 'Telegram ID gerekli' });
+        }
+        
+        // Oyuncunun ELO puanını sıfırla
+        const result = await Player.updateOne(
+            { telegramId }, 
             { 
                 elo: 0, 
                 level: 1,
@@ -310,46 +351,39 @@ app.get('/api/reset-all-elo', async (req, res) => {
             }
         );
         
-        // Tüm maçları sil
-        await Match.deleteMany({});
+        if (result.modifiedCount === 0) {
+            return res.status(404).json({ error: 'Oyuncu bulunamadı' });
+        }
         
-        console.log('🔄 Tüm ELO puanları ve istatistikler sıfırlandı!');
-        res.json({ success: true, message: 'Tüm ELO puanları sıfırlandı' });
+        console.log(`🔄 Oyuncu ${telegramId} ELO puanı sıfırlandı!`);
+        res.json({ success: true, message: 'Oyuncu ELO puanı sıfırlandı' });
     } catch (error) {
-        console.error('ELO sıfırlama hatası:', error);
+        console.error('Oyuncu ELO sıfırlama hatası:', error);
         res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
 
-// ELO sıfırlama komutu
-app.get('/api/reset-elo-simple', async (req, res) => {
+// Tüm istatistikleri ve maçları sıfırlama endpoint'i
+app.get('/api/reset-all-stats', async (req, res) => {
     try {
-        console.log('🔄 ELO sıfırlama başlatılıyor...');
+        console.log('🔄 Tüm istatistikleri ve maçları sıfırlama başlatılıyor...');
         
-        // Tüm oyuncuların ELO puanlarını sıfırla
-        const result = await Player.updateMany(
-            {}, 
-            { 
-                $set: {
-                    elo: 0, 
-                    level: 1,
-                    wins: 0,
-                    losses: 0,
-                    draws: 0,
-                    totalGames: 0,
-                    winStreak: 0,
-                    bestWinStreak: 0
-                }
+        // Tüm oyuncuların istatistiklerini sıfırla
+        const playerUpdateResult = await Player.updateMany({}, { 
+            $set: { 
+                elo: 0, level: 1, wins: 0, losses: 0, draws: 0, 
+                totalGames: 0, winStreak: 0, bestWinStreak: 0 
             }
-        );
+        });
         
         // Tüm maçları sil
         await Match.deleteMany({});
         
-        console.log(`✅ ${result.modifiedCount} oyuncunun ELO puanları sıfırlandı!`);
-        res.json({ success: true, message: `${result.modifiedCount} oyuncunun ELO puanları sıfırlandı` });
+        const message = `${playerUpdateResult.modifiedCount} oyuncunun tüm istatistikleri sıfırlandı ve tüm maç kayıtları silindi.`;
+        console.log(`✅ ${message}`);
+        res.json({ success: true, message });
     } catch (error) {
-        console.error('ELO sıfırlama hatası:', error);
+        console.error('Tüm istatistikleri sıfırlama hatası:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -407,8 +441,7 @@ app.get('/admin', (req, res) => {
                 <h1>🎮 Domino Admin Panel</h1>
                 <div class="card">
                     <h2>⚙️ ELO Yönetimi</h2>
-                    <button class="btn danger" onclick="resetElo()">🔄 Tüm ELO Puanlarını Sıfırla</button>
-                    <button class="btn" onclick="resetStats()">📊 İstatistikleri Sıfırla</button>
+                    <button class="btn danger" onclick="resetAllStats()">🔄 Tüm İstatistikleri ve Maçları Sıfırla</button>
                 </div>
                 <div class="card">
                     <h2>👥 Kullanıcı Yönetimi</h2>
@@ -423,16 +456,9 @@ app.get('/admin', (req, res) => {
                 </div>
             </div>
             <script>
-                async function resetElo() {
-                    if (confirm('Tüm ELO puanlarını sıfırlamak istediğinizden emin misiniz?')) {
-                        const response = await fetch('/admin/reset-all-elo');
-                        const result = await response.json();
-                        alert(result.message);
-                    }
-                }
-                async function resetStats() {
-                    if (confirm('Tüm istatistikleri sıfırlamak istediğinizden emin misiniz?')) {
-                        const response = await fetch('/admin/reset-all-stats');
+                async function resetAllStats() {
+                    if (confirm('DİKKAT: Tüm oyuncu istatistiklerini (ELO, seviye, galibiyet vb.) sıfırlamak ve tüm maç geçmişini silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!')) {
+                        const response = await fetch('/api/reset-all-stats'); // Genel API'yi kullan
                         const result = await response.json();
                         alert(result.message);
                     }
@@ -479,22 +505,13 @@ app.get('/admin', (req, res) => {
 });
 
 // Admin API'leri
-app.post('/admin/reset-all-elo', async (req, res) => {
-    try {
-        const result = await Player.updateMany({}, { $set: { elo: 0, level: 1 } });
-        console.log(`🔄 Admin: ${result.modifiedCount} oyuncunun ELO puanları sıfırlandı`);
-        res.json({ success: true, message: `${result.modifiedCount} oyuncunun ELO puanları sıfırlandı` });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Hata: ' + error.message });
-    }
-});
-
 app.post('/admin/reset-all-stats', async (req, res) => {
     try {
         await Player.updateMany({}, { 
             $set: { elo: 0, level: 1, wins: 0, losses: 0, draws: 0, totalGames: 0, winStreak: 0, bestWinStreak: 0 }
         });
         await Match.deleteMany({});
+        console.log('🔄 Admin: Tüm istatistikler ve maçlar sıfırlandı.');
         res.json({ success: true, message: 'Tüm istatistikler sıfırlandı' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Hata: ' + error.message });
@@ -1201,23 +1218,21 @@ async function handleGameEnd(roomCode, winnerResult, gameState) {
 
                 eloChanges = calculateElo(winner.elo, loser.elo, winner.level);
 
-                winner.elo = eloChanges.winnerElo;
-                winner.level = calculateLevel(winner.elo);
-                winner.wins += 1;
-                winner.winStreak += 1;
-                winner.bestWinStreak = Math.max(winner.bestWinStreak, winner.winStreak);
-                winner.totalGames += 1;
-                winner.lastPlayed = new Date();
+                // Kazananın istatistiklerini güncelle
+                await updatePlayerStats(winner.telegramId, {
+                    elo: eloChanges.winnerElo,
+                    level: calculateLevel(eloChanges.winnerElo),
+                    wins: 1,
+                    winStreak: winner.winStreak + 1
+                });
 
-                loser.elo = eloChanges.loserElo;
-                loser.level = calculateLevel(loser.elo);
-                loser.losses += 1;
-                loser.winStreak = 0;
-                loser.totalGames += 1;
-                loser.lastPlayed = new Date();
-
-                await winner.save();
-                await loser.save();
+                // Kaybedenin istatistiklerini güncelle
+                await updatePlayerStats(loser.telegramId, {
+                    elo: eloChanges.loserElo,
+                    level: calculateLevel(eloChanges.loserElo),
+                    losses: 1,
+                    winStreak: 0
+                });
 
                 const match = new Match({
                     player1: player1._id,
@@ -1236,18 +1251,9 @@ async function handleGameEnd(roomCode, winnerResult, gameState) {
 
                 console.log(`🏆 RANKED Maç bitti: ${winner.firstName || winner.username} kazandı! ELO: ${eloChanges.winnerChange > 0 ? '+' : ''}${eloChanges.winnerChange}`);
             } else {
-                player1.draws += 1;
-                player1.totalGames += 1;
-                player1.winStreak = 0;
-                player1.lastPlayed = new Date();
-
-                player2.draws += 1;
-                player2.totalGames += 1;
-                player2.winStreak = 0;
-                player2.lastPlayed = new Date();
-
-                await player1.save();
-                await player2.save();
+                // Beraberlik durumunda her iki oyuncunun istatistiklerini güncelle
+                await updatePlayerStats(player1.telegramId, { draws: 1, winStreak: 0 });
+                await updatePlayerStats(player2.telegramId, { draws: 1, winStreak: 0 });
 
                 const match = new Match({
                     player1: player1._id,
@@ -1331,6 +1337,7 @@ function handleForceDisconnect(ws, data) {
     if (!room) return;
     
     // Oyuncuyu bul ve çıkar
+    const isRankedMatch = room.type === 'ranked'; // Bu değişkenin tanımlanması gerekiyordu
     for (const playerId in room.players) {
         if (room.players[playerId].name === playerName || room.players[playerId].firstName === playerName) {
             const remainingPlayerId = Object.keys(room.players).find(id => id !== playerId);
@@ -1340,16 +1347,9 @@ function handleForceDisconnect(ws, data) {
                 const remainingWs = playerConnections.get(remainingPlayerId);
                 
                 if (remainingWs) {
-                    // Level'e göre ELO belirle
-                    const playerLevel = remainingPlayer.level || 1;
-                    let eloChange;
-                    
-                    if (playerLevel <= 5) {
-                        eloChange = Math.floor(Math.random() * 6) + 15; // 15-20 arası
-                    } else {
-                        eloChange = Math.floor(Math.random() * 6) + 10; // 10-15 arası
-                    }
-                    
+                    const disconnectedPlayer = room.players[playerId] || { elo: 0 };
+                    const eloResult = calculateElo(remainingPlayer.elo, disconnectedPlayer.elo, remainingPlayer.level);
+                    const eloChange = isRankedMatch ? eloResult.winnerChange : 0;
                     // Anında oyun bitirme lobisi gönder
                     remainingWs.send(JSON.stringify({
                         type: 'gameEnd',
@@ -1375,6 +1375,16 @@ function handleForceDisconnect(ws, data) {
                     }));
                     
                     console.log(`🏆 ${remainingPlayer.name} rakip ayrıldığı için kazandı! +${eloChange} ELO`);
+
+                    // Kazananın istatistiklerini güncelle
+                    if (isRankedMatch) {
+                        await updatePlayerStats(remainingPlayer.telegramId, {
+                            elo: eloResult.winnerElo,
+                            level: calculateLevel(eloResult.winnerElo),
+                            wins: 1,
+                            winStreak: (await Player.findOne({ telegramId: remainingPlayer.telegramId })).winStreak + 1
+                        });
+                    }
                 }
             }
             
@@ -1496,19 +1506,10 @@ function handleDisconnect(ws) {
                 if (remainingWs && remainingWs.readyState === WebSocket.OPEN) {
                     const disconnectedPlayer = room.players[ws.playerId] || { isGuest: true, elo: 0 };
                     const isRankedMatch = room.type === 'ranked' && !remainingPlayer.isGuest && !disconnectedPlayer.isGuest;
-                    let eloChange = 0;
-
-                    // Level'e göre ELO belirle
-                    if (isRankedMatch) {
-                        const winnerLevel = remainingPlayer.level || 1;
-                        const eloResult = calculateElo(remainingPlayer.elo, disconnectedPlayer.elo, winnerLevel);
-                        eloChange = eloResult.winnerChange;
-                        if (winnerLevel <= 5) {
-                            eloChange = Math.floor(Math.random() * 6) + 15; // 15-20 arası
-                        } else {
-                            eloChange = Math.floor(Math.random() * 6) + 10; // 10-15 arası
-                        }
-                    }
+                    
+                    // Merkezi ELO hesaplama fonksiyonunu kullan
+                    const eloResult = calculateElo(remainingPlayer.elo, disconnectedPlayer.elo, remainingPlayer.level);
+                    const eloChange = isRankedMatch ? eloResult.winnerChange : 0;
                     
                     // Anında oyun bitirme lobisi gönder
                     remainingWs.send(JSON.stringify({
@@ -1538,21 +1539,15 @@ function handleDisconnect(ws) {
                     
                     // ELO puanını ve diğer istatistikleri veritabanında güncelle
                     if (isRankedMatch) {
-                        Player.findOne({ telegramId: remainingPlayer.telegramId }).then(player => {
-                            if (player) {
-                                player.elo += eloChange;
-                                player.level = calculateLevel(player.elo);
-                                player.wins += 1;
-                                player.winStreak += 1;
-                                if (player.winStreak > player.bestWinStreak) {
-                                    player.bestWinStreak = player.winStreak;
-                                }
-                                player.totalGames += 1;
-                                player.lastPlayed = new Date();
-                                player.save();
-                                console.log(`💾 ELO güncellendi: ${player.firstName || player.username} +${eloChange}`);
-                            }
-                        }).catch(err => console.error('Rakip ayrıldıktan sonra ELO güncelleme hatası:', err));
+                        // Yeni merkezi fonksiyonu kullan
+                        Player.findOne({ telegramId: remainingPlayer.telegramId }).then(async (player) => {
+                            await updatePlayerStats(remainingPlayer.telegramId, {
+                                elo: eloResult.winnerElo,
+                                level: calculateLevel(eloResult.winnerElo),
+                                wins: 1,
+                                winStreak: player.winStreak + 1
+                            });
+                        });
                     }
                 }
             }
