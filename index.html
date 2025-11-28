@@ -216,6 +216,7 @@
         // --- ANA OYUN ---
 
         const DominoGame = () => {
+            console.log('DominoGame component rendering...');
             const [screen, setScreen] = useState('loading'); // loading, lobby, searching, game, leaderboard
             const [connected, setConnected] = useState(false);
             const [playerData, setPlayerData] = useState(null); // Telegram user data
@@ -1112,7 +1113,9 @@
         };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
+        console.log('React root created, rendering DominoGame...');
         root.render(<DominoGame />);
+        console.log('DominoGame rendered successfully!');
     </script>
 </body>
 </html>
