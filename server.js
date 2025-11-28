@@ -216,7 +216,7 @@ async function adminAuth(req, res, next) {
     }
 }
 
-app.post('/api/admin/reset-all-elos', adminAuth, async (req, res) => {
+app.post('/api/admin/reset-elo', adminAuth, async (req, res) => {
     try {
         const updateResult = await Player.updateMany({}, {
             $set: {
@@ -234,12 +234,12 @@ app.post('/api/admin/reset-all-elos', adminAuth, async (req, res) => {
 });
 
 app.post('/api/admin/toggle-visibility', adminAuth, async (req, res) => {
-    const { targetTelegramId } = req.body;
-    if (!targetTelegramId) {
+    const { telegramId } = req.body;
+    if (!telegramId) {
         return res.status(400).json({ error: 'Hedef oyuncu ID\'si gerekli.' });
     }
     try {
-        const player = await Player.findOne({ telegramId: targetTelegramId });
+        const player = await Player.findOne({ telegramId });
         if (!player) {
             return res.status(404).json({ error: 'Oyuncu bulunamadı.' });
         }
@@ -248,31 +248,8 @@ app.post('/api/admin/toggle-visibility', adminAuth, async (req, res) => {
         console.log(`✅ ADMIN: Oyuncu görünürlüğü değiştirildi - ${player.username}: ${player.isHidden ? 'Gizli' : 'Görünür'}`);
         res.json({ success: true, message: `${player.username} adlı oyuncu artık ${player.isHidden ? 'gizli' : 'görünür'}.` });
     } catch (error) {
+        console.error('❌ Admin görünürlük hatası:', error);
         res.status(500).json({ error: 'Sunucu hatası.' });
-    }
-});
-app.get('/api/admin/reset-all-elos', async (req, res) => {
-    try {
-        const updateResult = await Player.updateMany({}, {
-            $set: {
-                elo: 0,
-                level: 1,
-                wins: 0,
-                losses: 0,
-                draws: 0,
-                totalGames: 0,
-                winStreak: 0,
-                bestWinStreak: 0
-            }
-        });
-
-        await Match.deleteMany({});
-
-        console.log(`✅ TÜM OYUNCU İSTATİSTİKLERİ SIFIRLANDI! Etkilenen oyuncu sayısı: ${updateResult.modifiedCount}`);
-        res.status(200).json({ success: true, message: `Tüm istatistikler başarıyla sıfırlandı. Etkilenen oyuncu: ${updateResult.modifiedCount}` });
-    } catch (error) {
-        console.error('❌ ELO sıfırlama hatası:', error);
-        res.status(500).json({ error: 'Sunucu hatası sırasında ELO sıfırlama işlemi başarısız oldu.' });
     }
 });
 
@@ -520,6 +497,7 @@ wss.on('connection', (ws, req) => {
                 case 'joinRoom': handleJoinRoom(ws, data); break;
                 case 'playTile': handlePlayTile(ws, data); break;
                 case 'drawFromMarket': handleDrawFromMarket(ws); break;
+                case 'pass': handlePass(ws); break; // Pas geçme için eklendi
                 case 'leaveGame': handleLeaveGame(ws); break;
             }
         } catch (error) {
@@ -913,6 +891,7 @@ function handlePass(ws) {
     gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
     
     Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+    broadcastToRoom(ws.roomCode, { type: 'info', message: `${ws.playerName} pas geçti.` }, ws.playerId);
 }
 
 function handleDrawFromMarket(ws) {
@@ -928,8 +907,8 @@ function handleDrawFromMarket(ws) {
     const hasPlayableTile = player.hand.some(tile => canPlayTile(tile, gs.board));
     if (hasPlayableTile) {
         return sendMessage(ws, { 
-            type: 'info', 
-            message: 'Elinizde oynanabilir taş varken pazardan çekemezsiniz.' 
+            type: 'error', 
+            message: 'Oynanabilir taşınız varken pazardan çekemezsiniz.' 
         });
     }
     
@@ -958,21 +937,13 @@ function handleDrawFromMarket(ws) {
     
     if (canPlayTile(drawnTile, gs.board)) {
         // Eğer çekilen taş oynanabilir durumdaysa, oyuncuya bildir
-        sendMessage(ws, { 
-            type: 'info',
-            message: `Çektiğiniz [${drawnTile.value1}|${drawnTile.value2}] taşını oynayabilirsiniz.` 
-        });
-    } else if (gs.bazaar.length === 0) {
-        // Pazar bitti ve çekilen taş da oynanamıyor - sıra geç
-        console.log(`❌ ${player.name} oynanabilir taş bulamadı - Sıra geçiyor`);
-        gs.turn++;
-        gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId); // Sırayı diğer oyuncuya geçir
+        sendMessage(ws, { type: 'info', message: `Pazardan [${drawnTile.value1}|${drawnTile.value2}] çektiniz. Şimdi oynayın.` });
     } else {
-        // Pazardan taş çekmeye devam et
-        sendMessage(ws, { 
-            type: 'info', 
-            message: 'Çekilen taş oynanamıyor, tekrar çekmelisiniz.' 
-        });
+        // Çekilen taş oynanamıyor, sıra otomatik olarak geçer.
+        console.log(`❌ ${player.name} pazardan çektiği taşı oynayamadı. Sıra geçiyor.`);
+        gs.turn++;
+        gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
+        broadcastToRoom(ws.roomCode, { type: 'info', message: `${player.name} pazardan çekti ve pas geçti.` }, ws.playerId);
     }
     
     Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
