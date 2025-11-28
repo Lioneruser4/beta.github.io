@@ -88,8 +88,14 @@
             -webkit-user-select: none;
         }
         
-        .pip-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 100%; padding: 2px; }
-        .pip { background-color: #111; border-radius: 50%; width: 5px; height: 5px; margin: auto; box-shadow: inset 0 1px 1px rgba(255,255,255,0.2); }
+        .pip-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 100%; padding: 1px; }
+        .pip { background-color: #111; border-radius: 50%; width: 3px; height: 3px; margin: auto; box-shadow: inset 0 1px 1px rgba(255,255,255,0.2); }
+        @media (min-width: 640px) {
+            .pip { width: 4px; height: 4px; }
+        }
+        @media (min-width: 768px) {
+            .pip { width: 5px; height: 5px; padding: 2px; }
+        }
         /* Kırmızı noktalar (bazı setlerde olur ama burada siyah klasik yaptık) */
         
         .hide-scrollbar::-webkit-scrollbar { display: none; }
@@ -144,7 +150,7 @@
 
         // --- BİLEŞENLER ---
 
-        // 1. Domino Noktaları (Pips)
+        // 1. Domino Noktaları (Pips - Mobil Uyumlu)
         const RenderPips = ({ number }) => {
             const layouts = {
                 0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8],
@@ -154,20 +160,26 @@
             return (
                 <div className="pip-grid">
                     {[...Array(9)].map((_, i) => (
-                        <div key={i} className="pip" style={{ opacity: activePips.includes(i) ? 1 : 0 }}></div>
+                        <div key={i} className="pip" style={{ 
+                            opacity: activePips.includes(i) ? 1 : 0,
+                            width: '3px',
+                            height: '3px',
+                            sm: { width: '4px', height: '4px' },
+                            md: { width: '5px', height: '5px' }
+                        }}></div>
                     ))}
                 </div>
             );
         };
 
-        // 2. Domino Taşı (3D Tasarım)
+        // 2. Domino Taşı (3D Tasarım - Mobil Uyumlu)
         const DominoTile = ({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false }) => {
             const baseClasses = `
                 relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
                 transition-all duration-300 select-none
-                ${vertical ? 'flex-col w-9 h-[4.5rem] sm:w-10 sm:h-20' : 'flex-row w-[4.5rem] h-9 sm:w-20 sm:h-10'}
+                ${vertical ? 'flex-col w-8 h-[4rem] sm:w-9 sm:h-[4.5rem] md:w-10 md:h-20' : 'flex-row w-[4rem] h-8 sm:w-[4.5rem] sm:h-9 md:w-20 md:h-10'}
                 ${isGhost ? 'opacity-0 pointer-events-none' : 'shadow-3d'}
-                ${isSelected ? '-translate-y-4 shadow-3d-active ring-2 ring-yellow-500 z-10 animate-celebrate' : ''}
+                ${isSelected ? '-translate-y-3 sm:-translate-y-4 shadow-3d-active ring-2 ring-yellow-500 z-10 animate-celebrate' : ''}
                 ${animateIn ? 'animate-slide-in' : ''}
                 ${!disabled && !isGhost ? 'cursor-pointer active:translate-y-1 active:shadow-3d-active hover:brightness-110' : ''}
                 ${disabled ? 'brightness-90 cursor-default' : ''}
@@ -177,7 +189,7 @@
                 <div 
                     onClick={onClick}
                     className={baseClasses}
-                    style={{ transform: isSelected ? 'translateY(-15px) scale(1.1)' : `scale(${scale})` }}
+                    style={{ transform: isSelected ? 'translateY(-12px) scale(1.05)' : `scale(${scale})` }}
                 >
                     <div className={`flex-1 flex items-center justify-center ${vertical ? 'border-b' : 'border-r'} border-gray-300`}>
                         <RenderPips number={values[0]} />
@@ -185,7 +197,7 @@
                     <div className="flex-1 flex items-center justify-center">
                         <RenderPips number={values[1]} />
                     </div>
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-400 border border-gray-500 shadow-inner z-10"></div>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-gray-400 border border-gray-500 shadow-inner z-10"></div>
                 </div>
             );
         };
@@ -219,7 +231,6 @@
             const [notification, setNotification] = useState(null);
             const [searching, setSearching] = useState(false);
             
-            const [showAdminPanel, setShowAdminPanel] = useState(false);
             const wsRef = useRef(null);
             const boardScrollRef = useRef(null);
             const searchTimerRef = useRef(null);
@@ -300,13 +311,6 @@
                     setScreen('lobby');
                 }
             };
-
-            const leaveGame = () => {
-                if (confirm('Oyundan çıkmak istediğinize emin misiniz? Maçtan ayrılırsanız ELO kaybedebilirsiniz.')) {
-                    sendMessage({ type: 'leaveGame' });
-                }
-            };
-
 
             // Leaderboard yükle
             const loadLeaderboard = async () => {
@@ -444,6 +448,28 @@
                 }
             };
 
+            const handleExitGame = async () => {
+                if (confirm('Oyundan çıkmak istediğinize emin misiniz? Rakibiniz kazanan ilan edilecektir.')) {
+                    // Sunucuya oyundan çıkış bildir
+                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                        wsRef.current.send(JSON.stringify({ 
+                            type: 'leaveGame', 
+                            roomCode: gameState?.roomCode 
+                        }));
+                        
+                        // Hemen lobiye dön
+                        setScreen('lobby');
+                        setGameState(null);
+                        setSelectedTileIndex(null);
+                        setValidMoves([]);
+                    } else {
+                        // Eğer bağlantı yoksa direkt çık
+                        setScreen('lobby');
+                        setGameState(null);
+                    }
+                }
+            };
+
             const showNotification = (msg, type = 'info') => {
                 setNotification({ message: msg, type });
                 setTimeout(() => setNotification(null), 3000);
@@ -452,10 +478,10 @@
             // --- OYUN MANTIĞI ---
 
             const myPlayerId = gameState?.playerId;
-            const isMyTurn = gameState?.isMyTurn;
-            const myHand = gameState?.myHand || [];
-            const opponentHandSize = gameState?.opponentHandSize || 0;
-            const marketSize = gameState?.bazaarSize || 0;
+            const isMyTurn = gameState?.currentPlayer === myPlayerId;
+            const myHand = gameState?.players[myPlayerId]?.hand || [];
+            const marketSize = gameState?.market?.length || 0;
+            const canDrawFromMarket = marketSize > 0;
 
             // calculateValidMoves fonksiyonu - EKSİKTİ!
             const calculateValidMoves = (tile) => {
@@ -463,8 +489,8 @@
                 
                 const leftEnd = gameState.board[0][0];
                 const rightEnd = gameState.board[gameState.board.length - 1][1];
-                let moves = [];
-
+                const moves = [];
+                
                 if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
                 if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
                 
@@ -530,14 +556,37 @@
             };
 
             const drawFromMarket = () => {
-                if (!isMyTurn || marketSize === 0) return;
+                if (!isMyTurn) {
+                    showNotification('Sıra sizde değil!', 'warning');
+                    return;
+                }
+                
+                // Elinde oynayabileceği taş varsa pazardan çekemez
+                const hasPlayableTile = myHand.some(tile => {
+                    if (gameState.board.length === 0) return true;
+                    const leftEnd = gameState.board[0][0];
+                    const rightEnd = gameState.board[gameState.board.length - 1][1];
+                    return tile[0] === leftEnd || tile[1] === leftEnd || 
+                           tile[0] === rightEnd || tile[1] === rightEnd;
+                });
+                
+                if (hasPlayableTile) {
+                    showNotification('Elinde oynayabileceğin taş var!', 'warning');
+                    return;
+                }
+                
+                if (!canDrawFromMarket) {
+                    showNotification('Pazarda taş kalmadı!', 'error');
+                    return;
+                }
+                
                 sendMessage({ type: 'drawFromMarket' });
                 showNotification('🎲 Pazardan taş çekiliyor...', 'info');
             };
 
             // --- SEARCHING LOBBY ---
             if (screen === 'searching') {
-                 const minutes = Math.floor(searchTime / 60);
+                const minutes = Math.floor(searchTime / 60);
                 const seconds = searchTime % 60;
                 const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
                 
@@ -645,47 +694,28 @@
                 );
             }
 
-            if (screen === 'lobby') {
-                return (
-                    <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10">
-                        {notification && <Toast message={notification.message} type={notification.type} />}
-                        
-                        <div className="text-center mb-10 animate-float">
-                            <h1 className="text-5xl font-black text-white drop-shadow-lg mb-2 tracking-tighter">
-                                🎯 DOMINO <span className="text-yellow-400">101</span> 🏆
-                            </h1>
-                            <p className="text-gray-300 text-sm tracking-widest uppercase">⚡ Profesyonel Online Oyun ⚡</p>
-                        </div>
+                            const ADMIN_TELEGRAM_ID = '976640409';
+                            const isAdmin = playerData?.telegramId === ADMIN_TELEGRAM_ID;
+                            
+                            return (
+                                <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10">
+                                    {notification && <Toast message={notification.message} type={notification.type} />}
+                                    
+                                    <div className="text-center mb-10 animate-float">
+                                        <h1 className="text-5xl font-black text-white drop-shadow-lg mb-2 tracking-tighter">
+                                            🎯 DOMINO <span className="text-yellow-400">101</span> 🏆
+                                        </h1>
+                                        <p className="text-gray-300 text-sm tracking-widest uppercase">⚡ Profesyonel Online Oyun ⚡</p>
+                                    </div>
 
-                        {/* NAVİGASYON */}
-                        {playerData?.isAdmin && (
-                            <div className="absolute top-4 left-4 z-20">
-                                <button
-                                    onClick={() => setShowAdminPanel(!showAdminPanel)}
-                                    className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-full shadow-lg"
-                                >
-                                    👑 Admin
-                                </button>
-                            </div>
-                        )}
-                        {showAdminPanel && (
-                            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                                <div className="bg-white/20 backdrop-blur-xl p-6 rounded-2xl shadow-2xl border border-white/30">
-                                    <h2 className="text-white text-2xl font-bold mb-4">Admin Paneli</h2>
-                                    <button
-                                        onClick={() => { if (confirm('Tüm ELO puanlarını sıfırlamak istediğinizden emin misiniz?')) { sendMessage({ type: 'adminResetElo' }); } }}
-                                        className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded w-full mb-2"
-                                    >Tüm ELO Puanlarını Sıfırla</button>
-                                    <button onClick={() => setShowAdminPanel(false)} className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded w-full">
-                                        Kapat
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                        <div className="flex gap-3 mb-6">
-                            <button onClick={() => setScreen('lobby')} className="px-4 py-2 bg-yellow-500 text-black rounded-lg font-bold">🏠 Ana Sayfa</button>
-                            <button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold">🏆 Skor Tablosu</button>
-                        </div>
+                                    {/* NAVİGASYON */}
+                                    <div className="flex gap-3 mb-6">
+                                        <button onClick={() => setScreen('lobby')} className="px-4 py-2 bg-yellow-500 text-black rounded-lg font-bold">🏠 Ana Sayfa</button>
+                                        <button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold">🏆 Skor Tablosu</button>
+                                        {isAdmin && (
+                                            <button onClick={() => setScreen('admin')} className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold animate-pulse">👑 Admin</button>
+                                        )}
+                                    </div>
 
                         <div className="w-full max-w-sm bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
                             {/* Player Info */}
@@ -846,171 +876,126 @@
                 );
             }
 
-            // --- OYUN EKRANI ---
-            if (screen === 'game' && gameState) {
+            // --- ADMIN PANEL EKRANI ---
+            if (screen === 'admin') {
                 return (
-                    <div className="fixed inset-0 flex flex-col h-full w-full">
-                         {notification && <Toast message={notification.message} type={notification.type} />}
+                    <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10">
+                        {notification && <Toast message={notification.message} type={notification.type} />}
                         
-                        {/* ÜST PANEL: Rakip ve Çıkış */}
-                        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 mb-4 flex justify-between items-center border border-white/20 shadow-2xl">
-                            <div className={`flex items-center gap-3 px-6 py-3 rounded-xl ${!isMyTurn ? 'bg-purple-500 animate-pulse shadow-lg shadow-purple-500/50' : 'bg-white/20'} transition-all`}>
-                                <span className="text-2xl">👤</span>
-                                <span className="text-white font-bold text-lg">Rakip</span>
-                                <span className="text-white font-bold">({opponentHandSize} taş)</span>
-                            </div>
+                        <div className="text-center mb-6">
+                            <h1 className="text-4xl font-black text-white drop-shadow-lg mb-2">👑 ADMIN PANEL 👑</h1>
+                        </div>
 
-                            <div className="flex items-center gap-4">
-                                <div className="bg-white/20 px-6 py-3 rounded-xl backdrop-blur-sm">
-                                    <span className="text-2xl">⏱️</span>
-                                    <span className="text-white font-bold text-lg ml-2">Tur: {gameState.turn || 1}</span>
-                                </div>
-                                <button onClick={leaveGame} className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-5 rounded-xl shadow-lg transition-transform transform hover:scale-105">
-                                    Oyundan Çık
+                        <button onClick={() => setScreen('lobby')} className="mb-4 px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold">⬅️ Geri Dön</button>
+
+                        <div className="w-full max-w-2xl bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
+                            <div className="space-y-4">
+                                <button 
+                                    onClick={() => {
+                                        // Tüm ELO puanlarını sıfırla
+                                        fetch(`${API_URL}/api/admin/reset-elo`, { 
+                                            method: 'POST',
+                                            headers: { 'X-Admin-Id': '976640409' }
+                                        })
+                                            .then(res => res.json())
+                                            .then(data => {
+                                                if (data.success) {
+                                                    showNotification(data.message, 'success');
+                                                } else {
+                                                    showNotification(data.error, 'error');
+                                                }
+                                            })
+                                            .catch(() => showNotification('Hata oluştu!', 'error'));
+                                    }}
+                                    className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors"
+                                >
+                                    🔄 Tüm ELO Puanlarını Sıfırla
                                 </button>
-                            </div>
-
-                            <div className={`flex items-center gap-3 px-6 py-3 rounded-xl ${isMyTurn ? 'bg-green-500 animate-pulse shadow-lg shadow-green-500/50' : 'bg-white/20'} transition-all`}>
-                                <span className="text-2xl">👤</span>
-                                <span className="text-white font-bold text-lg">Sen</span>
-                                <span className="text-white font-bold">({myHand.length} taş)</span>
-                            </div>
-                        </div>
-
-                        <div className="text-center mb-4">
-                            {isMyTurn ? (
-                                <div className="bg-yellow-500 text-black text-xs font-bold px-4 py-1 rounded-full animate-pulse shadow-glow">⚡ SENİN SIRAN ⚡</div>
-                            ) : (
-                                <div className="text-gray-400 text-xs font-medium bg-black/40 px-3 py-1 rounded-full">⏳ Rakip Oynuyor...</div>
-                            )}
-                        </div>
-
-                        {/* ORTA PANEL: Masa ve Board */}
-                        <div className="flex-1 relative overflow-hidden flex items-center justify-center w-full">
-                            {/* Yatay Kaydırma Alanı */}
-                            <div 
-                                ref={boardScrollRef}
-                                className="w-full h-full overflow-x-auto overflow-y-hidden hide-scrollbar flex items-center px-8"
-                                style={{ scrollBehavior: 'smooth' }}
-                            >
-                                <div className="flex items-center gap-1 mx-auto min-w-max py-10">
-                                    
-                                    {/* SOL IŞIKLI GÖSTERGE */}
-                                    {validMoves.includes('left') && selectedTileIndex !== null && gameState.board.length > 0 && (
-                                        <div className="mr-2 sm:mr-3 flex items-center" onClick={() => playTile('left')}>
-                                            <div className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer">
-                                                <div className="absolute inset-0 bg-yellow-400/20 rounded-lg valid-zone"></div>
-                                                <div className="absolute inset-0 flex items-center justify-center">
-                                                    <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-yellow-400/10 rounded-md border-2 border-yellow-400 border-dashed animate-glow-pulse"></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* TAHTADAKİ TAŞLAR */}
-                                    {gameState.board.length === 0 ? (
-                                        <div className="text-white/30 text-xl font-bold border-4 border-dashed border-white/10 rounded-3xl p-6">
-                                            {selectedTileIndex !== null ? '👇 Taşı Buraya Koy' : 'Taş Seç ve Başla'}
-                                        </div>
-                                    ) : (
-                                        gameState.board.map((tile, i) => (
-                                            <DominoTile 
-                                                key={i} 
-                                                values={tile} 
-                                                vertical={tile[0] === tile[1]}
-                                                disabled={true}
-                                                scale={0.95}
-                                                animateIn={i === gameState.board.length - 1 || i === 0}
-                                            />
-                                        ))
-                                    )}
-
-                                    {/* SAĞ IŞIKLI GÖSTERGE */}
-                                    {validMoves.includes('right') && selectedTileIndex !== null && gameState.board.length > 0 && (
-                                        <div className="ml-2 sm:ml-3 flex items-center" onClick={() => playTile('right')}>
-                                            <div className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer">
-                                                <div className="absolute inset-0 bg-yellow-400/20 rounded-lg valid-zone"></div>
-                                                <div className="absolute inset-0 flex items-center justify-center">
-                                                    <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-yellow-400/10 rounded-md border-2 border-yellow-400 border-dashed animate-glow-pulse"></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                    
-                                    {/* İLK HAMLE (ORTAYA) */}
-                                    {validMoves.includes('start') && selectedTileIndex !== null && (
-                                        <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-30 animate-slide-up" onClick={() => playTile('start')}>
-                                            <div className="bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold px-8 py-4 rounded-2xl animate-glow-pulse cursor-pointer shadow-glow transform scale-110">
-                                                ✨ OYUNA BAŞLA
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* ALT PANEL: Oyuncu Eli */}
-                        <div className="bg-gradient-to-t from-black/90 via-table-dark to-transparent pb-6 pt-2 px-2 z-20">
-                            
-                            {/* Kontrol Butonları */}
-                            <div className="flex justify-between items-center px-4 mb-2">
-                                <div className="flex items-center gap-3">
-                                    <span className="text-white text-xs font-bold tracking-widest opacity-70">
-                                        🎴 ELİNİZ ({myHand.length})
-                                    </span>
-                                    {marketSize > 0 && (
-                                        <span className="text-yellow-400 text-xs font-bold bg-black/40 px-2 py-1 rounded-full">
-                                            🎲 PAZAR: {marketSize}
-                                        </span>
-                                    )}
-                                </div>
-                                {isMyTurn && (
-                                    <div className="flex gap-2">
-                                        {marketSize > 0 && myHand.length > 0 && !myHand.some(tile => calculateValidMoves(tile).length > 0) && (
-                                            <button 
-                                                onClick={drawFromMarket}
-                                                className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
-                                            >
-                                                🎲 ÇEK
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Taş Dizilimi */}
-                            <div className="w-full max-w-4xl mx-auto overflow-y-auto max-h-[40vh] p-2">
-                                <div className="flex justify-center gap-2 flex-wrap">
-                                    {myHand.map((tile, index) => {
-                                        const canPlay = isMyTurn && (gameState.board.length === 0 || calculateValidMoves(tile).length > 0);
-                                        
-                                        return (
-                                            <DominoTile 
-                                                key={index}
-                                                values={tile}
-                                                onClick={() => handleTileClick(index, tile)}
-                                                disabled={!isMyTurn}
-                                                isSelected={selectedTileIndex === index}
-                                                vertical={true}
-                                                animateIn={true}
-                                            />
-                                        );
-                                    })}
-                                </div>
+                                
+                                <button 
+                                    onClick={() => {
+                                        // Oyuncu görünürlüğünü değiştir
+                                        const targetId = prompt('Oyuncu Telegram ID:');
+                                        if (targetId) {
+                                            fetch(`${API_URL}/api/admin/toggle-visibility`, {
+                                                method: 'POST',
+                                                headers: { 
+                                                    'Content-Type': 'application/json',
+                                                    'X-Admin-Id': '976640409'
+                                                },
+                                                body: JSON.stringify({ telegramId: targetId })
+                                            })
+                                            .then(res => res.json())
+                                            .then(data => {
+                                                if (data.success) {
+                                                    showNotification(data.message, 'success');
+                                                } else {
+                                                    showNotification(data.error, 'error');
+                                                }
+                                            })
+                                            .catch(() => showNotification('Hata oluştu!', 'error'));
+                                        }
+                                    }}
+                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors"
+                                >
+                                    👁️ Oyuncu Görünürlüğünü Değiştir
+                                </button>
                             </div>
                         </div>
                     </div>
                 );
             }
 
-            return null;
-        };
+            // --- OYUN EKRANI ---
+            if (screen === 'game' && gameState) {
+                // Tahtada görsel olarak taşları döndürmek gerekir mi?
+                // Sunucu genellikle [[1,6], [6,2]] diye sıralı atar.
+                // Biz sadece çiziyoruz.
+                
+                // Elimizdeki taş sayısı 7'den fazla mı?
+                const isHandCrowded = myHand.length > 7;
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<DominoGame />);
-    </script>
-</body>
-</html>
+                return (
+                    <div className="fixed inset-0 flex flex-col h-full w-full max-w-[100vw] overflow-hidden">
+                         {notification && <Toast message={notification.message} type={notification.type} />}
+                        
+                        {/* ÜST PANEL: Rakip ve Çıkış */}
+                        <div class="bg-gray-800 p-3 rounded-lg shadow-lg mb-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3 flex-1">
+                                    <div class="relative">
+                                        <img id="opponent-photo" src="https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png" 
+                                             class="w-12 h-12 rounded-full border-2 border-slate-600 object-cover shadow-lg" 
+                                             alt="Rakip" />
+                                        <div class="absolute -bottom-1 -right-1 bg-yellow-500 text-black text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                                            <span id="opponent-level">1</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-white font-bold text-sm truncate" id="opponent-name">Rakip</div>
+                                        <div class="text-xs text-gray-300" id="opponent-elo">ELO: 0</div>
+                                        <div class="text-xs text-gray-400 mt-1">
+                                            🎲 <span id="opponent-pieces">0</span> Taş
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex flex-col items-center">
+                                    <div class="w-3 h-3 rounded-full bg-red-500 animate-pulse" id="opponent-status"></div>
+                                    <span class="text-xs text-gray-400 mt-1">Çevrimiçi</span>
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-center mb-4">
+                                <div id="current-turn-display" className="text-xl font-bold">
+                                    <span id="turn-text">Sıra: </span>
+                                    <span id="current-player">Bekleniyor...</span>
+                                </div>
+                                <button id="leave-game-btn" className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-200 flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                    </svg>
+                                    Oyundan Çık
+                                </button>
+                            </div>
                             <div className="text-center">
                                 {isMyTurn ? (
                                     <div className="bg-yellow-500 text-black text-xs font-bold px-4 py-1 rounded-full animate-pulse shadow-glow">⚡ SENİN SIRAN ⚡</div>
@@ -1021,14 +1006,14 @@
                         </div>
 
                         {/* ORTA PANEL: Masa ve Board */}
-                        <div className="flex-1 relative overflow-hidden flex items-center justify-center w-full">
+                        <div className="flex-1 relative overflow-hidden flex items-center justify-center w-full max-w-7xl mx-auto">
                             {/* Yatay Kaydırma Alanı */}
                             <div 
                                 ref={boardScrollRef}
-                                className="w-full h-full overflow-x-auto overflow-y-hidden hide-scrollbar flex items-center px-8"
+                                className="w-full h-full overflow-x-auto overflow-y-hidden hide-scrollbar flex items-center px-4"
                                 style={{ scrollBehavior: 'smooth' }}
                             >
-                                <div className="flex items-center gap-1 mx-auto min-w-max py-10">
+                                <div className="flex items-center gap-0.5 mx-auto min-w-max py-8 px-4">
                                     
                                     {/* SOL IŞIKLI GÖSTERGE */}
                                     {validMoves.includes('left') && selectedTileIndex !== null && gameState.board.length > 0 && (
@@ -1101,10 +1086,10 @@
                                 </div>
                                 {isMyTurn && (
                                     <div className="flex gap-2">
-                                        {canDrawFromMarket && validMoves.length === 0 && selectedTileIndex === null && (
+                                        {canDrawFromMarket && (
                                             <button 
                                                 onClick={drawFromMarket}
-                                                className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
+                                                className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95"
                                             >
                                                 🎲 ÇEK
                                             </button>
@@ -1114,8 +1099,8 @@
                             </div>
 
                             {/* Taş Dizilimi */}
-                            <div className="w-full max-w-4xl mx-auto overflow-y-auto max-h-[40vh] p-2">
-                                <div className="flex justify-center gap-2 flex-wrap">
+                            <div className="w-full max-w-6xl mx-auto overflow-x-auto overflow-y-hidden max-h-[35vh] p-2">
+                                <div className="flex justify-center gap-1 flex-nowrap min-w-max">
                                     {myHand.map((tile, index) => {
                                         const canPlay = isMyTurn && (gameState.board.length === 0 || calculateValidMoves(tile).length > 0);
                                         
