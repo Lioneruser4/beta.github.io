@@ -616,47 +616,32 @@
 
                         <div className="relative z-10 max-w-md w-full">
                             <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20">
-                                {/* Player Card */}
+                                {/* Simplified Player Info */}
                                 <div className="text-center mb-8">
                                     {playerData?.photoUrl && (
-                                        <img src={playerData.photoUrl} alt="Profile" className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 animate-pulse" />
+                                        <img src={playerData.photoUrl} alt="Profile" className="w-16 h-16 rounded-full mx-auto mb-3 border-3 border-yellow-400/50 opacity-80" />
                                     )}
-                                    <h2 className="text-white text-2xl font-bold mb-2">{playerData?.username}</h2>
-                                    {!playerData?.isGuest && (
-                                        <div className="flex justify-center gap-3">
-                                            <span className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-4 py-1 rounded-full text-sm font-bold">
-                                                LVL {playerData?.level}
-                                            </span>
-                                            <span className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-4 py-1 rounded-full text-sm font-bold">
-                                                {playerData?.elo} ELO
-                                            </span>
-                                        </div>
-                                    )}
+                                    <h2 className="text-white/90 text-lg font-medium">{playerData?.username}</h2>
                                 </div>
 
                                 {/* Searching Animation */}
                                 <div className="mb-8">
-                                    <div className="w-32 h-32 mx-auto relative">
-                                        <div className="absolute inset-0 border-8 border-yellow-400/30 rounded-full"></div>
+                                    <div className="w-40 h-40 mx-auto relative">
+                                        <div className="absolute inset-0 border-8 border-yellow-400/20 rounded-full"></div>
                                         <div className="absolute inset-0 border-8 border-t-yellow-400 rounded-full animate-spin"></div>
                                         <div className="absolute inset-0 flex items-center justify-center">
-                                            <span className="text-5xl">🎯</span>
+                                            <div className="w-20 h-20 bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                                                <span className="text-4xl">🎯</span>
+                                            </div>
                                         </div>
+                                        {/* Arama animasyonu için dönen halkalar */}
+                                        <div className="absolute inset-4 border-4 border-blue-400/30 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '2s' }}></div>
+                                        <div className="absolute inset-8 border-2 border-purple-400/40 rounded-full animate-pulse"></div>
                                     </div>
-                                    <h3 className="text-white text-2xl font-bold text-center mt-6 mb-2">🔍 RAIP ARANIYOR...</h3>
-                                    <p className="text-white/70 text-center text-sm mb-4">
-                                        {!playerData?.isGuest ? '⚔️ DERECELİ MAÇ' : '🎮 CASUAL MAÇ'}
-                                    </p>
                                     
-                                    {/* Timer */}
-                                    <div className="bg-black/30 rounded-xl p-4 text-center mb-6">
-                                        <div className="text-white text-4xl font-mono font-bold">⏱️ {timeString}</div>
-                                        <div className="text-white/60 text-sm mt-1">⏳ Geçen Süre</div>
-                                    </div>
-
-                                    {/* İpucu */}
-                                    <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-3 mb-4 text-center">
-                                        <p className="text-blue-300 text-xs">💡 İpucu: Dereceli maçlarda ELO puanınız değişir!</p>
+                                    {/* Sadece zarif bir loading text */}
+                                    <div className="text-white/60 text-sm font-light mt-4 animate-pulse">
+                                        Finding opponent...
                                     </div>
                                 </div>
 
@@ -1039,7 +1024,7 @@
                                                 values={tile} 
                                                 vertical={tile[0] === tile[1]}
                                                 disabled={true}
-                                                scale={0.95}
+                                                scale={0.85}
                                                 animateIn={i === gameState.board.length - 1 || i === 0}
                                             />
                                         ))
