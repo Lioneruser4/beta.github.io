@@ -335,6 +335,33 @@
                 }
             }, [gameState?.board]);
 
+            // Rakip seviyesini güncelle
+            useEffect(() => {
+                if (gameState && gameState.players) {
+                    const opponentId = Object.keys(gameState.players).find(id => id !== gameState.myPlayerId);
+                    if (opponentId && gameState.players[opponentId]) {
+                        const opponent = gameState.players[opponentId];
+                        const opponentLevelEl = document.getElementById('opponent-level');
+                        const opponentNameEl = document.getElementById('opponent-name');
+                        const opponentEloEl = document.getElementById('opponent-elo');
+                        const opponentPhotoEl = document.getElementById('opponent-photo');
+                        
+                        if (opponentLevelEl) {
+                            opponentLevelEl.textContent = opponent.level >= 10 ? 'PRO' : opponent.level.toString();
+                        }
+                        if (opponentNameEl) {
+                            opponentNameEl.textContent = opponent.name || 'Rakip';
+                        }
+                        if (opponentEloEl) {
+                            opponentEloEl.textContent = `ELO: ${opponent.elo || 0}`;
+                        }
+                        if (opponentPhotoEl && opponent.photoUrl) {
+                            opponentPhotoEl.src = opponent.photoUrl;
+                        }
+                    }
+                }
+            }, [gameState]);
+
             const connectToServer = () => {
                 let wsUrl = 'wss://beta-github-io.onrender.com';
                 // Test için Localhost kontrolü
@@ -714,7 +741,7 @@
                                     {!playerData.isGuest && (
                                         <div className="flex justify-center gap-4 mt-2">
                                             <span className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-sm font-bold">
-                                                LVL {playerData.level}
+                                                {playerData.level >= 10 ? 'PRO' : `LVL ${playerData.level}`}
                                             </span>
                                             <span className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-3 py-1 rounded-full text-sm font-bold">
                                                 {playerData.elo} ELO
@@ -870,7 +897,7 @@
                                                     {player.elo} ELO
                                                 </div>
                                                 <div className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-xs font-bold">
-                                                    LVL {player.level}
+                                                    {player.level >= 10 ? 'PRO' : `LVL ${player.level}`}
                                                 </div>
                                             </div>
                                         </div>
