@@ -19,6 +19,7 @@ mongoose.connect(MONGODB_URI, {
 
 const playerSchema = new mongoose.Schema({
     telegramId: { type: String, required: true, unique: true },
+    username: { type: String, default: 'Oyuncu' },
     elo: { type: Number, default: 0 },
     level: { type: Number, default: 1 },
 });
@@ -35,10 +36,10 @@ const Match = mongoose.model('Match', matchSchema);
 
 // Oyuncu oluşturma veya bulma fonksiyonu
 async function findOrCreatePlayer(telegramId) {
-    if (!telegramId) return null;
+    if (!telegramId) return null;    
     let player = await Player.findOne({ telegramId });
     if (!player) {
-        player = new Player({ telegramId });
+        player = new Player({ telegramId, username: telegramId }); // Başlangıçta username'i ID yap
         await player.save();
         console.log(`✨ Yeni oyuncu veritabanına eklendi: ${telegramId}`);
     }
@@ -75,6 +76,21 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
 
+// Skor Tablosu Endpoint'i
+app.get('/leaderboard', async (req, res) => {
+    try {
+        const players = await Player.find({})
+            .sort({ elo: -1 })
+            .select('username elo level')
+            .limit(100); // En iyi 100 oyuncuyu göster
+
+        res.json({ success: true, leaderboard: players });
+    } catch (error) {
+        console.error('Leaderboard error:', error);
+        res.status(500).json({ success: false, message: 'Sunucu hatası' });
+    }
+});
+
 const rooms = {};
 const matchQueue = [];
 const BOARD_SIZE = 8;
@@ -87,7 +103,7 @@ io.on('connection', (socket) => {
 
     // --- OTURUM YÖNETİMİ ---
     socket.on('register', (data) => {
-        const telegramId = data.telegramId; // Client'tan telegramId gelmeli
+        const { telegramId, username } = data; // Client'tan telegramId ve username gelmeli
         if (!telegramId) return; // Veya misafir olarak işaretle
 
         socket.telegramId = telegramId;
@@ -221,13 +237,21 @@ io.on('connection', (socket) => {
         if (playerColor === 'red' && to.r === BOARD_SIZE - 1) room.board[to.r][to.c] = 3; // Kırmızı dama
         if (playerColor === 'white' && to.r === 0) room.board[to.r][to.c] = 4; // Beyaz dama
 
+        // Önce oyunun normal bir şekilde bitip bitmediğini kontrol et (tüm taşlar bitti mi)
+        let winner = checkWinner(room.board);
+        if (winner) {
+            await handleGameEnd(roomCode, winner);
+            return;
+        }
+
         // Sırayı değiştir
         room.currentTurn = (playerColor === 'red') ? 'white' : 'red';
 
-        // Oyun bitiş kontrolü
-        const winner = checkWinner(room.board, room.currentTurn);
-        if (winner) {
-            await handleGameEnd(roomCode, winner);
+        // Şimdi sıradaki oyuncunun hamlesi var mı diye kontrol et. Yoksa, o oyuncu kaybeder.
+        const nextPlayerHasMoves = hasAnyValidMoves(room.board, room.currentTurn);
+        if (!nextPlayerHasMoves) {
+            const winnerByBlock = (room.currentTurn === 'red') ? 'white' : 'red';
+            await handleGameEnd(roomCode, winnerByBlock, 'Rakibin hamlesi kalmadı.');
         } else {
             io.to(roomCode).emit('gameUpdate', { board: room.board, currentTurn: room.currentTurn });
         }
@@ -293,11 +317,9 @@ function getPiecePlayer(pieceValue) {
     return null;
 }
 
-function checkWinner(board, nextTurn) {
+function checkWinner(board) {
     let redPieces = 0;
     let whitePieces = 0;
-    let redMoves = 0;
-    let whiteMoves = 0;
 
     for (let r = 0; r < BOARD_SIZE; r++) {
         for (let c = 0; c < BOARD_SIZE; c++) {
@@ -307,21 +329,27 @@ function checkWinner(board, nextTurn) {
             const player = getPiecePlayer(piece);
             if (player === 'red') {
                 redPieces++;
-                if (findValidMoves(board, r, c, 'red').length > 0) redMoves++;
             } else if (player === 'white') {
                 whitePieces++;
-                if (findValidMoves(board, r, c, 'white').length > 0) whiteMoves++;
             }
         }
     }
 
     if (redPieces === 0) return 'white';
     if (whitePieces === 0) return 'red';
-
-    if (nextTurn === 'red' && redMoves === 0) return 'white'; // Kırmızının sırası ama hamlesi yok
-    if (nextTurn === 'white' && whiteMoves === 0) return 'red'; // Beyazın sırası ama hamlesi yok
-
+    
     return null; // Oyun devam ediyor
+}
+
+function hasAnyValidMoves(board, player) {
+    for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+            if (getPiecePlayer(board[r][c]) === player && findValidMoves(board, r, c, player).length > 0) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 function hasAnyCaptureMoves(board, player) {
