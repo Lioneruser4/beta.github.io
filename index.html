@@ -732,6 +732,11 @@
                                     if(!playerData) return showNotification('Kullanıcı bilgileri yükleniyor, lütfen bekleyin...', 'warning');
                                     if(searching) return;
                                     
+                                    // Kimlik doğrulama kontrolü
+                                    if(playerData.isGuest) {
+                                        return showNotification('Maç aramak için Telegram giriş yapmanız gerekiyor', 'warning');
+                                    }
+                                    
                                     // Özel arama ekranına geç
                                     setScreen('searching');
                                     setSearching(true);
@@ -764,8 +769,14 @@
                             <div className="grid grid-cols-2 gap-3">
                                 <button 
                                     onClick={() => {
-                                        if(!playerData) return showNotification('İsim giriniz', 'error');
+                                        if(!playerData) return showNotification('Kullanıcı bilgileri yükleniyor, lütfen bekleyin...', 'error');
                                         if(roomCode) return;
+                                        
+                                        // Kimlik doğrulama kontrolü
+                                        if(playerData.isGuest) {
+                                            return showNotification('Oda kurmak için Telegram giriş yapmanız gerekiyor', 'warning');
+                                        }
+                                        
                                         sendMessage({ type: 'createRoom', ...playerData, playerName: playerData.username });
                                     }}
                                     disabled={roomCode !== ''}
@@ -782,7 +793,16 @@
                                         className="w-full h-full bg-black/30 border border-white/10 rounded-xl px-2 text-center text-white font-mono uppercase focus:ring-1 focus:ring-yellow-400"
                                     />
                                     <button 
-                                        onClick={() => sendMessage({ type: 'joinRoom', roomCode: joinCode, ...playerData, playerName: playerData.username })}
+                                        onClick={() => {
+                                            if(!playerData) return showNotification('Kullanıcı bilgileri yükleniyor, lütfen bekleyin...', 'error');
+                                            
+                                            // Kimlik doğrulama kontrolü
+                                            if(playerData.isGuest) {
+                                                return showNotification('Odaya katılmak için Telegram giriş yapmanız gerekiyor', 'warning');
+                                            }
+                                            
+                                            sendMessage({ type: 'joinRoom', roomCode: joinCode, ...playerData, playerName: playerData.username });
+                                        }}
                                         className="absolute right-1 top-1 bottom-1 bg-yellow-500 text-white px-3 rounded-lg hover:bg-yellow-400"
                                     >
                                         ➔
@@ -878,20 +898,46 @@
                             <div className="space-y-4">
                                 <button 
                                     onClick={() => {
+                                        // Admin kontrolü
+                                        if (!isAdmin) {
+                                            showNotification('Bu işlem için admin yetkisi gerekiyor!', 'error');
+                                            return;
+                                        }
+                                        
+                                        // Onay al
+                                        if (!confirm('Tüm oyuncuların ELO puanlarını sıfırlamak istediğinizden emin misiniz? Bu işlem geri alınamaz!')) {
+                                            return;
+                                        }
+                                        
                                         // Tüm ELO puanlarını sıfırla
                                         fetch(`${API_URL}/api/admin/reset-elo`, { 
                                             method: 'POST',
-                                            headers: { 'X-Admin-Id': playerData?.telegramId }
+                                            headers: { 
+                                                'Content-Type': 'application/json',
+                                                'X-Admin-Id': playerData?.telegramId
+                                            }
                                         })
-                                            .then(res => res.json())
+                                            .then(res => {
+                                                if (!res.ok) {
+                                                    throw new Error(`HTTP error! status: ${res.status}`);
+                                                }
+                                                return res.json();
+                                            })
                                             .then(data => {
                                                 if (data.success) {
-                                                    showNotification(data.message, 'success');
+                                                    showNotification(data.message || 'ELO puanları başarıyla sıfırlandı!', 'success');
+                                                    // Oyuncu verisini yenile
+                                                    if (playerData && !playerData.isGuest) {
+                                                        initializeTelegramAuth();
+                                                    }
                                                 } else {
-                                                    showNotification(data.error, 'error');
+                                                    showNotification(data.error || 'ELO sıfırlama başarısız oldu!', 'error');
                                                 }
                                             })
-                                            .catch(() => showNotification('Hata oluştu!', 'error'));
+                                            .catch(error => {
+                                                console.error('ELO reset error:', error);
+                                                showNotification('Sunucu hatası! Lütfen daha sonra tekrar deneyin.', 'error');
+                                            });
                                     }}
                                     className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors"
                                 >
@@ -905,7 +951,7 @@
                                     }}
                                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors"
                                 >
-                                    👁️ Kullanıcıları Yönet (Gizle/Göster)
+                                    � Kullanıcıları Yönet
                                 </button>
                             </div>
                         </div>
@@ -1157,8 +1203,5 @@
         root.render(<DominoGame />);
         console.log('DominoGame rendered successfully!');
     </script>
-    <script>
-        alert('HTML loaded successfully!');
-    </script>
-</body>
+    </body>
 </html>
