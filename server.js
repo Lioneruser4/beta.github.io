@@ -14,7 +14,6 @@ const wss = new WebSocket.Server({ server });
 const MONGODB_URI = 'mongodb+srv://xaliqmustafayev7313_db_user:R4Cno5z1Enhtr09u@sayt.1oqunne.mongodb.net/?appName=sayt';
 let db;
 
-// MongoDB Bağlantısı
 MongoClient.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(client => {
     db = client.db('domino_game');
@@ -26,7 +25,6 @@ const players = new Map();
 const rooms = new Map();
 const rankedQueue = [];
 
-// Domino taşlarını oluştur
 function createDominoes() {
   const dominoes = [];
   for (let i = 0; i <= 6; i++) {
@@ -46,7 +44,6 @@ function shuffleArray(array) {
   return arr;
 }
 
-// Oyun oluştur
 function createGame(player1, player2, isRanked = false) {
   const dominoes = createDominoes();
   return {
@@ -64,7 +61,6 @@ function createGame(player1, player2, isRanked = false) {
   };
 }
 
-// Geçerli hamleleri kontrol et
 function getValidMoves(domino, board) {
   if (board.length === 0) return ['left', 'right'];
   
@@ -78,7 +74,6 @@ function getValidMoves(domino, board) {
   return moves;
 }
 
-// Taşı yerleştir
 function playDomino(game, playerId, domino, side) {
   const player = game.players.find(p => p.id === playerId);
   if (!player) return false;
@@ -105,23 +100,20 @@ function playDomino(game, playerId, domino, side) {
   
   game.moveCount++;
   
-  // Kazanan kontrolü
   if (player.hand.length === 0) {
     game.winner = playerId;
     return true;
   }
   
-  // Sırayı değiştir
   const currentIndex = game.players.findIndex(p => p.id === playerId);
   game.currentPlayer = game.players[(currentIndex + 1) % 2].id;
   
   return true;
 }
 
-// ELO hesapla
 function calculateElo(game, winnerId) {
   const halfGame = game.moveCount >= 10;
-  const basePoints = Math.floor(Math.random() * 9) + 12; // 12-20
+  const basePoints = Math.floor(Math.random() * 9) + 12;
   
   return {
     winner: basePoints,
@@ -129,22 +121,22 @@ function calculateElo(game, winnerId) {
   };
 }
 
-// Oyuncu verilerini güncelle
 async function updatePlayerData(telegramId, eloChange, won) {
   try {
     const collection = db.collection('players');
     const player = await collection.findOne({ telegramId });
     
     if (!player) {
-      await collection.insertOne({
+      const newPlayer = {
         telegramId,
         elo: 1000 + eloChange,
         points: Math.abs(eloChange),
         level: 1,
         wins: won ? 1 : 0,
         losses: won ? 0 : 1
-      });
-      return { elo: 1000 + eloChange, points: Math.abs(eloChange), level: 1 };
+      };
+      await collection.insertOne(newPlayer);
+      return newPlayer;
     }
     
     const newElo = Math.max(0, player.elo + eloChange);
@@ -154,23 +146,18 @@ async function updatePlayerData(telegramId, eloChange, won) {
     await collection.updateOne(
       { telegramId },
       { 
-        $set: { 
-          elo: newElo, 
-          points: newPoints, 
-          level: newLevel 
-        },
+        $set: { elo: newElo, points: newPoints, level: newLevel },
         $inc: won ? { wins: 1 } : { losses: 1 }
       }
     );
     
-    return { elo: newElo, points: newPoints, level: newLevel };
+    return { ...player, elo: newElo, points: newPoints, level: newLevel };
   } catch (err) {
     console.error('❌ updatePlayerData hata:', err);
     return null;
   }
 }
 
-// WebSocket bağlantıları
 wss.on('connection', (ws) => {
   console.log('🔌 Yeni oyuncu bağlandı');
   
@@ -335,7 +322,6 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     const player = players.get(ws);
     if (player) {
-      // Oyuncu çıktı, odadan çıkar
       for (const [roomId, roomData] of rooms.entries()) {
         if (roomData.game && roomData.players.some(p => p.ws === ws)) {
           const otherPlayer = roomData.players.find(p => p.ws !== ws);
@@ -362,11 +348,27 @@ wss.on('connection', (ws) => {
   });
 });
 
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'Domino Game Server',
+    timestamp: new Date(),
+    connections: wss.clients.size 
+  });
+});
+
 app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date() });
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date(),
+    players: players.size,
+    rooms: rooms.size,
+    queue: rankedQueue.length
+  });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`🚀 Server çalışıyor: ${PORT}`);
+  console.log(`🚀 Server çalışıyor: Port ${PORT}`);
+  console.log(`📡 WebSocket hazır`);
 });
