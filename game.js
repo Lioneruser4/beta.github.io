@@ -1,9 +1,13 @@
 // --- PROFESSIONAL DOMINO 101 GAME CLIENT ---
 // WebSocket Connection
-const ws = new WebSocket('wss://beta-github-io.onrender.com');
+const WS_URL = 'wss://beta-github-io.onrender.com';
+const API_URL = 'https://beta-github-io.onrender.com/api'; // API URL'si
+const ADMIN_TELEGRAM_ID = '976640409'; // YÖNETİCİ ID'si
+
+const ws = new WebSocket(WS_URL);
 
 // Game State
-let gameState = {
+let gameState = { /* ... önceki mesajdakiyle aynı ... */
     board: [],
     marketSize: 0,
     currentPlayer: null,
@@ -11,25 +15,61 @@ let gameState = {
     isMyTurn: false,
     roomCode: null,
     status: 'waiting',
-    myHand: []
+    myHand: [],
+    opponentHandSize: 0
 };
+let playerData = null; // Telegram verisi buraya atanacak
+let screenChanger = null; // Ekran değiştirme fonksiyonu
 
-// UI State
+// UI State (Önceki mesajdakiyle aynı)
 let selectedTileIndex = null;
 let validMoves = [];
 let isSearching = false;
 
-// DOM Elements
+// DOM Elements (Yeni butonlar eklendi)
 const boardContainer = document.getElementById('board-container');
 const handContainer = document.getElementById('hand-container');
 const turnIndicator = document.getElementById('turn-indicator');
 const marketSizeDisplay = document.getElementById('market-size');
 const opponentHandSizeDisplay = document.getElementById('opponent-hand-size');
-const findMatchButton = document.getElementById('find-match-btn');
 const drawMarketButton = document.getElementById('draw-market-btn');
 const passTurnButton = document.getElementById('pass-turn-btn');
 
-// --- WebSocket Events ---
+// --- Helper Functions ---
+function setPlayerData(data) {
+    playerData = data;
+    console.log("Player Data Set:", playerData);
+}
+
+function setScreenChanger(changer) {
+    screenChanger = changer;
+}
+
+function showGameScreen() {
+    if (screenChanger) screenChanger('game');
+}
+
+function showLobbyScreen() {
+    if (screenChanger) screenChanger('main');
+}
+
+function showSearchingScreen() {
+    if (screenChanger) screenChanger('searching');
+}
+
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 4000);
+}
+
+// --- WebSocket Events ve Handlers (Önceki mesajdakiyle aynı) ---
 ws.onopen = () => {
     console.log('✅ Connected to server');
     showNotification('Sunucuya bağlandı', 'success');
@@ -43,7 +83,7 @@ ws.onmessage = (event) => {
 ws.onclose = () => {
     console.log('❌ Disconnected from server');
     showNotification('Bağlantı kesildi', 'error');
-    showLobbyScreen();
+    if (screenChanger) screenChanger('main');
 };
 
 ws.onerror = (error) => {
@@ -51,14 +91,13 @@ ws.onerror = (error) => {
     showNotification('Bağlantı hatası', 'error');
 };
 
-// --- Message Handlers ---
 function handleServerMessage(data) {
     console.log('Received:', data.type, data);
     
     switch(data.type) {
         case 'gameStart':
         case 'gameUpdate':
-            // Sunucudan gelen state'i kabul et
+            // State güncelleme (Önceki mesajdakiyle aynı)
             gameState.board = data.gameState.board || [];
             gameState.marketSize = data.gameState.marketSize || 0;
             gameState.currentPlayer = data.gameState.currentPlayer;
@@ -73,11 +112,8 @@ function handleServerMessage(data) {
                  showGameScreen();
                  isSearching = false;
             }
-
-            // Client-side UI durumunu sıfırla
             selectedTileIndex = null;
             validMoves = [];
-
             updateUI();
             break;
             
@@ -87,38 +123,32 @@ function handleServerMessage(data) {
             
         case 'error':
             showNotification(data.message, 'error');
+            isSearching = false;
+            if (screenChanger) screenChanger('main'); // Hata durumunda loby'ye dön
             break;
             
         case 'matchFound':
             showNotification('Maç bulundu! Yükleniyor...', 'success');
             break;
             
-        case 'searchStatus':
-            // Arama durumu mesajları
-            break;
-
         case 'searchCancelled':
             showNotification(data.message, 'info');
-            showLobbyScreen();
+            if (screenChanger) screenChanger('main');
             isSearching = false;
             break;
 
         default:
-            console.log('Unknown message type:', data.type);
+            // console.log('Unknown message type:', data.type);
     }
 }
 
-// --- Game Functions (Sadece Server'a Komut Gönderme) ---
+// --- Game/Match Functions ---
 
-// Telegram ID doğrulama ve sunucuya gönderme, Server API'sini kullanmak en doğrusudur.
-// Bu client sadece WebSocket'i kullanır, bu yüzden basit oyuncu verisi gönderilir.
 function findMatch(playerData) {
     if (isSearching) return;
-    
-    // Telegram ID'si var ise önce Auth API'sini çağırıp ELO bilgilerini alması gerekir.
-    // Şimdilik doğrudan WebSocket ile bağlanıp temel bilgileri gönderiyoruz.
-    
-    // Not: Telegram ID'yi HTML'den alıp gönderiyoruz. Server bunu kullanarak DB'den verileri çekecek.
+    if (!playerData || !playerData.telegramId) {
+        return showNotification('Giriş bilgileri eksik. Ranked maç için Telegram ile giriş yapmalısınız.', 'error');
+    }
     
     isSearching = true;
     showSearchingScreen();
@@ -127,14 +157,13 @@ function findMatch(playerData) {
         type: 'findMatch',
         telegramId: playerData.telegramId,
         username: playerData.username,
+        firstName: playerData.firstName,
         photoUrl: playerData.photoUrl
-        // ELO, Level server tarafından çekilecek
     }));
 }
 
 function cancelSearch() {
     if (!isSearching) return;
-    
     isSearching = false;
     ws.send(JSON.stringify({ type: 'cancelSearch' }));
 }
@@ -142,28 +171,20 @@ function cancelSearch() {
 function playTile(tileIndex, position) {
     if (!gameState.isMyTurn || selectedTileIndex === null) return;
     
-    // Sunucuya oynaması için komut gönder
     ws.send(JSON.stringify({
         type: 'playTile',
         tileIndex: tileIndex,
         position: position
     }));
-    
-    // Client UI durumu server'dan gelecek update ile sıfırlanacağı için
-    // local'de sıfırlamaya gerek yok, hata durumunda tekrar seçili kalması daha iyi.
 }
 
 function drawFromMarket() {
     if (!gameState.isMyTurn) return;
-    
-    // Server kontrolü yapacak. Elinde oynanabilir taş varsa hata mesajı dönecek.
     ws.send(JSON.stringify({ type: 'drawFromMarket' }));
 }
 
 function passTurn() {
     if (!gameState.isMyTurn) return;
-    
-    // Server kontrolü yapacak. Pazarda taş varken veya oynanabilir taş varken hata mesajı dönecek.
     ws.send(JSON.stringify({ type: 'pass' }));
 }
 
@@ -173,18 +194,172 @@ function leaveGame() {
     if (confirm('Oyundan çıkmak istediğinize emin misiniz? Mağlubiyet olarak kaydedilecektir.')) {
         ws.send(JSON.stringify({
             type: 'leaveGame',
-            roomCode: gameState.roomCode // Server tarafından işlenecek
+            roomCode: gameState.roomCode
         }));
-        // UI'yı hemen loby'ye çevir
-        showLobbyScreen();
+        if (screenChanger) screenChanger('main');
         gameState.roomCode = null;
     }
 }
 
-// --- Game Logic (Client-Side Validasyon ve UI Hazırlığı) ---
+function handleGameEnd(data) {
+    let message;
+    // ... (Önceki mesajdaki handleGameEnd mantığı aynı) ...
+    if (data.winner === 'DRAW') {
+        message = '🤝 Oyun Berabere!';
+        showNotification(message, 'info');
+    } else {
+        const isWinner = data.winner === gameState.myPlayerId;
+        message = isWinner ? `🎉 Kazandın! (${data.reason})` : `😔 Kaybettin! (${data.reason})`;
+        
+        // ELO bilgisi varsa ekle
+        if (data.myEloChange) {
+            message += ` | ELO: ${data.myEloChange > 0 ? '+' : ''}${data.myEloChange}`;
+        }
+        showNotification(message, isWinner ? 'success' : 'error');
+    }
 
-// Bu fonksiyonlar sadece UI'da nelerin mümkün olduğunu göstermek için kullanılır.
-// Nihai kontrol her zaman sunucudadır.
+    setTimeout(() => {
+        if (screenChanger) screenChanger('main');
+    }, 5000);
+}
+
+// --- Leaderboard Functions ---
+async function loadLeaderboard() {
+    const leaderboardList = document.getElementById('leaderboard-list');
+    leaderboardList.innerHTML = '<li>Skorlar yükleniyor...</li>';
+
+    try {
+        const response = await fetch(`${API_URL}/leaderboard`);
+        if (!response.ok) throw new Error('Sunucudan skorlar alınamadı');
+        
+        const data = await response.json();
+        const leaderboard = data.leaderboard;
+
+        if (leaderboard.length === 0) {
+            leaderboardList.innerHTML = '<li>Skor tablosu boş.</li>';
+            return;
+        }
+
+        leaderboardList.innerHTML = '';
+        leaderboard.forEach((player, index) => {
+            const li = document.createElement('li');
+            li.className = `leaderboard-item ${index < 3 ? 'top3' : ''}`;
+            
+            li.innerHTML = `
+                <div class="player-info">
+                    <span class="rank">#${index + 1}</span>
+                    <span>${player.firstName} (${player.username})</span>
+                </div>
+                <div class="elo">${player.elo} ELO</div>
+            `;
+            leaderboardList.appendChild(li);
+        });
+
+    } catch (error) {
+        console.error('Leaderboard yükleme hatası:', error);
+        showNotification('Skor tablosu yüklenirken hata oluştu.', 'error');
+        leaderboardList.innerHTML = '<li>Skorlar yüklenemedi. Sunucu hatası.</li>';
+    }
+}
+
+// --- Admin Panel Functions ---
+const admin = {
+    targetUserId: null,
+    
+    async searchUser() {
+        const targetId = document.getElementById('admin-target-id').value.trim();
+        const infoP = document.getElementById('admin-user-info');
+        infoP.textContent = 'Aranıyor...';
+        this.targetUserId = null;
+        
+        if (!targetId) {
+            infoP.textContent = 'Lütfen bir Telegram ID girin.';
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_URL}/admin/user/${targetId}`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                infoP.textContent = `Hata: ${data.error}`;
+                return;
+            }
+            
+            this.targetUserId = targetId;
+            infoP.innerHTML = `
+                Kullanıcı: <b>${data.user.username}</b> (ID: ${data.user.telegramId})<br>
+                ELO: ${data.user.elo} | Wins: ${data.user.wins} | Hidden: ${data.user.isHidden}
+            `;
+        } catch (error) {
+            infoP.textContent = 'Kullanıcı bulunamadı veya sunucu hatası.';
+            console.error('Admin Search Error:', error);
+        }
+    },
+
+    async setElo() {
+        if (!this.targetUserId) {
+            showNotification('Önce bir kullanıcı arayın.', 'error');
+            return;
+        }
+        
+        const newElo = parseInt(document.getElementById('admin-elo-value').value.trim());
+        if (isNaN(newElo) || newElo < 0) {
+            showNotification('Geçerli bir ELO değeri girin.', 'error');
+            return;
+        }
+
+        await this.adminAction('setElo', { targetId: this.targetUserId, value: newElo });
+    },
+
+    async setHiddenStatus() {
+        if (!this.targetUserId) {
+            showNotification('Önce bir kullanıcı arayın.', 'error');
+            return;
+        }
+        
+        const isHidden = document.getElementById('admin-hide-action').value === 'true';
+        await this.adminAction('setHidden', { targetId: this.targetUserId, value: isHidden });
+    },
+    
+    async adminAction(actionType, payload) {
+        if (!playerData || playerData.telegramId !== ADMIN_TELEGRAM_ID) {
+            return showNotification('Yetkiniz yok.', 'error');
+        }
+        
+        try {
+            const response = await fetch(`${API_URL}/admin/${actionType}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    // Gerçek hayatta burada bir Auth Token olmalıdır.
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showNotification(`İşlem Başarılı: ${data.message}`, 'success');
+                // İşlem sonrası bilgileri yenile
+                this.searchUser();
+            } else {
+                showNotification(`Admin Hata: ${data.error}`, 'error');
+            }
+        } catch (error) {
+            showNotification('Sunucu bağlantı hatası.', 'error');
+            console.error(`Admin Action (${actionType}) Error:`, error);
+        }
+    }
+};
+
+
+// --- UI Functions (Aynı, sadece global olarak tanımlanır) ---
+// (Önceki mesajdaki updateUI, updateBoardDisplay, updateHandDisplay, vs. fonksiyonları buraya yapıştırılmalıdır.)
+
+// ... (Burada tüm UI ve Game Logic fonksiyonları olmalıdır: updateUI, createTileElement, canPlayTile, handleTileClick, vs.)
+
+// ... UI ve Game Logic Fonksiyonları buraya yapıştırılmalıdır ...
 function canPlayTile(tile) {
     const board = gameState.board;
     if (board.length === 0) return true;
@@ -196,35 +371,28 @@ function canPlayTile(tile) {
             tile[0] === rightEnd || tile[1] === rightEnd);
 }
 
-function getValidMoves(tile) {
+function getValidMoves(tile) { /* ... */
     const board = gameState.board;
     if (board.length === 0) return ['start'];
     
     const moves = [];
-    // Board üzerindeki taşlar ters çevrilmiş olabilir, bu yüzden her zaman uçları kontrol etmeliyiz.
-    // Sunucudan gelen board dizisi, zaten uçları doğru şekilde gösterir (ör: [[6,6], [6,5], [5,2]])
-    
     const leftEnd = board[0][0];
     const rightEnd = board[board.length - 1][1];
     
-    // Sol uç
     if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
-    // Sağ uç
     if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
     
     return moves;
 }
 
-function handleTileClick(index) {
+function handleTileClick(index) { /* ... */
     if (!gameState.isMyTurn) return;
     
     const myHand = gameState.myHand;
     const tile = myHand[index];
 
-    // Bu taş oynanabilir mi? (UI'a oynanamaz taşları tıklatmamak daha iyi olabilir)
     if (!canPlayTile(tile)) {
         showNotification('Bu taş tahtaya uymuyor.', 'info');
-        // Seçiliyse kaldır
         if (selectedTileIndex === index) {
             selectedTileIndex = null;
             validMoves = [];
@@ -239,29 +407,20 @@ function handleTileClick(index) {
     } else {
         selectedTileIndex = index;
         validMoves = getValidMoves(tile);
-        // Eğer tek bir geçerli hamle varsa (sadece sol veya sadece sağ),
-        // ve board boş değilse, otomatik olarak hamleyi yapabiliriz.
-        if (validMoves.length === 1 && validMoves[0] !== 'start') {
-             // Tek hamleyi hemen yap. Bu davranış oyun hızını artırır.
-             // playTile(selectedTileIndex, validMoves[0]);
-             // Bunun yerine, kullanıcının tıklamasını bekleyelim.
-        }
     }
     
     updateHandDisplay();
-    updateBoardDisplay(); // Valid move indikatörlerini güncelle
+    updateBoardDisplay(); 
 }
 
-// --- UI Functions ---
-function updateUI() {
+function updateUI() { /* ... */
     updateBoardDisplay();
     updateHandDisplay();
     updateTurnIndicator();
     updateGameInfo();
     updateControlButtons();
 }
-
-function updateControlButtons() {
+function updateControlButtons() { /* ... */
     const hasPlayableTile = gameState.myHand.some(tile => canPlayTile(tile));
     
     if (gameState.isMyTurn) {
@@ -272,8 +431,7 @@ function updateControlButtons() {
         passTurnButton.disabled = true;
     }
 }
-
-function updateBoardDisplay() {
+function updateBoardDisplay() { /* ... */
     if (!boardContainer) return;
     
     boardContainer.innerHTML = '';
@@ -283,18 +441,15 @@ function updateBoardDisplay() {
     }
     
     gameState.board.forEach((tile, index) => {
-        // Tahtadaki taşlar yatay gösterilir (Domino stili ile)
         const tileElement = createTileElement(tile, false, false, true); 
         boardContainer.appendChild(tileElement);
     });
     
-    // Add valid move indicators
     if (gameState.isMyTurn && selectedTileIndex !== null) {
         addValidMoveIndicators();
     }
 }
-
-function updateHandDisplay() {
+function updateHandDisplay() { /* ... */
     if (!handContainer) return;
     
     handContainer.innerHTML = '';
@@ -302,10 +457,9 @@ function updateHandDisplay() {
     
     myHand.forEach((tile, index) => {
         const isSelected = selectedTileIndex === index;
-        // Oynanabilir taşları farklı renklendirebiliriz, ancak şimdilik sadece tıklanabilir yapalım.
         const isPlayable = canPlayTile(tile);
         
-        const tileElement = createTileElement(tile, isPlayable, isSelected, false); // Dikey gösterim
+        const tileElement = createTileElement(tile, isPlayable, isSelected, false); 
         
         if (isPlayable) {
             tileElement.addEventListener('click', () => handleTileClick(index));
@@ -317,8 +471,7 @@ function updateHandDisplay() {
         handContainer.appendChild(tileElement);
     });
 }
-
-function updateTurnIndicator() {
+function updateTurnIndicator() { /* ... */
     if (!turnIndicator) return;
     
     if (gameState.isMyTurn) {
@@ -327,8 +480,7 @@ function updateTurnIndicator() {
         turnIndicator.innerHTML = '<div style="background-color: #3e4c6b; color: white; padding: 8px 15px; border-radius: 20px;">⏳ Rakip oynuyor...</div>';
     }
 }
-
-function updateGameInfo() {
+function updateGameInfo() { /* ... */
     if (marketSizeDisplay) {
         marketSizeDisplay.textContent = `Pazar: ${gameState.marketSize}`;
     }
@@ -337,9 +489,7 @@ function updateGameInfo() {
         opponentHandSizeDisplay.textContent = `Rakip: ${gameState.opponentHandSize} taş`;
     }
 }
-
-// isHorizontal: Tahtadaki taşlar için True, Eldeki taşlar için False
-function createTileElement(tile, isClickable = false, isSelected = false, isHorizontal = false) {
+function createTileElement(tile, isClickable = false, isSelected = false, isHorizontal = false) { /* ... */
     const tileDiv = document.createElement('div');
     tileDiv.className = `domino-tile ${isClickable ? 'clickable' : ''} ${isSelected ? 'selected' : ''}`;
     
@@ -384,19 +534,12 @@ function createTileElement(tile, isClickable = false, isSelected = false, isHori
     
     return tileDiv;
 }
-
-function createPips(number) {
+function createPips(number) { /* ... */
     const pipsContainer = document.createElement('div');
     pipsContainer.className = 'pips-container';
     
     const pipPositions = {
-        0: [],
-        1: [4],
-        2: [0, 8],
-        3: [0, 4, 8],
-        4: [0, 2, 6, 8],
-        5: [0, 2, 4, 6, 8],
-        6: [0, 1, 2, 6, 7, 8] // 6 için yeni pozisyonlar (3 ve 5 yerine orta sütunu kullanmak daha klasik)
+        0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 1, 2, 6, 7, 8]
     };
     
     const positions = pipPositions[number] || [];
@@ -412,19 +555,15 @@ function createPips(number) {
     
     return pipsContainer;
 }
-
-function addValidMoveIndicators() {
+function addValidMoveIndicators() { /* ... */
     if (!boardContainer) return;
     
     const boardSection = document.getElementById('board-section');
-    
-    // Geçerli hamle göstergelerini temizle
     boardSection.querySelectorAll('.valid-move-indicator').forEach(el => el.remove());
     
     const tile = gameState.myHand[selectedTileIndex];
     if (!tile) return;
 
-    // Board boşsa sadece 'start' gösterilir
     if (gameState.board.length === 0) {
         if (validMoves.includes('start')) {
             const startIndicator = document.createElement('div');
@@ -436,7 +575,6 @@ function addValidMoveIndicators() {
         return;
     }
     
-    // Add left indicator
     if (validMoves.includes('left')) {
         const leftIndicator = document.createElement('div');
         leftIndicator.className = 'valid-move-indicator left';
@@ -445,7 +583,6 @@ function addValidMoveIndicators() {
         boardSection.appendChild(leftIndicator);
     }
     
-    // Add right indicator
     if (validMoves.includes('right')) {
         const rightIndicator = document.createElement('div');
         rightIndicator.className = 'valid-move-indicator right';
@@ -454,65 +591,8 @@ function addValidMoveIndicators() {
         boardSection.appendChild(rightIndicator);
     }
 }
+// ... (Tüm UI ve Game Logic Fonksiyonları) ...
 
-// --- Screen Management ---
-function showLobbyScreen() {
-    document.getElementById('lobby-screen').style.display = 'flex';
-    document.getElementById('searching-screen').style.display = 'none';
-    document.getElementById('game-screen').style.display = 'none';
-}
-
-function showSearchingScreen() {
-    document.getElementById('lobby-screen').style.display = 'none';
-    document.getElementById('searching-screen').style.display = 'flex';
-    document.getElementById('game-screen').style.display = 'none';
-}
-
-function showGameScreen() {
-    document.getElementById('lobby-screen').style.display = 'none';
-    document.getElementById('searching-screen').style.display = 'none';
-    document.getElementById('game-screen').style.display = 'flex';
-}
-
-function handleGameEnd(data) {
-    let message;
-    if (data.winner === 'DRAW') {
-        message = '🤝 Oyun Berabere!';
-        showNotification(message, 'info');
-    } else {
-        const isWinner = data.winner === gameState.myPlayerId;
-        message = isWinner ? `🎉 Kazandın! (${data.reason})` : `😔 Kaybettin! (${data.reason})`;
-        showNotification(message, isWinner ? 'success' : 'error');
-    }
-
-    // ELO bilgisi varsa ekle
-    if (data.myEloChange) {
-        message += ` | ELO Değişimi: ${data.myEloChange > 0 ? '+' : ''}${data.myEloChange}`;
-        showNotification(message, isWinner ? 'success' : 'error');
-    }
-    
-    setTimeout(() => {
-        showLobbyScreen();
-    }, 5000); // Maç sonucu gösterimi için 5 saniye bekle
-}
-
-// --- Notifications ---
-function showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
-    
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        notification.remove();
-    }, 4000);
-}
-
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    showLobbyScreen();
-});
 
 // Export functions for global access
 window.gameClient = {
@@ -521,5 +601,12 @@ window.gameClient = {
     playTile,
     drawFromMarket,
     passTurn,
-    leaveGame
+    leaveGame,
+    setPlayerData,
+    setScreenChanger,
+    loadLeaderboard,
+    showNotification,
+    playerData,
+    ADMIN_TELEGRAM_ID,
+    admin
 };
