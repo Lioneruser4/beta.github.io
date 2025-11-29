@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Professional Domino 101</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         /* Modern CSS Reset ve Temel Ayarlar */
         body {
-            font-family: sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #1a1a2e; /* Koyu Mavi Arka Plan */
             color: white;
             margin: 0;
@@ -18,13 +19,187 @@
             min-height: 100vh;
         }
 
-        /* Ana Ekran Düzeni */
+        /* Ana Konteyner */
         #game-container {
             width: 95%;
             max-width: 1200px;
             margin: 20px auto;
         }
 
+        /* --- Ekran Yönetimi ve Animasyonlar --- */
+        .screen {
+            display: none;
+            width: 100%;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #lobby-screen, #searching-screen, #score-screen, #admin-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 80vh;
+        }
+
+        /* Başlıklar */
+        h1 { color: #ffcc00; margin-bottom: 20px; font-size: 2.5em; }
+        h2 { color: #fff; margin-bottom: 15px; border-bottom: 2px solid #3e4c6b; padding-bottom: 5px; }
+
+        /* Buton Stili */
+        .button {
+            padding: 15px 30px;
+            margin: 10px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s, box-shadow 0.3s;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .primary-button {
+            background-color: #ffcc00;
+            color: #1a1a2e;
+        }
+
+        .primary-button:hover {
+            background-color: #e6b800;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.4);
+        }
+        
+        .secondary-button {
+            background-color: #3e4c6b;
+            color: white;
+        }
+
+        .secondary-button:hover {
+            background-color: #2a3c58;
+            transform: translateY(-2px);
+        }
+
+        /* İkonlar için basit Font Awesome/Emoji yerine text kullanıldı */
+        .icon { font-size: 1.5em; }
+
+        /* --- Skor Tablosu Stili --- */
+        #leaderboard-list {
+            list-style: none;
+            padding: 0;
+            width: 100%;
+            max-width: 600px;
+            margin-top: 20px;
+        }
+
+        .leaderboard-item {
+            background-color: #2a3c58;
+            padding: 15px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.1em;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .leaderboard-item.top3 {
+            border: 2px solid #ffcc00;
+            background-color: #3e4c6b;
+        }
+
+        .player-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .rank {
+            font-weight: bold;
+            color: #ffcc00;
+            width: 30px;
+            text-align: left;
+        }
+        
+        .elo {
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        /* --- Admin Panel Stili --- */
+        #admin-panel-content {
+            background-color: #2a3c58;
+            padding: 30px;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 500px;
+            margin-top: 20px;
+        }
+        
+        .admin-action {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #3e4c6b;
+            border-radius: 8px;
+        }
+
+        .admin-action input, .admin-action select {
+            width: 80%;
+            padding: 10px;
+            margin-top: 5px;
+            border-radius: 4px;
+            border: none;
+            background-color: #1a1a2e;
+            color: white;
+        }
+        
+        .action-button {
+            padding: 10px 15px;
+            margin-top: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .action-button:hover {
+            background-color: #45a049;
+        }
+        
+        /* Geri butonu */
+        #back-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 10px 15px;
+            background-color: #555;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            z-index: 100;
+        }
+        
+        #back-button:hover { background-color: #777; }
+
+        /* Oyun Ekranı CSS'i (Önceki mesajdaki gibi kaldı, sadece buraya taşındı) */
+        /* [Önceki mesajdaki tüm domino-tile, board-section, hand-container, vs. CSS'leri buraya yapıştırılmalıdır] */
+        /* ... */
+        #board-section { /* ... */ }
+        #hand-container { /* ... */ }
+        /* ... */
+        
+    </style>
+    <style id="game-css">
+        /* Önceki game.js'deki tüm .domino-tile, #board-container, vb. stiller buraya kopyalanmıştır */
         /* --- Dominos CSS --- */
         .domino-tile {
             width: 60px;
@@ -44,9 +219,8 @@
             position: relative;
         }
 
-        /* Yan Tahta Stili */
         #board-container .domino-tile {
-            height: 60px; /* Tahtada yatay görünüm için */
+            height: 60px;
             width: 120px;
             flex-direction: row;
             padding: 0 5px;
@@ -81,7 +255,7 @@
             gap: 2px;
             width: 90%;
             height: 90%;
-            transform: scale(0.75); /* Küçült */
+            transform: scale(0.75);
         }
 
         .pip {
@@ -94,7 +268,6 @@
             background-color: black;
         }
 
-        /* El Taşı Stili */
         .domino-tile.clickable {
             cursor: pointer;
         }
@@ -109,7 +282,6 @@
             transform: translateY(-10px);
         }
 
-        /* Tahta ve El Düzeni */
         #board-section {
             background: #2a3c58;
             padding: 10px;
@@ -132,7 +304,6 @@
             border-radius: 10px;
         }
 
-        /* Geçerli Hamle Göstergeleri */
         .valid-move-indicator {
             position: absolute;
             background-color: #4CAF50;
@@ -167,54 +338,7 @@
             transform: translate(-50%, -50%);
             white-space: nowrap;
         }
-
-        /* Lobi ve Ekran Yönetimi */
-        .screen {
-            display: none;
-            width: 100%;
-            text-align: center;
-        }
-
-        #lobby-screen, #searching-screen, #game-screen {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 80vh; /* Ekranı ortalamak için */
-        }
         
-        .button {
-            padding: 12px 25px;
-            margin: 10px;
-            border: none;
-            border-radius: 5px;
-            font-size: 1.1em;
-            cursor: pointer;
-            transition: background-color 0.2s, transform 0.1s;
-        }
-
-        .primary-button {
-            background-color: #ffcc00;
-            color: #1a1a2e;
-            font-weight: bold;
-        }
-
-        .primary-button:hover {
-            background-color: #e6b800;
-            transform: translateY(-2px);
-        }
-
-        .secondary-button {
-            background-color: #3e4c6b;
-            color: white;
-        }
-
-        .secondary-button:hover {
-            background-color: #2a3c58;
-            transform: translateY(-2px);
-        }
-
-        /* Oyun Bilgisi */
         #game-info {
             display: flex;
             justify-content: space-between;
@@ -230,7 +354,6 @@
             min-width: 200px;
         }
 
-        /* Bildirimler */
         .notification {
             position: fixed;
             top: 20px;
@@ -257,15 +380,42 @@
 </head>
 <body>
 
+    <button id="back-button" style="display: none;">⬅️ Geri</button>
+
     <div id="game-container">
 
+        <div id="main-screen" class="screen" style="display: flex;">
+            <h1>DOMINO 101</h1>
+            <p id="telegram-status">Telegram bilgileri bekleniyor...</p>
+
+            <button id="find-ranked-btn" class="button primary-button">
+                <span class="icon">🥇</span> Dereceli Maç Bul (Ranked)
+            </button>
+            
+            <button id="open-lobby-btn" class="button secondary-button">
+                <span class="icon">👥</span> Arkadaşla Oyna (Lobi)
+            </button>
+            
+            <button id="open-score-btn" class="button secondary-button">
+                <span class="icon">🏆</span> Skor Tablosu
+            </button>
+            
+            <button id="open-admin-btn" class="button secondary-button" style="display: none;">
+                <span class="icon">⚙️</span> Admin Panel
+            </button>
+        </div>
+
         <div id="lobby-screen" class="screen">
-            <h1>PROFESSIONAL DOMINO 101</h1>
-            <p>Sıralamalı maç bulmak için hazır mısın?</p>
-            <button id="find-match-btn" class="button primary-button">RAKİP BUL</button>
-            <p class="mt-4">
-                <input type="text" id="telegram-id-input" placeholder="Telegram ID (Zorunlu değil)" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc; width: 200px; background-color: #333; color: white;">
-            </p>
+            <h2>👥 Arkadaşla Oyna</h2>
+            <button id="create-room-btn" class="button primary-button">
+                <span class="icon">🚪</span> Oda Kur
+            </button>
+            <div style="margin: 20px 0;">
+                <input type="text" id="room-code-input" placeholder="Oda Kodu Gir" style="padding: 10px; border-radius: 6px; border: none; width: 200px; background-color: #333; color: white; margin-right: 10px;">
+                <button id="join-room-btn" class="action-button" style="background-color: #007bff;">
+                    <span class="icon">🔗</span> Katıl
+                </button>
+            </div>
         </div>
 
         <div id="searching-screen" class="screen">
@@ -273,8 +423,39 @@
             <div id="search-spinner" style="font-size: 50px; animation: spin 2s linear infinite;">🔄</div>
             <button id="cancel-search-btn" class="button secondary-button">ARAMAYI İPTAL ET</button>
         </div>
+        
+        <div id="score-screen" class="screen">
+            <h2>🏆 Skor Tablosu (Top 10)</h2>
+            <ul id="leaderboard-list">
+                <li>Skorlar yükleniyor...</li>
+            </ul>
+        </div>
 
-        <div id="game-screen" class="screen" style="display: flex; flex-direction: column; justify-content: space-between; height: 100vh;">
+        <div id="admin-screen" class="screen">
+            <h2>⚙️ Admin Panel</h2>
+            <div id="admin-panel-content">
+                <div class="admin-action">
+                    <h4>Kullanıcı İşlemleri</h4>
+                    <input type="text" id="admin-target-id" placeholder="Target Telegram ID">
+                    <button class="action-button" onclick="window.gameClient.admin.searchUser()">Kullanıcı Ara</button>
+                    <p id="admin-user-info" style="margin-top: 10px; color: #ffcc00; font-size: 0.9em;"></p>
+                    
+                    <input type="number" id="admin-elo-value" placeholder="Yeni ELO Değeri">
+                    <button class="action-button" style="background-color: #f4d03f;" onclick="window.gameClient.admin.setElo()">ELO Ayarla</button>
+                </div>
+                
+                <div class="admin-action">
+                    <h4>Gizleme İşlemi</h4>
+                    <select id="admin-hide-action">
+                        <option value="true">Gizle</option>
+                        <option value="false">Göster</option>
+                    </select>
+                    <button class="action-button" style="background-color: #e74c3c;" onclick="window.gameClient.admin.setHiddenStatus()">Gizle/Göster</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="game-screen" class="screen" style="flex-direction: column; justify-content: space-between; height: 100vh;">
             
             <div id="game-info">
                 <span id="opponent-hand-size" class="text-lg">Rakip: ? taş</span>
@@ -301,22 +482,108 @@
 
     <script src="game.js"></script>
     <script>
-        // DOMContentLoaded burada çalıştırılacak
-        document.getElementById('find-match-btn').addEventListener('click', () => {
-            const telegramId = document.getElementById('telegram-id-input').value.trim() || null;
-            // Basit bir guest verisi ile başlatma
-            const playerData = {
-                telegramId: telegramId,
-                username: telegramId || 'Guest' + Math.floor(Math.random() * 1000),
-                firstName: telegramId ? 'Player' : 'Guest',
-                photoUrl: null
-            };
-            window.gameClient.findMatch(playerData);
+        // --- Ekran Yöneticisi ve Telegram Başlatma ---
+        const screens = {
+            'main': document.getElementById('main-screen'),
+            'lobby': document.getElementById('lobby-screen'),
+            'searching': document.getElementById('searching-screen'),
+            'score': document.getElementById('score-screen'),
+            'admin': document.getElementById('admin-screen'),
+            'game': document.getElementById('game-screen')
+        };
+        const backButton = document.getElementById('back-button');
+        let currentScreen = 'main';
+
+        function changeScreen(newScreen, canGoBack = true) {
+            Object.values(screens).forEach(s => s.style.display = 'none');
+            
+            if (screens[newScreen]) {
+                screens[newScreen].style.display = newScreen === 'game' ? 'flex' : 'flex';
+                currentScreen = newScreen;
+                backButton.style.display = canGoBack && newScreen !== 'game' && newScreen !== 'main' ? 'block' : 'none';
+                
+                if (newScreen === 'score') {
+                    window.gameClient.loadLeaderboard();
+                }
+                
+                // Admin butonu kontrolü (admin ID'si game.js içinde tanımlanacak)
+                if (window.gameClient.playerData && window.gameClient.playerData.telegramId === window.gameClient.ADMIN_TELEGRAM_ID) {
+                    document.getElementById('open-admin-btn').style.display = 'flex';
+                }
+            }
+        }
+        
+        backButton.addEventListener('click', () => {
+            if (currentScreen === 'lobby' || currentScreen === 'score' || currentScreen === 'admin') {
+                changeScreen('main', false);
+            }
         });
         
-        document.getElementById('cancel-search-btn').addEventListener('click', () => {
-            window.gameClient.cancelSearch();
+        // Ana Menü Buton Olayları
+        document.getElementById('find-ranked-btn').addEventListener('click', () => {
+            if (window.gameClient.playerData) {
+                window.gameClient.findMatch(window.gameClient.playerData);
+            } else {
+                window.gameClient.showNotification("Telegram verisi alınamadı. Lütfen WebApp'i Telegram'dan başlatın.", 'error');
+            }
         });
+        document.getElementById('open-lobby-btn').addEventListener('click', () => changeScreen('lobby'));
+        document.getElementById('open-score-btn').addEventListener('click', () => changeScreen('score'));
+        document.getElementById('open-admin-btn').addEventListener('click', () => changeScreen('admin'));
+
+        // Lobi Buton Olayları
+        document.getElementById('create-room-btn').addEventListener('click', () => {
+             window.gameClient.showNotification("Lobi kurma özelliği yakında eklenecek!", 'info');
+             // window.gameClient.createRoom(); 
+        });
+        document.getElementById('join-room-btn').addEventListener('click', () => {
+            const roomCode = document.getElementById('room-code-input').value.trim();
+            if (roomCode) {
+                window.gameClient.showNotification(`Oda ${roomCode} özelliğine katılma yakında eklenecek!`, 'info');
+                // window.gameClient.joinRoom(roomCode);
+            } else {
+                window.gameClient.showNotification('Lütfen bir oda kodu girin.', 'error');
+            }
+        });
+
+        // Telegram Verisi Yakalama
+        document.addEventListener('DOMContentLoaded', () => {
+            window.gameClient.setScreenChanger(changeScreen); // game.js'ye ekran değiştirme fonksiyonunu gönder
+            
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+                const initData = window.Telegram.WebApp.initDataUnsafe;
+                
+                if (initData.user) {
+                    const user = initData.user;
+                    const playerData = {
+                        telegramId: user.id.toString(),
+                        username: user.username || `User_${user.id}`,
+                        firstName: user.first_name || 'Player',
+                        photoUrl: user.photo_url || null
+                    };
+                    
+                    window.gameClient.setPlayerData(playerData);
+                    document.getElementById('telegram-status').textContent = `Hoş geldin, ${playerData.firstName}!`;
+                    
+                    // Eğer admin ise admin butonunu göster
+                    if (playerData.telegramId === window.gameClient.ADMIN_TELEGRAM_ID) {
+                        document.getElementById('open-admin-btn').style.display = 'flex';
+                    }
+
+                } else {
+                     document.getElementById('telegram-status').textContent = "Telegram kullanıcı bilgisi alınamadı. Misafir olarak devam et.";
+                     window.gameClient.setPlayerData({ telegramId: null, username: 'Guest' + Math.floor(Math.random() * 1000) });
+                }
+                
+                window.Telegram.WebApp.ready();
+            } else {
+                 document.getElementById('telegram-status').textContent = "Telegram WebApp ortamı bulunamadı. Misafir olarak devam et.";
+                 window.gameClient.setPlayerData({ telegramId: null, username: 'Guest' + Math.floor(Math.random() * 1000) });
+            }
+            
+            changeScreen('main', false);
+        });
+        
     </script>
 </body>
 </html>
