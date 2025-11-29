@@ -244,7 +244,16 @@
             useEffect(() => {
                 initializeTelegramAuth();
                 connectToServer();
-                return () => { if (wsRef.current) wsRef.current.close(); };
+                
+                // Emergency fallback: 5 saniye içinde lobby'e geçmezse zorla geç
+                const fallbackTimer = setTimeout(() => {
+                    setScreen('lobby');
+                }, 5000);
+                
+                return () => { 
+                    if (wsRef.current) wsRef.current.close(); 
+                    clearTimeout(fallbackTimer);
+                };
             }, []);
 
             // Telegram Auth
