@@ -19,7 +19,8 @@ mongoose.connect(MONGODB_URI, {
 
 const playerSchema = new mongoose.Schema({
     telegramId: { type: String, required: true, unique: true },
-    elo: { type: Number, default: 1000 },
+    elo: { type: Number, default: 0 },
+    level: { type: Number, default: 1 },
 });
 
 const matchSchema = new mongoose.Schema({
@@ -47,6 +48,12 @@ async function findOrCreatePlayer(telegramId) {
 // ELO Hesaplama
 function calculateEloChange() {
     return { winnerGain: 15, loserLoss: -10 };
+}
+
+// Seviye Hesaplama (Her 100 ELO'da 1 seviye, maks 10)
+function calculateLevel(elo) {
+    const level = Math.floor(elo / 100) + 1;
+    return Math.min(level, 10); // Seviyeyi 10 ile sınırla
 }
 
 const io = new Server(server, {
@@ -416,7 +423,10 @@ async function handleGameEnd(roomCode, winnerColor, reason = 'Oyun bitti.') {
             const { winnerGain, loserLoss } = calculateEloChange();
             
             winnerDB.elo += winnerGain;
-            loserDB.elo += loserLoss;
+            loserDB.elo = Math.max(0, loserDB.elo + loserLoss); // ELO'nun 0'ın altına düşmesini engelle
+
+            winnerDB.level = calculateLevel(winnerDB.elo);
+            loserDB.level = calculateLevel(loserDB.elo);
 
             await winnerDB.save();
             await loserDB.save();
