@@ -8,7 +8,8 @@ let gameState = {
     selectedPiece: null,
     myColor: null,
     isMyTurn: false,
-    roomCode: null,
+    roomCode: null, 
+    telegramId: "user_" + Math.random().toString(36).substr(2, 9), // Test için rastgele ID
     isSearching: false,
     gameStarted: false
 };
@@ -53,6 +54,8 @@ socket.on('connect', () => {
     connectionStatus.classList.remove('text-yellow-400');
     connectionStatus.classList.add('text-green-500');
     showScreen('main');
+    // Sunucuya kimliğimizi kaydedelim
+    socket.emit('register', { telegramId: gameState.telegramId });
 });
 
 socket.on('disconnect', () => {
@@ -60,6 +63,11 @@ socket.on('disconnect', () => {
     connectionStatus.classList.remove('text-green-500');
     connectionStatus.classList.add('text-red-500');
     showModal('Serverle elaqe kesildi. Səhifeni yenileyin.');
+});
+
+socket.on('forceDisconnect', (message) => {
+    showModal(message);
+    socket.disconnect();
 });
 
 socket.on('matchFound', (data) => {
@@ -259,6 +267,11 @@ function isValidMove(board, fromR, fromC, toR, toC, player) {
     return moves.some(move => move.to.r === toR && move.to.c === toC);
 }
 
+function hasAnyCaptureMoves(board, player) {
+    // Tüm taşları kontrol et, herhangi birinin zıplama hamlesi var mı?
+    return board.flat().some((piece, index) => getPiecePlayer(piece) === player && findJumps(board, Math.floor(index / BOARD_SIZE), index % BOARD_SIZE, player).length > 0);
+}
+
 // --- UI Funksiyalari ---
 
 function drawBoard() {
@@ -298,7 +311,18 @@ function drawBoard() {
             }
 
             if (gameState.selectedPiece && gameState.isMyTurn) {
-                if (isValidMove(gameState.board, gameState.selectedPiece.r, gameState.selectedPiece.c, r, c, gameState.myColor)) {
+                const fromR = gameState.selectedPiece.r;
+                const fromC = gameState.selectedPiece.c;
+                const mustCapture = hasAnyCaptureMoves(gameState.board, gameState.myColor);
+                const validMoves = findValidMoves(gameState.board, fromR, fromC, gameState.myColor);
+                const isThisMoveValid = validMoves.some(move => move.to.r === r && move.to.c === c);
+
+                // Eğer taş yeme zorunluluğu varsa ve bu hamle bir yeme hamlesi değilse, gösterme.
+                // Eğer taş yeme zorunluluğu yoksa, tüm geçerli hamleleri göster.
+                const isCaptureMove = Math.abs(fromR - r) === 2;
+                const shouldShow = isThisMoveValid && (!mustCapture || isCaptureMove);
+
+                if (shouldShow) {
                     cell.classList.add('valid-move');
                 }
             }
@@ -333,7 +357,17 @@ function handleCellClick(r, c) {
         const fromR = gameState.selectedPiece.r;
         const fromC = gameState.selectedPiece.c;
 
-        if (isValidMove(gameState.board, fromR, fromC, r, c, gameState.myColor)) {
+        // Hamlenin geçerliliğini tekrar kontrol et, bu sefer zorunlu yeme kuralıyla birlikte.
+        const mustCapture = hasAnyCaptureMoves(gameState.board, gameState.myColor);
+        const validMoves = findValidMoves(gameState.board, fromR, fromC, gameState.myColor);
+        const move = validMoves.find(m => m.to.r === r && m.to.c === c);
+
+        if (move) {
+            const isCaptureMove = Math.abs(fromR - r) === 2;
+            if (mustCapture && !isCaptureMove) {
+                showModal("Taş yemek zorunludur!");
+                return;
+            }
             socket.emit('makeMove', {
                 roomCode: gameState.roomCode,
                 from: { r: fromR, c: fromC },
@@ -410,6 +444,7 @@ function leaveGame() {
         selectedPiece: null,
         myColor: null,
         isMyTurn: false,
+        telegramId: gameState.telegramId, // Kimliği koru
         roomCode: null,
         isSearching: false,
         gameStarted: false
