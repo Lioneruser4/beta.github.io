@@ -133,4 +133,240 @@ function calculateElo(game, winnerId) {
 async function updatePlayerData(telegramId, eloChange, won) {
   try {
     const collection = db.collection('players');
-    const player = await collection.findOne({ telegramI
+    const player = await collection.findOne({ telegramId });
+    
+    if (!player) {
+      await collection.insertOne({
+        telegramId,
+        elo: 1000 + eloChange,
+        points: Math.abs(eloChange),
+        level: 1,
+        wins: won ? 1 : 0,
+        losses: won ? 0 : 1
+      });
+      return { elo: 1000 + eloChange, points: Math.abs(eloChange), level: 1 };
+    }
+    
+    const newElo = Math.max(0, player.elo + eloChange);
+    const newPoints = player.points + Math.abs(eloChange);
+    const newLevel = Math.min(10, Math.floor(newPoints / 100) + 1);
+    
+    await collection.updateOne(
+      { telegramId },
+      { 
+        $set: { 
+          elo: newElo, 
+          points: newPoints, 
+          level: newLevel 
+        },
+        $inc: won ? { wins: 1 } : { losses: 1 }
+      }
+    );
+    
+    return { elo: newElo, points: newPoints, level: newLevel };
+  } catch (err) {
+    console.error('❌ updatePlayerData hata:', err);
+    return null;
+  }
+}
+
+// WebSocket bağlantıları
+wss.on('connection', (ws) => {
+  console.log('🔌 Yeni oyuncu bağlandı');
+  
+  ws.on('message', async (message) => {
+    try {
+      const data = JSON.parse(message);
+      
+      switch (data.type) {
+        case 'register':
+          const collection = db.collection('players');
+          let playerData = await collection.findOne({ telegramId: data.telegramId });
+          
+          if (!playerData) {
+            playerData = {
+              telegramId: data.telegramId,
+              name: data.name,
+              elo: 1000,
+              points: 0,
+              level: 1,
+              wins: 0,
+              losses: 0
+            };
+            await collection.insertOne(playerData);
+          }
+          
+          players.set(ws, { 
+            id: data.telegramId, 
+            name: data.name,
+            elo: playerData.elo,
+            level: playerData.level 
+          });
+          
+          ws.send(JSON.stringify({ type: 'playerData', data: playerData }));
+          break;
+          
+        case 'searchRanked':
+          const player = players.get(ws);
+          if (!player) break;
+          
+          rankedQueue.push({ player, ws });
+          
+          if (rankedQueue.length >= 2) {
+            const p1 = rankedQueue.shift();
+            const p2 = rankedQueue.shift();
+            
+            const game = createGame(p1.player, p2.player, true);
+            rooms.set(game.id, { game, players: [p1, p2] });
+            
+            p1.ws.send(JSON.stringify({ type: 'matchFound', game }));
+            p2.ws.send(JSON.stringify({ type: 'matchFound', game }));
+          }
+          break;
+          
+        case 'cancelSearch':
+          const idx = rankedQueue.findIndex(q => q.ws === ws);
+          if (idx !== -1) rankedQueue.splice(idx, 1);
+          break;
+          
+        case 'createRoom':
+          const creator = players.get(ws);
+          if (!creator) break;
+          
+          const roomCode = Math.floor(1000 + Math.random() * 9000).toString();
+          rooms.set(roomCode, { creator, ws, waiting: true });
+          
+          ws.send(JSON.stringify({ type: 'roomCreated', roomCode }));
+          break;
+          
+        case 'joinRoom':
+          const room = rooms.get(data.roomCode);
+          if (!room || !room.waiting) break;
+          
+          const joiner = players.get(ws);
+          if (!joiner) break;
+          
+          const friendlyGame = createGame(room.creator, joiner, false);
+          rooms.set(friendlyGame.id, { game: friendlyGame, players: [{ ws: room.ws }, { ws }] });
+          rooms.delete(data.roomCode);
+          
+          room.ws.send(JSON.stringify({ type: 'roomJoined', game: friendlyGame }));
+          ws.send(JSON.stringify({ type: 'roomJoined', game: friendlyGame }));
+          break;
+          
+        case 'getValidMoves':
+          for (const [roomId, roomData] of rooms.entries()) {
+            if (!roomData.game) continue;
+            const moves = getValidMoves(data.domino, roomData.game.board);
+            ws.send(JSON.stringify({ type: 'validMoves', moves }));
+          }
+          break;
+          
+        case 'playDomino':
+          for (const [roomId, roomData] of rooms.entries()) {
+            if (!roomData.game) continue;
+            
+            const success = playDomino(roomData.game, players.get(ws).id, data.domino, data.side);
+            
+            if (success) {
+              roomData.players.forEach(p => {
+                p.ws.send(JSON.stringify({ type: 'gameUpdate', game: roomData.game }));
+              });
+              
+              if (roomData.game.winner) {
+                const eloChanges = calculateElo(roomData.game, roomData.game.winner);
+                
+                if (roomData.game.isRanked) {
+                  for (const p of roomData.players) {
+                    const playerId = players.get(p.ws).id;
+                    const won = playerId === roomData.game.winner;
+                    const eloChange = won ? eloChanges.winner : eloChanges.loser;
+                    
+                    const updated = await updatePlayerData(playerId, eloChange, won);
+                    p.ws.send(JSON.stringify({ 
+                      type: 'gameEnd', 
+                      game: roomData.game,
+                      eloChange,
+                      playerData: updated
+                    }));
+                  }
+                } else {
+                  roomData.players.forEach(p => {
+                    p.ws.send(JSON.stringify({ type: 'gameEnd', game: roomData.game }));
+                  });
+                }
+                
+                rooms.delete(roomId);
+              }
+            }
+          }
+          break;
+          
+        case 'drawDomino':
+          for (const [roomId, roomData] of rooms.entries()) {
+            if (!roomData.game || roomData.game.pool.length === 0) continue;
+            
+            const drawnPlayer = roomData.game.players.find(p => p.id === players.get(ws).id);
+            if (drawnPlayer) {
+              drawnPlayer.hand.push(roomData.game.pool.pop());
+              
+              roomData.players.forEach(p => {
+                p.ws.send(JSON.stringify({ type: 'gameUpdate', game: roomData.game }));
+              });
+            }
+          }
+          break;
+          
+        case 'getLeaderboard':
+          const leaderboardData = await db.collection('players')
+            .find()
+            .sort({ elo: -1 })
+            .limit(100)
+            .toArray();
+          
+          ws.send(JSON.stringify({ type: 'leaderboard', data: leaderboardData }));
+          break;
+      }
+    } catch (err) {
+      console.error('❌ Mesaj hata:', err);
+    }
+  });
+  
+  ws.on('close', () => {
+    const player = players.get(ws);
+    if (player) {
+      // Oyuncu çıktı, odadan çıkar
+      for (const [roomId, roomData] of rooms.entries()) {
+        if (roomData.game && roomData.players.some(p => p.ws === ws)) {
+          const otherPlayer = roomData.players.find(p => p.ws !== ws);
+          if (otherPlayer && roomData.game.isRanked) {
+            const halfGame = roomData.game.moveCount >= 10;
+            const eloChange = halfGame ? 20 : 10;
+            
+            updatePlayerData(players.get(otherPlayer.ws).id, eloChange, true);
+            updatePlayerData(player.id, halfGame ? -20 : -10, false);
+            
+            otherPlayer.ws.send(JSON.stringify({ 
+              type: 'gameEnd', 
+              game: { ...roomData.game, winner: players.get(otherPlayer.ws).id },
+              eloChange
+            }));
+          }
+          rooms.delete(roomId);
+        }
+      }
+      
+      players.delete(ws);
+      console.log('👋 Oyuncu ayrıldı');
+    }
+  });
+});
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date() });
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`🚀 Server çalışıyor: ${PORT}`);
+});
