@@ -245,10 +245,11 @@
                 initializeTelegramAuth();
                 connectToServer();
                 
-                // Emergency fallback: 5 saniye içinde lobby'e geçmezse zorla geç
+                // Emergency fallback: 2 saniye içinde lobby'e geçmezse zorla geç
                 const fallbackTimer = setTimeout(() => {
+                    console.log('⚡ Fallback: Zorla lobby\'e geçiliyor...');
                     setScreen('lobby');
-                }, 5000);
+                }, 2000);
                 
                 return () => { 
                     if (wsRef.current) wsRef.current.close(); 
@@ -355,18 +356,28 @@
                         const opponentEloEl = document.getElementById('opponent-elo');
                         const opponentPhotoEl = document.getElementById('opponent-photo');
                         
+                        // Guest kontrolü ve isim gösterimi
+                        const displayName = opponent.isGuest ? 'Guest' : (opponent.name || 'Rakip');
+                        const displayElo = opponent.isGuest ? 'Guest' : `ELO: ${opponent.elo || 0}`;
+                        const displayLevel = opponent.isGuest ? 'GUEST' : (opponent.level >= 10 ? 'PRO' : opponent.level.toString());
+                        
                         if (opponentLevelEl) {
-                            opponentLevelEl.textContent = opponent.level >= 10 ? 'PRO' : opponent.level.toString();
+                            opponentLevelEl.textContent = displayLevel;
                         }
                         if (opponentNameEl) {
-                            opponentNameEl.textContent = opponent.name || 'Rakip';
+                            opponentNameEl.textContent = displayName;
                         }
                         if (opponentEloEl) {
-                            opponentEloEl.textContent = `ELO: ${opponent.elo || 0}`;
+                            opponentEloEl.textContent = displayElo;
                         }
-                        if (opponentPhotoEl && opponent.photoUrl) {
+                        if (opponentPhotoEl && opponent.photoUrl && !opponent.isGuest) {
                             opponentPhotoEl.src = opponent.photoUrl;
+                        } else if (opponentPhotoEl && opponent.isGuest) {
+                            // Guest için default profil resmi
+                            opponentPhotoEl.src = 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png';
                         }
+                        
+                        console.log('👤 Rakip bilgileri güncellendi:', { displayName, displayElo, displayLevel });
                     }
                 }
             }, [gameState]);
