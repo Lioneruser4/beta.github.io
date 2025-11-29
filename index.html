@@ -1247,8 +1247,26 @@
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         console.log('React root created, rendering DominoGame...');
-        root.render(<DominoGame />);
-        console.log('DominoGame rendered successfully!');
+        
+        // Error boundary ile güvenli render
+        try {
+            root.render(<DominoGame />);
+            console.log('DominoGame rendered successfully!');
+        } catch (error) {
+            console.error('❌ React render hatası:', error);
+            // Fallback: Basit HTML göster
+            document.getElementById('root').innerHTML = `
+                <div style="display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <div style="text-align: center; color: white;">
+                        <h1 style="font-size: 3rem; margin-bottom: 1rem;">🎯 DOMINO 101 🏆</h1>
+                        <p style="font-size: 1.2rem; margin-bottom: 2rem;">Oyun Yükleniyor...</p>
+                        <button onclick="location.reload()" style="padding: 1rem 2rem; font-size: 1rem; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                            🔄 Sayfayı Yenile
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
     </script>
     </body>
 </html>
