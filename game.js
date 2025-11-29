@@ -451,23 +451,29 @@ joinRoomBtn.onclick = () => {
     socket.emit('joinRoom', { roomCode });
 };
 
-leaveGameBtn.onclick = () => leaveGame();
+leaveGameBtn.onclick = () => {
+    // Oyuncuya oyundan çıkmak isteyip istemediğini sor
+    if (confirm("Oyundan çıxmaq istədiyinizə əminsiniz? Bu, məğlubiyyət sayılacaq.")) {
+        leaveGame();
+    }
+};
 
 function leaveGame(isGameOver = false) {
     // Eğer oyun bitmediyse ve oyuncu manuel ayrılıyorsa sunucuya haber ver
     if (gameState.roomCode && !isGameOver) {
         socket.emit('leaveGame', { roomCode: gameState.roomCode });
     }
-    
+
+    const preservedTelegramId = gameState.telegramId;
+
     // Oyun durumunu tamamen sıfırla
     gameState = {
-        ...gameState, // telegramId gibi kalıcı verileri koru
         board: [],
         currentTurn: 'red',
         selectedPiece: null,
         myColor: null,
         isMyTurn: false,
-        telegramId: gameState.telegramId, // Kimliği koru
+        telegramId: preservedTelegramId, // Kimliği koru
         roomCode: null,
         isSearching: false,
         gameStarted: false
