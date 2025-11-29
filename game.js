@@ -123,8 +123,18 @@ socket.on('gameUpdate', (data) => {
 
 socket.on('gameOver', (data) => {
     const isWinner = data.winner === gameState.myColor;
-    showModal('Oyun bitdi! ' + (isWinner ? 'Siz qazandiniz!' : 'Raqib qazandi!'));
-    setTimeout(() => leaveGame(), 3000);
+    let message = `Oyun bitdi! ${isWinner ? 'Siz qazandınız!' : 'Məğlub oldunuz.'}`;
+    
+    if (data.reason && data.reason !== 'Oyun bitti.') {
+        message += `\nSəbəb: ${data.reason}`;
+    }
+
+    if (data.eloChange) {
+        const eloText = data.eloChange > 0 ? `+${data.eloChange}` : data.eloChange;
+        message += `\nELO Dəyişimi: ${eloText}`;
+    }
+    showModal(message);
+    setTimeout(() => leaveGame(true), 4000); // Oyunu tamamen sıfırla
 });
 
 socket.on('error', (message) => {
@@ -132,7 +142,9 @@ socket.on('error', (message) => {
     gameState.isSearching = false;
     clearInterval(searchTimer);
     searchTimer = null;
-    showScreen('main');
+    if (!gameState.gameStarted) { // Sadece lobideyken ana ekrana dön
+        showScreen('main');
+    }
 });
 
 // --- Yardimci Funksiyalar ---
@@ -351,6 +363,14 @@ function handleCellClick(r, c) {
     const piecePlayer = getPiecePlayer(pieceValue);
 
     if (piecePlayer === gameState.myColor) {
+        // Taş yeme zorunluluğu var mı diye kontrol et.
+        const mustCapture = hasAnyCaptureMoves(gameState.board, gameState.myColor);
+        if (mustCapture) {
+            const jumpsForThisPiece = findJumps(gameState.board, r, c, gameState.myColor);
+            if (jumpsForThisPiece.length === 0) {
+                return showModal("Taş yemek zorunludur! Başka bir taşınızı seçin.");
+            }
+        }
         gameState.selectedPiece = { r, c };
         drawBoard();
     } else if (gameState.selectedPiece && !pieceValue) {
@@ -433,12 +453,15 @@ joinRoomBtn.onclick = () => {
 
 leaveGameBtn.onclick = () => leaveGame();
 
-function leaveGame() {
-    if (gameState.roomCode) {
+function leaveGame(isGameOver = false) {
+    // Eğer oyun bitmediyse ve oyuncu manuel ayrılıyorsa sunucuya haber ver
+    if (gameState.roomCode && !isGameOver) {
         socket.emit('leaveGame', { roomCode: gameState.roomCode });
     }
     
+    // Oyun durumunu tamamen sıfırla
     gameState = {
+        ...gameState, // telegramId gibi kalıcı verileri koru
         board: [],
         currentTurn: 'red',
         selectedPiece: null,
