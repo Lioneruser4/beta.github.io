@@ -11,15 +11,44 @@ const server = http.createServer(app);
 // MongoDB Bağlantısı (Bu örnekte kullanılmıyor ama gelecekteki özellikler için kalabilir)
 const MONGODB_URI = 'mongodb+srv://xaliqmustafayev7313_db_user:R4Cno5z1Enhtr09u@sayt.1oqunne.mongodb.net/domino_game?retryWrites=true&w=majority';
 
-/*
 mongoose.connect(MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 }).then(() => console.log('✅ MongoDB bağlantısı başarılı.'))
   .catch(err => console.error('❌ MongoDB bağlantı hatası:', err));
 
-const io = new Server(server, {
-*/
+const playerSchema = new mongoose.Schema({
+    telegramId: { type: String, required: true, unique: true },
+    elo: { type: Number, default: 1000 },
+});
+
+const matchSchema = new mongoose.Schema({
+    players: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Player' }],
+    winner: { type: mongoose.Schema.Types.ObjectId, ref: 'Player' },
+    eloChange: { type: Number },
+    createdAt: { type: Date, default: Date.now }
+});
+
+const Player = mongoose.model('Player', playerSchema);
+const Match = mongoose.model('Match', matchSchema);
+
+// Oyuncu oluşturma veya bulma fonksiyonu
+async function findOrCreatePlayer(telegramId) {
+    if (!telegramId) return null;
+    let player = await Player.findOne({ telegramId });
+    if (!player) {
+        player = new Player({ telegramId });
+        await player.save();
+        console.log(`✨ Yeni oyuncu veritabanına eklendi: ${telegramId}`);
+    }
+    return player;
+}
+
+// ELO Hesaplama
+function calculateEloChange() {
+    return { winnerGain: 15, loserLoss: -10 };
+}
+
 const io = new Server(server, {
     cors: {
         origin: "*", // Geliştirme için tüm kaynaklara izin ver, canlıda kısıtla
@@ -55,6 +84,7 @@ io.on('connection', (socket) => {
         if (!telegramId) return; // Veya misafir olarak işaretle
 
         socket.telegramId = telegramId;
+        findOrCreatePlayer(telegramId); // Oyuncuyu DB'de bul veya oluştur
 
         if (activeConnections.has(telegramId)) {
             const oldSocketId = activeConnections.get(telegramId);
@@ -144,7 +174,7 @@ io.on('connection', (socket) => {
         io.to(roomCode).emit('gameUpdate', { board: room.board, currentTurn: room.currentTurn });
     });
 
-    socket.on('makeMove', ({ roomCode, from, to }) => {
+    socket.on('makeMove', async ({ roomCode, from, to }) => {
         const room = rooms[roomCode];
         if (!room) return socket.emit('error', 'Oyun odası bulunamadı.');
 
@@ -154,11 +184,20 @@ io.on('connection', (socket) => {
         }
 
         // Sunucu tarafında hamle doğrulama
-        const validMoves = findValidMoves(room.board, from.r, from.c, playerColor);
+        const mustCapture = hasAnyCaptureMoves(room.board, playerColor);
+        const validMoves = findValidMoves(room.board, from.r, from.c, playerColor); // Bu, ya zıplamaları ya da normal hamleleri içerir
         const move = validMoves.find(m => m.to.r === to.r && m.to.c === to.c);
 
         if (!move) {
             return socket.emit('error', 'Geçersiz hamle.');
+        }
+
+        // Eğer taş yeme zorunluluğu varsa, yapılan hamlenin bir yeme hamlesi olduğundan emin ol.
+        // 'move.captured' özelliği sadece yeme hamlelerinde bulunur.
+        if (mustCapture && !move.captured) {
+            // Bu durum, istemcinin bir şekilde kuralı atlatmaya çalıştığını gösterir.
+            console.warn(`⚠️ Geçersiz hamle denemesi: ${socket.id} yeme zorunluluğunu atlamaya çalıştı.`);
+            return socket.emit('error', 'Geçersiz hamle. Taş yemek zorunludur.');
         }
 
         // Hamleyi uygula
@@ -181,8 +220,7 @@ io.on('connection', (socket) => {
         // Oyun bitiş kontrolü
         const winner = checkWinner(room.board, room.currentTurn);
         if (winner) {
-            io.to(roomCode).emit('gameOver', { winner });
-            delete rooms[roomCode];
+            await handleGameEnd(roomCode, winner);
         } else {
             io.to(roomCode).emit('gameUpdate', { board: room.board, currentTurn: room.currentTurn });
         }
@@ -279,6 +317,16 @@ function checkWinner(board, nextTurn) {
     return null; // Oyun devam ediyor
 }
 
+function hasAnyCaptureMoves(board, player) {
+    for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+            if (getPiecePlayer(board[r][c]) === player && findJumps(board, r, c, player).length > 0) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
 // Bu fonksiyonlar istemcidekiyle aynı olmalı
 function findValidMoves(board, r, c, player) {
     const moves = [];
@@ -341,14 +389,62 @@ function handleDisconnect(socket, roomCode) {
     if (room) {
         // Rakibe oyunun bittiğini haber ver
         const opponentColor = room.players[socket.id] === 'red' ? 'white' : 'red';
-        io.to(roomCode).emit('gameOver', { winner: opponentColor, reason: 'Rakip oyundan ayrıldı.' });
-        console.log(`👋 ${socket.id}, ${roomCode} odasından ayrıldı. Oyun bitti.`);
-        delete rooms[roomCode];
+        handleGameEnd(roomCode, opponentColor, 'Rakip oyundan ayrıldı.');
     }
 }
 
-// MongoDB şemaları ve API endpoint'leri bu dosyanın geri kalanında yer alabilir.
-// Bu örnekte sadece oyun mantığına odaklanılmıştır.
+async function handleGameEnd(roomCode, winnerColor, reason = 'Oyun bitti.') {
+    const room = rooms[roomCode];
+    if (!room) return;
+
+    console.log(`🏁 Oyun bitti: ${roomCode}. Kazanan: ${winnerColor}. Sebep: ${reason}`);
+
+    const playerSocketIds = Object.keys(room.players);
+    const winnerSocketId = playerSocketIds.find(id => room.players[id] === winnerColor);
+    const loserSocketId = playerSocketIds.find(id => room.players[id] !== winnerColor);
+
+    const winnerSocket = io.sockets.sockets.get(winnerSocketId);
+    const loserSocket = io.sockets.sockets.get(loserSocketId);
+
+    let eloChanges = { winner: 0, loser: 0 };
+
+    if (winnerSocket && loserSocket && winnerSocket.telegramId && loserSocket.telegramId) {
+        const winnerDB = await Player.findOne({ telegramId: winnerSocket.telegramId });
+        const loserDB = await Player.findOne({ telegramId: loserSocket.telegramId });
+
+        if (winnerDB && loserDB) {
+            const { winnerGain, loserLoss } = calculateEloChange();
+            
+            winnerDB.elo += winnerGain;
+            loserDB.elo += loserLoss;
+
+            await winnerDB.save();
+            await loserDB.save();
+
+            eloChanges = { winner: winnerGain, loser: loserLoss };
+            console.log(`📈 ELO güncellendi: ${winnerSocket.telegramId} +${winnerGain}, ${loserSocket.telegramId} ${loserLoss}`);
+
+            // Maç kaydı oluştur
+            const match = new Match({
+                players: [winnerDB._id, loserDB._id],
+                winner: winnerDB._id,
+                eloChange: winnerGain
+            });
+            await match.save();
+        }
+    }
+
+    // Oyunculara sonuçları gönder
+    if (winnerSocket) {
+        winnerSocket.emit('gameOver', { winner: winnerColor, reason, eloChange: eloChanges.winner });
+    }
+    if (loserSocket) {
+        loserSocket.emit('gameOver', { winner: winnerColor, reason, eloChange: eloChanges.loser });
+    }
+
+    // Odayı temizle
+    delete rooms[roomCode];
+}
     const piece = room.board[from.r][from.c];
     room.board[to.r][to.c] = piece;
     room.board[from.r][from.c] = 0;
