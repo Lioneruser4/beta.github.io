@@ -1,159 +1,136 @@
-const WebSocket = require('ws');
-const http = require('http');
 const express = require('express');
-const mongoose = require('mongoose');
+const http = require('http');
+const WebSocket = require('ws');
+const { MongoClient } = require('mongodb');
 const cors = require('cors');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- Sabitler ---
-const MONGODB_URI = 'mongodb+srv://xaliqmustafayev7313_db_user:R4Cno5z1Enhtr09u@sayt.1oqunne.mongodb.net/domino_game?retryWrites=true&w=majority';
-const ADMIN_TELEGRAM_ID = '976640409'; // YÖNETİCİ ID'si
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
 
-// --- MongoDB Bağlantısı ve Modeller (Aynı Kaldı) ---
-// (Player ve Match Schemaları önceki mesajdaki gibi tanımlanmıştır)
-// ...
-mongoose.connect(MONGODB_URI)
-.then(() => console.log('✅ MongoDB bağlantısı başarılı'))
-.catch(err => console.error('❌ MongoDB bağlantı hatası:', err));
+const MONGODB_URI = 'mongodb+srv://xaliqmustafayev7313_db_user:R4Cno5z1Enhtr09u@sayt.1oqunne.mongodb.net/?appName=sayt';
+let db;
 
-const playerSchema = new mongoose.Schema({ /* ... */ });
-const matchSchema = new mongoose.Schema({ /* ... */ });
-const Player = mongoose.model('DominoPlayer', playerSchema);
-const Match = mongoose.model('DominoMatch', matchSchema);
+// MongoDB Bağlantısı
+MongoClient.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(client => {
+    db = client.db('domino_game');
+    console.log('✅ MongoDB bağlandı!');
+  })
+  .catch(err => console.error('❌ MongoDB hata:', err));
 
-// --- ELO ve Level Hesaplama (Aynı Kaldı) ---
-function calculateElo(winnerElo, loserElo, winnerLevel) { /* ... */ }
-function calculateLevel(elo) { /* ... */ }
-
-// --- WebSocket Game State (Aynı Kaldı) ---
+const players = new Map();
 const rooms = new Map();
-const matchQueue = [];
-const playerConnections = new Map();
-const playerToRoomMap = new Map();
+const rankedQueue = [];
 
-// --- Yeni Middleware: Admin Kontrolü ---
-function isAdmin(req, res, next) {
-    // Gerçek bir sistemde bu kontrol Auth token ile yapılmalıdır. 
-    // Telegram ID'yi header'dan almak yerine body'den alıp kontrol edeceğiz.
-    // Ancak API'ler client tarafından çağrıldığı için, şimdilik basit bir kontrol yapıyoruz.
-    // Client, admin isteği gönderdiğinde kendi Telegram ID'sini payload'da göndermelidir.
-
-    // Şimdilik sadece Admin ID'sini server'a sabit tanımladık.
-    // Güvenlik için, bu API'ye sadece Admin'in WebApp'i içinden gelen ve onaylanmış token'ı olan istekler izin vermelidir.
-    if (req.body && req.body.requesterId === ADMIN_TELEGRAM_ID) {
-        next();
-    } else {
-        res.status(403).json({ success: false, error: 'Yetkisiz erişim.' });
+// Domino taşlarını oluştur
+function createDominoes() {
+  const dominoes = [];
+  for (let i = 0; i <= 6; i++) {
+    for (let j = i; j <= 6; j++) {
+      dominoes.push([i, j]);
     }
+  }
+  return shuffleArray(dominoes);
 }
 
-// --- DÜZELTİLMİŞ/EKLENMİŞ API Endpoints ---
+function shuffleArray(array) {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
-// 1. Leaderboard API'si
-app.get('/api/leaderboard', async (req, res) => {
-    try {
-        const players = await Player.find({ isHidden: { $ne: true } }) // Gizli olmayanları getir
-            .sort({ elo: -1, wins: -1, totalGames: 1 }) // ELO, Win sayısı, Toplam oyun sırası
-            .limit(10)
-            .select('telegramId username firstName photoUrl elo level wins totalGames');
-        
-        res.json({ success: true, leaderboard: players });
-    } catch (error) {
-        console.error('Leaderboard error:', error);
-        res.status(500).json({ success: false, error: 'Sunucu hatası: Skorlar alınamadı' });
-    }
-});
+// Oyun oluştur
+function createGame(player1, player2, isRanked = false) {
+  const dominoes = createDominoes();
+  return {
+    id: Math.random().toString(36).substr(2, 9),
+    players: [
+      { id: player1.id, name: player1.name, hand: dominoes.slice(0, 7), level: player1.level },
+      { id: player2.id, name: player2.name, hand: dominoes.slice(7, 14), level: player2.level }
+    ],
+    board: [],
+    pool: dominoes.slice(14),
+    currentPlayer: player1.id,
+    isRanked,
+    moveCount: 0,
+    startTime: Date.now()
+  };
+}
 
-// 2. Admin API: Kullanıcı Arama
-app.get('/api/admin/user/:telegramId', async (req, res) => {
-    try {
-        const targetId = req.params.telegramId;
-        const user = await Player.findOne({ telegramId: targetId }).select('-__v');
-        
-        if (!user) {
-            return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
-        }
-        
-        res.json({ success: true, user });
-    } catch (error) {
-        console.error('Admin user search error:', error);
-        res.status(500).json({ success: false, error: 'Sunucu hatası' });
-    }
-});
+// Geçerli hamleleri kontrol et
+function getValidMoves(domino, board) {
+  if (board.length === 0) return ['left', 'right'];
+  
+  const moves = [];
+  const leftEnd = board[0][0];
+  const rightEnd = board[board.length - 1][1];
+  
+  if (domino.includes(leftEnd)) moves.push('left');
+  if (domino.includes(rightEnd)) moves.push('right');
+  
+  return moves;
+}
 
-// 3. Admin API: ELO Ayarlama (POST)
-app.post('/api/admin/setElo', async (req, res) => {
-    // Admin kontrolü client'ta yapıldı. Server'da bu yetkiyi kontrol etmek gerekir.
-    // Şimdilik client'ın admin olduğunu varsayıyoruz (Güvenlik zafiyeti).
-    const { targetId, value, requesterId } = req.body;
-    
-    if (requesterId !== ADMIN_TELEGRAM_ID) return res.status(403).json({ success: false, error: 'Yetkisiz.' });
-    
-    if (!targetId || typeof value !== 'number' || value < 0) {
-        return res.status(400).json({ success: false, error: 'Geçersiz veri.' });
-    }
+// Taşı yerleştir
+function playDomino(game, playerId, domino, side) {
+  const player = game.players.find(p => p.id === playerId);
+  if (!player) return false;
+  
+  const dominoIndex = player.hand.findIndex(d => d[0] === domino[0] && d[1] === domino[1]);
+  if (dominoIndex === -1) return false;
+  
+  const validMoves = getValidMoves(domino, game.board);
+  if (!validMoves.includes(side)) return false;
+  
+  player.hand.splice(dominoIndex, 1);
+  
+  if (game.board.length === 0) {
+    game.board.push(domino);
+  } else if (side === 'left') {
+    const leftEnd = game.board[0][0];
+    const oriented = domino[1] === leftEnd ? domino : [domino[1], domino[0]];
+    game.board.unshift(oriented);
+  } else {
+    const rightEnd = game.board[game.board.length - 1][1];
+    const oriented = domino[0] === rightEnd ? domino : [domino[1], domino[0]];
+    game.board.push(oriented);
+  }
+  
+  game.moveCount++;
+  
+  // Kazanan kontrolü
+  if (player.hand.length === 0) {
+    game.winner = playerId;
+    return true;
+  }
+  
+  // Sırayı değiştir
+  const currentIndex = game.players.findIndex(p => p.id === playerId);
+  game.currentPlayer = game.players[(currentIndex + 1) % 2].id;
+  
+  return true;
+}
 
-    try {
-        const user = await Player.findOneAndUpdate(
-            { telegramId: targetId },
-            { $set: { 
-                elo: value,
-                level: calculateLevel(value)
-            }},
-            { new: true }
-        );
+// ELO hesapla
+function calculateElo(game, winnerId) {
+  const halfGame = game.moveCount >= 10;
+  const basePoints = Math.floor(Math.random() * 9) + 12; // 12-20
+  
+  return {
+    winner: basePoints,
+    loser: halfGame ? -20 : -10
+  };
+}
 
-        if (!user) {
-            return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
-        }
-
-        res.json({ success: true, message: `Kullanıcı ${targetId} ELO'su ${value} olarak ayarlandı.`, user });
-    } catch (error) {
-        console.error('Admin setElo error:', error);
-        res.status(500).json({ success: false, error: 'Sunucu hatası.' });
-    }
-});
-
-// 4. Admin API: Gizle/Göster (POST)
-app.post('/api/admin/setHidden', async (req, res) => {
-    const { targetId, value, requesterId } = req.body;
-
-    if (requesterId !== ADMIN_TELEGRAM_ID) return res.status(403).json({ success: false, error: 'Yetkisiz.' });
-
-    if (!targetId || typeof value !== 'boolean') {
-        return res.status(400).json({ success: false, error: 'Geçersiz veri.' });
-    }
-
-    try {
-        const user = await Player.findOneAndUpdate(
-            { telegramId: targetId },
-            { $set: { isHidden: value }},
-            { new: true }
-        );
-
-        if (!user) {
-            return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı.' });
-        }
-
-        const status = value ? 'Gizli' : 'Açık';
-        res.json({ success: true, message: `Kullanıcı ${targetId} skor tablosunda ${status} olarak ayarlandı.`, user });
-    } catch (error) {
-        console.error('Admin setHidden error:', error);
-        res.status(500).json({ success: false, error: 'Sunucu hatası.' });
-    }
-});
-
-// --- WebSocket Server (Aynı Kaldı) ---
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server, perMessageDeflate: false, clientTracking: true });
-// ... wss.on('connection') ve diğer WebSocket event'leri (Önceki mesajdakiyle aynı) ...
-// ... handleFindMatch, initializeGame, handlePlayTile, handleDrawFromMarket, handlePass, handleLeaveGame (Önceki mesajdaki DÜZELTİLMİŞ mantıkla aynı kalmalıdır) ...
-
-// Server'ı başlat
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`🚀 Server çalışıyor: Port ${PORT}`);
-});
+// Oyuncu verilerini güncelle
+async function updatePlayerData(telegramId, eloChange, won) {
+  try {
+    const collection = db.collection('players');
+    const player = await collection.findOne({ telegramI
