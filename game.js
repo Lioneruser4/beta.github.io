@@ -9,7 +9,7 @@ let gameState = {
     myColor: null,
     isMyTurn: false,
     roomCode: null, 
-    telegramId: "user_" + Math.random().toString(36).substr(2, 9), // Test için rastgele ID
+    telegramId: "user_" + Math.random().toString(16).slice(2), // Test için rastgele ID
     isSearching: false,
     gameStarted: false
 };
@@ -26,6 +26,7 @@ const friendLobby = document.getElementById('friend-lobby');
 const gameScreen = document.getElementById('game-screen');
 const connectionStatus = document.getElementById('connection-status');
 const dereceliBtn = document.getElementById('dereceli-btn');
+const leaderboardBtn = document.getElementById('leaderboard-btn'); // Yeni buton
 const friendBtn = document.getElementById('friend-btn');
 const cancelRankedBtn = document.getElementById('cancel-ranked-btn');
 const createRoomBtn = document.getElementById('create-room-btn');
@@ -42,6 +43,9 @@ const leaveGameBtn = document.getElementById('leave-game-btn');
 const messageModal = document.getElementById('message-modal');
 const modalMessage = document.getElementById('modal-message');
 const modalCloseBtn = document.getElementById('modal-close-btn');
+const leaderboardModal = document.getElementById('leaderboard-modal'); // Yeni modal
+const leaderboardList = document.getElementById('leaderboard-list');
+const leaderboardCloseBtn = document.getElementById('leaderboard-close-btn');
 
 const BOARD_SIZE = 8;
 
@@ -55,7 +59,10 @@ socket.on('connect', () => {
     connectionStatus.classList.add('text-green-500');
     showScreen('main');
     // Sunucuya kimliğimizi kaydedelim
-    socket.emit('register', { telegramId: gameState.telegramId });
+    socket.emit('register', { 
+        telegramId: gameState.telegramId,
+        username: gameState.telegramId // Veya bir input'tan alınan kullanıcı adı
+    });
 });
 
 socket.on('disconnect', () => {
@@ -152,6 +159,33 @@ socket.on('error', (message) => {
 function showModal(message) {
     modalMessage.textContent = message;
     messageModal.classList.remove('hidden');
+}
+
+async function showLeaderboard() {
+    try {
+        // Sunucu adresini buraya yazın
+        const response = await fetch('https://mario-io-1.onrender.com/leaderboard');
+        const data = await response.json();
+
+        if (data.success) {
+            leaderboardList.innerHTML = ''; // Listeyi temizle
+            data.leaderboard.forEach((player, index) => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center p-3 bg-gray-700 rounded-lg mb-2';
+                li.innerHTML = `
+                    <span class="font-bold text-lg">${index + 1}. ${player.username}</span>
+                    <span class="text-yellow-400">🏆 ${player.elo} ELO (Lv. ${player.level})</span>
+                `;
+                leaderboardList.appendChild(li);
+            });
+            leaderboardModal.classList.remove('hidden');
+        } else {
+            showModal('Liderlər cədvəlini yükləmək mümkün olmadı.');
+        }
+    } catch (error) {
+        showModal('Liderlər cədvəlinə qoşulma xətası.');
+        console.error('Leaderboard fetch error:', error);
+    }
 }
 
 function showScreen(screen) {
@@ -408,6 +442,10 @@ dereceliBtn.onclick = () => {
     console.log('✅ findMatch gonderildi!');
 };
 
+leaderboardBtn.onclick = () => {
+    showLeaderboard();
+};
+
 friendBtn.onclick = () => {
     showScreen('friend');
 };
@@ -484,6 +522,10 @@ function leaveGame(isGameOver = false) {
 
 modalCloseBtn.onclick = () => {
     messageModal.classList.add('hidden');
+};
+
+leaderboardCloseBtn.onclick = () => {
+    leaderboardModal.classList.add('hidden');
 };
 
 // Baslangic
