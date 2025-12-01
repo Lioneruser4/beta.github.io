@@ -1,22 +1,30 @@
 {
-  "name": "domino-101-online",
-  "version": "2.0.0",
-  "description": "Professional Domino 101 Game with MongoDB, ELO System & Telegram Integration",
+  "name": "domino-online",
+  "version": "1.0.0",
+  "description": "Professional Online Domino Game with ELO System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
+  "keywords": [
+    "domino",
+    "online",
+    "game",
+    "multiplayer",
+    "elo"
+  ],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
     "express": "^4.18.2",
-    "ws": "^8.16.0",
-    "mongoose": "^8.0.3",
-    "cors": "^2.8.5"
+    "socket.io": "^4.5.4",
+    "mongoose": "^8.0.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
   },
-  "keywords": ["domino", "101", "game", "websocket", "multiplayer", "mongodb", "elo", "telegram"],
-  "author": "Developer",
-  "license": "MIT"
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
