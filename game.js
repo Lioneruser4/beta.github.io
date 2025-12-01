@@ -1,535 +1,303 @@
-// Socket.io baglantisi
-const socket = io('https://mario-io-1.onrender.com');
+// ============================================
+// DOMINO GAME LOGIC
+// ============================================
 
-// Oyun durumu
-let gameState = {
-    board: [],
-    currentTurn: 'red',
-    selectedPiece: null,
-    myColor: null,
-    isMyTurn: false,
-    roomCode: null, 
-    telegramId: "user_" + Math.random().toString(16).slice(2), // Test için rastgele ID
-    isSearching: false,
-    gameStarted: false
-};
-
-// Timer
-let searchTimer = null;
-let searchTime = 0;
-
-// UI elementleri
-const loader = document.getElementById('loader');
-const mainLobby = document.getElementById('main-lobby');
-const rankedLobby = document.getElementById('ranked-lobby');
-const friendLobby = document.getElementById('friend-lobby');
-const gameScreen = document.getElementById('game-screen');
-const connectionStatus = document.getElementById('connection-status');
-const dereceliBtn = document.getElementById('dereceli-btn');
-const leaderboardBtn = document.getElementById('leaderboard-btn'); // Yeni buton
-const friendBtn = document.getElementById('friend-btn');
-const cancelRankedBtn = document.getElementById('cancel-ranked-btn');
-const createRoomBtn = document.getElementById('create-room-btn');
-const backToMainBtn = document.getElementById('back-to-main-btn');
-const rankedStatus = document.getElementById('ranked-status');
-const roomCodeOutput = document.getElementById('room-code-output');
-const copyCodeBtn = document.getElementById('copy-code-btn');
-const joinRoomInput = document.getElementById('join-room-input');
-const joinRoomBtn = document.getElementById('join-room-btn');
-const boardElement = document.getElementById('board');
-const currentTurnDisplay = document.getElementById('current-turn-display');
-const turnText = document.getElementById('turn-text');
-const leaveGameBtn = document.getElementById('leave-game-btn');
-const messageModal = document.getElementById('message-modal');
-const modalMessage = document.getElementById('modal-message');
-const modalCloseBtn = document.getElementById('modal-close-btn');
-const leaderboardModal = document.getElementById('leaderboard-modal'); // Yeni modal
-const leaderboardList = document.getElementById('leaderboard-list');
-const leaderboardCloseBtn = document.getElementById('leaderboard-close-btn');
-
-const BOARD_SIZE = 8;
-
-// --- Socket.io Eventleri ---
-
-socket.on('connect', () => {
-    console.log('✅ Servere baglandi');
-    console.log('🔗 Socket ID:', socket.id);
-    connectionStatus.textContent = 'Servere baglandi!';
-    connectionStatus.classList.remove('text-yellow-400');
-    connectionStatus.classList.add('text-green-500');
-    showScreen('main');
-    // Sunucuya kimliğimizi kaydedelim
-    socket.emit('register', { 
-        telegramId: gameState.telegramId,
-        username: gameState.telegramId // Veya bir input'tan alınan kullanıcı adı
-    });
-});
-
-socket.on('disconnect', () => {
-    connectionStatus.textContent = 'Serverle elaqe kesildi';
-    connectionStatus.classList.remove('text-green-500');
-    connectionStatus.classList.add('text-red-500');
-    showModal('Serverle elaqe kesildi. Səhifeni yenileyin.');
-});
-
-socket.on('forceDisconnect', (message) => {
-    showModal(message);
-    socket.disconnect();
-});
-
-socket.on('matchFound', (data) => {
-    console.log('🎉 Raqib tapildi!', data);
-    gameState.roomCode = data.roomCode;
-    gameState.myColor = data.color;
-    gameState.gameStarted = true;
-    gameState.isSearching = false;
-    gameState.board = createInitialBoard();
-    
-    clearInterval(searchTimer);
-    searchTimer = null;
-    
-    showModal('Raqib tapildi! Siz ' + (gameState.myColor === 'red' ? 'Qirmizi' : 'Ag') + ' rengindesiniz.');
-    showScreen('game');
-    updateGameUI();
-});
-
-socket.on('searchStatus', (data) => {
-    console.log('🔍 Axtaris statusu:', data);
-    rankedStatus.textContent = data.message;
-});
-
-socket.on('searchCancelled', (data) => {
-    showModal(data.message);
-    clearInterval(searchTimer);
-    searchTimer = null;
-    showScreen('main');
-});
-
-socket.on('roomCreated', (data) => {
-    gameState.roomCode = data.roomCode;
-    gameState.myColor = 'red';
-    roomCodeOutput.textContent = data.roomCode;
-    console.log('🏠 Oda yaradildi:', data.roomCode);
-});
-
-socket.on('opponentJoined', (data) => {
-    gameState.gameStarted = true;
-    gameState.isMyTurn = gameState.myColor === 'red';
-    gameState.board = createInitialBoard();
-    console.log('👥 Raqib qosuldu! Oyun baslayir...');
-    showScreen('game');
-    updateGameUI();
-});
-
-socket.on('gameUpdate', (data) => {
-    gameState.board = data.board;
-    gameState.currentTurn = data.currentTurn;
-    gameState.isMyTurn = gameState.currentTurn === gameState.myColor;
-    updateGameUI();
-});
-
-socket.on('gameOver', (data) => {
-    const isWinner = data.winner === gameState.myColor;
-    let message = `Oyun bitdi! ${isWinner ? 'Siz qazandınız!' : 'Məğlub oldunuz.'}`;
-    
-    if (data.reason && data.reason !== 'Oyun bitti.') {
-        message += `\nSəbəb: ${data.reason}`;
+class DominoGame {
+    constructor() {
+        this.reset();
     }
 
-    if (data.eloChange) {
-        const eloText = data.eloChange > 0 ? `+${data.eloChange}` : data.eloChange;
-        message += `\nELO Dəyişimi: ${eloText}`;
+    reset() {
+        this.board = [];
+        this.leftEnd = -1;
+        this.rightEnd = -1;
+        this.players = [];
+        this.currentPlayerIndex = 0;
+        this.status = 'waiting';
+        this.isRanked = false;
+        this.turnCount = 0;
+        this.winner = null;
     }
-    showModal(message);
-    setTimeout(() => leaveGame(true), 4000); // Oyunu tamamen sıfırla
-});
 
-socket.on('error', (message) => {
-    showModal(message);
-    gameState.isSearching = false;
-    clearInterval(searchTimer);
-    searchTimer = null;
-    if (!gameState.gameStarted) { // Sadece lobideyken ana ekrana dön
-        showScreen('main');
+    // Generate all 28 domino tiles (0-0 to 6-6)
+    generateAllTiles() {
+        const tiles = [];
+        let id = 0;
+        for (let i = 0; i <= 6; i++) {
+            for (let j = i; j <= 6; j++) {
+                tiles.push({
+                    id: `tile-${id++}`,
+                    left: i,
+                    right: j,
+                    isDouble: i === j
+                });
+            }
+        }
+        return tiles;
     }
-});
 
-// --- Yardimci Funksiyalar ---
+    // Fisher-Yates shuffle
+    shuffleTiles(tiles) {
+        const shuffled = [...tiles];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    }
 
-function showModal(message) {
-    modalMessage.textContent = message;
-    messageModal.classList.remove('hidden');
-}
+    // Initialize game with players
+    initializeGame(playerNames, isRanked = false) {
+        this.reset();
+        const allTiles = this.shuffleTiles(this.generateAllTiles());
+        const tilesPerPlayer = 7;
 
-async function showLeaderboard() {
-    try {
-        // Sunucu adresini buraya yazın
-        const response = await fetch('https://mario-io-1.onrender.com/leaderboard');
-        const data = await response.json();
+        this.players = playerNames.map((name, index) => ({
+            id: `player-${index}`,
+            name: name,
+            tiles: allTiles.slice(index * tilesPerPlayer, (index + 1) * tilesPerPlayer),
+            level: 1,
+            elo: 0,
+            isActive: true
+        }));
 
-        if (data.success) {
-            leaderboardList.innerHTML = ''; // Listeyi temizle
-            data.leaderboard.forEach((player, index) => {
-                const li = document.createElement('li');
-                li.className = 'flex justify-between items-center p-3 bg-gray-700 rounded-lg mb-2';
-                li.innerHTML = `
-                    <span class="font-bold text-lg">${index + 1}. ${player.username}</span>
-                    <span class="text-yellow-400">🏆 ${player.elo} ELO (Lv. ${player.level})</span>
-                `;
-                leaderboardList.appendChild(li);
-            });
-            leaderboardModal.classList.remove('hidden');
+        this.isRanked = isRanked;
+        this.status = 'playing';
+        this.currentPlayerIndex = 0;
+
+        return this.players;
+    }
+
+    // Get current player
+    getCurrentPlayer() {
+        return this.players[this.currentPlayerIndex];
+    }
+
+    // Check if a tile can be played
+    canPlayTile(tile) {
+        if (this.board.length === 0) return true;
+
+        return (
+            tile.left === this.leftEnd ||
+            tile.right === this.leftEnd ||
+            tile.left === this.rightEnd ||
+            tile.right === this.rightEnd
+        );
+    }
+
+    // Get playable positions for a tile
+    getPlayablePositions(tile) {
+        if (this.board.length === 0) {
+            return [
+                { side: 'left', matchingValue: tile.left },
+                { side: 'right', matchingValue: tile.right }
+            ];
+        }
+
+        const positions = [];
+
+        if (tile.left === this.leftEnd || tile.right === this.leftEnd) {
+            positions.push({ side: 'left', matchingValue: this.leftEnd });
+        }
+
+        if (tile.left === this.rightEnd || tile.right === this.rightEnd) {
+            positions.push({ side: 'right', matchingValue: this.rightEnd });
+        }
+
+        return positions;
+    }
+
+    // Check if current player has any playable tile
+    hasPlayableTile() {
+        const currentPlayer = this.getCurrentPlayer();
+        return currentPlayer.tiles.some(tile => this.canPlayTile(tile));
+    }
+
+    // Get all playable tiles for current player
+    getPlayableTiles() {
+        const currentPlayer = this.getCurrentPlayer();
+        return currentPlayer.tiles.filter(tile => this.canPlayTile(tile));
+    }
+
+    // Place a tile on the board
+    placeTile(tileId, side) {
+        const currentPlayer = this.getCurrentPlayer();
+        const tileIndex = currentPlayer.tiles.findIndex(t => t.id === tileId);
+
+        if (tileIndex === -1) {
+            return { success: false, error: 'Tile not found' };
+        }
+
+        const tile = currentPlayer.tiles[tileIndex];
+
+        // Validate placement
+        if (this.board.length > 0) {
+            const positions = this.getPlayablePositions(tile);
+            if (!positions.some(p => p.side === side)) {
+                return { success: false, error: 'Invalid placement' };
+            }
+        }
+
+        // Remove tile from player's hand
+        currentPlayer.tiles.splice(tileIndex, 1);
+
+        // Calculate new ends and orientation
+        let placedTile = { ...tile, placedSide: side, flipped: false };
+
+        if (this.board.length === 0) {
+            // First tile
+            this.leftEnd = tile.left;
+            this.rightEnd = tile.right;
+        } else if (side === 'left') {
+            // Placing on left end
+            if (tile.right === this.leftEnd) {
+                this.leftEnd = tile.left;
+            } else if (tile.left === this.leftEnd) {
+                this.leftEnd = tile.right;
+                placedTile.flipped = true;
+            }
         } else {
-            showModal('Liderlər cədvəlini yükləmək mümkün olmadı.');
-        }
-    } catch (error) {
-        showModal('Liderlər cədvəlinə qoşulma xətası.');
-        console.error('Leaderboard fetch error:', error);
-    }
-}
-
-function showScreen(screen) {
-    loader.classList.add('hidden');
-    mainLobby.classList.add('hidden');
-    rankedLobby.classList.add('hidden');
-    friendLobby.classList.add('hidden');
-    gameScreen.classList.add('hidden');
-
-    if (screen === 'main') {
-        mainLobby.classList.remove('hidden');
-        gameState.isSearching = false;
-        clearInterval(searchTimer);
-        searchTimer = null;
-    } else if (screen === 'ranked') {
-        rankedLobby.classList.remove('hidden');
-        gameState.isSearching = true;
-        searchTime = 0;
-        startSearchTimer();
-    } else if (screen === 'friend') {
-        friendLobby.classList.remove('hidden');
-        gameState.isSearching = false;
-        clearInterval(searchTimer);
-        searchTimer = null;
-    } else if (screen === 'game') {
-        gameScreen.classList.remove('hidden');
-        clearInterval(searchTimer);
-        searchTimer = null;
-    } else {
-        loader.classList.remove('hidden');
-    }
-}
-
-function startSearchTimer() {
-    clearInterval(searchTimer);
-    searchTimer = setInterval(() => {
-        searchTime++;
-        const minutes = Math.floor(searchTime / 60);
-        const seconds = searchTime % 60;
-        const timeString = minutes + ':' + seconds.toString().padStart(2, '0');
-        rankedStatus.textContent = 'Raqib axtarilir... (' + timeString + ')';
-    }, 1000);
-}
-
-function createInitialBoard() {
-    const board = [];
-    for (let r = 0; r < BOARD_SIZE; r++) {
-        board[r] = new Array(BOARD_SIZE).fill(0);
-        for (let c = 0; c < BOARD_SIZE; c++) {
-            if ((r + c) % 2 !== 0) {
-                if (r < 3) {
-                    board[r][c] = 1; // Kirmizi
-                } else if (r > 4) {
-                    board[r][c] = 2; // Ag
-                }
+            // Placing on right end
+            if (tile.left === this.rightEnd) {
+                this.rightEnd = tile.right;
+            } else if (tile.right === this.rightEnd) {
+                this.rightEnd = tile.left;
+                placedTile.flipped = true;
             }
         }
-    }
-    return board;
-}
 
-function generateRoomCode() {
-    return Math.floor(1000 + Math.random() * 9000).toString();
-}
-
-function getPiecePlayer(pieceValue) {
-    if (pieceValue === 1 || pieceValue === 3) return 'red';
-    if (pieceValue === 2 || pieceValue === 4) return 'white';
-    return null;
-}
-
-function isValidCell(r, c) { 
-    return r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE; 
-}
-
-function findJumps(board, r, c, player) {
-    const piece = board[r][c];
-    const isKingPiece = piece === 3 || piece === 4;
-    const jumps = [];
-    const directions = isKingPiece ? [[-1, -1], [-1, 1], [1, -1], [1, 1]] :
-        player === 'red' ? [[1, -1], [1, 1]] : [[-1, -1], [-1, 1]];
-
-    for (const [dr, dc] of directions) {
-        const capturedR = r + dr;
-        const capturedC = c + dc;
-        const landR = r + 2 * dr;
-        const landC = c + 2 * dc;
-
-        if (isValidCell(landR, landC) && board[landR][landC] === 0) {
-            const capturedPieceValue = board[capturedR][capturedC];
-            const capturedPlayer = getPiecePlayer(capturedPieceValue);
-
-            if (capturedPlayer && capturedPlayer !== player) {
-                jumps.push({ from: { r, c }, to: { r: landR, c: landC }, captured: { r: capturedR, c: capturedC } });
-            }
+        // Add to board
+        if (side === 'left') {
+            this.board.unshift(placedTile);
+        } else {
+            this.board.push(placedTile);
         }
-    }
-    return jumps;
-}
 
-function findValidMoves(board, r, c, player) {
-    const moves = [];
-    const piece = board[r][c];
-    const isKingPiece = piece === 3 || piece === 4;
-    
-    const jumps = findJumps(board, r, c, player);
-    if (jumps.length > 0) return jumps;
-    
-    const directions = isKingPiece ? [[-1, -1], [-1, 1], [1, -1], [1, 1]] :
-        player === 'red' ? [[1, -1], [1, 1]] : [[-1, -1], [-1, 1]];
-
-    for (const [dr, dc] of directions) {
-        const newR = r + dr;
-        const newC = c + dc;
-
-        if (isValidCell(newR, newC) && board[newR][newC] === 0) {
-            moves.push({ from: { r, c }, to: { r: newR, c: newC } });
+        // Check for win
+        if (currentPlayer.tiles.length === 0) {
+            this.status = 'finished';
+            this.winner = currentPlayer.id;
+            return { 
+                success: true, 
+                gameOver: true, 
+                winner: currentPlayer,
+                tile: placedTile
+            };
         }
+
+        // Next turn
+        this.turnCount++;
+        this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
+
+        return { success: true, tile: placedTile };
     }
-    return moves;
-}
 
-function isValidMove(board, fromR, fromC, toR, toC, player) {
-    const moves = findValidMoves(board, fromR, fromC, player);
-    return moves.some(move => move.to.r === toR && move.to.c === toC);
-}
+    // Pass turn (when no playable tiles)
+    passTurn() {
+        this.turnCount++;
+        this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
 
-function hasAnyCaptureMoves(board, player) {
-    // Tüm taşları kontrol et, herhangi birinin zıplama hamlesi var mı?
-    return board.flat().some((piece, index) => getPiecePlayer(piece) === player && findJumps(board, Math.floor(index / BOARD_SIZE), index % BOARD_SIZE, player).length > 0);
-}
-
-// --- UI Funksiyalari ---
-
-function drawBoard() {
-    boardElement.innerHTML = '';
-    
-    for (let r = 0; r < BOARD_SIZE; r++) {
-        for (let c = 0; c < BOARD_SIZE; c++) {
-            const cell = document.createElement('div');
-            const isDark = (r + c) % 2 !== 0;
-
-            cell.className = 'cell ' + (isDark ? 'cell-black' : 'cell-white');
-            cell.dataset.r = r;
-            cell.dataset.c = c;
-            cell.onclick = () => handleCellClick(r, c);
-
-            const pieceValue = gameState.board[r] && gameState.board[r][c];
-            if (pieceValue && pieceValue !== 0) {
-                const pieceElement = document.createElement('div');
-                const piecePlayer = getPiecePlayer(pieceValue);
-                const isKingPiece = pieceValue === 3 || pieceValue === 4;
-
-                pieceElement.className = 'piece ' + 
-                    (piecePlayer === 'red' ? 'piece-black' : 'piece-white') + 
-                    (isKingPiece ? ' piece-king ' + (piecePlayer === 'red' ? 'piece-king-black' : 'piece-king-white') : '');
-
-                pieceElement.innerHTML = isKingPiece ? '👑' : '●';
-
-                if (gameState.selectedPiece && gameState.selectedPiece.r === r && gameState.selectedPiece.c === c) {
-                    pieceElement.classList.add('selected');
-                }
-
-                if (gameState.currentTurn === piecePlayer && gameState.isMyTurn) {
-                    pieceElement.classList.add('current-turn-piece');
-                }
-
-                cell.appendChild(pieceElement);
-            }
-
-            if (gameState.selectedPiece && gameState.isMyTurn) {
-                const fromR = gameState.selectedPiece.r;
-                const fromC = gameState.selectedPiece.c;
-                const mustCapture = hasAnyCaptureMoves(gameState.board, gameState.myColor);
-                const validMoves = findValidMoves(gameState.board, fromR, fromC, gameState.myColor);
-                const isThisMoveValid = validMoves.some(move => move.to.r === r && move.to.c === c);
-
-                // Eğer taş yeme zorunluluğu varsa ve bu hamle bir yeme hamlesi değilse, gösterme.
-                // Eğer taş yeme zorunluluğu yoksa, tüm geçerli hamleleri göster.
-                const isCaptureMove = Math.abs(fromR - r) === 2;
-                const shouldShow = isThisMoveValid && (!mustCapture || isCaptureMove);
-
-                if (shouldShow) {
-                    cell.classList.add('valid-move');
-                }
-            }
-
-            boardElement.appendChild(cell);
-        }
-    }
-}
-
-function updateGameUI() {
-    if (!gameState.gameStarted) return;
-    
-    turnText.textContent = gameState.isMyTurn ? 'Sizdir!' : 'Raqibdir';
-    currentTurnDisplay.className = 'w-full max-w-md mb-4 p-4 rounded-xl bg-gray-800 shadow-xl text-center ' + 
-        (gameState.isMyTurn ? 'bg-green-700' : 'bg-yellow-700');
-    
-    drawBoard();
-}
-
-// --- Event Handlers ---
-
-function handleCellClick(r, c) {
-    if (!gameState.isMyTurn || !gameState.gameStarted) return;
-
-    const pieceValue = gameState.board[r] && gameState.board[r][c];
-    const piecePlayer = getPiecePlayer(pieceValue);
-
-    if (piecePlayer === gameState.myColor) {
-        // Taş yeme zorunluluğu var mı diye kontrol et.
-        const mustCapture = hasAnyCaptureMoves(gameState.board, gameState.myColor);
-        if (mustCapture) {
-            const jumpsForThisPiece = findJumps(gameState.board, r, c, gameState.myColor);
-            if (jumpsForThisPiece.length === 0) {
-                return showModal("Taş yemek zorunludur! Başka bir taşınızı seçin.");
-            }
-        }
-        gameState.selectedPiece = { r, c };
-        drawBoard();
-    } else if (gameState.selectedPiece && !pieceValue) {
-        const fromR = gameState.selectedPiece.r;
-        const fromC = gameState.selectedPiece.c;
-
-        // Hamlenin geçerliliğini tekrar kontrol et, bu sefer zorunlu yeme kuralıyla birlikte.
-        const mustCapture = hasAnyCaptureMoves(gameState.board, gameState.myColor);
-        const validMoves = findValidMoves(gameState.board, fromR, fromC, gameState.myColor);
-        const move = validMoves.find(m => m.to.r === r && m.to.c === c);
-
-        if (move) {
-            const isCaptureMove = Math.abs(fromR - r) === 2;
-            if (mustCapture && !isCaptureMove) {
-                showModal("Taş yemek zorunludur!");
-                return;
-            }
-            socket.emit('makeMove', {
-                roomCode: gameState.roomCode,
-                from: { r: fromR, c: fromC },
-                to: { r, c }
-            });
-            gameState.selectedPiece = null;
-        }
-    }
-}
-
-// --- Button Eventleri ---
-
-dereceliBtn.onclick = () => {
-    console.log('🎮 Dereceli butona tiklandi');
-    showScreen('ranked');
-    console.log('📡 findMatch gonderiliyor...');
-    socket.emit('findMatch');
-    console.log('✅ findMatch gonderildi!');
-};
-
-leaderboardBtn.onclick = () => {
-    showLeaderboard();
-};
-
-friendBtn.onclick = () => {
-    showScreen('friend');
-};
-
-cancelRankedBtn.onclick = () => {
-    gameState.isSearching = false;
-    socket.emit('cancelSearch');
-};
-
-createRoomBtn.onclick = () => {
-    const roomCode = generateRoomCode();
-    gameState.roomCode = roomCode;
-    gameState.myColor = 'red';
-    socket.emit('createRoom', { roomCode });
-};
-
-backToMainBtn.onclick = () => {
-    showScreen('main');
-};
-
-copyCodeBtn.onclick = () => {
-    const code = roomCodeOutput.textContent;
-    if (code && code !== '...') {
-        navigator.clipboard.writeText(code).then(() => {
-            showModal('Otaq kodu (' + code + ') kopyalandi!');
-        }).catch(() => {
-            showModal("Kopyalama xetasi: Kodu el ile kopyalayin.");
+        // Check if game is blocked (no one can play)
+        const allBlocked = this.players.every(player => {
+            const originalIndex = this.currentPlayerIndex;
+            const canPlay = player.tiles.some(tile => this.canPlayTile(tile));
+            return !canPlay;
         });
-    }
-};
 
-joinRoomBtn.onclick = () => {
-    const roomCode = joinRoomInput.value.trim();
-    if (roomCode.length !== 4) {
-        showModal("Xahis edirik, 4 reqemli otaq kodunu daxil edin.");
-        return;
-    }
-    
-    gameState.roomCode = roomCode;
-    gameState.myColor = 'white';
-    socket.emit('joinRoom', { roomCode });
-};
+        if (allBlocked) {
+            // Game blocked - winner is player with lowest pip count
+            let minPips = Infinity;
+            let winner = null;
 
-leaveGameBtn.onclick = () => {
-    // Oyuncuya oyundan çıkmak isteyip istemediğini sor
-    if (confirm("Oyundan çıxmaq istədiyinizə əminsiniz? Bu, məğlubiyyət sayılacaq.")) {
-        leaveGame();
-    }
-};
+            this.players.forEach(player => {
+                const pipCount = player.tiles.reduce((sum, tile) => sum + tile.left + tile.right, 0);
+                if (pipCount < minPips) {
+                    minPips = pipCount;
+                    winner = player;
+                }
+            });
 
-function leaveGame(isGameOver = false) {
-    // Eğer oyun bitmediyse ve oyuncu manuel ayrılıyorsa sunucuya haber ver
-    if (gameState.roomCode && !isGameOver) {
-        socket.emit('leaveGame', { roomCode: gameState.roomCode });
+            this.status = 'finished';
+            this.winner = winner.id;
+
+            return { blocked: true, winner: winner };
+        }
+
+        return { blocked: false };
     }
 
-    const preservedTelegramId = gameState.telegramId;
+    // Calculate ELO change based on game result
+    calculateEloChange(isWinner, opponentLeft, halfwayPassed) {
+        if (!this.isRanked) return 0;
 
-    // Oyun durumunu tamamen sıfırla
-    gameState = {
-        board: [],
-        currentTurn: 'red',
-        selectedPiece: null,
-        myColor: null,
-        isMyTurn: false,
-        telegramId: preservedTelegramId, // Kimliği koru
-        roomCode: null,
-        isSearching: false,
-        gameStarted: false
-    };
-    
-    showScreen('main');
+        if (isWinner) {
+            if (opponentLeft) {
+                return halfwayPassed ? 20 : 10;
+            }
+            // Normal win: 12-20 points based on performance
+            return Math.floor(Math.random() * 9) + 12;
+        } else {
+            if (opponentLeft) {
+                return 0; // No penalty if opponent left
+            }
+            return halfwayPassed ? -20 : -10;
+        }
+    }
+
+    // Get game state for syncing
+    getState() {
+        return {
+            board: this.board,
+            leftEnd: this.leftEnd,
+            rightEnd: this.rightEnd,
+            players: this.players.map(p => ({
+                ...p,
+                tiles: p.tiles // In real implementation, hide opponent tiles
+            })),
+            currentPlayerIndex: this.currentPlayerIndex,
+            status: this.status,
+            isRanked: this.isRanked,
+            turnCount: this.turnCount,
+            winner: this.winner
+        };
+    }
 }
 
-modalCloseBtn.onclick = () => {
-    messageModal.classList.add('hidden');
-};
+// ============================================
+// ELO SYSTEM
+// ============================================
 
-leaderboardCloseBtn.onclick = () => {
-    leaderboardModal.classList.add('hidden');
-};
+class EloSystem {
+    constructor() {
+        this.levels = [
+            { level: 1, minElo: 0, maxElo: 99, color: 'yellow', icon: '🌟' },
+            { level: 2, minElo: 100, maxElo: 199, color: 'yellow', icon: '🌟' },
+            { level: 3, minElo: 200, maxElo: 299, color: 'yellow', icon: '🌟' },
+            { level: 4, minElo: 300, maxElo: 399, color: 'blue', icon: '💎' },
+            { level: 5, minElo: 400, maxElo: 499, color: 'blue', icon: '💎' },
+            { level: 6, minElo: 500, maxElo: 599, color: 'blue', icon: '💎' },
+            { level: 7, minElo: 600, maxElo: 699, color: 'purple', icon: '👑' },
+            { level: 8, minElo: 700, maxElo: 799, color: 'purple', icon: '👑' },
+            { level: 9, minElo: 800, maxElo: 899, color: 'purple', icon: '👑' },
+            { level: 10, minElo: 900, maxElo: Infinity, color: 'purple', icon: '🏆' }
+        ];
+    }
 
-// Baslangic
-document.addEventListener('DOMContentLoaded', () => {
-    connectionStatus.textContent = 'Servere qosulur...';
-    connectionStatus.classList.add('text-yellow-400', 'animate-pulse');
-});
+    getLevelFromElo(elo) {
+        return Math.min(10, Math.floor(elo / 100) + 1);
+    }
+
+    getLevelInfo(level) {
+        return this.levels[Math.min(level - 1, 9)];
+    }
+
+    getLevelClass(level) {
+        if (level <= 3) return 'level-low';
+        if (level <= 6) return 'level-mid';
+        return 'level-high';
+    }
+}
+
+// Export for use in main.js
+window.DominoGame = DominoGame;
+window.EloSystem = EloSystem;
