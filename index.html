@@ -448,6 +448,22 @@
             font-size: 0.9rem;
         }
 
+        .player-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-size: cover;
+            background-position: center;
+            background-color: rgba(255, 255, 255, 0.08);
+            flex-shrink: 0;
+        }
+
         .board-ends {
             display: flex;
             gap: 10px;
@@ -666,7 +682,7 @@
 
         .leaderboard-entry {
             display: grid;
-            grid-template-columns: 46px 1fr 80px 80px;
+            grid-template-columns: 38px 40px 1fr 80px 80px;
             align-items: center;
             gap: 10px;
             padding: 10px 12px;
@@ -693,6 +709,15 @@
             font-weight: 700;
             font-size: 1rem;
             text-align: center;
+        }
+
+        .entry-avatar-small {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-size: cover;
+            background-position: center;
+            background-color: rgba(255, 255, 255, 0.08);
         }
 
         .entry-name {
@@ -987,17 +1012,27 @@
                     <div class="info-row">
                         <div class="player-card">
                             <h4>Rakip</h4>
-                            <div id="opponent-name">—</div>
-                            <div style="margin-top:4px; display:flex; align-items:center; gap:6px;">
-                                <div id="opponent-level" class="level-icon level-low">1</div>
-                                <div id="opponent-elo" class="entry-elo-value">0 ELO</div>
+                            <div class="player-header">
+                                <div id="opponent-avatar" class="avatar"></div>
+                                <div>
+                                    <div id="opponent-name">—</div>
+                                    <div style="margin-top:4px; display:flex; align-items:center; gap:6px;">
+                                        <div id="opponent-level" class="level-icon level-low">1</div>
+                                        <div id="opponent-elo" class="entry-elo-value">0 ELO</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <div class="player-card">
                             <h4>Sen</h4>
-                            <div style="display:flex; align-items:center; gap:6px;">
-                                <div id="my-level" class="level-icon level-low">1</div>
-                                <div id="player-elo" class="entry-elo-value">0 ELO</div>
+                            <div class="player-header">
+                                <div id="my-avatar" class="avatar"></div>
+                                <div>
+                                    <div style="display:flex; align-items:center; gap:6px;">
+                                        <div id="my-level" class="level-icon level-low">1</div>
+                                        <div id="player-elo" class="entry-elo-value">0 ELO</div>
+                                    </div>
+                                </div>
                             </div>
                             <div style="margin-top:4px; font-size:0.78rem; color:var(--text-muted);">
                                 Sıra sende olduğunda bu panel hafif parlar.
@@ -1070,6 +1105,7 @@
 
     <div id="toast-container"></div>
 
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" crossorigin="anonymous"></script>
     <script src="game.js"></script>
 </body>
