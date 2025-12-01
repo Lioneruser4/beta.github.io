@@ -431,12 +431,14 @@ wss.on('close', () => clearInterval(pingInterval));
 // --- OYUN MANTIKLARI ---
 
 function handleFindMatch(ws, data) {
+    // Aynı soket zaten kuyruktaysa veya aktif bir odası varsa engelle
     if (ws.playerId && playerConnections.has(ws.playerId)) {
         const existingInQueue = matchQueue.find(p => p.playerId === ws.playerId);
         if (existingInQueue) {
             return sendMessage(ws, { type: 'error', message: 'Zaten kuyrukta bekliyorsunuz' });
         }
-        if (ws.roomCode) {
+        // ws.roomCode sadece gerçekten aktif oda varsa dolu kalır; leaveGame sonrasında null olur
+        if (ws.roomCode && rooms.has(ws.roomCode)) {
             return sendMessage(ws, { type: 'error', message: 'Zaten bir oyundasınız' });
         }
     }
@@ -483,6 +485,16 @@ function handleFindMatch(ws, data) {
             matchQueue.unshift(p2);
             // Bu durumda p1 için tekrar rakip beklenir
             console.log('⚠️ Aynı Telegram hesabı kendi kendisiyle eşleşmeye çalıştı, engellendi');
+            return;
+        }
+
+        // Guest ile Telegram kullanıcısı eşleşmesini engelle
+        if ((p1.isGuest && !p2.isGuest) || (!p1.isGuest && p2.isGuest)) {
+            // İkinci oyuncuyu kuyruğa geri koy
+            matchQueue.unshift(p2);
+            // İlk oyuncuyu da kuyruğun başına geri koy ki kendi türünden rakip bulabilsin
+            matchQueue.unshift(p1);
+            console.log('⚠️ Guest ile Telegram kullanıcısı eşleşmeye çalıştı, engellendi');
             return;
         }
         const roomCode = generateRoomCode();
@@ -739,9 +751,20 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
             eloChanges: eloChanges ? {
                 winner: eloChanges.winnerChange,
                 loser: eloChanges.loserChange
-            } : null
+            } : null,
+            // Her iki oyuncunun da güncel ELO/level bilgisi
+            updatedPlayers: {
+                [player1Id]: { elo: player1?.elo || 0, level: player1?.level || 1 },
+                [player2Id]: { elo: player2?.elo || 0, level: player2?.level || 1 }
+            }
         });
         rooms.delete(roomCode);
+
+        // Oyun bitti, her iki oyuncunun da ws.roomCode'unu temizle ki tekrar eşleşme arayabilsinler
+        const player1Ws = Array.from(wss.clients).find(ws => ws.playerId === player1Id);
+        const player2Ws = Array.from(wss.clients).find(ws => ws.playerId === player2Id);
+        if (player1Ws) player1Ws.roomCode = null;
+        if (player2Ws) player2Ws.roomCode = null;
     } catch (error) {
         console.error('❌ Game end error:', error);
         broadcastToRoom(roomCode, { 
@@ -751,6 +774,12 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
             isRanked: false
         });
         rooms.delete(roomCode);
+        // Hata durumunda da her iki oyuncunun roomCode'unu temizle
+        const playerIds = Object.keys(gameState.players);
+        playerIds.forEach(pid => {
+            const ws = Array.from(wss.clients).find(ws => ws.playerId === pid);
+            if (ws) ws.roomCode = null;
+        });
     }
 }
 
