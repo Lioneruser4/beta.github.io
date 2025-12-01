@@ -26,11 +26,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('.'));
 
-// User Schema
+// User Schema (sadece Telegram kullanıcıları için DB kaydı)
 const userSchema = new mongoose.Schema({
     telegramId: { type: String, required: true, unique: true },
     firstName: { type: String, required: true },
     username: { type: String },
+    photoUrl: { type: String },
     elo: { type: Number, default: 0 },
     wins: { type: Number, default: 0 },
     losses: { type: Number, default: 0 },
@@ -325,25 +326,51 @@ io.on('connection', (socket) => {
     // Auth
     socket.on('authenticate', async (data) => {
         try {
-            let user = await User.findOne({ telegramId: data.telegramId });
-            if (!user) {
-                user = new User({
-                    telegramId: data.telegramId,
-                    firstName: data.firstName || 'Oyuncu',
-                    username: data.username,
+            let userObj;
+
+            // Guest kullanıcı (Telegram yok) - DB'ye yazma
+            if (!data.telegramId || data.isGuest) {
+                userObj = {
+                    telegramId: data.telegramId || `guest_${socket.id}`,
+                    firstName: data.firstName || 'Guest',
+                    username: data.username || 'guest',
+                    photoUrl: data.photoUrl || '',
                     elo: 0,
                     wins: 0,
                     losses: 0,
-                    level: 1
-                });
-                await user.save();
+                    level: 1,
+                    isGuest: true
+                };
             } else {
-                user.lastActive = new Date();
-                await user.save();
+                // Telegram kullanıcısı: DB'de tut
+                let user = await User.findOne({ telegramId: data.telegramId });
+                if (!user) {
+                    user = new User({
+                        telegramId: data.telegramId,
+                        firstName: data.firstName || 'Oyuncu',
+                        username: data.username,
+                        photoUrl: data.photoUrl || '',
+                        elo: 0,
+                        wins: 0,
+                        losses: 0,
+                        level: 1
+                    });
+                    await user.save();
+                } else {
+                    user.lastActive = new Date();
+                    if (data.photoUrl) {
+                        user.photoUrl = data.photoUrl;
+                    }
+                    await user.save();
+                }
+                userObj = {
+                    ...user.toObject(),
+                    isGuest: false
+                };
             }
 
-            socketUsers.set(socket.id, user);
-            socket.emit('user_authenticated', { user: user.toObject() });
+            socketUsers.set(socket.id, userObj);
+            socket.emit('user_authenticated', { user: userObj });
         } catch (err) {
             console.error('Auth hata', err);
             socket.emit('auth_error', { message: 'Doğrulama hatası' });
@@ -491,7 +518,7 @@ io.on('connection', (socket) => {
             const top10 = await User.find()
                 .sort({ elo: -1 })
                 .limit(10)
-                .select('firstName username elo wins losses rank');
+                .select('firstName username photoUrl elo wins losses rank level');
 
             const user = socketUsers.get(socket.id);
             let myRank = null;
@@ -529,7 +556,7 @@ async function handleGameOver(room, winnerSocketId, reason) {
     const loser = room.getOpponent(winnerSocketId);
     if (!winner || !loser) return;
 
-    if (room.isRanked) {
+    if (room.isRanked && !winner.user.isGuest && !loser.user.isGuest) {
         const progress = game.getGameProgress();
         const eloChange = calculateEloChange(winner.user.elo, loser.user.elo, progress);
 
