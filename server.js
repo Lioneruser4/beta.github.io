@@ -407,6 +407,7 @@ wss.on('connection', (ws, req) => {
                 case 'joinRoom': handleJoinRoom(ws, data); break;
                 case 'playTile': handlePlayTile(ws, data); break;
                 case 'drawFromMarket': handleDrawFromMarket(ws); break;
+                case 'leaveGame': handleLeaveGame(ws); break;
             }
         } catch (error) {
             console.error('Hata:', error);
@@ -449,6 +450,14 @@ function handleFindMatch(ws, data) {
     ws.elo = data.elo || 0; // 0 = guest
     ws.isGuest = !data.telegramId; // Telegram yoksa guest
     
+    // Aynı Telegram hesabının ikinci kez kuyruğa girmesini engelle
+    if (!ws.isGuest && ws.telegramId) {
+        const sameTelegramInQueue = matchQueue.find(p => p.telegramId === ws.telegramId);
+        if (sameTelegramInQueue) {
+            return sendMessage(ws, { type: 'error', message: 'Bu Telegram hesabı zaten eşleşme kuyruğunda' });
+        }
+    }
+
     playerConnections.set(playerId, ws);
     matchQueue.push({ 
         ws, 
@@ -465,8 +474,17 @@ function handleFindMatch(ws, data) {
     console.log(`✅ ${ws.playerName} (${playerType}) kuyrukta - Toplam: ${matchQueue.length}`);
 
     if (matchQueue.length >= 2) {
-        const p1 = matchQueue.shift();
-        const p2 = matchQueue.shift();
+        let p1 = matchQueue.shift();
+        let p2 = matchQueue.shift();
+
+        // Aynı Telegram hesabının kendi kendisiyle eşleşmesini engelle
+        if (!p1.isGuest && !p2.isGuest && p1.telegramId && p2.telegramId && p1.telegramId === p2.telegramId) {
+            // İkinci oyuncuyu kuyruğa geri koy ve bu eşleşmeyi iptal et
+            matchQueue.unshift(p2);
+            // Bu durumda p1 için tekrar rakip beklenir
+            console.log('⚠️ Aynı Telegram hesabı kendi kendisiyle eşleşmeye çalıştı, engellendi');
+            return;
+        }
         const roomCode = generateRoomCode();
         
         const gameType = (p1.isGuest || p2.isGuest) ? 'casual' : 'ranked';
@@ -811,6 +829,29 @@ function handleDrawFromMarket(ws) {
     }
     
     Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+}
+
+function handleLeaveGame(ws) {
+    const room = rooms.get(ws.roomCode);
+    if (!room || !room.gameState || !ws.playerId) {
+        return;
+    }
+
+    const gs = room.gameState;
+    const playerIds = Object.keys(gs.players);
+    if (playerIds.length !== 2) {
+        rooms.delete(ws.roomCode);
+        ws.roomCode = null;
+        return;
+    }
+
+    const leaverId = ws.playerId;
+    const winnerId = playerIds.find(id => id !== leaverId);
+
+    handleGameEnd(ws.roomCode, winnerId, gs);
+
+    // Oyun bitti, bu soketin oda bilgisini temizle ki tekrar eşleşme arayabilsin
+    ws.roomCode = null;
 }
 
 function handleDisconnect(ws) {
