@@ -325,7 +325,12 @@ function sendMessage(type, payload) {
 }
 
 function handleServerMessage(message) {
+    console.log('Server message:', message.type);
+    
     switch (message.type) {
+        case 'CONNECTION_SUCCESS':
+            showToast('Sunucuya başarıyla bağlandı!', 'success');
+            break;
         case 'MATCH_FOUND':
             stopSearching();
             startGame(message.payload);
