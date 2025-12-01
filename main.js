@@ -2,11 +2,14 @@
 // MAIN APPLICATION
 // ============================================
 
+// Render URL'in doğru olduğundan emin ol. Sonunda slash (/) olmamalı.
 const SERVER_URL = 'wss://mario-io-1.onrender.com';
 
 // State
 let ws = null;
 let connectionStatus = 'disconnected';
+let reconnectInterval = null;
+let heartbeatInterval = null;
 let game = new DominoGame();
 let eloSystem = new EloSystem();
 let selectedTile = null;
@@ -43,51 +46,110 @@ let leaderboard = [
 ];
 
 // ============================================
-// WEBSOCKET CONNECTION
+// WEBSOCKET CONNECTION (DÜZELTİLDİ & GÜÇLENDİRİLDİ)
 // ============================================
 
 function connectWebSocket() {
+    // Eğer zaten bağlıysak veya bağlanıyorsak işlem yapma
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        return;
+    }
+
     updateConnectionStatus('connecting');
+    console.log('Sunucuya bağlanılıyor: ' + SERVER_URL);
 
     try {
         ws = new WebSocket(SERVER_URL);
 
         ws.onopen = () => {
+            console.log('WebSocket bağlantısı başarılı!');
             updateConnectionStatus('connected');
             showToast('Sunucuya bağlandı!', 'success');
+            
+            // Render sunucusunun bağlantıyı kesmemesi için Heartbeat başlat
+            startHeartbeat();
+            
+            // Eğer yeniden bağlanma döngüsü varsa durdur
+            if (reconnectInterval) {
+                clearInterval(reconnectInterval);
+                reconnectInterval = null;
+            }
         };
 
-        ws.onclose = () => {
+        ws.onclose = (event) => {
+            console.log('Bağlantı kesildi. Kod:', event.code, 'Sebep:', event.reason);
             updateConnectionStatus('disconnected');
-            setTimeout(connectWebSocket, 3000);
+            stopHeartbeat();
+            
+            // Otomatik yeniden bağlanma (5 saniye sonra)
+            if (!reconnectInterval) {
+                reconnectInterval = setInterval(() => {
+                    console.log('Yeniden bağlanmaya çalışılıyor...');
+                    connectWebSocket();
+                }, 5000);
+            }
         };
 
         ws.onerror = (error) => {
+            console.error('WebSocket hatası:', error);
+            // Hata durumunda statüyü güncelle ama onclose zaten tetikleneceği için
+            // yeniden bağlanma mantığını oraya bırakıyoruz.
             updateConnectionStatus('error');
-            console.error('WebSocket error:', error);
         };
 
         ws.onmessage = (event) => {
             try {
+                // Pong mesajlarını yoksay (Heartbeat yanıtı)
+                if (event.data === 'pong') return;
+
                 const message = JSON.parse(event.data);
                 handleServerMessage(message);
             } catch (e) {
-                console.error('Failed to parse message:', e);
+                console.error('Mesaj parse hatası:', e);
             }
         };
+
     } catch (e) {
+        console.error('Bağlantı başlatma hatası:', e);
         updateConnectionStatus('error');
-        setTimeout(connectWebSocket, 5000);
+    }
+}
+
+// Render gibi platformlarda bağlantının kopmaması için düzenli sinyal
+function startHeartbeat() {
+    stopHeartbeat(); // Eskisi varsa temizle
+    heartbeatInterval = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            // Backend bu ping mesajını karşılayıp 'pong' dönmeli veya sadece yok saymalı
+            // Amaç hattı açık tutmak.
+            try {
+                ws.send(JSON.stringify({ type: 'PING' }));
+            } catch (e) {
+                console.log("Ping gönderilemedi");
+            }
+        }
+    }, 30000); // 30 saniyede bir
+}
+
+function stopHeartbeat() {
+    if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
     }
 }
 
 function sendMessage(type, payload) {
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type, payload }));
+    } else {
+        console.warn('Mesaj gönderilemedi, bağlantı yok:', type);
+        showToast('Bağlantı yok, tekrar bağlanılıyor...', 'error');
+        connectWebSocket();
     }
 }
 
 function handleServerMessage(message) {
+    // Mesaj tiplerini kontrol et
     switch (message.type) {
         case 'MATCH_FOUND':
             stopSearching();
@@ -109,6 +171,9 @@ function handleServerMessage(message) {
         case 'GAME_OVER':
             handleGameOver(message.payload);
             break;
+        case 'PONG': // Sunucudan gelen yanıt
+            // Bağlantı sağlıklı
+            break;
     }
 }
 
@@ -121,37 +186,55 @@ function updateConnectionStatus(status) {
     const dot = document.getElementById('status-dot');
     const text = document.getElementById('status-text');
 
-    dot.className = 'status-dot ' + status;
+    if(dot) dot.className = 'status-dot ' + status;
 
     const statusTexts = {
-        disconnected: 'Bağlantı kesildi',
-        connecting: 'Bağlanıyor...',
-        connected: 'Bağlı',
-        error: 'Bağlantı hatası'
+        disconnected: 'Bağlantı kesildi (Tekrar deneniyor...)',
+        connecting: 'Sunucuya Bağlanıyor... (Uyanması sürebilir)',
+        connected: 'Çevrimiçi',
+        error: 'Bağlantı Hatası'
     };
 
-    text.textContent = statusTexts[status];
+    if(text) text.textContent = statusTexts[status];
 }
 
 function updateUserStats() {
     const level = eloSystem.getLevelFromElo(userStats.elo);
     const levelClass = eloSystem.getLevelClass(level);
 
-    document.getElementById('level-icon').className = 'level-icon ' + levelClass;
-    document.getElementById('level-icon').textContent = level;
-    document.getElementById('level-text').textContent = `Seviye ${level}`;
-    document.getElementById('elo-text').textContent = `${userStats.elo} ELO`;
-    document.getElementById('user-rank').textContent = userStats.rank;
-    document.getElementById('wins').textContent = userStats.wins;
-    document.getElementById('losses').textContent = userStats.losses;
+    const levelIcon = document.getElementById('level-icon');
+    if(levelIcon) {
+        levelIcon.className = 'level-icon ' + levelClass;
+        levelIcon.textContent = level;
+    }
+    
+    const levelText = document.getElementById('level-text');
+    if(levelText) levelText.textContent = `Seviye ${level}`;
+    
+    const eloText = document.getElementById('elo-text');
+    if(eloText) eloText.textContent = `${userStats.elo} ELO`;
+    
+    const userRank = document.getElementById('user-rank');
+    if(userRank) userRank.textContent = userStats.rank;
+    
+    const wins = document.getElementById('wins');
+    if(wins) wins.textContent = userStats.wins;
+    
+    const losses = document.getElementById('losses');
+    if(losses) losses.textContent = userStats.losses;
 
     // Update in-game level display
-    document.getElementById('my-level').textContent = level;
-    document.getElementById('my-level').className = 'level-icon ' + levelClass;
+    const myLevel = document.getElementById('my-level');
+    if(myLevel) {
+        myLevel.textContent = level;
+        myLevel.className = 'level-icon ' + levelClass;
+    }
 }
 
 function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
+    if(!container) return;
+    
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.textContent = message;
@@ -168,6 +251,12 @@ function showToast(message, type = 'info') {
 // ============================================
 
 function startSearching() {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        showToast('Sunucu bağlantısı bekleniyor...', 'error');
+        connectWebSocket();
+        return;
+    }
+
     isSearching = true;
     searchTime = 0;
 
@@ -185,18 +274,21 @@ function startSearching() {
         searchTime++;
         const mins = Math.floor(searchTime / 60);
         const secs = (searchTime % 60).toString().padStart(2, '0');
-        document.getElementById('search-time').textContent = `${mins}:${secs}`;
+        const timeEl = document.getElementById('search-time');
+        if(timeEl) timeEl.textContent = `${mins}:${secs}`;
     }, 1000);
 
     sendMessage('START_RANKED_SEARCH', { userId: userStats.name });
 
-    // Demo: Start game after 3 seconds
-    setTimeout(() => {
+    // Demo: Start game after 3 seconds (EĞER SERVER CEVAP VERMEZSE DEMO OYNAT)
+    // Gerçek bağlantıda bunu kaldırabilirsin
+    /* setTimeout(() => {
         if (isSearching) {
             stopSearching();
             startDemoGame(true);
         }
     }, 3000);
+    */
 }
 
 function stopSearching() {
@@ -216,6 +308,7 @@ function cancelSearch() {
 
 function resetRankedButton() {
     const container = document.getElementById('ranked-container');
+    if(!container) return;
     container.innerHTML = `
         <button class="game-btn ranked" id="ranked-btn" onclick="startSearching()">
             <div class="btn-icon">⚔️</div>
@@ -228,9 +321,13 @@ function resetRankedButton() {
 }
 
 function createRoom() {
-    roomCode = generateRoomCode();
-    sendMessage('CREATE_ROOM', { code: roomCode });
-    showRoomCode();
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        showToast('Sunucu bağlantısı yok!', 'error');
+        return;
+    }
+    // Odayı server'ın oluşturmasını bekle, burada kod üretme
+    sendMessage('CREATE_ROOM', {}); 
+    // Server 'ROOM_CREATED' mesajı ile dönecek
 }
 
 function generateRoomCode() {
@@ -253,13 +350,6 @@ function showRoomCode() {
             <button class="cancel-btn" style="margin-top: 15px" onclick="cancelRoom()">İptal</button>
         </div>
     `;
-
-    // Demo: Start game after 3 seconds
-    setTimeout(() => {
-        if (roomCode) {
-            startDemoGame(false);
-        }
-    }, 3000);
 }
 
 function copyRoomCode() {
@@ -270,6 +360,8 @@ function copyRoomCode() {
 function cancelRoom() {
     roomCode = null;
     resetFriendButton();
+    // Sunucuya odayı iptal ettiğini bildir (opsiyonel)
+    sendMessage('LEAVE_ROOM', {});
 }
 
 function resetFriendButton() {
@@ -298,7 +390,8 @@ function showJoinInput() {
             </div>
         </div>
     `;
-    document.getElementById('join-code-input').focus();
+    const input = document.getElementById('join-code-input');
+    if(input) input.focus();
 }
 
 function cancelJoin() {
@@ -315,19 +408,21 @@ function cancelJoin() {
 }
 
 function joinRoom() {
-    const code = document.getElementById('join-code-input').value;
+    const codeInput = document.getElementById('join-code-input');
+    const code = codeInput ? codeInput.value : '';
+    
     if (code.length !== 4) {
         showToast('Lütfen 4 haneli oda kodunu girin!', 'error');
         return;
     }
 
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        showToast('Sunucu bağlantısı bekleniyor...', 'error');
+        return;
+    }
+
     sendMessage('JOIN_ROOM', { code: code });
     showToast('Odaya bağlanılıyor...', 'info');
-
-    // Demo: Start game
-    setTimeout(() => {
-        startDemoGame(false);
-    }, 1500);
 }
 
 // ============================================
@@ -346,6 +441,7 @@ function startDemoGame(isRanked) {
 }
 
 function startGame(payload) {
+    // Backend'den gelen veriye göre oyunu başlat
     game.initializeGame([payload.player1, payload.player2], payload.isRanked);
     myPlayerId = payload.myPlayerId;
     currentScreen = 'game';
@@ -519,6 +615,8 @@ function selectTile(tile) {
 function playTile(side) {
     if (!selectedTile) return;
 
+    // Önce client tarafında hamle yap (iyimser UI)
+    // Gerçek uygulamada sunucu onayı beklenebilir ama bu daha akıcı hissettirir
     const result = game.placeTile(selectedTile.id, side);
 
     if (result.success) {
@@ -535,14 +633,11 @@ function playTile(side) {
     selectedTile = null;
     playablePositions = [];
     renderGame();
-
-    // Demo: AI plays after 1-2 seconds
-    if (game.status === 'playing' && game.getCurrentPlayer().id !== myPlayerId) {
-        setTimeout(aiPlay, 1000 + Math.random() * 1000);
-    }
 }
 
 function aiPlay() {
+    // Bu fonksiyon sadece demo/offline modda kullanılır.
+    // Online modda rakip hamlesi sunucudan 'GAME_STATE_UPDATE' ile gelir.
     if (game.status !== 'playing' || game.getCurrentPlayer().id === myPlayerId) return;
 
     const playableTiles = game.getPlayableTiles();
@@ -561,8 +656,18 @@ function aiPlay() {
             handleGameOver({ winner: result.winner, isRanked: game.isRanked });
         }
     }
-
     renderGame();
+}
+
+function updateGameState(newState) {
+    // Sunucudan gelen state ile yerel state'i senkronize et
+    // Not: Bu kısım DominoGame class'ının yapısına göre ayarlanmalıdır.
+    // Şimdilik basitçe UI güncelliyoruz.
+    
+    // Örnek: game.board = newState.board;
+    // game.players = newState.players;
+    // renderGame();
+    console.log("Sunucudan oyun güncellemesi geldi", newState);
 }
 
 function passTurn() {
@@ -576,11 +681,6 @@ function passTurn() {
     }
 
     renderGame();
-
-    // AI plays
-    if (game.status === 'playing' && game.getCurrentPlayer().id !== myPlayerId) {
-        setTimeout(aiPlay, 1000 + Math.random() * 1000);
-    }
 }
 
 function updateTurnIndicator() {
@@ -700,6 +800,11 @@ function backToLobby() {
     resetFriendButton();
     cancelJoin();
     updateUserStats();
+    
+    // Bağlantı kopmuşsa tekrar dene
+    if(!ws || ws.readyState !== WebSocket.OPEN) {
+        connectWebSocket();
+    }
 }
 
 // ============================================
