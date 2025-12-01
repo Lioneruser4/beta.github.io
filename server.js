@@ -56,7 +56,7 @@ const Match = mongoose.model('DominoMatch', matchSchema);
 app.use(cors());
 app.use(express.json());
 
-const ADMIN_IDS = [976640409]; // Admin Telegram ID'leri (virgülle ayırarak çoğaltabilirsin)
+const rooms = new Map();
 const matchQueue = [];
 const playerConnections = new Map();
 const playerSessions = new Map(); // telegramId -> player data
@@ -901,112 +901,6 @@ function handleDisconnect(ws) {
         rooms.delete(ws.roomCode);
     }
 }
-
-// Admin endpoint'leri
-app.post('/api/admin/reset-all-elo', async (req, res) => {
-    try {
-        const { telegramId } = req.body;
-        if (!ADMIN_IDS.includes(Number(telegramId))) {
-            return res.status(403).json({ error: 'Yetkisiz' });
-        }
-
-        const result = await Player.updateMany({}, {
-            $set: {
-                elo: 0,
-                level: 1,
-                wins: 0,
-                losses: 0,
-                draws: 0,
-                totalGames: 0,
-                winStreak: 0,
-                bestWinStreak: 0,
-                lastPlayed: new Date()
-            }
-        });
-
-        res.json({ success: true, message: `Tüm ELO ve istatistikler sıfırlandı. ${result.modifiedCount} oyuncu güncellendi.` });
-        console.log(`🔄 ADMIN ${telegramId}: Tüm ELO sıfırlandı. ${result.modifiedCount} oyuncu güncellendi.`);
-    } catch (error) {
-        console.error('ELO reset hatası:', error);
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
-
-app.post('/api/admin/kick-player', async (req, res) => {
-    try {
-        const { telegramId: adminId, targetTelegramId } = req.body;
-        if (!ADMIN_IDS.includes(Number(adminId))) {
-            return res.status(403).json({ error: 'Yetkisiz' });
-        }
-
-        // Hedef oyuncuyu tüm bağlantılardan kopar
-        const wsToKick = Array.from(wss.clients).find(ws => ws.telegramId === targetTelegramId);
-        if (wsToKick) {
-            wsToKick.send(JSON.stringify({ type: 'kicked', message: 'Admin tarafından sistemden atıldınız.' }));
-            wsToKick.terminate();
-            // Odaları ve kuyruğu temizle
-            if (wsToKick.roomCode && rooms.has(wsToKick.roomCode)) {
-                rooms.delete(wsToKick.roomCode);
-            }
-            // Kuyruktan çıkar
-            const queueIndex = matchQueue.findIndex(p => p.telegramId === targetTelegramId);
-            if (queueIndex !== -1) {
-                matchQueue.splice(queueIndex, 1);
-            }
-            res.json({ success: true, message: `Oyuncu ${targetTelegramId} sistemden atıldı.` });
-            console.log(`🚫 ADMIN ${adminId}: Oyuncu ${targetTelegramId} sistemden atıldı.`);
-        } else {
-            res.status(404).json({ error: 'Oyuncu çevrimdışı veya bulunamadı' });
-        }
-    } catch (error) {
-        console.error('Kick hatası:', error);
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
-
-app.post('/api/admin/update-player-elo', async (req, res) => {
-    try {
-        const { telegramId: adminId, targetTelegramId, newElo, newLevel } = req.body;
-        if (!ADMIN_IDS.includes(Number(adminId))) {
-            return res.status(403).json({ error: 'Yetkisiz' });
-        }
-
-        const player = await Player.findOne({ telegramId: targetTelegramId });
-        if (!player) {
-            return res.status(404).json({ error: 'Oyuncu bulunamadı' });
-        }
-
-        const oldElo = player.elo;
-        player.elo = newElo;
-        if (newLevel !== undefined) player.level = newLevel;
-        await player.save();
-
-        // Oyuncu çevrimiçiyse güncel bilgisini gönder
-        const ws = Array.from(wss.clients).find(ws => ws.telegramId === targetTelegramId);
-        if (ws) {
-            ws.send(JSON.stringify({
-                type: 'playerDataUpdated',
-                elo: player.elo,
-                level: player.level
-            }));
-        }
-
-        res.json({ 
-            success: true, 
-            message: `Oyuncu ${targetTelegramId} güncellendi: ELO ${oldElo} → ${player.elo}, Level ${player.level}`,
-            player: {
-                telegramId: player.telegramId,
-                username: player.username,
-                elo: player.elo,
-                level: player.level
-            }
-        });
-        console.log(`🔧 ADMIN ${adminId}: Oyuncu ${targetTelegramId} güncellendi: ELO ${oldElo} → ${player.elo}, Level ${player.level}`);
-    } catch (error) {
-        console.error('Player update hatası:', error);
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
