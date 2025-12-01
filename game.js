@@ -199,7 +199,6 @@ class DominoGame {
 
         // Check if game is blocked (no one can play)
         const allBlocked = this.players.every(player => {
-            const originalIndex = this.currentPlayerIndex;
             const canPlay = player.tiles.some(tile => this.canPlayTile(tile));
             return !canPlay;
         });
