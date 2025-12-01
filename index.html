@@ -409,7 +409,7 @@
                 ws.onclose = () => { setConnected(false); setTimeout(connectToServer, 3000); };
                 ws.onmessage = (e) => {
                     try {
-                        const data = JSON.parse(e.data);
+                        const data = JSON.parse(e.dta);a
                         handleServerMessage(data);
                     } catch(err) { console.error(err); }
                 };
@@ -420,12 +420,20 @@
                 console.log('📨 Server mesajı:', data.type, data);
                 
                 switch(data.type) {
+                    case 'authSuccess':
+                        setPlayerData({ ...data.player, isGuest: false });
+                        setScreen('lobby');
+                        break;
+                    case 'guestMode':
+                        setPlayerData({ username: 'Guest', isGuest: true });
+                        setScreen('lobby');
+                        break;
                     case 'roomCreated':
                         setRoomCode(data.roomCode);
                         break;
                     case 'gameStart':
                         console.log('🎮 Oyun başlıyor...', data.gameState);
-                        setGameState(data.gameState);
+                        setGameState({ ...data.gameState, playerId: prevState?.playerId || data.gameState.playerId });
                         setScreen('game');
                         setSelectedTileIndex(null);
                         setValidMoves([]);
@@ -536,6 +544,14 @@
                         searchTimerRef.current = null;
                     }
                     setSearchTime(0);
+                    break;
+                case 'kicked':
+                    showNotification(data.message || 'Admin tarafından sistemden atıldınız.', 'error');
+                    setScreen('lobby');
+                    setGameState(null);
+                    setRoomCode('');
+                    break;
+                default:
                     break;
                 }
             };
