@@ -852,6 +852,7 @@ function handleLeaveGame(ws) {
 
     // Oyun bitti, bu soketin oda bilgisini temizle ki tekrar eşleşme arayabilsin
     ws.roomCode = null;
+    // playerId bağlantı için dursun ama aktif oda ilişkisi kalmasın
 }
 
 function handleDisconnect(ws) {
