@@ -219,6 +219,7 @@
             const [notification, setNotification] = useState(null);
             const [searching, setSearching] = useState(false);
             const [endInfo, setEndInfo] = useState(null);
+            const [opponent, setOpponent] = useState(null);
             
             const wsRef = useRef(null);
             const boardScrollRef = useRef(null);
@@ -436,6 +437,7 @@
                     case 'matchFound':
                         showNotification(`Rakip Bulundu! ${data.gameType === 'ranked' ? '🏆 RANKED' : '🎮 CASUAL'}`, 'success');
                         setSearching(false);
+                        setOpponent(data.opponent || null);
                         if (searchTimerRef.current) {
                             clearInterval(searchTimerRef.current);
                             searchTimerRef.current = null;
@@ -548,6 +550,17 @@
             };
 
             const leaveGameClient = () => {
+                // Kullanıcıdan onay iste
+                const confirmed = window.confirm(
+                    'Oyundan çıkmak istediğine emin misin?\n\n' +
+                    'Bu eli terk edersen ELO puanı kaybedebilirsin ve el otomatik olarak rakibine yazılacaktır.'
+                );
+                if (!confirmed) return;
+
+                // Sunucuya haber ver
+                sendMessage({ type: 'leaveGame' });
+
+                // Lokal state temizle ve lobiye dön
                 setGameState(null);
                 setRoomCode('');
                 setSearching(false);
@@ -860,13 +873,27 @@
                         {/* ÜST PANEL: Rakip */}
                         <div className="h-16 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between px-4 z-20">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center shadow-lg">
-                                    👤
-                                </div>
+                                {opponent?.photoUrl ? (
+                                    <img
+                                        src={opponent.photoUrl}
+                                        alt={opponent.name || opponent.username || 'Rakip'}
+                                        className="w-10 h-10 rounded-full border-2 border-yellow-400 shadow-lg object-cover"
+                                    />
+                                ) : (
+                                    <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center shadow-lg">
+                                        👤
+                                    </div>
+                                )}
                                 <div>
-                                    <div className="text-white text-sm font-bold shadow-black drop-shadow-md">🎯 RAIP</div>
+                                    <div className="text-white text-sm font-bold shadow-black drop-shadow-md">
+                                        {opponent?.name || opponent?.username || 'Rakip'}
+                                    </div>
                                     <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
-                                        🎲 {Object.values(gameState.players).find(p => p.id !== myPlayerId)?.hand?.length || 0} Taş
+                                        🎲 {(() => {
+                                            const oppName = opponent?.name || opponent?.username;
+                                            const oppEntry = Object.values(gameState.players).find(p => p.name === oppName);
+                                            return (oppEntry && oppEntry.hand ? oppEntry.hand.length : 0);
+                                        })()} Taş
                                     </div>
                                 </div>
                             </div>
