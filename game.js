@@ -123,15 +123,36 @@ class DominoGame {
 
     // TELEGRAM AUTH
     checkTelegramAuth() {
+        // Telegram WebApp içinden açıldıysa otomatik kullanıcı bilgisi
+        try {
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+                const u = window.Telegram.WebApp.initDataUnsafe.user;
+                if (u && u.id) {
+                    localStorage.setItem('telegram_id', u.id.toString());
+                    localStorage.setItem('first_name', u.first_name || 'Oyuncu');
+                    localStorage.setItem('username', u.username || `user_${u.id}`);
+                    if (u.photo_url) {
+                        localStorage.setItem('photo_url', u.photo_url);
+                    }
+                    return;
+                }
+            }
+        } catch (e) {
+            // sessiz geç
+        }
+
+        // URL parametre fallback
         const urlParams = new URLSearchParams(window.location.search);
         const telegramId = urlParams.get('telegram_id');
         const firstName = urlParams.get('first_name');
         const username = urlParams.get('username');
+        const photoUrl = urlParams.get('photo_url');
 
         if (telegramId) {
             localStorage.setItem('telegram_id', telegramId);
             localStorage.setItem('first_name', firstName || 'Oyuncu');
             localStorage.setItem('username', username || `user_${telegramId}`);
+            if (photoUrl) localStorage.setItem('photo_url', photoUrl);
 
             // querystring temizle
             window.history.replaceState({}, document.title, window.location.pathname);
@@ -142,15 +163,25 @@ class DominoGame {
         const telegramId = localStorage.getItem('telegram_id');
         const firstName = localStorage.getItem('first_name');
         const username = localStorage.getItem('username');
+        const photoUrl = localStorage.getItem('photo_url');
 
         if (telegramId) {
             this.socket.emit('authenticate', {
                 telegramId,
                 firstName,
-                username
+                username,
+                photoUrl,
+                isGuest: false
             });
         } else {
-            this.showTelegramLogin();
+            // Telegram yoksa sunucuya guest auth gönder
+            this.socket.emit('authenticate', {
+                telegramId: null,
+                firstName: 'Guest',
+                username: 'guest',
+                photoUrl: '',
+                isGuest: true
+            });
         }
     }
 
@@ -216,8 +247,8 @@ class DominoGame {
 
     // MATCHMAKING & ROOMS
     startRankedMatch() {
-        if (!this.currentUser) {
-            this.showToast('Önce Telegram ile giriş yap', 'error');
+        if (!this.currentUser || this.currentUser.isGuest) {
+            this.showToast('Dereceli oynamak için Telegram ile giriş yap', 'error');
             return;
         }
 
@@ -376,6 +407,7 @@ class DominoGame {
             const oppName = document.getElementById('opponent-name');
             const oppLevelEl = document.getElementById('opponent-level');
             const oppEloEl = document.getElementById('opponent-elo');
+            const oppAvatarEl = document.getElementById('opponent-avatar');
             const oppLevel = this.calculateLevel(opponent.elo || 0);
 
             if (oppName) oppName.textContent = opponent.firstName || opponent.username || 'Rakip';
@@ -388,6 +420,9 @@ class DominoGame {
                 if (oppLevel >= 7) oppLevelEl.classList.add('level-premium');
             }
             if (oppEloEl) oppEloEl.textContent = `${opponent.elo || 0} ELO`;
+            if (oppAvatarEl && opponent.photoUrl) {
+                oppAvatarEl.style.backgroundImage = `url(${opponent.photoUrl})`;
+            }
         }
 
         // kendi level/elo oyun ekranı
@@ -395,6 +430,7 @@ class DominoGame {
             const myLevel = this.calculateLevel(this.currentUser.elo || 0);
             const myLevelEl = document.getElementById('my-level');
             const myEloEl = document.getElementById('player-elo');
+            const myAvatarEl = document.getElementById('my-avatar');
             if (myLevelEl) {
                 myLevelEl.textContent = myLevel;
                 myLevelEl.className = 'level-icon';
@@ -404,6 +440,9 @@ class DominoGame {
                 if (myLevel >= 7) myLevelEl.classList.add('level-premium');
             }
             if (myEloEl) myEloEl.textContent = `${this.currentUser.elo || 0} ELO`;
+            if (myAvatarEl && this.currentUser.photoUrl) {
+                myAvatarEl.style.backgroundImage = `url(${this.currentUser.photoUrl})`;
+            }
         }
 
         this.updateGameBoard();
@@ -683,6 +722,7 @@ class DominoGame {
 
             entry.innerHTML = `
                 <div class="entry-rank">${index + 1}</div>
+                <div class="entry-avatar-small" style="${player.photoUrl ? `background-image:url(${player.photoUrl})` : ''}"></div>
                 <div>
                     <div class="entry-name">${player.firstName || player.username}</div>
                     <div class="entry-stats">${player.wins || 0}G / ${player.losses || 0}M</div>
@@ -705,6 +745,7 @@ class DominoGame {
                 <div class="my-rank-label">Senin sıralaman:</div>
                 <div class="leaderboard-entry">
                     <div class="entry-rank">${data.myRank}</div>
+                    <div class="entry-avatar-small" style="${this.currentUser.photoUrl ? `background-image:url(${this.currentUser.photoUrl})` : ''}"></div>
                     <div>
                         <div class="entry-name">${this.currentUser.firstName}</div>
                         <div class="entry-stats">${this.currentUser.wins || 0}G / ${this.currentUser.losses || 0}M</div>
