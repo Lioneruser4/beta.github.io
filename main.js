@@ -1,62 +1,244 @@
 // ============================================
-// MAIN APPLICATION
+// YARDIMCI SINIFLAR (DominoGame ve EloSystem yer tutucuları)
+// BU KISIM GERÇEK UYGULAMANIZDA AYRI BİR DOSYADA OLMALIDIR!
 // ============================================
 
-// Render URL'in doğru olduğundan emin ol. Sonunda slash (/) olmamalı.
+/**
+ * Bu, gerçek DominoGame mantığınızı temsil eden bir yer tutucudur.
+ * Kodun çalışması için bu sınıfın tamamen implemente edilmiş olması gerekir.
+ */
+class DominoGame {
+    constructor() {
+        this.board = [];
+        this.players = [];
+        this.status = 'lobby'; // playing, game_over
+        this.currentPlayerId = null;
+        this.leftEnd = null;
+        this.rightEnd = null;
+        this.isRanked = false;
+        this.turnCount = 0;
+    }
+    
+    initializeGame(playerNames, isRanked) {
+        this.board = [];
+        this.players = playerNames.map((name, index) => ({
+            id: `player-${index}`,
+            name: name,
+            tiles: [ { id: index + 1, left: index, right: 6 - index } ], // Demo tiles
+            elo: 100 // Demo elo
+        }));
+        this.currentPlayerId = 'player-0';
+        this.status = 'playing';
+        this.isRanked = isRanked;
+        this.turnCount = 0;
+        this.leftEnd = null;
+        this.rightEnd = null;
+    }
+
+    getCurrentPlayer() {
+        return this.players.find(p => p.id === this.currentPlayerId);
+    }
+    
+    getPlayableTiles() {
+        const player = this.getCurrentPlayer();
+        if (!player) return [];
+        
+        if (this.board.length === 0) return player.tiles; // İlk taş
+        
+        return player.tiles.filter(tile => 
+            tile.left === this.leftEnd || tile.right === this.leftEnd || 
+            tile.left === this.rightEnd || tile.right === this.rightEnd
+        );
+    }
+    
+    getPlayablePositions(tile) {
+        if (this.board.length === 0) return [{ side: 'left' }];
+        
+        const positions = [];
+        // Sol uç
+        if (tile.left === this.leftEnd || tile.right === this.leftEnd) {
+            positions.push({ side: 'left', requiredValue: this.leftEnd });
+        }
+        // Sağ uç
+        if (tile.left === this.rightEnd || tile.right === this.rightEnd) {
+            positions.push({ side: 'right', requiredValue: this.rightEnd });
+        }
+        return positions;
+    }
+    
+    placeTile(tileId, side) {
+        const player = this.getCurrentPlayer();
+        const tileIndex = player.tiles.findIndex(t => t.id === tileId);
+        if (tileIndex === -1) return { success: false };
+
+        const tile = player.tiles[tileIndex];
+        const positions = this.getPlayablePositions(tile);
+        const position = positions.find(p => p.side === side);
+
+        if (!position) return { success: false };
+
+        // Taşı çevir (flip) mantığı
+        let flipped = false;
+        if (this.board.length > 0) {
+            if (side === 'left') {
+                if (tile.right === this.leftEnd) {
+                    // Bağlantı zaten doğru, çevirme yok
+                } else if (tile.left === this.leftEnd) {
+                    flipped = true; // Taşı çevir
+                } else {
+                    return { success: false }; // Hata
+                }
+            } else if (side === 'right') {
+                if (tile.left === this.rightEnd) {
+                    // Bağlantı zaten doğru, çevirme yok
+                } else if (tile.right === this.rightEnd) {
+                    flipped = true; // Taşı çevir
+                } else {
+                    return { success: false }; // Hata
+                }
+            }
+        }
+        
+        // Taşı elden kaldır
+        player.tiles.splice(tileIndex, 1);
+        
+        // Tahtaya ekle
+        this.board[side === 'left' ? 'unshift' : 'push']({ ...tile, flipped });
+
+        // Uçları güncelle
+        const newEndValue = (flipped ? tile.left : tile.right);
+
+        if (this.board.length === 1) {
+            this.leftEnd = tile.left;
+            this.rightEnd = tile.right;
+        } else if (side === 'left') {
+             this.leftEnd = flipped ? tile.right : tile.left;
+        } else if (side === 'right') {
+             this.rightEnd = flipped ? tile.left : tile.right;
+        }
+
+        this.passTurn(true); // Hamleyi yapınca tur geçer
+        
+        const gameOver = player.tiles.length === 0;
+        return { success: true, gameOver, winner: gameOver ? player : null };
+    }
+
+    passTurn(played = false) {
+        if (!played && this.getPlayableTiles().length > 0) {
+            return { blocked: false }; // Pas geçme hakkı yok
+        }
+        
+        const currentIndex = this.players.findIndex(p => p.id === this.currentPlayerId);
+        const nextIndex = (currentIndex + 1) % this.players.length;
+        this.currentPlayerId = this.players[nextIndex].id;
+        this.turnCount++;
+
+        // Oyun bloke oldu mu kontrol et (Sunucuda daha iyi kontrol edilir)
+        if (this.turnCount > this.players.length * 2 && this.getPlayableTiles().length === 0) {
+             // Basit bloke kuralı
+             const winner = this.players.reduce((minPlayer, current) => {
+                 const minScore = minPlayer.tiles.reduce((sum, t) => sum + t.left + t.right, 0);
+                 const currentScore = current.tiles.reduce((sum, t) => sum + t.left + t.right, 0);
+                 return currentScore < minScore ? current : minPlayer;
+             }, this.players[0]);
+
+             return { blocked: true, gameOver: true, winner };
+        }
+        
+        return { blocked: false };
+    }
+    
+    // ELO hesaplaması, DominoGame veya EloSystem'de olabilir
+    calculateEloChange(isWinner, isDraw, halfwayPassed) {
+        // Basit demo ELO hesaplaması
+        if (isDraw) return 0;
+        return isWinner ? (halfwayPassed ? 25 : 15) : (halfwayPassed ? -25 : -15);
+    }
+}
+
+/**
+ * Bu, gerçek EloSystem mantığınızı temsil eden bir yer tutucudur.
+ * Kodun çalışması için bu sınıfın tamamen implemente edilmiş olması gerekir.
+ */
+class EloSystem {
+    getLevelFromElo(elo) {
+        if (elo < 200) return 1;
+        if (elo < 400) return 2;
+        if (elo < 600) return 3;
+        if (elo < 800) return 4;
+        if (elo < 1000) return 5;
+        if (elo < 1200) return 6;
+        return 7;
+    }
+    
+    getLevelClass(level) {
+        if (level >= 6) return 'master';
+        if (level >= 4) return 'pro';
+        return 'rookie';
+    }
+}
+
+
+// ============================================
+// YAPILANDIRMA
+// ============================================
+
+// Render URL'in doğru olduğundan emin olun. Sonunda slash (/) olmamalı.
 const SERVER_URL = 'wss://mario-io-1.onrender.com';
 
-// State
+// State (Durum)
 let ws = null;
-let connectionStatus = 'disconnected';
+let connectionStatus = 'disconnected'; // disconnected, connecting, connected, error
 let reconnectInterval = null;
 let heartbeatInterval = null;
-let game = new DominoGame();
-let eloSystem = new EloSystem();
+let game = new DominoGame(); 
+let eloSystem = new EloSystem(); 
 let selectedTile = null;
 let playablePositions = [];
-let myPlayerId = 'player-0';
+let myPlayerId = 'player-0'; 
 let isSearching = false;
 let searchTime = 0;
 let searchInterval = null;
 let roomCode = null;
 let currentScreen = 'lobby';
 
-// User stats (demo data - would come from server)
+// Kullanıcı istatistikleri (demo verisi - sunucudan gelmeli)
 let userStats = {
     name: 'Oyuncu',
     level: 1,
-    elo: 0,
+    elo: 100, 
     wins: 0,
     losses: 0,
-    rank: 1
+    rank: 100 
 };
 
-// Demo leaderboard
+// Demo liderlik tablosu (UI testi için)
 let leaderboard = [
     { rank: 1, name: 'ProGamer', level: 10, elo: 1250, wins: 150, losses: 30 },
     { rank: 2, name: 'DominoKing', level: 9, elo: 980, wins: 120, losses: 45 },
     { rank: 3, name: 'MasterPlay', level: 8, elo: 850, wins: 100, losses: 50 },
-    { rank: 4, name: 'TileChamp', level: 7, elo: 720, wins: 85, losses: 55 },
-    { rank: 5, name: 'QuickWin', level: 6, elo: 650, wins: 70, losses: 40 },
-    { rank: 6, name: 'LuckyDom', level: 5, elo: 550, wins: 60, losses: 50 },
-    { rank: 7, name: 'NightOwl', level: 5, elo: 520, wins: 55, losses: 45 },
-    { rank: 8, name: 'StarPlayer', level: 4, elo: 450, wins: 50, losses: 40 },
-    { rank: 9, name: 'RookieRise', level: 4, elo: 380, wins: 40, losses: 35 },
     { rank: 10, name: 'NewHero', level: 3, elo: 280, wins: 30, losses: 25 }
 ];
 
 // ============================================
-// WEBSOCKET CONNECTION (DÜZELTİLDİ & GÜÇLENDİRİLDİ)
+// WEBSOCKET BAĞLANTISI
 // ============================================
 
 function connectWebSocket() {
-    // Eğer zaten bağlıysak veya bağlanıyorsak işlem yapma
+    // Eğer zaten bağlıysak veya bağlanıyorsak tekrar deneme
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        console.log('Zaten bağlantı açık veya bağlanılıyor.');
         return;
     }
 
+    // Önceki denemeyi durdur
+    if (reconnectInterval) {
+        clearInterval(reconnectInterval);
+        reconnectInterval = null;
+    }
+
     updateConnectionStatus('connecting');
-    console.log('Sunucuya bağlanılıyor: ' + SERVER_URL);
+    console.log(`Sunucuya bağlanılıyor: ${SERVER_URL}`);
 
     try {
         ws = new WebSocket(SERVER_URL);
@@ -65,43 +247,39 @@ function connectWebSocket() {
             console.log('WebSocket bağlantısı başarılı!');
             updateConnectionStatus('connected');
             showToast('Sunucuya bağlandı!', 'success');
-            
-            // Render sunucusunun bağlantıyı kesmemesi için Heartbeat başlat
             startHeartbeat();
-            
-            // Eğer yeniden bağlanma döngüsü varsa durdur
-            if (reconnectInterval) {
-                clearInterval(reconnectInterval);
-                reconnectInterval = null;
-            }
         };
 
         ws.onclose = (event) => {
-            console.log('Bağlantı kesildi. Kod:', event.code, 'Sebep:', event.reason);
-            updateConnectionStatus('disconnected');
-            stopHeartbeat();
+            console.log(`Bağlantı kesildi. Kod: ${event.code}, Sebep: ${event.reason}`);
             
-            // Otomatik yeniden bağlanma (5 saniye sonra)
-            if (!reconnectInterval) {
-                reconnectInterval = setInterval(() => {
-                    console.log('Yeniden bağlanmaya çalışılıyor...');
-                    connectWebSocket();
-                }, 5000);
+            if (event.code !== 1000) {
+                updateConnectionStatus('disconnected');
+                stopHeartbeat();
+                
+                if (!reconnectInterval) {
+                    showToast('Bağlantı kesildi. Yeniden deneniyor...', 'error');
+                    reconnectInterval = setInterval(() => {
+                        console.log('Yeniden bağlanmaya çalışılıyor...');
+                        connectWebSocket();
+                    }, 5000);
+                }
+            } else {
+                 updateConnectionStatus('disconnected');
+                 stopHeartbeat();
             }
         };
 
         ws.onerror = (error) => {
             console.error('WebSocket hatası:', error);
-            // Hata durumunda statüyü güncelle ama onclose zaten tetikleneceği için
-            // yeniden bağlanma mantığını oraya bırakıyoruz.
             updateConnectionStatus('error');
+            showToast('Bağlantı sırasında kritik hata oluştu.', 'error');
         };
 
         ws.onmessage = (event) => {
             try {
-                // Pong mesajlarını yoksay (Heartbeat yanıtı)
                 if (event.data === 'pong') return;
-
+                
                 const message = JSON.parse(event.data);
                 handleServerMessage(message);
             } catch (e) {
@@ -112,23 +290,21 @@ function connectWebSocket() {
     } catch (e) {
         console.error('Bağlantı başlatma hatası:', e);
         updateConnectionStatus('error');
+        showToast('Bağlantı başlatılamadı. Protokol/URL hatası olabilir.', 'error');
     }
 }
 
-// Render gibi platformlarda bağlantının kopmaması için düzenli sinyal
 function startHeartbeat() {
-    stopHeartbeat(); // Eskisi varsa temizle
+    stopHeartbeat();
     heartbeatInterval = setInterval(() => {
         if (ws && ws.readyState === WebSocket.OPEN) {
-            // Backend bu ping mesajını karşılayıp 'pong' dönmeli veya sadece yok saymalı
-            // Amaç hattı açık tutmak.
             try {
                 ws.send(JSON.stringify({ type: 'PING' }));
             } catch (e) {
-                console.log("Ping gönderilemedi");
+                console.log("Ping gönderilemedi, bağlantı koptu.");
             }
         }
-    }, 30000); // 30 saniyede bir
+    }, 30000); 
 }
 
 function stopHeartbeat() {
@@ -149,7 +325,6 @@ function sendMessage(type, payload) {
 }
 
 function handleServerMessage(message) {
-    // Mesaj tiplerini kontrol et
     switch (message.type) {
         case 'MATCH_FOUND':
             stopSearching();
@@ -158,6 +333,13 @@ function handleServerMessage(message) {
         case 'ROOM_CREATED':
             roomCode = message.payload.code;
             showRoomCode();
+            break;
+        case 'JOIN_SUCCESS':
+            showToast('Odaya başarıyla katıldınız!', 'success');
+            break;
+        case 'JOIN_FAILED':
+            showToast(`Odaya katılamadı: ${message.payload.reason}`, 'error');
+            cancelJoin(); 
             break;
         case 'GAME_STATE_UPDATE':
             updateGameState(message.payload);
@@ -171,14 +353,15 @@ function handleServerMessage(message) {
         case 'GAME_OVER':
             handleGameOver(message.payload);
             break;
-        case 'PONG': // Sunucudan gelen yanıt
-            // Bağlantı sağlıklı
+        case 'PONG': 
             break;
+        default:
+            console.warn('Bilinmeyen sunucu mesajı tipi:', message.type);
     }
 }
 
 // ============================================
-// UI UPDATES
+// UI GÜNCELLEMELERİ
 // ============================================
 
 function updateConnectionStatus(status) {
@@ -190,7 +373,7 @@ function updateConnectionStatus(status) {
 
     const statusTexts = {
         disconnected: 'Bağlantı kesildi (Tekrar deneniyor...)',
-        connecting: 'Sunucuya Bağlanıyor... (Uyanması sürebilir)',
+        connecting: 'Sunucuya Bağlanıyor... (Render uyanması sürebilir)',
         connected: 'Çevrimiçi',
         error: 'Bağlantı Hatası'
     };
@@ -223,7 +406,6 @@ function updateUserStats() {
     const losses = document.getElementById('losses');
     if(losses) losses.textContent = userStats.losses;
 
-    // Update in-game level display
     const myLevel = document.getElementById('my-level');
     if(myLevel) {
         myLevel.textContent = level;
@@ -249,7 +431,6 @@ function showToast(message, type = 'info') {
 // ============================================
 // LOBBY FUNCTIONS
 // ============================================
-
 function startSearching() {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
         showToast('Sunucu bağlantısı bekleniyor...', 'error');
@@ -261,6 +442,8 @@ function startSearching() {
     searchTime = 0;
 
     const container = document.getElementById('ranked-container');
+    if(!container) return;
+    
     container.innerHTML = `
         <div class="searching-state">
             <div class="spinner"></div>
@@ -278,17 +461,7 @@ function startSearching() {
         if(timeEl) timeEl.textContent = `${mins}:${secs}`;
     }, 1000);
 
-    sendMessage('START_RANKED_SEARCH', { userId: userStats.name });
-
-    // Demo: Start game after 3 seconds (EĞER SERVER CEVAP VERMEZSE DEMO OYNAT)
-    // Gerçek bağlantıda bunu kaldırabilirsin
-    /* setTimeout(() => {
-        if (isSearching) {
-            stopSearching();
-            startDemoGame(true);
-        }
-    }, 3000);
-    */
+    sendMessage('START_RANKED_SEARCH', { userId: userStats.name, elo: userStats.elo });
 }
 
 function stopSearching() {
@@ -310,7 +483,7 @@ function resetRankedButton() {
     const container = document.getElementById('ranked-container');
     if(!container) return;
     container.innerHTML = `
-        <button class="game-btn ranked" id="ranked-btn" onclick="startSearching()">
+        <button class="game-btn ranked" id="ranked-btn">
             <div class="btn-icon">⚔️</div>
             <div class="btn-content">
                 <div class="btn-title">DERECELİ</div>
@@ -318,6 +491,7 @@ function resetRankedButton() {
             </div>
         </button>
     `;
+    document.getElementById('ranked-btn').onclick = startSearching;
 }
 
 function createRoom() {
@@ -325,31 +499,24 @@ function createRoom() {
         showToast('Sunucu bağlantısı yok!', 'error');
         return;
     }
-    // Odayı server'ın oluşturmasını bekle, burada kod üretme
     sendMessage('CREATE_ROOM', {}); 
-    // Server 'ROOM_CREATED' mesajı ile dönecek
-}
-
-function generateRoomCode() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < 4; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
+    showToast('Özel oda oluşturuluyor...', 'info');
 }
 
 function showRoomCode() {
     const container = document.getElementById('friend-container');
+    if (!container) return;
     container.innerHTML = `
         <div class="room-code-display">
             <div class="room-code-label">Oda Kodu:</div>
             <div class="room-code">${roomCode}</div>
-            <button class="copy-btn" onclick="copyRoomCode()">📋 Kopyala</button>
+            <button class="copy-btn" id="copy-btn">📋 Kopyala</button>
             <div class="room-code-hint">Arkadaşınla bu kodu paylaş</div>
-            <button class="cancel-btn" style="margin-top: 15px" onclick="cancelRoom()">İptal</button>
+            <button class="cancel-btn" id="cancel-room-btn" style="margin-top: 15px">İptal</button>
         </div>
     `;
+    document.getElementById('cancel-room-btn').onclick = cancelRoom;
+    document.getElementById('copy-btn').onclick = copyRoomCode;
 }
 
 function copyRoomCode() {
@@ -358,16 +525,18 @@ function copyRoomCode() {
 }
 
 function cancelRoom() {
+    const codeToLeave = roomCode; // Bağlantı kesilmeden önce kodu kaydet
     roomCode = null;
     resetFriendButton();
-    // Sunucuya odayı iptal ettiğini bildir (opsiyonel)
-    sendMessage('LEAVE_ROOM', {});
+    sendMessage('LEAVE_ROOM', { code: codeToLeave });
+    showToast('Oda iptal edildi.', 'info');
 }
 
 function resetFriendButton() {
     const container = document.getElementById('friend-container');
+    if(!container) return;
     container.innerHTML = `
-        <button class="game-btn friend" id="friend-btn" onclick="createRoom()">
+        <button class="game-btn friend" id="friend-btn">
             <div class="btn-icon">👥</div>
             <div class="btn-content">
                 <div class="btn-title">ARKADAŞLA OYNA</div>
@@ -375,29 +544,35 @@ function resetFriendButton() {
             </div>
         </button>
     `;
+    document.getElementById('friend-btn').onclick = createRoom;
 }
 
 function showJoinInput() {
     const container = document.getElementById('join-container');
+    if (!container) return;
     container.innerHTML = `
         <div class="join-room-panel">
             <input type="text" class="join-input" id="join-code-input" 
                    placeholder="XXXX" maxlength="4" 
                    oninput="this.value = this.value.toUpperCase()">
             <div class="join-btns">
-                <button class="join-cancel-btn" onclick="cancelJoin()">İptal</button>
-                <button class="join-confirm-btn" onclick="joinRoom()">Bağlan</button>
+                <button class="join-cancel-btn" id="join-cancel-btn">İptal</button>
+                <button class="join-confirm-btn" id="join-confirm-btn">Bağlan</button>
             </div>
         </div>
     `;
+    document.getElementById('join-cancel-btn').onclick = cancelJoin;
+    document.getElementById('join-confirm-btn').onclick = joinRoom;
+
     const input = document.getElementById('join-code-input');
     if(input) input.focus();
 }
 
 function cancelJoin() {
     const container = document.getElementById('join-container');
+    if(!container) return;
     container.innerHTML = `
-        <button class="game-btn join" id="join-btn" onclick="showJoinInput()">
+        <button class="game-btn join" id="join-btn">
             <div class="btn-icon">🔑</div>
             <div class="btn-content">
                 <div class="btn-title">ODAYA KATIL</div>
@@ -405,6 +580,7 @@ function cancelJoin() {
             </div>
         </button>
     `;
+    document.getElementById('join-btn').onclick = showJoinInput;
 }
 
 function joinRoom() {
@@ -418,6 +594,7 @@ function joinRoom() {
 
     if (!ws || ws.readyState !== WebSocket.OPEN) {
         showToast('Sunucu bağlantısı bekleniyor...', 'error');
+        connectWebSocket();
         return;
     }
 
@@ -425,31 +602,106 @@ function joinRoom() {
     showToast('Odaya bağlanılıyor...', 'info');
 }
 
+function openLeaderboard() {
+    const modal = document.getElementById('leaderboard-modal');
+    const body = document.getElementById('leaderboard-body');
+    if (!modal || !body) return;
+
+    let html = '';
+
+    leaderboard.forEach((entry, index) => {
+        const levelClass = eloSystem.getLevelClass(entry.level);
+        const topClass = index < 3 ? `top-${index + 1}` : '';
+
+        html += `
+            <div class="leaderboard-entry ${topClass}">
+                <div class="entry-rank">#${entry.rank}</div>
+                <div class="entry-info">
+                    <div class="entry-name">${entry.name}</div>
+                    <div class="entry-stats">${entry.wins}G / ${entry.losses}M</div>
+                </div>
+                <div class="level-icon entry-level ${levelClass}">${entry.level}</div>
+                <div class="entry-elo">
+                    <div class="entry-elo-value">${entry.elo}</div>
+                    <div class="entry-elo-label">ELO</div>
+                </div>
+            </div>
+        `;
+    });
+
+    if (userStats.rank > 10) {
+        const levelClass = eloSystem.getLevelClass(userStats.level);
+        html += `
+            <div class="my-rank">
+                <div class="my-rank-label">Senin Sıralamanın:</div>
+                <div class="leaderboard-entry">
+                    <div class="entry-rank">#${userStats.rank}</div>
+                    <div class="entry-info">
+                        <div class="entry-name">${userStats.name}</div>
+                        <div class="entry-stats">${userStats.wins}G / ${userStats.losses}M</div>
+                    </div>
+                    <div class="level-icon entry-level ${levelClass}">${userStats.level}</div>
+                    <div class="entry-elo">
+                        <div class="entry-elo-value">${userStats.elo}</div>
+                        <div class="entry-elo-label">ELO</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    body.innerHTML = html;
+    modal.classList.add('active');
+}
+
+function closeLeaderboard() {
+    const modal = document.getElementById('leaderboard-modal');
+    if (modal) modal.classList.remove('active');
+}
+
 // ============================================
 // GAME FUNCTIONS
 // ============================================
 
-function startDemoGame(isRanked) {
-    game.initializeGame(['Sen', 'Rakip'], isRanked);
-    myPlayerId = 'player-0';
+function startGame(payload) {
+    const playerNames = payload.players || ['Oyuncu 1', 'Oyuncu 2'];
+
+    game.initializeGame(playerNames, payload.isRanked); 
+    myPlayerId = payload.myPlayerId; // Sunucudan gelen oyuncu ID'si
     currentScreen = 'game';
 
-    document.getElementById('lobby-screen').style.display = 'none';
-    document.getElementById('game-screen').style.display = 'flex';
+    const lobbyScreen = document.getElementById('lobby-screen');
+    const gameScreen = document.getElementById('game-screen');
+    if (lobbyScreen) lobbyScreen.style.display = 'none';
+    if (gameScreen) gameScreen.style.display = 'flex';
 
     renderGame();
+    showToast('Maç başladı!', 'success');
 }
 
-function startGame(payload) {
-    // Backend'den gelen veriye göre oyunu başlat
-    game.initializeGame([payload.player1, payload.player2], payload.isRanked);
-    myPlayerId = payload.myPlayerId;
-    currentScreen = 'game';
-
-    document.getElementById('lobby-screen').style.display = 'none';
-    document.getElementById('game-screen').style.display = 'flex';
+function updateGameState(newState) {
+    console.log("Sunucudan oyun güncellemesi geldi", newState);
+    
+    // Temel state güncellemeleri
+    if (newState.board) game.board = newState.board;
+    if (newState.players) game.players = newState.players;
+    if (newState.currentPlayerId) game.currentPlayerId = newState.currentPlayerId;
+    if (newState.leftEnd !== undefined) game.leftEnd = newState.leftEnd;
+    if (newState.rightEnd !== undefined) game.rightEnd = newState.rightEnd;
+    
+    // Kendi taşlarımızı güncelle
+    const myNewState = newState.players.find(p => p.id === myPlayerId);
+    if (myNewState && myNewState.tiles) {
+        const myPlayer = game.players.find(p => p.id === myPlayerId);
+        if (myPlayer) {
+            myPlayer.tiles = myNewState.tiles;
+        }
+    }
 
     renderGame();
+    if (game.getCurrentPlayer().id === myPlayerId) {
+        showToast('Sıra sende!', 'info');
+    }
 }
 
 function renderGame() {
@@ -464,26 +716,32 @@ function renderOpponentArea() {
     const opponent = game.players.find(p => p.id !== myPlayerId);
     if (!opponent) return;
 
-    document.getElementById('opponent-name').textContent = opponent.name;
+    const nameEl = document.getElementById('opponent-name');
+    if(nameEl) nameEl.textContent = opponent.name;
 
     const container = document.getElementById('opponent-tiles');
+    if(!container) return;
     container.innerHTML = '';
 
-    for (let i = 0; i < opponent.tiles.length; i++) {
+    // Rakibin elindeki taş sayısı kadar kapalı taş göster
+    const tileCount = opponent.tiles.length || 7; // Varsayım: Başlangıçta 7 taş
+    for (let i = 0; i < tileCount; i++) {
         const tile = document.createElement('div');
         tile.className = 'hidden-tile';
         container.appendChild(tile);
     }
 
-    // Update opponent level
-    const level = eloSystem.getLevelFromElo(opponent.elo || 0);
+    const level = eloSystem.getLevelFromElo(opponent.elo || 100);
     const levelEl = document.getElementById('opponent-level');
-    levelEl.textContent = level;
-    levelEl.className = 'level-icon ' + eloSystem.getLevelClass(level);
+    if(levelEl) {
+        levelEl.textContent = level;
+        levelEl.className = 'level-icon ' + eloSystem.getLevelClass(level);
+    }
 }
 
 function renderBoard() {
     const container = document.getElementById('board-tiles');
+    if(!container) return;
     container.innerHTML = '';
 
     if (game.board.length === 0) {
@@ -502,6 +760,7 @@ function renderPlayerHand() {
     if (!player) return;
 
     const container = document.getElementById('hand-tiles');
+    if (!container) return;
     container.innerHTML = '';
 
     const isMyTurn = game.getCurrentPlayer().id === myPlayerId;
@@ -512,32 +771,31 @@ function renderPlayerHand() {
         const isSelected = selectedTile && selectedTile.id === tile.id;
         const tileEl = createTileElement(tile, false, isPlayable, isSelected);
 
-        if (isMyTurn && isPlayable) {
+        if (isMyTurn) {
             tileEl.onclick = () => selectTile(tile);
         }
 
         container.appendChild(tileEl);
     });
 
-    // Update pass button
     const passBtn = document.getElementById('pass-btn');
-    passBtn.disabled = !isMyTurn || playableTiles.length > 0;
+    if(passBtn) passBtn.disabled = !isMyTurn || playableTiles.length > 0;
 
-    // Show/hide play positions
     const positionsEl = document.getElementById('play-positions');
-    if (selectedTile && playablePositions.length > 0) {
-        positionsEl.classList.remove('hidden');
+    if(positionsEl) {
+        if (selectedTile && playablePositions.length > 0) {
+            positionsEl.classList.remove('hidden');
 
-        const leftBtn = document.getElementById('play-left-btn');
-        const rightBtn = document.getElementById('play-right-btn');
+            const leftBtn = document.getElementById('play-left-btn');
+            const rightBtn = document.getElementById('play-right-btn');
+            const canPlayLeft = playablePositions.some(p => p.side === 'left');
+            const canPlayRight = playablePositions.some(p => p.side === 'right');
 
-        const canPlayLeft = playablePositions.some(p => p.side === 'left');
-        const canPlayRight = playablePositions.some(p => p.side === 'right');
-
-        leftBtn.style.display = canPlayLeft ? 'block' : 'none';
-        rightBtn.style.display = canPlayRight ? 'block' : 'none';
-    } else {
-        positionsEl.classList.add('hidden');
+            if(leftBtn) leftBtn.style.display = canPlayLeft ? 'block' : 'none';
+            if(rightBtn) rightBtn.style.display = canPlayRight ? 'block' : 'none';
+        } else {
+            positionsEl.classList.add('hidden');
+        }
     }
 }
 
@@ -562,7 +820,6 @@ function createTileElement(tile, isOnBoard, isPlayable, isSelected = false) {
         div.classList.add('selected');
     }
 
-    // Determine display values
     let leftVal = tile.left;
     let rightVal = tile.right;
 
@@ -596,38 +853,51 @@ function createPips(value) {
 function selectTile(tile) {
     if (game.getCurrentPlayer().id !== myPlayerId) return;
 
+    // Aynı taşı tekrar seçerse iptal et
+    if (selectedTile && selectedTile.id === tile.id) {
+        selectedTile = null;
+        playablePositions = [];
+        renderPlayerHand();
+        updateBoardEnds(); // Uç işaretlemesini kaldır
+        return;
+    }
+
     const positions = game.getPlayablePositions(tile);
     if (positions.length === 0) return;
 
     selectedTile = tile;
     playablePositions = positions;
 
-    // If only one position, play immediately
+    // Tek pozisyon varsa hemen oyna (veya tahta boşsa)
     if (positions.length === 1 || game.board.length === 0) {
         playTile(positions[0].side);
         return;
     }
 
     renderPlayerHand();
-    updateBoardEnds();
+    updateBoardEnds(); // Uç işaretlemesini güncelle
 }
 
 function playTile(side) {
     if (!selectedTile) return;
+    if (game.getCurrentPlayer().id !== myPlayerId) return;
 
-    // Önce client tarafında hamle yap (iyimser UI)
-    // Gerçek uygulamada sunucu onayı beklenebilir ama bu daha akıcı hissettirir
+    // İyimser UI için yerel hamle yap
     const result = game.placeTile(selectedTile.id, side);
 
     if (result.success) {
+        // Sunucuya hamleyi bildir
         sendMessage('PLACE_TILE', {
             tileId: selectedTile.id,
-            side: side
+            side: side,
+            flipped: result.flipped // Sunucu için gerekli olabilir
         });
 
         if (result.gameOver) {
             handleGameOver({ winner: result.winner, isRanked: game.isRanked });
         }
+    } else {
+        showToast('Geçersiz hamle!', 'error');
     }
 
     selectedTile = null;
@@ -635,44 +905,14 @@ function playTile(side) {
     renderGame();
 }
 
-function aiPlay() {
-    // Bu fonksiyon sadece demo/offline modda kullanılır.
-    // Online modda rakip hamlesi sunucudan 'GAME_STATE_UPDATE' ile gelir.
-    if (game.status !== 'playing' || game.getCurrentPlayer().id === myPlayerId) return;
-
-    const playableTiles = game.getPlayableTiles();
-
-    if (playableTiles.length === 0) {
-        game.passTurn();
-        showToast('Rakip pas geçti', 'info');
-    } else {
-        const tile = playableTiles[Math.floor(Math.random() * playableTiles.length)];
-        const positions = game.getPlayablePositions(tile);
-        const side = positions[Math.floor(Math.random() * positions.length)].side;
-
-        const result = game.placeTile(tile.id, side);
-
-        if (result.gameOver) {
-            handleGameOver({ winner: result.winner, isRanked: game.isRanked });
-        }
-    }
-    renderGame();
-}
-
-function updateGameState(newState) {
-    // Sunucudan gelen state ile yerel state'i senkronize et
-    // Not: Bu kısım DominoGame class'ının yapısına göre ayarlanmalıdır.
-    // Şimdilik basitçe UI güncelliyoruz.
-    
-    // Örnek: game.board = newState.board;
-    // game.players = newState.players;
-    // renderGame();
-    console.log("Sunucudan oyun güncellemesi geldi", newState);
-}
-
 function passTurn() {
     if (game.getCurrentPlayer().id !== myPlayerId) return;
+    if (game.getPlayableTiles().length > 0) {
+        showToast('Elinde oynanabilir taş var. Pas geçemezsin!', 'error');
+        return;
+    }
 
+    // İyimser UI için yerel pas geç
     const result = game.passTurn();
     sendMessage('PASS_TURN', {});
 
@@ -685,15 +925,17 @@ function passTurn() {
 
 function updateTurnIndicator() {
     const indicator = document.getElementById('turn-indicator');
+    if (!indicator) return;
     const isMyTurn = game.getCurrentPlayer().id === myPlayerId;
 
     indicator.textContent = isMyTurn ? 'Senin Sıran' : 'Rakibin Sırası';
-    indicator.className = 'turn-indicator' + (isMyTurn ? '' : ' opponent');
+    indicator.className = 'turn-indicator' + (isMyTurn ? ' my-turn' : ' opponent');
 }
 
 function updateBoardEnds() {
     const leftEl = document.getElementById('left-end');
     const rightEl = document.getElementById('right-end');
+    if (!leftEl || !rightEl) return;
 
     if (game.board.length === 0) {
         leftEl.textContent = 'Sol: -';
@@ -706,7 +948,6 @@ function updateBoardEnds() {
     leftEl.textContent = `Sol: ${game.leftEnd}`;
     rightEl.textContent = `Sağ: ${game.rightEnd}`;
 
-    // Highlight if selected tile can play there
     if (selectedTile) {
         const canPlayLeft = playablePositions.some(p => p.side === 'left');
         const canPlayRight = playablePositions.some(p => p.side === 'right');
@@ -720,10 +961,11 @@ function updateBoardEnds() {
 }
 
 function handleGameOver(payload) {
-    const isWinner = payload.winner.id === myPlayerId;
+    const winner = payload.winner;
+    const isWinner = winner && winner.id === myPlayerId;
     const eloChange = game.calculateEloChange(isWinner, false, game.turnCount > 10);
 
-    // Update stats
+    // İstatistikleri güncelle (Sunucuya bu sonucu bildirmelisiniz)
     if (game.isRanked) {
         userStats.elo += eloChange;
         if (isWinner) {
@@ -733,12 +975,14 @@ function handleGameOver(payload) {
         }
         userStats.level = eloSystem.getLevelFromElo(userStats.elo);
     }
+    updateUserStats(); // Lobi istatistiklerini güncelle
 
-    // Show result modal
+    // Sonuç modalını göster
     const modal = document.getElementById('result-modal');
     const icon = document.getElementById('result-icon');
     const title = document.getElementById('result-title');
     const elo = document.getElementById('result-elo');
+    if (!modal || !icon || !title || !elo) return;
 
     if (isWinner) {
         icon.textContent = '🏆';
@@ -787,9 +1031,14 @@ function leaveGame() {
 }
 
 function backToLobby() {
-    document.getElementById('result-modal').classList.remove('active');
-    document.getElementById('game-screen').style.display = 'none';
-    document.getElementById('lobby-screen').style.display = 'flex';
+    const modal = document.getElementById('result-modal');
+    if (modal) modal.classList.remove('active');
+    
+    const gameScreen = document.getElementById('game-screen');
+    const lobbyScreen = document.getElementById('lobby-screen');
+    
+    if (gameScreen) gameScreen.style.display = 'none';
+    if (lobbyScreen) lobbyScreen.style.display = 'flex';
 
     currentScreen = 'lobby';
     roomCode = null;
@@ -801,112 +1050,67 @@ function backToLobby() {
     cancelJoin();
     updateUserStats();
     
-    // Bağlantı kopmuşsa tekrar dene
     if(!ws || ws.readyState !== WebSocket.OPEN) {
         connectWebSocket();
     }
 }
 
 // ============================================
-// LEADERBOARD
-// ============================================
-
-function openLeaderboard() {
-    const modal = document.getElementById('leaderboard-modal');
-    const body = document.getElementById('leaderboard-body');
-
-    let html = '';
-
-    leaderboard.forEach((entry, index) => {
-        const levelClass = eloSystem.getLevelClass(entry.level);
-        const topClass = index < 3 ? `top-${index + 1}` : '';
-
-        html += `
-            <div class="leaderboard-entry ${topClass}">
-                <div class="entry-rank">#${entry.rank}</div>
-                <div class="entry-info">
-                    <div class="entry-name">${entry.name}</div>
-                    <div class="entry-stats">${entry.wins}G / ${entry.losses}M</div>
-                </div>
-                <div class="level-icon entry-level ${levelClass}">${entry.level}</div>
-                <div class="entry-elo">
-                    <div class="entry-elo-value">${entry.elo}</div>
-                    <div class="entry-elo-label">ELO</div>
-                </div>
-            </div>
-        `;
-    });
-
-    // Add user's rank if not in top 10
-    if (userStats.rank > 10) {
-        const levelClass = eloSystem.getLevelClass(userStats.level);
-        html += `
-            <div class="my-rank">
-                <div class="my-rank-label">Senin Sıralamanın:</div>
-                <div class="leaderboard-entry">
-                    <div class="entry-rank">#${userStats.rank}</div>
-                    <div class="entry-info">
-                        <div class="entry-name">${userStats.name}</div>
-                        <div class="entry-stats">${userStats.wins}G / ${userStats.losses}M</div>
-                    </div>
-                    <div class="level-icon entry-level ${levelClass}">${userStats.level}</div>
-                    <div class="entry-elo">
-                        <div class="entry-elo-value">${userStats.elo}</div>
-                        <div class="entry-elo-label">ELO</div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    body.innerHTML = html;
-    modal.classList.add('active');
-}
-
-function closeLeaderboard() {
-    document.getElementById('leaderboard-modal').classList.remove('active');
-}
-
-// ============================================
-// EVENT LISTENERS
+// BAŞLANGIÇ VE EVENT LISTENERS
 // ============================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Connect to WebSocket
+    // WebSocket'e bağlan
     connectWebSocket();
 
-    // Update user stats display
+    // İstatistik ekranını güncelle
     updateUserStats();
 
-    // Lobby buttons
-    document.getElementById('ranked-btn').onclick = startSearching;
-    document.getElementById('friend-btn').onclick = createRoom;
-    document.getElementById('join-btn').onclick = showJoinInput;
-    document.getElementById('leaderboard-btn').onclick = openLeaderboard;
+    // Lobi düğmelerini bağla
+    const rankedBtn = document.getElementById('ranked-btn');
+    if (rankedBtn) rankedBtn.onclick = startSearching;
+    
+    const friendBtn = document.getElementById('friend-btn');
+    if (friendBtn) friendBtn.onclick = createRoom;
+    
+    const joinBtn = document.getElementById('join-btn');
+    if (joinBtn) joinBtn.onclick = showJoinInput;
+    
+    const leaderboardBtn = document.getElementById('leaderboard-btn');
+    if (leaderboardBtn) leaderboardBtn.onclick = openLeaderboard;
 
-    // Game buttons
-    document.getElementById('leave-btn').onclick = leaveGame;
-    document.getElementById('pass-btn').onclick = passTurn;
-    document.getElementById('play-left-btn').onclick = () => playTile('left');
-    document.getElementById('play-right-btn').onclick = () => playTile('right');
+    // Oyun düğmeleri
+    const leaveBtn = document.getElementById('leave-btn');
+    if (leaveBtn) leaveBtn.onclick = leaveGame;
+    
+    const passBtn = document.getElementById('pass-btn');
+    if (passBtn) passBtn.onclick = passTurn;
+    
+    const playLeftBtn = document.getElementById('play-left-btn');
+    if (playLeftBtn) playLeftBtn.onclick = () => playTile('left');
+    
+    const playRightBtn = document.getElementById('play-right-btn');
+    if (playRightBtn) playRightBtn.onclick = () => playTile('right');
 
-    // Modal buttons
-    document.getElementById('close-leaderboard').onclick = closeLeaderboard;
-    document.getElementById('result-btn').onclick = backToLobby;
+    // Modal düğmeleri
+    const closeLeaderboard = document.getElementById('close-leaderboard');
+    if (closeLeaderboard) closeLeaderboard.onclick = closeLeaderboard;
+    
+    const resultBtn = document.getElementById('result-btn');
+    if (resultBtn) resultBtn.onclick = backToLobby;
 
-    // Close modals on overlay click
-    document.getElementById('leaderboard-modal').onclick = (e) => {
+    // Modalleri kapatma
+    const leaderboardModal = document.getElementById('leaderboard-modal');
+    if (leaderboardModal) leaderboardModal.onclick = (e) => {
         if (e.target.id === 'leaderboard-modal') closeLeaderboard();
     };
-});
 
-// Keyboard shortcuts
-document.addEventListener('keydown', (e) => {
-    if (currentScreen === 'game') {
-        if (e.key === 'Escape') {
+    // Klavye kısayolları
+    document.addEventListener('keydown', (e) => {
+        if (currentScreen === 'game' && e.key === 'Escape') {
             selectedTile = null;
             playablePositions = [];
             renderPlayerHand();
         }
-    }
+    });
 });
