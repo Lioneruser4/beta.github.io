@@ -52,7 +52,6 @@ socket.on('connect', () => {
     connectionStatus.textContent = 'Servere baglandi!';
     connectionStatus.classList.remove('text-yellow-400');
     connectionStatus.classList.add('text-green-500');
-    showScreen('main');
 });
 
 socket.on('disconnect', () => {
@@ -425,5 +424,6 @@ modalCloseBtn.onclick = () => {
 // Baslangic
 document.addEventListener('DOMContentLoaded', () => {
     connectionStatus.textContent = 'Servere qosulur...';
-    connectionStatus.classList.add('text-yellow-400', 'animate-pulse');
+    connectionStatus.classList.add('text-yellow-400');
+    showScreen('main'); // Ana lobiyi en başta göster
 });
