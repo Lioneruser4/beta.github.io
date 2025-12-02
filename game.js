@@ -434,24 +434,23 @@ function handleCellClick(r, c) {
 // --- Button Eventleri ---
 
 function startMatchmaking(isGuest = false) {
-    // Eğer zaten oyun arıyorsa veya oyundaysa işlem yapma
-    if (gameState.isSearching || gameState.gameStarted) {
-        showModal('Zaten bir oyundasınız veya eşleşme arıyorsunuz!');
+    if (gameState.isSearching) {
+        showModal('Zaten eşleşme arıyorsunuz!');
         return;
     }
     
-    // Eşleşme aramaya başla
     gameState.isSearching = true;
     gameState.isGuest = isGuest;
+    gameState.gameType = isGuest ? 'friendly' : 'ranked';
     
-    // Sunucuya eşleşme isteği gönder
     socket.emit('findMatch', { 
         telegramId: isGuest ? `guest_${Date.now()}` : 'user123', // Gerçek uygulamada bu kullanıcı kimliği olacak
-        isGuest
+        isGuest,
+        gameType: gameState.gameType
     });
     
-    // Eşleşme ekranını göster
-    showScreen('ranked');
+    showScreen('searching');
+    showStatus('Eşleşme aranıyor...');
     startSearchTimer();
 }
 
@@ -460,6 +459,7 @@ dereceliBtn.onclick = () => {
     
     gameState.isSearching = true;
     gameState.gameType = 'ranked';
+    gameState.isGuest = false;
     
     // Önceki bağlantıları temizle
     socket.emit('cancelSearch');
@@ -468,7 +468,8 @@ dereceliBtn.onclick = () => {
     socket.emit('findMatch', { 
         telegramId: 'user123', // Gerçek uygulamada bu kullanıcı ID'si olacak
         isGuest: false,
-        gameType: 'ranked'
+        gameType: 'ranked',
+        playerData: gameState.playerStats
     });
     
     // Eşleşme ekranını göster
