@@ -541,41 +541,27 @@ async function handleFindMatch(ws, data) {
 
         // Eşleşme bul
         console.log(`🔍 Eşleşme aranıyor: ${telegramId} (${isGuest ? 'Misafir' : 'Telegram'}), Mod: ${gameType}`);
-        console.log(`📊 Kuyruktaki oyuncular: ${matchQueue.length}`);
         
-        // Eşleşme kontrolü
-        const matchIndex = matchQueue.findIndex(p => {
-            // Kendi kendine eşleşme olmasın
-            if (p.telegramId === player.telegramId) {
-                console.log('❌ Kendi kendine eşleşme engellendi');
-                return false;
-            }
+        // Eşleşme bulma mantığı
+        let opponent = null;
+        let opponentIndex = -1;
+        
+        // Eşleşme kriterlerine göre rakip bul
+        for (let i = 0; i < matchQueue.length; i++) {
+            const potentialOpponent = matchQueue[i];
             
-            // Ranked modu için sadece Telegram kullanıcılarını eşleştir
-            if (gameType === 'ranked') {
-                // Eğer herhangi biri misafirse eşleştirme
-                if (p.isGuest || player.isGuest) {
-                    console.log('❌ Ranked modunda sadece Telegram kullanıcıları eşleşebilir');
-                    return false;
-                }
-                
-                // ELO farkı kontrolü
-                const eloDiff = Math.abs((p.elo || 0) - (player.elo || 0));
-                const isEligible = eloDiff <= 200;
-                console.log(`🏆 Ranked eşleşme: ${p.telegramId} (${p.elo}) ↔ ${player.telegramId} (${player.elo}), Uygun mu? ${isEligible}, ELO Farkı: ${eloDiff}`);
-                return isEligible;
+            // Aynı oyuncu değilse ve aynı oyun türündeyse eşleştir
+            if (potentialOpponent.telegramId !== telegramId && 
+                potentialOpponent.gameType === gameType) {
+                opponent = potentialOpponent;
+                opponentIndex = i;
+                break;
             }
-            
-            // Friendly modu için herkes herkesle eşleşebilir
-            console.log(`🤝 Friendly eşleşme: ${p.telegramId} (${p.isGuest ? 'Misafir' : 'Telegram'}) ↔ ${player.telegramId} (${player.isGuest ? 'Misafir' : 'Telegram'})`);
-            return true;
-        });
+        }
 
-        if (matchIndex !== -1) {
-            // Found a match!
-            const opponent = matchQueue[matchIndex];
-            matchQueue.splice(matchIndex, 1);
-
+        if (opponent) {
+            // Eşleşme bulundu, kuyruktan çıkar
+            matchQueue.splice(opponentIndex, 1);
             console.log(`🔵 Eşleşme bulundu: ${player.telegramId} (${player.isGuest ? 'Misafir' : 'Telegram'}) ↔ ${opponent.telegramId} (${opponent.isGuest ? 'Misafir' : 'Telegram'})`);
             
             const roomCode = generateRoomCode();
