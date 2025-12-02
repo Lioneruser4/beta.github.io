@@ -127,7 +127,7 @@
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="root" class="w-full h-screen"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
@@ -165,7 +165,7 @@
             const baseClasses = `
                 relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
                 transition-all duration-300 select-none
-                ${vertical ? 'flex-col w-9 h-[4.5rem] sm:w-10 sm:h-20' : 'flex-row w-[4.5rem] h-9 sm:w-20 sm:h-10'}
+                ${vertical ? 'flex-col w-8 h-[3.6rem] sm:w-9 sm:h-[4.5rem]' : 'flex-row w-[3.6rem] h-8 sm:w-[4.5rem] sm:h-9'}
                 ${isGhost ? 'opacity-0 pointer-events-none' : 'shadow-3d'}
                 ${isSelected ? '-translate-y-4 shadow-3d-active ring-2 ring-yellow-500 z-10 animate-celebrate' : ''}
                 ${animateIn ? 'animate-slide-in' : ''}
@@ -420,12 +420,20 @@
                 console.log('📨 Server mesajı:', data.type, data);
                 
                 switch(data.type) {
+                    case 'authSuccess':
+                        setPlayerData({ ...data.player, isGuest: false });
+                        setScreen('lobby');
+                        break;
+                    case 'guestMode':
+                        setPlayerData({ username: 'Guest', isGuest: true });
+                        setScreen('lobby');
+                        break;
                     case 'roomCreated':
                         setRoomCode(data.roomCode);
                         break;
                     case 'gameStart':
                         console.log('🎮 Oyun başlıyor...', data.gameState);
-                        setGameState(data.gameState);
+                        setGameState({ ...data.gameState, playerId: prevState?.playerId || data.gameState.playerId });
                         setScreen('game');
                         setSelectedTileIndex(null);
                         setValidMoves([]);
@@ -536,6 +544,14 @@
                         searchTimerRef.current = null;
                     }
                     setSearchTime(0);
+                    break;
+                case 'kicked':
+                    showNotification(data.message || 'Admin tarafından sistemden atıldınız.', 'error');
+                    setScreen('lobby');
+                    setGameState(null);
+                    setRoomCode('');
+                    break;
+                default:
                     break;
                 }
             };
@@ -1042,7 +1058,7 @@
                                 className="w-full h-full overflow-x-auto overflow-y-hidden hide-scrollbar flex items-center justify-center px-2 sm:px-8"
                                 style={{ scrollBehavior: 'smooth' }}
                             >
-                                <div className="flex flex-wrap items-center justify-center gap-1 py-10 max-w-full">
+                                <div className="flex flex-nowrap items-center justify-center gap-0 py-10">
                                     
                                     {/* SOL IŞIKLI GÖSTERGE */}
                                     {validMoves.includes('left') && selectedTileIndex !== null && gameState.board.length > 0 && (
@@ -1068,7 +1084,7 @@
                                                 values={tile} 
                                                 vertical={tile[0] === tile[1]}
                                                 disabled={true}
-                                                scale={0.85}
+                                                scale={0.75}
                                                 animateIn={i === gameState.board.length - 1 || i === 0}
                                             />
                                         ))
@@ -1133,7 +1149,7 @@
 
                             {/* Taş Dizilimi */}
                             <div className="w-full max-w-4xl mx-auto overflow-y-auto max-h-[40vh] p-2">
-                                <div className="flex justify-center gap-2 flex-wrap">
+                                <div className="flex flex-wrap justify-center gap-1">
                                     {myHand.map((tile, index) => {
                                         const canPlay = isMyTurn && (gameState.board.length === 0 || calculateValidMoves(tile).length > 0);
                                         
