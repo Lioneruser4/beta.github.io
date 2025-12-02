@@ -531,19 +531,18 @@ async function handleFindMatch(ws, data) {
             }
         }
 
-        // For ranked games, only match telegram users with other telegram users
-        // For guest games,// Dereceli oyun için sadece Telegram kullanıcılarını eşleştir
-        // Özel oda için herhangi bir kullanıcıyı eşleştir
+        // Find a match with similar ELO (±200) and same account type (guest/telegram)
         const matchIndex = matchQueue.findIndex(p => {
-            // Aynı oyuncu değil mi kontrol et
+            // Don't match with self
             if (p.telegramId === player.telegramId) return false;
             
-            // Eğer dereceli oyun ise sadece Telegram kullanıcılarını eşleştir
-            if (!isGuest && !player.isGuest) {
-                return Math.abs((p.elo || 0) - (player.elo || 0)) <= 200;
+            // For ranked games, only match Telegram users with other Telegram users
+            if (data.gameType === 'ranked') {
+                return !p.isGuest && !player.isGuest && 
+                       Math.abs((p.elo || 0) - (player.elo || 0)) <= 200;
             }
             
-            // Özel oda için herhangi bir kullanıcıyı eşleştir
+            // For friendly games, match any user with any other user
             return true;
         });
 
