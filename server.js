@@ -3,6 +3,7 @@ const http = require('http');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 
@@ -393,9 +394,83 @@ function sendMessage(ws, message) {
 
 // --- WEBSOCKET EVENTLERİ ---
 
+// Store active connections
+const activeConnections = new Map();
+
 wss.on('connection', (ws, req) => {
     ws.isAlive = true;
-    ws.on('pong', () => ws.isAlive = true);
+    const connectionId = uuidv4();
+    let playerId = null;
+    let roomCode = null;
+
+    // Handle reconnection
+    ws.on('reconnect', async (data) => {
+        try {
+            const { playerId: reconnectingPlayerId, roomCode: reconnectingRoomCode, sessionId } = data;
+            if (!reconnectingPlayerId || !reconnectingRoomCode || !sessionId) {
+                return sendMessage(ws, { type: 'error', message: 'Geçersiz yeniden bağlantı isteği' });
+            }
+
+            playerId = reconnectingPlayerId;
+            roomCode = reconnectingRoomCode;
+            const room = rooms.get(roomCode);
+
+            if (!room) {
+                return sendMessage(ws, {
+                    type: 'reconnectFailed',
+                    message: 'Oyun bulunamadı'
+                });
+            }
+
+            const player = room.players.find(p => p.telegramId === playerId && p.sessionId === sessionId);
+            if (!player) {
+                return sendMessage(ws, {
+                    type: 'reconnectFailed',
+                    message: 'Oturum bulunamadı'
+                });
+            }
+
+            // Update player's WebSocket connection
+            player.ws = ws;
+            playerConnections.set(ws, { playerId, roomCode });
+
+            // Send current game state
+            sendMessage(ws, {
+                type: 'gameState',
+                ...room,
+                isReconnect: true
+            });
+
+            // Notify other player
+            const otherPlayer = room.players.find(p => p.telegramId !== playerId);
+            if (otherPlayer && otherPlayer.ws) {
+                sendMessage(otherPlayer.ws, {
+                    type: 'playerReconnected',
+                    playerId
+                });
+            }
+
+        } catch (error) {
+            console.error('Yeniden bağlantı hatası:', error);
+            sendMessage(ws, {
+                type: 'reconnectFailed',
+                message: 'Yeniden bağlanırken hata oluştu'
+            });
+        }
+    });
+    ws.on('pong', () => {
+        ws.isAlive = true;
+        // Update last ping time
+        if (playerId && roomCode) {
+            const room = rooms.get(roomCode);
+            if (room) {
+                const player = room.players.find(p => p.telegramId === playerId);
+                if (player) {
+                    player.lastPing = Date.now();
+                }
+            }
+        }
+    });
 
     ws.on('message', (message) => {
         try {
@@ -418,17 +493,7 @@ wss.on('connection', (ws, req) => {
     sendMessage(ws, { type: 'connected', message: 'Sunucuya bağlandınız' });
 });
 
-const pingInterval = setInterval(() => {
-    wss.clients.forEach((ws) => {
-        if (ws.isAlive === false) return ws.terminate();
-        ws.isAlive = false;
-        ws.ping();
-    });
-}, 30000);
-
-wss.on('close', () => clearInterval(pingInterval));
-
-// --- OYUN MANTIKLARI ---
+// ...
 
 async function handleFindMatch(ws, data) {
     try {
@@ -456,13 +521,16 @@ async function handleFindMatch(ws, data) {
             return;
         }
 
-        // Add to queue
+        // Add to queue with session ID for reconnection
         const player = {
             ws,
             telegramId,
-            isGuest,
+            isGuest: isGuest || false,
             elo: 0, // Default ELO for guests
-            username: `Guest_${Math.floor(Math.random() * 10000)}`
+            sessionId: uuidv4(), // Unique session ID for reconnection
+            lastPing: Date.now(),
+            username: isGuest ? `Guest_${Math.floor(Math.random() * 10000)}` : '',
+            playerData: data.playerData || {}
         };
 
         // If player is not a guest, get their ELO from database
@@ -474,15 +542,15 @@ async function handleFindMatch(ws, data) {
             }
         }
 
-        // Find a match with similar ELO (±200) and same account type (guest/telegram)
+        // For ranked games, only match telegram users with other telegram users
+        // For guest games, only match guests with other guests
         const matchIndex = matchQueue.findIndex(p => {
-            // Guest can only match with other guests when creating a room
-            // But can match with anyone when joining a room (handled in room join logic)
             const sameAccountType = p.isGuest === player.isGuest;
             const eloDifference = Math.abs((p.elo || 0) - (player.elo || 0)) <= 200;
             const notSamePlayer = p.telegramId !== player.telegramId;
+            const bothReady = p.ws.readyState === WebSocket.OPEN && ws.readyState === WebSocket.OPEN;
             
-            return sameAccountType && eloDifference && notSamePlayer;
+            return sameAccountType && eloDifference && notSamePlayer && bothReady;
         });
 
         if (matchIndex !== -1) {
