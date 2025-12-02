@@ -376,12 +376,21 @@ function sendGameState(roomCode, playerId) {
     if (!room || !room.gameState) return;
 
     const ws = playerConnections.get(playerId);
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) { console.warn(`WebSocket for player ${playerId} not open.`); return; }
 
     try {
         ws.send(JSON.stringify({
-            type: 'gameUpdate',
-            gameState: { ...room.gameState, playerId: playerId }
+            type: 'gameUpdate', // Client expects this
+            gameState: {
+                board: room.gameState.board, // The actual game board (dominoes)
+                myHand: room.gameState.players[playerId].hand, // Player's own hand
+                opponentHandSize: room.gameState.players[room.players.find(p => p.telegramId !== playerId).telegramId].hand.length, // Opponent's hand size
+                marketSize: room.gameState.market.length,
+                currentTurn: room.gameState.currentPlayer, // Telegram ID of current player
+                myColor: room.players.find(p => p.telegramId === playerId).color, // Player's assigned color (red/white)
+                isMyTurn: room.gameState.currentPlayer === playerId,
+                // Other relevant game state info for the client
+            }
         }));
     } catch (error) { console.error(error); }
 }
@@ -500,11 +509,11 @@ async function handleFindMatch(ws, data) {
         const { telegramId, isGuest = false, gameType = 'friendly' } = data;
         
         // Önce bu bağlantı için eski kuyruk girişlerini temizle
-        const existingQueueIndex = matchQueue.findIndex(p => p.ws === ws || p.telegramId === telegramId);
+        const existingQueueIndex = matchQueue.findIndex(p => p.telegramId === telegramId); // Find by telegramId
         if (existingQueueIndex !== -1) {
             console.log(`♻️ Önceki kuyruk girişi temizlendi: ${telegramId}`);
             matchQueue.splice(existingQueueIndex, 1);
-        }
+        } // This is for preventing duplicate queue entries for the same user
         
         // Önce oyuncunun önceki bağlantılarını temizle
         for (const [code, room] of rooms.entries()) {
@@ -512,7 +521,7 @@ async function handleFindMatch(ws, data) {
             if (existingPlayer) {
                 // Eğer bu bağlantı zaten bu odadaysa, sadece bağlantıyı güncelle
                 existingPlayer.ws = ws;
-                playerConnections.set(ws, { playerId: telegramId, roomCode: code });
+                playerConnections.set(ws, { playerId: telegramId, roomCode: code }); // Update WS for existing player in room
                 return sendGameState(ws, code);
             }
         }
@@ -520,7 +529,7 @@ async function handleFindMatch(ws, data) {
         // Eğer oyuncu bir odada değilse devam et 
         const player = {
             ws,
-            telegramId,
+            telegramId: telegramId, // Ensure telegramId is set
             gameType, // Oyun türünü de kaydediyoruz
             isGuest: isGuest || false,
             elo: 0, // Default ELO for guests
@@ -545,7 +554,7 @@ async function handleFindMatch(ws, data) {
         // Eşleşme bulma mantığı
         let opponent = null;
         let opponentIndex = -1;
-        
+
         // Eşleşme kriterlerine göre rakip bul
         for (let i = 0; i < matchQueue.length; i++) {
             const potentialOpponent = matchQueue[i];
@@ -564,45 +573,64 @@ async function handleFindMatch(ws, data) {
             matchQueue.splice(opponentIndex, 1);
             console.log(`🔵 Eşleşme bulundu: ${player.telegramId} (${player.isGuest ? 'Misafir' : 'Telegram'}) ↔ ${opponent.telegramId} (${opponent.isGuest ? 'Misafir' : 'Telegram'})`);
             
-            const roomCode = generateRoomCode();
+            const roomCode = generateRoomCode(); // Generate room code
             
-            // Initialize the game
-            const gameInitialized = initializeGame(roomCode, player, opponent);
-            
-            if (!gameInitialized) {
-                console.error('❌ Oyun başlatılamadı');
-                sendMessage(ws, { 
-                    type: 'error',
-                    message: 'Oyun başlatılırken bir hata oluştu.'
-                });
-                sendMessage(opponent.ws, {
-                    type: 'error',
-                    message: 'Oyun başlatılırken bir hata oluştu.'
-                });
-                return;
+            // Assign colors (for checkers client, but server uses for internal logic)
+            player.color = 'red';
+            opponent.color = 'white';
+
+            // Create the room object with full player data
+            const newRoom = {
+                code: roomCode,
+                players: [player, opponent], // Store full player objects
+                status: 'playing',
+                createdAt: new Date()
+            };
+            rooms.set(roomCode, newRoom);
+
+            // Update playerConnections for both players
+            playerConnections.set(player.ws, { playerId: player.telegramId, roomCode });
+            playerConnections.set(opponent.ws, { playerId: opponent.telegramId, roomCode });
+
+            // Initialize game state (dominoes specific)
+            const initialGameState = initializeGame(roomCode, player, opponent); // Pass player objects
+            if (!initialGameState) { // Check if initialization failed
+                console.error('❌ Oyun başlatılamadı (initializeGame başarısız)');
+                // Clean up room and connections if game init fails
+                rooms.delete(roomCode);
+                playerConnections.delete(player.ws);
+                playerConnections.delete(opponent.ws);
+                return; // Exit
             }
+            newRoom.gameState = initialGameState; // Store initialized game state in room
             
             // Notify both players
             const player1Data = {
                 type: 'matchFound',
                 roomCode,
-                color: 'red',
+                color: player.color, // Player's assigned color
                 opponent: {
                     username: opponent.username || 'Rakip',
                     elo: opponent.elo || 0
                 },
-                gameType: player.gameType
+                gameType: player.gameType,
+                gameState: initialGameState, // Send initial game state to client
+                myStats: player.playerData, // Send player's own stats
+                opponentStats: opponent.playerData // Send opponent's stats
             };
             
             const player2Data = {
                 type: 'matchFound',
                 roomCode,
-                color: 'white',
+                color: opponent.color, // Opponent's assigned color
                 opponent: {
                     username: player.username || 'Rakip',
                     elo: player.elo || 0
                 },
-                gameType: opponent.gameType
+                gameType: opponent.gameType,
+                gameState: initialGameState, // Send initial game state to client
+                myStats: opponent.playerData, // Send opponent's own stats
+                opponentStats: player.playerData // Send player's stats as opponent's
             };
             
             console.log('📤 Oyuncu 1 bilgileri:', player1Data);
@@ -648,6 +676,7 @@ async function handleFindMatch(ws, data) {
     }
 };
 
+// This function is for when a WebSocket connection closes
 function handleDisconnect(ws) {
     console.log('❌ İstifadəçi ayrıldı');
     
@@ -658,14 +687,14 @@ function handleDisconnect(ws) {
     }
     
     // Eğer oyuncu bir odadaysa, oyundan çıkar
-    for (const [roomCode, room] of rooms.entries()) {
-        const playerIndex = room.players.findIndex(p => p.ws === ws);
-        if (playerIndex !== -1) {
+    for (const [roomCode, room] of rooms.entries()) { // Iterate through all rooms
+        const playerInRoom = room.players.find(p => p.ws === ws); // Find the player by their WebSocket
+        if (playerInRoom) {
             // Oyuncunun bağlantısını kaldır ama oyun durumunu koru
-            room.players[playerIndex].ws = null;
+            playerInRoom.ws = null; // Mark WS as null, but keep player object in room
             
             // Diğer oyuncuya bildir
-            const otherPlayer = room.players[1 - playerIndex];
+            const otherPlayer = room.players.find(p => p.ws !== ws); // Find the other player
             if (otherPlayer && otherPlayer.ws) {
                 sendMessage(otherPlayer.ws, {
                     type: 'opponentDisconnected',
@@ -675,26 +704,25 @@ function handleDisconnect(ws) {
                 // Oyunu bitir ve oyuncuyu lobiye gönder
                 setTimeout(() => {
                     if (otherPlayer.ws) { // Hala bağlı mı kontrol et
+                        // This should trigger a game over event for the remaining player
                         sendMessage(otherPlayer.ws, {
                             type: 'gameOver',
-                            winner: otherPlayer.telegramId,
+                            winner: otherPlayer.telegramId, // The remaining player wins
                             reason: 'leave',
-                            eloChange: 0
+                            eloChange: 0 // ELO calculation would happen here
                         });
                     }
                 }, 3000);
             }
-            
-            // Odayı temizle
-            rooms.delete(roomCode);
-            break;
+// The room should not be deleted immediately if a player disconnects, only if both leave or game ends.
+// Reconnection logic should handle re-assigning the WS.
+// For now, let's just remove the WS from playerConnections.
         }
     }
-    
-    // Bağlantıyı temizle
-    playerConnections.delete(ws);
+    playerConnections.delete(ws); // Remove the WS from the global connections map
 }
 
+// This function is for when a player explicitly clicks "Leave Game" button
 function handleLeaveGame(ws) {
     const connection = playerConnections.get(ws);
     if (!connection) return;
