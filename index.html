@@ -225,6 +225,18 @@
             const boardScrollRef = useRef(null);
             const searchTimerRef = useRef(null);
 
+            // Oyun state'ini temizlemek için merkezi bir fonksiyon
+            const resetGameClientState = () => {
+                setGameState(null);
+                setRoomCode('');
+                setSearching(false);
+                setSelectedTileIndex(null);
+                setValidMoves([]);
+                setEndInfo(null);
+                setOpponent(null);
+                setJoinCode('');
+            };
+
             // Ses Efektleri (Opsiyonel - Tarayıcı izin verirse çalışır)
             const playSound = (type) => {
                 // Basit bip sesleri veya mp3 eklenebilir. Şimdilik boş bırakıyorum hata vermesin diye.
@@ -402,11 +414,7 @@
                             isWinner: isWinnerClient,
                             eloChange,
                         });
-
                         setScreen('end');
-                        setGameState(null);
-                        setRoomCode('');
-                        setSearching(false);
 
                         if (searchTimerRef.current) {
                             clearInterval(searchTimerRef.current);
@@ -415,8 +423,8 @@
                         setSearchTime(0);
 
                         setTimeout(() => {
+                            resetGameClientState(); // Tüm oyun state'ini temizle
                             setScreen('lobby');
-                            setEndInfo(null);
                             if (isRanked && playerData && !playerData.isGuest) {
                                 initializeTelegramAuth();
                             }
@@ -561,12 +569,7 @@
                 sendMessage({ type: 'leaveGame' });
 
                 // Lokal state temizle ve lobiye dön
-                setGameState(null);
-                setRoomCode('');
-                setSearching(false);
-                setSelectedTileIndex(null);
-                setValidMoves([]);
-                setEndInfo(null);
+                resetGameClientState();
                 setScreen('lobby');
             };
 
