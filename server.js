@@ -913,24 +913,39 @@ function handleJoinRoom(ws, data) {
 function handleCancelSearch(ws) {
     console.log('🔍 Eşleşme iptal ediliyor...');
     
+    // Tüm kuyruklardan bu bağlantıyı temizle
+    let found = false;
+    
     // Eşleşme kuyruğundan çıkar
     const queueIndex = matchQueue.findIndex(p => p.ws === ws);
     if (queueIndex !== -1) {
         const player = matchQueue[queueIndex];
-        console.log(`❌ Eşleşme iptal edildi: ${player.telegramId} (${player.isGuest ? 'Misafir' : 'Telegram'})`);
+        console.log(`❌ Eşleşme iptal edildi: ${player.telegramId || 'Bilinmeyen'} (${player.isGuest ? 'Misafir' : 'Telegram'})`);
         matchQueue.splice(queueIndex, 1);
-        
-        // Kullanıcıya iptal bilgisini gönder
+        found = true;
+    }
+    
+    // Eğer hala bağlantı açıksa, kullanıcıya iptal bilgisini gönder
+    if (ws.readyState === WebSocket.OPEN) {
         try {
             sendMessage(ws, { 
                 type: 'searchCancelled', 
-                message: 'Eşleşme araması iptal edildi' 
+                message: 'Eşleşme araması iptal edildi',
+                success: found
+            });
+            
+            // Client tarafındaki arama durumunu sıfırla
+            sendMessage(ws, {
+                type: 'updateSearchStatus',
+                isSearching: false
             });
         } catch (error) {
             console.error('İptal mesajı gönderilirken hata:', error);
         }
-    } else {
-        console.log('⚠️ İptal edilecek aktif eşleşme bulunamadı');
+    }
+    
+    if (!found) {
+        console.log('⚠️ İptal edilecek aktif arama bulunamadı');
     }
 }
 
