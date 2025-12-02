@@ -149,6 +149,8 @@ socket.on('searchStatus', (data) => {
 });
 
 socket.on('searchCancelled', (data) => {
+    gameState.isSearching = false;
+    gameState.roomCode = null;
     showModal(data.message);
     clearInterval(searchTimer);
     searchTimer = null;
@@ -203,11 +205,13 @@ socket.on('gameOver', (data) => {
     showScreen('post-game');
 });
 
-socket.on('error', (message) => {
-    showModal(message);
+socket.on('error', (error) => {
+    console.error('Hata:', error);
     gameState.isSearching = false;
+    gameState.roomCode = null;
     clearInterval(searchTimer);
     searchTimer = null;
+    showModal(error.message || 'Bir hata oluştu');
     showScreen('main');
 });
 
