@@ -536,14 +536,19 @@ async function handleFindMatch(ws, data) {
             // Don't match with self
             if (p.telegramId === player.telegramId) return false;
             
-            // For ranked games, only match Telegram users with other Telegram users
+            // Always match Telegram users with other Telegram users, and guests with guests
+            const isSameAccountType = p.isGuest === player.isGuest;
+            
+            // For ranked games, also consider ELO difference
             if (data.gameType === 'ranked') {
-                return !p.isGuest && !player.isGuest && 
+                return isSameAccountType && 
+                       !p.isGuest && 
+                       !player.isGuest && 
                        Math.abs((p.elo || 0) - (player.elo || 0)) <= 200;
             }
             
-            // For friendly games, match any user with any other user
-            return true;
+            // For friendly games, only match same account types
+            return isSameAccountType;
         });
 
         if (matchIndex !== -1) {
