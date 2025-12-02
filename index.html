@@ -548,11 +548,12 @@
 
             const drawFromMarket = () => {
                 if (!isMyTurn || !canDrawFromMarket) return;
-                const hasPlayable = myHand.some(tile => calculateValidMoves(tile).length > 0);
-                if (hasPlayable) {
-                    showNotification('Elinde oynanabilir taş varken pazardan çekemezsin', 'warning');
-                    return;
-                }
+                // Elinde oynanabilir taş varsa pazardan çekmeyi engelle
+                const canPlayFromHand = myHand.some(tile => calculateValidMoves(tile).length > 0);
+                if (gameState.board.length > 0 && canPlayFromHand) {
+                     showNotification('Elinde oynanabilir taş varken pazardan çekemezsin!', 'warning');
+                     return; // Fonksiyondan tamamen çık
+                 }
                 sendMessage({ type: 'drawFromMarket' });
                 showNotification('🎲 Pazardan taş çekiliyor...', 'info');
             };
