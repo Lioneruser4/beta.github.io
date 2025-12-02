@@ -1,5 +1,16 @@
 // Socket.io baglantisi
-const socket = io('https://mario-io-1.onrender.com');
+const socket = io('https://mario-io-1.onrender.com', {
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 10000
+});
+
+// Yeniden baglanma durumu
+let isReconnecting = false;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
 
 // Oyun durumu
 let gameState = {
@@ -82,56 +93,54 @@ socket.on('connect', () => {
     showScreen('main');
 });
 
-function resetGameState() {
-    gameState = {
-        board: [],
-        currentTurn: 'red',
-        selectedPiece: null,
-        myColor: null,
-        isMyTurn: false,
-        roomCode: null,
-        isSearching: false,
-        gameStarted: false,
-        isGuest: true,
-        playerStats: {
-            elo: 0,
-            wins: 0,
-            losses: 0,
-            draws: 0
-        },
-        opponentStats: {
-            username: '',
-            elo: 0
-        }
-    };
-}
+socket.on('disconnect', (reason) => {
+    console.log('Sunucu bağlantısı kesildi:', reason);
+    connectionStatus.textContent = 'Bağlantı kesildi';
+    connectionStatus.className = 'text-red-500';
+    
+    // Eğer oyundaysak, yeniden bağlanmayı dene
+    if (gameState.roomCode && !isReconnecting) {
+        isReconnecting = true;
+        reconnectAttempts = 0;
+        attemptReconnect();
+    }
+});
 
-socket.on('disconnect', () => {
-    connectionStatus.textContent = 'Serverle elaqe kesildi';
-    connectionStatus.classList.remove('text-green-500');
-    connectionStatus.classList.add('text-red-500');
-    showModal('Serverle elaqe kesildi. Səhifeni yenileyin.');
+socket.on('reconnect', () => {
+    console.log('Sunucuya yeniden bağlanıldı');
+    isReconnecting = false;
+    reconnectAttempts = 0;
+    
+    // Eğer oyundaysak, oyun durumunu senkronize et
+    if (gameState.roomCode) {
+        socket.emit('reconnectToGame', {
+            roomCode: gameState.roomCode,
+            playerId: gameState.playerId
+        });
+    }
+});
+
+socket.on('reconnectFailed', () => {
+    console.error('Yeniden bağlanılamadı');
+    showModal('Sunucuya bağlanılamadı. Lütfen sayfayı yenileyin.', 'error');
 });
 
 socket.on('matchFound', (data) => {
-    console.log('🎉 Raqib tapildi!', data);
-    gameState.roomCode = data.roomCode;
-    gameState.myColor = data.color;
-    gameState.gameStarted = true;
-    gameState.isSearching = false;
-    gameState.board = createInitialBoard();
-    gameState.opponentStats = {
-        username: data.opponent.username,
-        elo: data.opponent.elo || 0
-    };
+    console.log('Eşleşme bulundu:', data);
+    handleMatchFound(data);
+});
+
+socket.on('opponentLeft', (data) => {
+    console.log('Rakip ayrıldı:', data);
+    showModal('Rakibiniz oyundan ayrıldı', 'info');
     
-    clearInterval(searchTimer);
-    searchTimer = null;
-    
-    showModal('Raqib tapildi! Siz ' + (gameState.myColor === 'red' ? 'Qirmizi' : 'Ag') + ' rengindesiniz.');
-    showScreen('game');
-    updateGameUI();
-    updatePlayerStats();
+    // Eğer oda temizlendiyse, oyuncuyu ana menüye gönder
+    if (data.roomCleared) {
+        setTimeout(() => {
+            resetGameState();
+            showScreen('main');
+        }, 3000);
+    }
 });
 
 socket.on('searchStatus', (data) => {
@@ -446,7 +455,27 @@ function startMatchmaking(isGuest = false) {
     startSearchTimer();
 }
 
-dereceliBtn.onclick = () => startMatchmaking(false);
+dereceliBtn.onclick = () => {
+    if (gameState.isSearching) return;
+    
+    gameState.isSearching = true;
+    gameState.gameType = 'ranked';
+    
+    // Önceki bağlantıları temizle
+    socket.emit('cancelSearch');
+    
+    // Eşleşme isteği gönder (sadece Telegram kullanıcıları için)
+    socket.emit('findMatch', { 
+        telegramId: 'user123', // Gerçek uygulamada bu kullanıcı ID'si olacak
+        isGuest: false,
+        gameType: 'ranked'
+    });
+    
+    // Eşleşme ekranını göster
+    showScreen('searching');
+    showStatus('Eşleşme aranıyor...');
+};
+
 friendBtn.onclick = () => startMatchmaking(true);
 
 cancelRankedBtn.onclick = () => {
@@ -505,7 +534,13 @@ function leaveGame() {
     if (gameState.roomCode) {
         socket.emit('leaveGame', { roomCode: gameState.roomCode });
     }
-    
+    // Oyun durumunu sıfırla
+    resetGameState();
+    showScreen('main');
+}
+
+// Oyun durumunu sıfırla
+function resetGameState() {
     gameState = {
         board: [],
         currentTurn: 'red',
@@ -514,15 +549,74 @@ function leaveGame() {
         isMyTurn: false,
         roomCode: null,
         isSearching: false,
-        gameStarted: false
+        gameStarted: false,
+        isGuest: false,
+        playerStats: {
+            elo: 0,
+            wins: 0,
+            losses: 0,
+            draws: 0
+        },
+        opponentStats: {
+            username: '',
+            elo: 0
+        }
     };
     
-    showScreen('main');
+    // Arayüzü güncelle
+    updatePlayerStats();
+}
+
+// Oyuncu istatistiklerini güncelle
+function updatePlayerStats() {
+    if (gameState.playerStats) {
+        const playerElo = document.getElementById('player-elo');
+        const playerWins = document.getElementById('player-wins');
+        const playerLosses = document.getElementById('player-losses');
+        const playerDraws = document.getElementById('player-draws');
+        
+        if (playerElo) playerElo.textContent = gameState.playerStats.elo || 0;
+        if (playerWins) playerWins.textContent = gameState.playerStats.wins || 0;
+        if (playerLosses) playerLosses.textContent = gameState.playerStats.losses || 0;
+        if (playerDraws) playerDraws.textContent = gameState.playerStats.draws || 0;
+    }
+    
+    if (gameState.opponentStats) {
+        const opponentName = document.getElementById('opponent-name');
+        const opponentElo = document.getElementById('opponent-elo');
+        
+        if (opponentName) opponentName.textContent = gameState.opponentStats.username || 'Rəqib';
+        if (opponentElo) opponentElo.textContent = `(${gameState.opponentStats.elo || 0})`;
+    }
+}
+
+// Yeniden bağlanma denemesi
+function attemptReconnect() {
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        showModal('Sunucuya bağlanılamadı. Lütfen sayfayı yenileyin.', 'error');
+        return;
+    }
+    
+    reconnectAttempts++;
+    console.log(`Yeniden bağlanma denemesi ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`);
+    
+    // 2 saniye sonra tekrar dene
+    setTimeout(() => {
+        socket.connect();
+    }, 2000);
+}
+
+// Durum mesajını göster
+function showStatus(message) {
+    const statusElement = document.getElementById('status-message');
+    if (statusElement) {
+        statusElement.textContent = message;
+    }
 }
 
 modalCloseBtn.onclick = () => {
     messageModal.classList.add('hidden');
-};
+}
 
 // Baslangic
 document.addEventListener('DOMContentLoaded', () => {
