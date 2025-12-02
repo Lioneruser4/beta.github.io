@@ -10,7 +10,18 @@ let gameState = {
     isMyTurn: false,
     roomCode: null,
     isSearching: false,
-    gameStarted: false
+    gameStarted: false,
+    isGuest: true, // Varsayılan olarak misafir
+    playerStats: {
+        elo: 0,
+        wins: 0,
+        losses: 0,
+        draws: 0
+    },
+    opponentStats: {
+        username: '',
+        elo: 0
+    }
 };
 
 // Timer
@@ -48,6 +59,13 @@ const gameResultMessage = document.getElementById('game-result-message');
 const eloChangeDisplay = document.getElementById('elo-change');
 const backToLobbyBtn = document.getElementById('back-to-lobby-btn');
 
+// Oyuncu istatistik elementleri
+const playerEloElement = document.getElementById('player-elo');
+const playerWinsElement = document.getElementById('player-wins');
+const playerLossesElement = document.getElementById('player-losses');
+const opponentNameElement = document.getElementById('opponent-name');
+const opponentEloElement = document.getElementById('opponent-elo');
+
 const BOARD_SIZE = 8;
 
 // --- Socket.io Eventleri ---
@@ -58,8 +76,35 @@ socket.on('connect', () => {
     connectionStatus.textContent = 'Servere baglandi!';
     connectionStatus.classList.remove('text-yellow-400');
     connectionStatus.classList.add('text-green-500');
+    
+    // Oyun durumunu sıfırla
+    resetGameState();
     showScreen('main');
 });
+
+function resetGameState() {
+    gameState = {
+        board: [],
+        currentTurn: 'red',
+        selectedPiece: null,
+        myColor: null,
+        isMyTurn: false,
+        roomCode: null,
+        isSearching: false,
+        gameStarted: false,
+        isGuest: true,
+        playerStats: {
+            elo: 0,
+            wins: 0,
+            losses: 0,
+            draws: 0
+        },
+        opponentStats: {
+            username: '',
+            elo: 0
+        }
+    };
+}
 
 socket.on('disconnect', () => {
     connectionStatus.textContent = 'Serverle elaqe kesildi';
@@ -75,6 +120,10 @@ socket.on('matchFound', (data) => {
     gameState.gameStarted = true;
     gameState.isSearching = false;
     gameState.board = createInitialBoard();
+    gameState.opponentStats = {
+        username: data.opponent.username,
+        elo: data.opponent.elo || 0
+    };
     
     clearInterval(searchTimer);
     searchTimer = null;
@@ -82,6 +131,7 @@ socket.on('matchFound', (data) => {
     showModal('Raqib tapildi! Siz ' + (gameState.myColor === 'red' ? 'Qirmizi' : 'Ag') + ' rengindesiniz.');
     showScreen('game');
     updateGameUI();
+    updatePlayerStats();
 });
 
 socket.on('searchStatus', (data) => {
@@ -374,17 +424,30 @@ function handleCellClick(r, c) {
 
 // --- Button Eventleri ---
 
-dereceliBtn.onclick = () => {
-    console.log('🎮 Dereceli butona tiklandi');
+function startMatchmaking(isGuest = false) {
+    // Eğer zaten oyun arıyorsa veya oyundaysa işlem yapma
+    if (gameState.isSearching || gameState.gameStarted) {
+        showModal('Zaten bir oyundasınız veya eşleşme arıyorsunuz!');
+        return;
+    }
+    
+    // Eşleşme aramaya başla
+    gameState.isSearching = true;
+    gameState.isGuest = isGuest;
+    
+    // Sunucuya eşleşme isteği gönder
+    socket.emit('findMatch', { 
+        telegramId: isGuest ? `guest_${Date.now()}` : 'user123', // Gerçek uygulamada bu kullanıcı kimliği olacak
+        isGuest
+    });
+    
+    // Eşleşme ekranını göster
     showScreen('ranked');
-    console.log('📡 findMatch gonderiliyor...');
-    socket.emit('findMatch');
-    console.log('✅ findMatch gonderildi!');
-};
+    startSearchTimer();
+}
 
-friendBtn.onclick = () => {
-    showScreen('friend');
-};
+dereceliBtn.onclick = () => startMatchmaking(false);
+friendBtn.onclick = () => startMatchmaking(true);
 
 cancelRankedBtn.onclick = () => {
     gameState.isSearching = false;
@@ -426,7 +489,14 @@ joinRoomBtn.onclick = () => {
 };
 
 backToLobbyBtn.onclick = () => {
-    leaveGame();
+    // Oyun durumunu sıfırla
+    resetGameState();
+    
+    // Sunucuya oyundan ayrıldığımızı bildir
+    socket.emit('leaveGame');
+    
+    // Ana menüye dön
+    showScreen('main');
 };
 
 leaveGameBtn.onclick = () => leaveGame();
