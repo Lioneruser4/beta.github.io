@@ -1,5 +1,5 @@
 // Socket.io baglantisi
-const socket = io('https://mario-io-1.onrender.com');
+const socket = io('https://beta-github-io.onrender.com');
 
 // Oyun durumu
 let gameState = {
