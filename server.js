@@ -497,7 +497,7 @@ wss.on('connection', (ws, req) => {
 
 async function handleFindMatch(ws, data) {
     try {
-        const { telegramId, isGuest = false } = data;
+        const { telegramId, isGuest = false, gameType = 'friendly' } = data;
         
         // Önce oyuncunun önceki bağlantılarını temizle
         for (const [code, room] of rooms.entries()) {
@@ -531,24 +531,23 @@ async function handleFindMatch(ws, data) {
             }
         }
 
-        // Find a match with similar ELO (±200) and same account type (guest/telegram)
+        // Find a match based on account type and game type
         const matchIndex = matchQueue.findIndex(p => {
             // Don't match with self
             if (p.telegramId === player.telegramId) return false;
             
-            // Always match Telegram users with other Telegram users, and guests with guests
-            const isSameAccountType = p.isGuest === player.isGuest;
+            // Always match same account types (Telegram with Telegram, Guest with Guest)
+            if (p.isGuest !== player.isGuest) return false;
             
-            // For ranked games, also consider ELO difference
-            if (data.gameType === 'ranked') {
-                return isSameAccountType && 
-                       !p.isGuest && 
-                       !player.isGuest && 
+            // For ranked games, check ELO difference (only for Telegram users)
+            if (gameType === 'ranked') {
+                // Only match if both are Telegram users and ELO difference is within 200
+                return !p.isGuest && !player.isGuest && 
                        Math.abs((p.elo || 0) - (player.elo || 0)) <= 200;
             }
             
-            // For friendly games, only match same account types
-            return isSameAccountType;
+            // For friendly games, just match same account types
+            return true;
         });
 
         if (matchIndex !== -1) {
@@ -556,6 +555,8 @@ async function handleFindMatch(ws, data) {
             const opponent = matchQueue[matchIndex];
             matchQueue.splice(matchIndex, 1);
 
+            console.log(`🔵 Eşleşme bulundu: ${player.telegramId} (${player.isGuest ? 'Misafir' : 'Telegram'}) ↔ ${opponent.telegramId} (${opponent.isGuest ? 'Misafir' : 'Telegram'})`);
+            
             const roomCode = generateRoomCode();
             initializeGame(roomCode, player, opponent);
             
@@ -581,10 +582,11 @@ async function handleFindMatch(ws, data) {
             });
         } else {
             // No match found, add to queue
+            console.log(`⏳ Kuyruğa eklendi: ${player.telegramId} (${player.isGuest ? 'Misafir' : 'Telegram'}) - Toplam sırada: ${matchQueue.length + 1} oyuncu`);
             matchQueue.push(player);
             sendMessage(ws, { 
                 type: 'searchStatus', 
-                message: 'Eşleşme aranıyor...' 
+                message: `Eşleşme aranıyor... (${player.isGuest ? 'Misafir Modu' : 'Sıralı Maç'})` 
             });
         }
     } catch (error) {
