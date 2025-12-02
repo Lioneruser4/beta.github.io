@@ -674,19 +674,59 @@ function handleLeaveGame(ws) {
         }
     }
 
-    // Bağlantıyı temizle
-    playerConnections.delete(ws);
-    
-    // Eşleşme kuyruğundan da çıkar
-    const queueIndex = matchQueue.findIndex(p => p.ws === ws);
-    if (queueIndex !== -1) {
-        matchQueue.splice(queueIndex, 1);
+    // Eğer oda boşsa sil
+    if (room.players.length === 0) {
+        rooms.delete(roomCode);
+    } else {
+        // Diğer oyuncuya haber ver
+        const otherPlayer = room.players[0];
+        if (otherPlayer && otherPlayer.ws) {
+            sendMessage(otherPlayer.ws, {
+                type: 'opponentLeft',
+                message: 'Rakibiniz oyundan ayrıldı',
+                roomCleared: true  // Oda temizlendi bilgisi
+            });
+            
+            // Diğer oyuncunun bağlantısını temizle
+            playerConnections.delete(otherPlayer.ws);
+        }
+        // Odayı temizle
+        rooms.delete(roomCode);
     }
+}
+
+// Bağlantıyı temizle
+playerConnections.delete(ws);
     
-    console.log(`Oyuncu çıktı: ${playerId}, Oda: ${roomCode}`);
+// Eşleşme kuyruğundan da çıkar
+const queueIndex = matchQueue.findIndex(p => p.ws === ws);
+if (queueIndex !== -1) {
+    matchQueue.splice(queueIndex, 1);
+}
+    
+console.log(`Oyuncu çıktı: ${playerId}, Oda: ${roomCode}`);
+}
+
+function handleCancelSearch(ws) {
+const index = matchQueue.findIndex(p => p.ws === ws);
+if (index !== -1) {
+    matchQueue.splice(index, 1);
+}
+// Tüm bağlantıları kontrol et ve temizle
+for (const [code, room] of rooms.entries()) {
+    const playerIndex = room.players.findIndex(p => p.ws === ws);
+    if (playerIndex !== -1) {
+        room.players[playerIndex].ws = null;
+    }
+}
+playerConnections.delete(ws);
+sendMessage(ws, { 
+    type: 'searchCancelled', 
+    message: 'Eşleşme araması iptal edildi' 
+});
 }
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Domino Sunucusu çalışıyor: Port ${PORT}`);
+console.log(`🚀 Domino Sunucusu çalışıyor: Port ${PORT}`);
 });
