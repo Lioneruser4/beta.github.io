@@ -127,7 +127,7 @@
     </style>
 </head>
 <body>
-    <div id="root" class="w-full h-screen"></div>
+    <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
@@ -165,7 +165,7 @@
             const baseClasses = `
                 relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
                 transition-all duration-300 select-none
-                ${vertical ? 'flex-col w-8 h-[3.6rem] sm:w-9 sm:h-[4.5rem]' : 'flex-row w-[3.6rem] h-8 sm:w-[4.5rem] sm:h-9'}
+                ${vertical ? 'flex-col w-9 h-[4.5rem] sm:w-10 sm:h-20' : 'flex-row w-[4.5rem] h-9 sm:w-20 sm:h-10'}
                 ${isGhost ? 'opacity-0 pointer-events-none' : 'shadow-3d'}
                 ${isSelected ? '-translate-y-4 shadow-3d-active ring-2 ring-yellow-500 z-10 animate-celebrate' : ''}
                 ${animateIn ? 'animate-slide-in' : ''}
@@ -201,83 +201,11 @@
             );
         };
 
-        // Admin fonksiyonları
-            const isAdmin = () => playerData?.telegramId === 976640409;
-
-            const handleResetAllElo = async () => {
-                if (!isAdmin()) return;
-                try {
-                    const res = await fetch('/api/admin/reset-all-elo', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ telegramId: playerData.telegramId })
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                        showNotification(data.message, 'success');
-                        setShowAdminPanel(false);
-                    } else {
-                        showNotification(data.error || 'Hata', 'error');
-                    }
-                } catch (err) {
-                    showNotification('Sunucu hatası', 'error');
-                }
-            };
-
-            const handleKickPlayer = async () => {
-                if (!isAdmin() || !kickTargetId) return;
-                try {
-                    const res = await fetch('/api/admin/kick-player', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ telegramId: playerData.telegramId, targetTelegramId: kickTargetId })
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                        showNotification(data.message, 'success');
-                        setKickTargetId('');
-                    } else {
-                        showNotification(data.error || 'Hata', 'error');
-                    }
-                } catch (err) {
-                    showNotification('Sunucu hatası', 'error');
-                }
-            };
-
-            const handleUpdatePlayerElo = async () => {
-                if (!isAdmin() || !updateTargetId || newElo === '') return;
-                try {
-                    const res = await fetch('/api/admin/update-player-elo', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            telegramId: playerData.telegramId, 
-                            targetTelegramId: updateTargetId, 
-                            newElo: Number(newElo),
-                            newLevel: newLevel ? Number(newLevel) : undefined
-                        })
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                        showNotification(data.message, 'success');
-                        setUpdateTargetId('');
-                        setNewElo('');
-                        setNewLevel('');
-                    } else {
-                        showNotification(data.error || 'Hata', 'error');
-                    }
-                } catch (err) {
-                    showNotification('Sunucu hatası', 'error');
-                }
-            };
+        // --- ANA OYUN ---
 
         const DominoGame = () => {
             const [screen, setScreen] = useState('loading'); // loading, lobby, searching, game, leaderboard, end
-            const [showAdminPanel, setShowAdminPanel] = React.useState(false);
-            const [kickTargetId, setKickTargetId] = React.useState('');
-            const [updateTargetId, setUpdateTargetId] = React.useState('');
-            const [newElo, setNewElo] = React.useState('');
-            const [newLevel, setNewLevel] = React.useState('');
+            const [connected, setConnected] = useState(false);
             const [playerData, setPlayerData] = useState(null); // Telegram user data
             const [leaderboard, setLeaderboard] = useState([]);
             const [roomCode, setRoomCode] = useState('');
@@ -420,20 +348,12 @@
                 console.log('📨 Server mesajı:', data.type, data);
                 
                 switch(data.type) {
-                    case 'authSuccess':
-                        setPlayerData({ ...data.player, isGuest: false });
-                        setScreen('lobby');
-                        break;
-                    case 'guestMode':
-                        setPlayerData({ username: 'Guest', isGuest: true });
-                        setScreen('lobby');
-                        break;
                     case 'roomCreated':
                         setRoomCode(data.roomCode);
                         break;
                     case 'gameStart':
                         console.log('🎮 Oyun başlıyor...', data.gameState);
-                        setGameState({ ...data.gameState, playerId: prevState?.playerId || data.gameState.playerId });
+                        setGameState(data.gameState);
                         setScreen('game');
                         setSelectedTileIndex(null);
                         setValidMoves([]);
@@ -467,92 +387,63 @@
                         }
                         setSearchTime(0);
                         break;
-                    case 'playerDataUpdated':
-                // Admin tarafından güncellenmiş ELO/level bilgisi
-                if (data.elo !== undefined || data.level !== undefined) {
-                    setPlayerData(prev => ({
-                        ...prev,
-                        elo: data.elo ?? prev.elo,
-                        level: data.level ?? prev.level
-                    }));
-                    showNotification('ELO/Level bilgileriniz admin tarafından güncellendi', 'info');
-                }
-                break;
-                        case 'gameEnd':
-                    const isRanked = data.isRanked;
-                    const isWinnerClient = data.winner === gameState?.playerId;
-                    const eloChange = data.eloChanges
-                        ? (isWinnerClient ? data.eloChanges.winner : data.eloChanges.loser)
-                        : 0;
+                    case 'gameEnd':
+                        const isRanked = data.isRanked;
+                        const isWinnerClient = data.winner === gameState?.playerId;
+                        const eloChange = data.eloChanges
+                            ? (isWinnerClient ? data.eloChanges.winner : data.eloChanges.loser)
+                            : 0;
                         const winMsg = `Oyun Bitti! Kazanan: ${data.winnerName}`;
-                    const eloMsg = data.eloChanges ? ` (ELO: ${eloChange > 0 ? '+' : ''}${eloChange})` : '';
-
-                        // Güncel oyuncu bilgilerini anlık olarak güncelle
-                    if (data.updatedPlayers && data.updatedPlayers[gameState?.playerId]) {
-                        const updated = data.updatedPlayers[gameState?.playerId];
-                        setPlayerData(prev => ({
-                            ...prev,
-                            elo: updated.elo,
-                            level: updated.level
-                        }));
-                    }
+                        const eloMsg = data.eloChanges ? ` (ELO: ${eloChange > 0 ? '+' : ''}${eloChange})` : '';
 
                         setEndInfo({
-                        winnerName: data.winnerName,
-                        isRanked,
-                        isWinner: isWinnerClient,
-                        eloChange,
-                    });
+                            winnerName: data.winnerName,
+                            isRanked,
+                            isWinner: isWinnerClient,
+                            eloChange,
+                        });
 
-                    setScreen('end');
-                    setGameState(null);
+                        setScreen('end');
+                        setGameState(null);
                         setRoomCode('');
-                    setSearching(false);
+                        setSearching(false);
 
-                    if (searchTimerRef.current) {
-                        clearInterval(searchTimerRef.current);
-                        searchTimerRef.current = null;
-                    }
-                    setSearchTime(0);
-
-                    setTimeout(() => {
-                        setScreen('lobby');
-                        setEndInfo(null);
-                        if (isRanked && playerData && !playerData.isGuest) {
-                            initializeTelegramAuth();
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
                         }
-                    }, 4000);
-                    break;
+                        setSearchTime(0);
+
+                        setTimeout(() => {
+                            setScreen('lobby');
+                            setEndInfo(null);
+                            if (isRanked && playerData && !playerData.isGuest) {
+                                initializeTelegramAuth();
+                            }
+                        }, 3000);
+                        break;
                     case 'searchCancelled':
-                    showNotification('Arama iptal edildi', 'info');
-                    setSearching(false);
-                    setScreen('lobby');
-                    if (searchTimerRef.current) {
-                        clearInterval(searchTimerRef.current);
-                        searchTimerRef.current = null;
-                    }
-                    setSearchTime(0);
-                    break;
+                        showNotification('Arama iptal edildi', 'info');
+                        setSearching(false);
+                        setScreen('lobby');
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
+                        break;
                     case 'searchStatus':
-                    break;
-                case 'matchFound':
-                    showNotification(`Rakip Bulundu! ${data.gameType === 'ranked' ? '🏆 RANKED' : '🎮 CASUAL'}`, 'success');
-                    setSearching(false);
-                    setOpponent(data.opponent || null);
-                    if (searchTimerRef.current) {
-                        clearInterval(searchTimerRef.current);
-                        searchTimerRef.current = null;
-                    }
-                    setSearchTime(0);
-                    break;
-                case 'kicked':
-                    showNotification(data.message || 'Admin tarafından sistemden atıldınız.', 'error');
-                    setScreen('lobby');
-                    setGameState(null);
-                    setRoomCode('');
-                    break;
-                default:
-                    break;
+                        break;
+                    case 'matchFound':
+                        showNotification(`Rakip Bulundu! ${data.gameType === 'ranked' ? '🏆 RANKED' : '🎮 CASUAL'}`, 'success');
+                        setSearching(false);
+                        setOpponent(data.opponent || null);
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
+                        break;
                 }
             };
 
@@ -686,8 +577,29 @@
                 const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
                 
                 return (
-                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
+                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6 relative overflow-hidden">
+                        {/* Animated Background */}
+                        <div className="absolute inset-0 overflow-hidden">
+                            {[...Array(20)].map((_, i) => 
+                                <div
+                                    key={i}
+                                    className="absolute animate-pulse"
+                                    style={{
+                                        left: `${Math.random() * 100}%`,
+                                        top: `${Math.random() * 100}%`,
+                                        width: `${Math.random() * 4 + 2}px`,
+                                        height: `${Math.random() * 4 + 2}px`,
+                                        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                                        borderRadius: '50%',
+                                        animationDelay: `${Math.random() * 2}s`,
+                                        animationDuration: `${Math.random() * 3 + 2}s`
+                                    }}
+                                />
+                            )}
+                        </div>
+
                         {notification && <Toast message={notification.message} type={notification.type} />}
+
                         <div className="relative z-10 max-w-md w-full">
                             <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20">
                                 {/* Player Card */}
@@ -945,62 +857,6 @@
                 );
             }
 
-            // --- OYUN SONU EKRANI ---
-            if (screen === 'end' && endInfo) {
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
-                        {notification && <Toast message={notification.message} type={notification.type} />}
-                        <div className="bg-black/40 backdrop-blur-lg rounded-3xl p-8 text-center text-white max-w-md w-full shadow-2xl border border-white/10">
-                            {/* KAZANAN BİLGİSİ */}
-                            <div className="mb-6">
-                                {opponent?.photoUrl && !endInfo.isWinner ? (
-                                    <img src={opponent.photoUrl} alt={opponent.name || opponent.username} className="w-20 h-20 rounded-full mx-auto mb-3 border-4 border-yellow-400 shadow-lg" />
-                                ) : playerData?.photoUrl && endInfo.isWinner ? (
-                                    <img src={playerData.photoUrl} alt={playerData.username} className="w-20 h-20 rounded-full mx-auto mb-3 border-4 border-yellow-400 shadow-lg" />
-                                ) : (
-                                    <div className="w-20 h-20 rounded-full bg-slate-700 border-4 border-slate-600 flex items-center justify-center shadow-lg mx-auto mb-3">
-                                        👤
-                                    </div>
-                                )}
-                                <h2 className="text-3xl font-bold mb-2">
-                                    {endInfo.isWinner ? '🏆 Kazandın!' : '❌ Kaybettin'}
-                                </h2>
-                                <p className="text-lg mb-1">
-                                    Kazanan: {endInfo.isWinner ? playerData?.username : opponent?.name || opponent?.username || 'Rakip'}
-                                </p>
-                            </div>
-
-                            {/* ELO BİLGİSİ */}
-                            {endInfo.isRanked && (
-                                <div className="mb-6 space-y-2">
-                                    {endInfo.isWinner ? (
-                                        <p className="text-green-400 font-bold text-lg">
-                                            ELO: +{endInfo.eloChange}
-                                        </p>
-                                    ) : (
-                                        <p className="text-red-400 font-bold text-lg">
-                                            ELO: {endInfo.eloChange}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* KAYBEDENİN PUANI */}
-                            {!endInfo.isWinner && (
-                                <div className="mb-6 text-sm text-white/70">
-                                    <p>Kayıp: -{Math.abs(endInfo.eloChange || 0)} ELO</p>
-                                </div>
-                            )}
-
-                            {/* GERİ SAYIM */}
-                            <p className="mt-6 text-sm text-white/60">
-                                4 saniye içinde lobiye dönülüyor...
-                            </p>
-                        </div>
-                    </div>
-                );
-            }
-
             // --- OYUN EKRANI ---
             if (screen === 'game' && gameState) {
                 // Tahtada görsel olarak taşları döndürmek gerekir mi?
@@ -1055,10 +911,10 @@
                             {/* Yatay Kaydırma Alanı */}
                             <div 
                                 ref={boardScrollRef}
-                                className="w-full h-full overflow-x-auto overflow-y-hidden hide-scrollbar flex items-center justify-center px-2 sm:px-8"
+                                className="w-full h-full overflow-x-auto overflow-y-hidden hide-scrollbar flex items-center px-8"
                                 style={{ scrollBehavior: 'smooth' }}
                             >
-                                <div className="flex flex-nowrap items-center justify-center gap-0 py-10">
+                                <div className="flex items-center gap-1 mx-auto min-w-max py-10">
                                     
                                     {/* SOL IŞIKLI GÖSTERGE */}
                                     {validMoves.includes('left') && selectedTileIndex !== null && gameState.board.length > 0 && (
@@ -1084,7 +940,7 @@
                                                 values={tile} 
                                                 vertical={tile[0] === tile[1]}
                                                 disabled={true}
-                                                scale={0.75}
+                                                scale={0.95}
                                                 animateIn={i === gameState.board.length - 1 || i === 0}
                                             />
                                         ))
@@ -1149,7 +1005,7 @@
 
                             {/* Taş Dizilimi */}
                             <div className="w-full max-w-4xl mx-auto overflow-y-auto max-h-[40vh] p-2">
-                                <div className="flex flex-wrap justify-center gap-1">
+                                <div className="flex justify-center gap-2 flex-wrap">
                                     {myHand.map((tile, index) => {
                                         const canPlay = isMyTurn && (gameState.board.length === 0 || calculateValidMoves(tile).length > 0);
                                         
@@ -1166,243 +1022,6 @@
                                         );
                                     })}
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
-
-            // --- LOBBY EKRANI ---
-            if (screen === 'loading') {
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-                        <div className="text-center">
-                            <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                            <p className="text-white text-xl font-bold">Yükleniyor...</p>
-                        </div>
-                    </div>
-                );
-            }
-
-            if (screen === 'lobby') {
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
-                        {notification && <Toast message={notification.message} type={notification.type} />}
-                        <div className="relative z-10 max-w-md w-full">
-                            <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20">
-                                {/* Player Card */}
-                                <div className="text-center mb-8">
-                                    {playerData?.photoUrl && (
-                                        <img src={playerData.photoUrl} alt="Profile" className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400" />
-                                    )}
-                                    <h2 className="text-white text-2xl font-bold mb-2">{playerData?.username}</h2>
-                                    {!playerData?.isGuest && (
-                                        <div className="flex justify-center gap-3">
-                                            <span className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-4 py-1 rounded-full text-sm font-bold">
-                                                LVL {Math.min(playerData?.level || 0, 10)}
-                                            </span>
-                                            <span className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-4 py-1 rounded-full text-sm font-bold">
-                                                {playerData?.elo} ELO
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="space-y-4">
-                                    <button
-                                        onClick={() => {
-                                            setSearching(true);
-                                            setSearchTime(0);
-                                            sendMessage({ 
-                                                type: 'findMatch', 
-                                                ...playerData,
-                                                playerName: playerData.username
-                                            });
-                                            searchTimerRef.current = setInterval(() => {
-                                                setSearchTime(prev => prev + 1);
-                                            }, 1000);
-                                        }}
-                                        className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all"
-                                    >
-                                        🎯 MAÇ ARA
-                                    </button>
-
-                                    <div className="flex gap-4">
-                                        <input
-                                            type="text"
-                                            placeholder="Oda kodu"
-                                            value={joinCode}
-                                            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                                            className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:border-yellow-400"
-                                            maxLength={6}
-                                        />
-                                        <button
-                                            onClick={() => {
-                                                if (joinCode.length === 6) {
-                                                    sendMessage({ type: 'joinRoom', roomCode: joinCode });
-                                                } else {
-                                                    showNotification('Geçerli bir oda kodu girin (6 karakter)', 'error');
-                                                }
-                                            }}
-                                            className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg transform active:scale-95 transition-all"
-                                        >
-                                            🔗 KATIL
-                                        </button>
-                                    </div>
-
-                                    <button
-                                        onClick={() => {
-                                            const roomCode = generateRoomCode();
-                                            sendMessage({ type: 'createRoom', roomCode });
-                                            setRoomCode(roomCode);
-                                            setScreen('game');
-                                        }}
-                                        className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all"
-                                    >
-                                        🏠 ODA OLUŞTUR
-                                    </button>
-
-                                    <button
-                                        onClick={() => setScreen('leaderboard')}
-                                        className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-600 hover:to-amber-700 text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all"
-                                    >
-                                        🏆 LİDERLİK TABLOSU
-                                    </button>
-
-                                    {/* ADMIN PANEL BUTONU */}
-                                    {isAdmin() && (
-                                        <button
-                                            onClick={() => setShowAdminPanel(true)}
-                                            className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all mt-2"
-                                        >
-                                            🛠️ ADMIN PANEL
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
-
-            if (screen === 'leaderboard') {
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
-                        {notification && <Toast message={notification.message} type={notification.type} />}
-                        <div className="relative z-10 max-w-2xl w-full">
-                            <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20">
-                                <h2 className="text-white text-3xl font-bold text-center mb-6">🏆 LİDERLİK TABLOSU</h2>
-                                {leaderboard.length > 0 ? (
-                                    <div className="space-y-3">
-                                        {leaderboard.map((player, index) => (
-                                            <div key={player._id} className="bg-black/30 rounded-xl p-4 flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-2xl">
-                                                        {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
-                                                    </span>
-                                                    {player.photoUrl && (
-                                                        <img src={player.photoUrl} alt={player.username} className="w-10 h-10 rounded-full border-2 border-yellow-400" />
-                                                    )}
-                                                    <div>
-                                                        <p className="text-white font-bold">{player.username}</p>
-                                                        <p className="text-white/60 text-sm">Level {player.level}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-yellow-400 font-bold">{player.elo} ELO</p>
-                                                    <p className="text-white/60 text-sm">{player.wins}W / {player.losses}L</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-white/60 text-center py-8">Henüz oyuncu bulunmuyor</p>
-                                )}
-                                <button
-                                    onClick={() => setScreen('lobby')}
-                                    className="w-full mt-6 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-bold py-3 rounded-xl shadow-lg transform active:scale-95 transition-all"
-                                >
-                                    🔙 GERİ DÖN
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
-
-            // --- ADMIN PANEL MODALI ---
-            if (showAdminPanel) {
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
-                        {notification && <Toast message={notification.message} type={notification.type} />}
-                        <div className="bg-black/40 backdrop-blur-lg rounded-3xl p-8 text-white max-w-md w-full shadow-2xl border border-white/10">
-                            <h2 className="text-2xl font-bold mb-6 text-center">🛠️ Admin Panel</h2>
-                            <div className="space-y-4">
-                                <button
-                                    onClick={handleResetAllElo}
-                                    className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-3 rounded-xl shadow-lg transform active:scale-95 transition-all"
-                                >
-                                    🔄 Tüm ELO'yu Sıfırla
-                                </button>
-                                <div className="bg-white/10 rounded-xl p-3">
-                                    <label className="block text-sm mb-2">Oyuncu ID ile At:</label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            placeholder="Telegram ID"
-                                            value={kickTargetId}
-                                            onChange={(e) => setKickTargetId(e.target.value)}
-                                            className="flex-1 bg-black/30 border border-white/20 rounded px-3 py-2 text-white placeholder-white/50"
-                                        />
-                                        <button
-                                            onClick={handleKickPlayer}
-                                            className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-4 py-2 rounded-xl transition-all"
-                                        >
-                                            🚫 At
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="bg-white/10 rounded-xl p-3">
-                                    <label className="block text-sm mb-2">Oyuncu Puanı/Level Ayarla:</label>
-                                    <div className="space-y-2">
-                                        <input
-                                            type="text"
-                                            placeholder="Telegram ID"
-                                            value={updateTargetId}
-                                            onChange={(e) => setUpdateTargetId(e.target.value)}
-                                            className="w-full bg-black/30 border border-white/20 rounded px-3 py-2 text-white placeholder-white/50"
-                                        />
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="number"
-                                                placeholder="Yeni ELO"
-                                                value={newElo}
-                                                onChange={(e) => setNewElo(e.target.value)}
-                                                className="flex-1 bg-black/30 border border-white/20 rounded px-3 py-2 text-white placeholder-white/50"
-                                            />
-                                            <input
-                                                type="number"
-                                                placeholder="Yeni Level"
-                                                value={newLevel}
-                                                onChange={(e) => setNewLevel(e.target.value)}
-                                                className="w-24 bg-black/30 border border-white/20 rounded px-3 py-2 text-white placeholder-white/50"
-                                            />
-                                        </div>
-                                        <button
-                                            onClick={handleUpdatePlayerElo}
-                                            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-xl transition-all"
-                                        >
-                                            🔧 Güncelle
-                                        </button>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setShowAdminPanel(false)}
-                                    className="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 rounded-xl shadow-lg transform active:scale-95 transition-all"
-                                >
-                                    🔙 Geri
-                                </button>
                             </div>
                         </div>
                     </div>
