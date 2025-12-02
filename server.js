@@ -499,29 +499,18 @@ async function handleFindMatch(ws, data) {
     try {
         const { telegramId, isGuest = false } = data;
         
-        // Check if player is already in a game
+        // Önce oyuncunun önceki bağlantılarını temizle
         for (const [code, room] of rooms.entries()) {
-            if (room.players.some(p => p.telegramId === telegramId)) {
-                sendMessage(ws, { 
-                    type: 'error', 
-                    message: 'Zaten bir oyundasınız!',
-                    roomCode: code
-                });
-                return;
+            const existingPlayer = room.players.find(p => p.telegramId === telegramId);
+            if (existingPlayer) {
+                // Eğer bu bağlantı zaten bu odadaysa, sadece bağlantıyı güncelle
+                existingPlayer.ws = ws;
+                playerConnections.set(ws, { playerId: telegramId, roomCode: code });
+                return sendGameState(ws, code);
             }
         }
-
-        // Check if player is already in queue
-        const existingInQueue = matchQueue.findIndex(p => p.telegramId === telegramId);
-        if (existingInQueue !== -1) {
-            sendMessage(ws, { 
-                type: 'error', 
-                message: 'Zaten eşleşme arıyorsunuz!' 
-            });
-            return;
-        }
-
-        // Add to queue with session ID for reconnection
+        
+        // Eğer oyuncu bir odada değilse devam et // Add to queue with session ID for reconnection
         const player = {
             ws,
             telegramId,
@@ -543,14 +532,19 @@ async function handleFindMatch(ws, data) {
         }
 
         // For ranked games, only match telegram users with other telegram users
-        // For guest games, only match guests with other guests
+        // For guest games,// Dereceli oyun için sadece Telegram kullanıcılarını eşleştir
+        // Özel oda için herhangi bir kullanıcıyı eşleştir
         const matchIndex = matchQueue.findIndex(p => {
-            const sameAccountType = p.isGuest === player.isGuest;
-            const eloDifference = Math.abs((p.elo || 0) - (player.elo || 0)) <= 200;
-            const notSamePlayer = p.telegramId !== player.telegramId;
-            const bothReady = p.ws.readyState === WebSocket.OPEN && ws.readyState === WebSocket.OPEN;
+            // Aynı oyuncu değil mi kontrol et
+            if (p.telegramId === player.telegramId) return false;
             
-            return sameAccountType && eloDifference && notSamePlayer && bothReady;
+            // Eğer dereceli oyun ise sadece Telegram kullanıcılarını eşleştir
+            if (!isGuest && !player.isGuest) {
+                return Math.abs((p.elo || 0) - (player.elo || 0)) <= 200;
+            }
+            
+            // Özel oda için herhangi bir kullanıcıyı eşleştir
+            return true;
         });
 
         if (matchIndex !== -1) {
@@ -643,6 +637,54 @@ function handleDisconnect(ws) {
     
     // Bağlantıyı temizle
     playerConnections.delete(ws);
+}
+
+function handleLeaveGame(ws) {
+    const connection = playerConnections.get(ws);
+    if (!connection) return;
+
+    const { playerId, roomCode } = connection;
+    const room = rooms.get(roomCode);
+    
+    // Eğer oyuncu bir odadaysa
+    if (room) {
+        // Oyuncuyu odadan çıkar
+        const playerIndex = room.players.findIndex(p => p.ws === ws);
+        if (playerIndex !== -1) {
+            room.players.splice(playerIndex, 1);
+        }
+
+        // Eğer oda boşsa sil
+        if (room.players.length === 0) {
+            rooms.delete(roomCode);
+        } else {
+            // Diğer oyuncuya haber ver
+            const otherPlayer = room.players[0];
+            if (otherPlayer && otherPlayer.ws) {
+                sendMessage(otherPlayer.ws, {
+                    type: 'opponentLeft',
+                    message: 'Rakibiniz oyundan ayrıldı',
+                    roomCleared: true  // Oda temizlendi bilgisi
+                });
+                
+                // Diğer oyuncunun bağlantısını temizle
+                playerConnections.delete(otherPlayer.ws);
+            }
+            // Odayı temizle
+            rooms.delete(roomCode);
+        }
+    }
+
+    // Bağlantıyı temizle
+    playerConnections.delete(ws);
+    
+    // Eşleşme kuyruğundan da çıkar
+    const queueIndex = matchQueue.findIndex(p => p.ws === ws);
+    if (queueIndex !== -1) {
+        matchQueue.splice(queueIndex, 1);
+    }
+    
+    console.log(`Oyuncu çıktı: ${playerId}, Oda: ${roomCode}`);
 }
 
 const PORT = process.env.PORT || 10000;
