@@ -125,9 +125,96 @@ socket.on('reconnectFailed', () => {
     showModal('Sunucuya bağlanılamadı. Lütfen sayfayı yenileyin.', 'error');
 });
 
+// Eşleşme bulunduğunda çağrılır
+function handleMatchFound(data) {
+    console.log('🔵 Eşleşme bulundu:', data);
+    
+    // Eğer zaten bir odadaysanız, bağlantıyı güncelle
+    gameState.roomCode = data.roomCode;
+    gameState.myColor = data.color;
+    gameState.opponent = data.opponent;
+    gameState.isSearching = false;
+    
+    // Oyun ekranını göster
+    showScreen('game');
+    showStatus(`Rakip bulundu: ${data.opponent.username || 'Bilinmeyen'}`);
+    
+    // Oyun tahtasını başlat
+    if (data.gameState) {
+        Object.assign(gameState, data.gameState);
+        drawBoard();
+    }
+}
+
+// Oda oluşturma başarılı olduğunda
+socket.on('roomCreated', (data) => {
+    console.log('✅ Oda başarıyla oluşturuldu:', data);
+    gameState.roomCode = data.roomCode;
+    gameState.isHost = true;
+    gameState.isSearching = true;
+    
+    // Oda kodunu göster
+    showStatus(`Oda Kodu: ${data.roomCode}\nRakip bekleniyor...`);
+    
+    // Oda kodunu ekranda göster
+    if (roomCodeOutput) {
+        roomCodeOutput.textContent = data.roomCode;
+        roomCodeOutput.classList.remove('hidden');
+    }
+});
+
+// Odaya katılma başarılı olduğunda
+socket.on('joinedRoom', (data) => {
+    console.log('✅ Odaya katıldınız:', data);
+    gameState.roomCode = data.roomCode;
+    gameState.myColor = data.color || 'white';
+    gameState.opponent = data.opponent;
+    gameState.isSearching = false;
+    
+    // Oyun ekranına geç
+    showScreen('game');
+    showStatus(`Oyun başladı! Sıra ${gameState.isMyTurn ? 'sizde' : 'rakibinizde'}`);
+});
+
+// Oda bulunamadı hatası
+socket.on('roomNotFound', (data) => {
+    console.error('❌ Oda bulunamadı:', data);
+    showModal('Oda bulunamadı. Lütfen geçerli bir oda kodu giriniz.', 'error');
+    showScreen('main');
+});
+
+// Oda dolu hatası
+socket.on('roomFull', (data) => {
+    console.error('❌ Oda dolu:', data);
+    showModal('Bu oda dolu. Lütfen başka bir oda seçiniz.', 'error');
+    showScreen('main');
+});
+
+// Socket event listeners
 socket.on('matchFound', (data) => {
-    console.log('Eşleşme bulundu:', data);
-    handleMatchFound(data);
+    console.log('🔵 Sunucudan eşleşme bildirimi:', data);
+    try {
+        handleMatchFound(data);
+    } catch (error) {
+        console.error('Eşleşme işlenirken hata:', error);
+        showModal('Eşleşme işlenirken bir hata oluştu', 'error');
+    }
+});
+
+// Kuyruk güncelleme bildirimi
+socket.on('queueUpdate', (data) => {
+    console.log('📊 Kuyruk güncellendi:', data);
+    if (gameState.isSearching) {
+        showStatus(data.message || `Sırada bekleniyor... (${data.position || 1}. sıradasınız)`);
+    }
+});
+
+// Arama iptal edildi bildirimi
+socket.on('searchCancelled', (data) => {
+    console.log('❌ Arama iptal edildi:', data);
+    gameState.isSearching = false;
+    showModal(data.message || 'Arama iptal edildi', 'info');
+    showScreen('main');
 });
 
 socket.on('opponentLeft', (data) => {
@@ -439,18 +526,40 @@ function handleCellClick(r, c) {
 
 function startMatchmaking(isGuest = false) {
     if (gameState.isSearching) {
-        showModal('Zaten eşleşme arıyorsunuz!');
+        console.log('⚠️ Zaten eşleşme aranıyor, önceki arama iptal ediliyor...');
+        // Önceki aramayı iptal et
+        cancelSearch();
+        // Kısa bir bekleme süresi ekle
+        setTimeout(() => {
+            startMatchmaking(isGuest);
+        }, 500);
         return;
     }
+    
+    console.log(`🔄 Eşleşme başlatılıyor: ${isGuest ? 'Misafir Modu' : 'Sıralı Maç'}`);
     
     gameState.isSearching = true;
     gameState.isGuest = isGuest;
     gameState.gameType = isGuest ? 'friendly' : 'ranked';
     
-    socket.emit('findMatch', { 
+    const playerData = {
         telegramId: isGuest ? `guest_${Date.now()}` : 'user123', // Gerçek uygulamada bu kullanıcı kimliği olacak
         isGuest,
-        gameType: gameState.gameType
+        gameType: gameState.gameType,
+        timestamp: Date.now()
+    };
+    
+    console.log('📤 Sunucuya eşleşme isteği gönderiliyor:', playerData);
+    
+    socket.emit('findMatch', playerData, (response) => {
+        if (response && response.error) {
+            console.error('❌ Eşleşme hatası:', response.error);
+            showModal(`Eşleşme hatası: ${response.error}`, 'error');
+            gameState.isSearching = false;
+            showScreen('main');
+            return;
+        }
+        console.log('✅ Eşleşme isteği alındı');
     });
     
     showScreen('searching');
@@ -458,8 +567,30 @@ function startMatchmaking(isGuest = false) {
     startSearchTimer();
 }
 
+// Arama iptal etme fonksiyonu
+function cancelSearch() {
+    if (gameState.isSearching) {
+        console.log('🔍 Eşleşme araması iptal ediliyor...');
+        socket.emit('cancelSearch');
+        gameState.isSearching = false;
+        stopSearchTimer();
+        showScreen('main');
+    }
+}
+
+// İptal butonunu ayarla
+const cancelSearchBtn = document.getElementById('cancelSearchBtn');
+if (cancelSearchBtn) {
+    cancelSearchBtn.onclick = () => {
+        cancelSearch();
+    };
+}
+
 dereceliBtn.onclick = () => {
-    if (gameState.isSearching) return;
+    if (gameState.isSearching) {
+        cancelSearch();
+        return;
+    }
     
     gameState.isSearching = true;
     gameState.gameType = 'ranked';
@@ -489,10 +620,31 @@ cancelRankedBtn.onclick = () => {
 };
 
 createRoomBtn.onclick = () => {
+    // Önce arama yapılıyorsa iptal et
+    if (gameState.isSearching) {
+        cancelSearch();
+    }
+    
+    // Oda kodu oluştur
     const roomCode = generateRoomCode();
+    console.log(`🔄 Oda oluşturuluyor: ${roomCode}`);
+    
+    // Oyun durumunu güncelle
     gameState.roomCode = roomCode;
     gameState.myColor = 'red';
-    socket.emit('createRoom', { roomCode });
+    gameState.isHost = true;
+    gameState.isSearching = true;
+    
+    // Kullanıcıya bilgi göster
+    showStatus('Oda oluşturuluyor...');
+    showScreen('searching');
+    
+    // Sunucuya oda oluşturma isteği gönder
+    socket.emit('createRoom', { 
+        roomCode,
+        playerName: gameState.playerName || 'Oyuncu',
+        isGuest: gameState.isGuest || false
+    });
 };
 
 backToMainBtn.onclick = () => {
@@ -542,6 +694,28 @@ function leaveGame() {
     // Oyun durumunu sıfırla
     resetGameState();
     showScreen('main');
+}
+
+// Odaya katılma fonksiyonu
+function joinRoom(roomCode) {
+    if (!roomCode || roomCode.length !== 6) {
+        showModal('Lütfen geçerli bir oda kodu giriniz (6 karakter)', 'error');
+        return;
+    }
+    
+    console.log(`🔄 Odaya katılmaya çalışılıyor: ${roomCode}`);
+    showStatus('Odaya katılıyor...');
+    showScreen('searching');
+    
+    gameState.roomCode = roomCode;
+    gameState.isHost = false;
+    gameState.isSearching = true;
+    
+    socket.emit('joinRoom', {
+        roomCode,
+        playerName: gameState.playerName || 'Oyuncu',
+        isGuest: gameState.isGuest || false
+    });
 }
 
 // Oyun durumunu sıfırla
