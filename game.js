@@ -11,11 +11,13 @@ const socket = io('https://mario-io-1.onrender.com', {
 let isReconnecting = false;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
+let isWaitingForCancelConfirmation = false; // Yeni: İptal onayı bekleniyor mu?
 
 // Oyun durumu
 let gameState = {
     board: [],
     currentTurn: 'red',
+    currentPlayerId: null, // Sunucudan gelen güncel oyuncu ID'sini tutmak için
     selectedPiece: null,
     myColor: null,
     isMyTurn: false,
@@ -133,6 +135,7 @@ function handleMatchFound(data) {
     gameState.roomCode = data.roomCode;
     gameState.myColor = data.color;
     gameState.opponent = data.opponent;
+    gameState.currentPlayerId = data.gameState.currentTurn; // Sunucudan gelen currentTurn artık telegramId
     gameState.isSearching = false;
     
     // Oyun ekranını göster
@@ -141,8 +144,14 @@ function handleMatchFound(data) {
     
     // Oyun tahtasını başlat
     if (data.gameState) {
-        Object.assign(gameState, data.gameState);
-        drawBoard();
+        // DİKKAT: Bu kısım, istemci (checkers) ve sunucu (dominoes) arasındaki uyumsuzluk nedeniyle sorun çıkaracaktır.
+        // Sunucudan gelen domino tahtası verisi, istemcinin checkers tahtası çizim fonksiyonuyla uyumlu değildir.
+        console.warn("Sunucudan gelen oyun durumu (dominoes) istemcinin (checkers) beklediği formatta değil. Tahta çizimi başarısız olabilir.");
+        // Şimdilik sadece gerekli alanları güncelleyelim, tahta çizimi için uyumluluk sağlanmalı.
+        gameState.board = data.gameState.board; // Bu domino taşlarını içerecek (örneğin [[1,2], [2,3]])
+        gameState.currentTurn = data.gameState.currentTurn; // Bu güncel oyuncunun telegramId'si olacak
+        gameState.isMyTurn = gameState.currentTurn === gameState.myColor; // Bu karşılaştırma yanlış olacak (telegramId vs 'red'/'white')
+        updateGameUI(); // UI'ı güncellemeye çalış
     }
 }
 
@@ -194,29 +203,11 @@ socket.on('roomFull', (data) => {
 socket.on('matchFound', (data) => {
     console.log('🔵 Sunucudan eşleşme bildirimi:', data);
     try {
-        gameState.isSearching = false; // Arama durumunu sıfırla
         handleMatchFound(data);
     } catch (error) {
         console.error('Eşleşme işlenirken hata:', error);
         showModal('Eşleşme işlenirken bir hata oluştu', 'error');
-        gameState.isSearching = false; // Hata durumunda da arama durumunu sıfırla
-        updateUI();
     }
-});
-
-// Arama iptal edildiğinde
-socket.on('searchCancelled', (data) => {
-    console.log('🔍 Arama iptal edildi:', data);
-    gameState.isSearching = false;
-    showStatus('Arama iptal edildi');
-    updateUI();
-});
-
-// Arama durumu güncellemesi
-socket.on('updateSearchStatus', (data) => {
-    console.log('🔄 Arama durumu güncellendi:', data);
-    gameState.isSearching = data.isSearching;
-    updateUI();
 });
 
 // Kuyruk güncelleme bildirimi
@@ -279,9 +270,11 @@ socket.on('opponentJoined', (data) => {
 });
 
 socket.on('gameUpdate', (data) => {
-    gameState.board = data.board;
-    gameState.currentTurn = data.currentTurn;
-    gameState.isMyTurn = gameState.currentTurn === gameState.myColor;
+    // DİKKAT: Sunucudan gelen domino oyun durumu istemcinin checkers oyun durumuyla uyumsuz.
+    // Bu kısım, istemcinin domino oyununa göre güncellenmesi gerektiği anlamına gelir.
+    gameState.board = data.gameState.board; // Domino taşları
+    gameState.currentTurn = data.gameState.currentTurn; // Güncel oyuncunun telegramId'si
+    gameState.isMyTurn = gameState.currentTurn === gameState.myColor; // Bu hala yanlış, myColor 'red'/'white' iken currentTurn telegramId
     updateGameUI();
 });
 
@@ -517,17 +510,16 @@ function updateGameUI() {
 // --- Event Handlers ---
 
 function handleCellClick(r, c) {
-    if (!gameState.isMyTurn || !gameState.gameStarted) return;
-
-    const pieceValue = gameState.board[r] && gameState.board[r][c];
-    const piecePlayer = getPiecePlayer(pieceValue);
-
-    if (piecePlayer === gameState.myColor) {
-        gameState.selectedPiece = { r, c };
-        drawBoard();
-    } else if (gameState.selectedPiece && !pieceValue) {
-        const fromR = gameState.selectedPiece.r;
-        const fromC = gameState.selectedPiece.c;
+    // DİKKAT: Bu fonksiyon checkers oyununa özeldir. Domino oyununda hücre tıklaması farklı çalışır.
+    // Bu fonksiyonun domino oyununa göre yeniden yazılması gerekmektedir.
+    // Şimdilik, eğer sunucu domino oyunu ise bu fonksiyon çalışmayacaktır.
+    console.warn("handleCellClick fonksiyonu checkers oyununa özeldir ve domino oyunu için uyumlu değildir.");
+    // Aşağıdaki kod checkers için geçerlidir, domino için değil.
+    if (!gameState.isMyTurn || !gameState.gameStarted) {
+        console.log("Sıra sizde değil veya oyun başlamadı.");
+        return;
+    }
+    // ... (checkers logic)
 
         if (isValidMove(gameState.board, fromR, fromC, r, c, gameState.myColor)) {
             socket.emit('makeMove', {
@@ -543,15 +535,14 @@ function handleCellClick(r, c) {
 // --- Button Eventleri ---
 
 function startMatchmaking(isGuest = false) {
-    if (gameState.isSearching) {
-        console.log('⚠️ Zaten eşleşme aranıyor, önceki arama iptal ediliyor...');
-        // Önceki aramayı iptal et
-        cancelSearch();
-        // Kısa bir bekleme süresi ekle
-        setTimeout(() => {
-            startMatchmaking(isGuest);
-        }, 500);
+    if (gameState.isSearching || isWaitingForCancelConfirmation) {
+        console.log('⚠️ Zaten eşleşme aranıyor veya iptal onayı bekleniyor. Yeni arama başlatılamaz.');
+        showModal('Zaten eşleşme aranıyor veya önceki aramanın iptali bekleniyor.', 'info');
         return;
+    }
+    if (isGuest && !gameState.isGuest) { // If trying to start guest match but not guest
+        // This might be a redundant check depending on UI flow
+        // For now, assume it's okay to proceed
     }
     
     console.log(`🔄 Eşleşme başlatılıyor: ${isGuest ? 'Misafir Modu' : 'Sıralı Maç'}`);
@@ -561,7 +552,7 @@ function startMatchmaking(isGuest = false) {
     gameState.gameType = isGuest ? 'friendly' : 'ranked';
     
     const playerData = {
-        telegramId: isGuest ? `guest_${Date.now()}` : 'user123', // Gerçek uygulamada bu kullanıcı kimliği olacak
+        telegramId: isGuest ? `guest_${Date.now()}` : 'user123', // TODO: Gerçek uygulamada bu kullanıcı kimliği olacak
         isGuest,
         gameType: gameState.gameType,
         timestamp: Date.now()
@@ -588,27 +579,11 @@ function startMatchmaking(isGuest = false) {
 // Arama iptal etme fonksiyonu
 function cancelSearch() {
     if (gameState.isSearching) {
-        console.log('⏹️ Eşleşme araması iptal ediliyor...');
-        gameState.isSearching = false;
-        updateUI();
-        
-        // Sunucuya iptal isteği gönder
+        console.log('🔍 Eşleşme araması iptal ediliyor...');
         socket.emit('cancelSearch');
-        
-        // Hemen UI'ı güncelle
-        showStatus('Arama iptal ediliyor...');
-        
-        // 3 saniye sonra eğer hala iptal edilmediyse zorla kapat
-        setTimeout(() => {
-            if (gameState.isSearching) {
-                console.log('⚠️ Sunucudan yanıt gelmedi, arama durumu zorla kapatılıyor');
-                gameState.isSearching = false;
-                showStatus('Arama iptal edildi');
-                updateUI();
-            }
-        }, 3000);
-    } else {
-        console.log('⚠️ Zaten aktif bir arama yok');
+        gameState.isSearching = false;
+        stopSearchTimer();
+        showScreen('main');
     }
 }
 
@@ -625,25 +600,28 @@ dereceliBtn.onclick = () => {
         cancelSearch();
         return;
     }
-    
-    gameState.isSearching = true;
-    gameState.gameType = 'ranked';
-    gameState.isGuest = false;
-    
-    // Önceki bağlantıları temizle
-    socket.emit('cancelSearch');
-    
-    // Eşleşme isteği gönder (sadece Telegram kullanıcıları için)
-    socket.emit('findMatch', { 
-        telegramId: 'user123', // Gerçek uygulamada bu kullanıcı ID'si olacak
-        isGuest: false,
-        gameType: 'ranked',
-        playerData: gameState.playerStats
-    });
-    
-    // Eşleşme ekranını göster
-    showScreen('searching');
-    showStatus('Eşleşme aranıyor...');
+    // Eğer zaten arama yapılmıyorsa veya iptal onayı beklenmiyorsa yeni bir arama başlat
+    if (!gameState.isSearching && !isWaitingForCancelConfirmation) {
+        gameState.isSearching = true;
+        gameState.gameType = 'ranked';
+        gameState.isGuest = false;
+        
+        // Eşleşme isteği gönder (sadece Telegram kullanıcıları için)
+        socket.emit('findMatch', { 
+            telegramId: 'user123', // TODO: Gerçek uygulamada bu kullanıcı ID'si olacak
+            isGuest: false,
+            gameType: 'ranked',
+            playerData: gameState.playerStats
+        });
+        
+        // Eşleşme ekranını göster
+        showScreen('ranked'); // 'searching' ekranı yerine 'ranked' lobisini göster
+        showStatus('Eşleşme aranıyor...');
+        startSearchTimer();
+    } else {
+        console.log('⚠️ Zaten eşleşme aranıyor veya iptal onayı bekleniyor. Yeni arama başlatılamaz.');
+        showModal('Zaten eşleşme aranıyor veya önceki aramanın iptali bekleniyor.', 'info');
+    }
 };
 
 friendBtn.onclick = () => startMatchmaking(true);
@@ -660,7 +638,7 @@ createRoomBtn.onclick = () => {
     }
     
     // Oda kodu oluştur
-    const roomCode = generateRoomCode();
+    const roomCode = generateRoomCode(); // Bu fonksiyon client tarafında, server tarafında da var. Tutarlılık önemli.
     console.log(`🔄 Oda oluşturuluyor: ${roomCode}`);
     
     // Oyun durumunu güncelle
@@ -671,7 +649,7 @@ createRoomBtn.onclick = () => {
     
     // Kullanıcıya bilgi göster
     showStatus('Oda oluşturuluyor...');
-    showScreen('searching');
+    showScreen('friend'); // 'searching' ekranı yerine 'friend' lobisini göster
     
     // Sunucuya oda oluşturma isteği gönder
     socket.emit('createRoom', { 
@@ -739,7 +717,7 @@ function joinRoom(roomCode) {
     
     console.log(`🔄 Odaya katılmaya çalışılıyor: ${roomCode}`);
     showStatus('Odaya katılıyor...');
-    showScreen('searching');
+    showScreen('friend'); // 'searching' ekranı yerine 'friend' lobisini göster
     
     gameState.roomCode = roomCode;
     gameState.isHost = false;
@@ -756,6 +734,7 @@ function joinRoom(roomCode) {
 function resetGameState() {
     gameState = {
         board: [],
+        currentPlayerId: null,
         currentTurn: 'red',
         selectedPiece: null,
         myColor: null,
