@@ -389,12 +389,17 @@ function leaveGame() {
     socket.emit('leaveGame');
     
     gameState = {
-        myPlayerId: null,
+        myPlayerId: null, // Bu objeyi tamamen yeniden oluşturuyoruz
+        players: {},
         board: [],
+        market: [],
+        currentPlayer: null,
+        selectedTile: null,
         isMyTurn: false,
         roomCode: null,
         isSearching: false,
-        gameStarted: false
+        gameStarted: false,
+        opponent: null
     };
     
     showScreen('main');
