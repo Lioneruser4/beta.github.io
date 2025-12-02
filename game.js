@@ -194,11 +194,29 @@ socket.on('roomFull', (data) => {
 socket.on('matchFound', (data) => {
     console.log('🔵 Sunucudan eşleşme bildirimi:', data);
     try {
+        gameState.isSearching = false; // Arama durumunu sıfırla
         handleMatchFound(data);
     } catch (error) {
         console.error('Eşleşme işlenirken hata:', error);
         showModal('Eşleşme işlenirken bir hata oluştu', 'error');
+        gameState.isSearching = false; // Hata durumunda da arama durumunu sıfırla
+        updateUI();
     }
+});
+
+// Arama iptal edildiğinde
+socket.on('searchCancelled', (data) => {
+    console.log('🔍 Arama iptal edildi:', data);
+    gameState.isSearching = false;
+    showStatus('Arama iptal edildi');
+    updateUI();
+});
+
+// Arama durumu güncellemesi
+socket.on('updateSearchStatus', (data) => {
+    console.log('🔄 Arama durumu güncellendi:', data);
+    gameState.isSearching = data.isSearching;
+    updateUI();
 });
 
 // Kuyruk güncelleme bildirimi
@@ -570,11 +588,27 @@ function startMatchmaking(isGuest = false) {
 // Arama iptal etme fonksiyonu
 function cancelSearch() {
     if (gameState.isSearching) {
-        console.log('🔍 Eşleşme araması iptal ediliyor...');
-        socket.emit('cancelSearch');
+        console.log('⏹️ Eşleşme araması iptal ediliyor...');
         gameState.isSearching = false;
-        stopSearchTimer();
-        showScreen('main');
+        updateUI();
+        
+        // Sunucuya iptal isteği gönder
+        socket.emit('cancelSearch');
+        
+        // Hemen UI'ı güncelle
+        showStatus('Arama iptal ediliyor...');
+        
+        // 3 saniye sonra eğer hala iptal edilmediyse zorla kapat
+        setTimeout(() => {
+            if (gameState.isSearching) {
+                console.log('⚠️ Sunucudan yanıt gelmedi, arama durumu zorla kapatılıyor');
+                gameState.isSearching = false;
+                showStatus('Arama iptal edildi');
+                updateUI();
+            }
+        }, 3000);
+    } else {
+        console.log('⚠️ Zaten aktif bir arama yok');
     }
 }
 
