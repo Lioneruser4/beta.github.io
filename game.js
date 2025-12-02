@@ -23,6 +23,7 @@ const mainLobby = document.getElementById('main-lobby');
 const rankedLobby = document.getElementById('ranked-lobby');
 const friendLobby = document.getElementById('friend-lobby');
 const gameScreen = document.getElementById('game-screen');
+const postGameLobby = document.getElementById('post-game-lobby'); // Yeni ekran
 const connectionStatus = document.getElementById('connection-status');
 const dereceliBtn = document.getElementById('dereceli-btn');
 const friendBtn = document.getElementById('friend-btn');
@@ -41,6 +42,11 @@ const leaveGameBtn = document.getElementById('leave-game-btn');
 const messageModal = document.getElementById('message-modal');
 const modalMessage = document.getElementById('modal-message');
 const modalCloseBtn = document.getElementById('modal-close-btn');
+// Oyun sonu ekranı elementleri
+const gameResultTitle = document.getElementById('game-result-title');
+const gameResultMessage = document.getElementById('game-result-message');
+const eloChangeDisplay = document.getElementById('elo-change');
+const backToLobbyBtn = document.getElementById('back-to-lobby-btn');
 
 const BOARD_SIZE = 8;
 
@@ -114,9 +120,28 @@ socket.on('gameUpdate', (data) => {
 });
 
 socket.on('gameOver', (data) => {
+    // data objesi: { winner: 'red'/'white', reason: 'win'/'leave', eloChange: 15 }
     const isWinner = data.winner === gameState.myColor;
-    showModal('Oyun bitdi! ' + (isWinner ? 'Siz qazandiniz!' : 'Raqib qazandi!'));
-    setTimeout(() => leaveGame(), 3000);
+    let title = '';
+    let message = '';
+
+    if (data.reason === 'leave') {
+        title = 'Raqib Oyundan Cixdi!';
+        message = 'Siz qazandiniz!';
+    } else {
+        title = isWinner ? '🎉 QAZANDINIZ! 🎉' : '😔 MEGLUB OLDUNUZ 😔';
+        message = isWinner ? 'Tebrikler! Gozel oyun idi.' : 'Novbeti sefer ugurlar!';
+    }
+
+    gameResultTitle.textContent = title;
+    gameResultMessage.textContent = message;
+
+    if (data.eloChange !== undefined && data.eloChange !== null) {
+        const sign = data.eloChange >= 0 ? '+' : '';
+        eloChangeDisplay.textContent = `${sign}${data.eloChange} Puan`;
+        eloChangeDisplay.className = `text-2xl font-bold ${data.eloChange >= 0 ? 'text-green-400' : 'text-red-400'}`;
+    }
+    showScreen('post-game');
 });
 
 socket.on('error', (message) => {
@@ -140,6 +165,7 @@ function showScreen(screen) {
     rankedLobby.classList.add('hidden');
     friendLobby.classList.add('hidden');
     gameScreen.classList.add('hidden');
+    postGameLobby.classList.add('hidden');
 
     if (screen === 'main') {
         mainLobby.classList.remove('hidden');
@@ -160,6 +186,8 @@ function showScreen(screen) {
         gameScreen.classList.remove('hidden');
         clearInterval(searchTimer);
         searchTimer = null;
+    } else if (screen === 'post-game') {
+        postGameLobby.classList.remove('hidden');
     } else {
         loader.classList.remove('hidden');
     }
@@ -395,6 +423,10 @@ joinRoomBtn.onclick = () => {
     gameState.roomCode = roomCode;
     gameState.myColor = 'white';
     socket.emit('joinRoom', { roomCode });
+};
+
+backToLobbyBtn.onclick = () => {
+    leaveGame();
 };
 
 leaveGameBtn.onclick = () => leaveGame();
