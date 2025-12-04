@@ -219,6 +219,7 @@
             const [notification, setNotification] = useState(null);
             const [searching, setSearching] = useState(false);
             const [endInfo, setEndInfo] = useState(null);
+            const [confetti, setConfetti] = useState(false);
             const [opponent, setOpponent] = useState(null);
             
             const wsRef = useRef(null);
@@ -247,6 +248,18 @@
                 connectToServer();
                 return () => { if (wsRef.current) wsRef.current.close(); };
             }, []);
+
+            // Sunucuya yeniden bağlandığında veya playerData yüklendiğinde oyun durumunu iste
+            useEffect(() => {
+                if (connected && playerData && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                    sendMessage({
+                        type: 'reconnect',
+                        telegramId: playerData.telegramId, // Misafirler için null olabilir
+                        username: playerData.username // Misafirler için kullanılır
+                    });
+                    console.log('🔄 Yeniden bağlantı algılandı, sunucudan oyun durumu isteniyor.');
+                }
+            }, [connected, playerData]); // connected ve playerData değiştiğinde tetiklenir
 
             // Telegram Auth
             const initializeTelegramAuth = async () => {
@@ -381,11 +394,24 @@
                     case 'gameUpdate':
                         console.log('🔄 Oyun güncelleniyor...', data.gameState);
                         if (data.gameState && data.gameState.board) {
-                            setGameState(prevState => ({
-                                ...prevState,
-                                ...data.gameState,
-                                playerId: prevState?.playerId || data.gameState.playerId
-                            }));
+                            setGameState(currentGameState => {
+                                let newPlayerId = currentGameState?.playerId;
+
+                                // Eğer playerId henüz ayarlanmamışsa, gelen gameState'deki oyunculardan çıkarmaya çalış
+                                // Bu, özellikle yeniden bağlantı veya ilk oyun durumu senkronizasyonu için önemlidir.
+                                if (!newPlayerId && playerData) {
+                                    const playerEntries = Object.entries(data.gameState.players || {});
+                                    const foundEntry = playerEntries.find(([id, player]) =>
+                                        (playerData.telegramId && player.telegramId === playerData.telegramId) ||
+                                        (!playerData.telegramId && player.name === playerData.username)
+                                    );
+                                    if (foundEntry) {
+                                        newPlayerId = foundEntry[0]; // Anahtar, playerId'dir
+                                        console.log(`✅ Client playerId tespit edildi: ${newPlayerId}`);
+                                    }
+                                }
+                                return { ...currentGameState, ...data.gameState, playerId: newPlayerId };
+                            });
                             setSelectedTileIndex(null);
                             setValidMoves([]);
                         }
@@ -409,6 +435,7 @@
                         const eloMsg = data.eloChanges ? ` (ELO: ${eloChange > 0 ? '+' : ''}${eloChange})` : '';
 
                         setEndInfo({
+
                             winnerName: data.winnerName,
                             isRanked,
                             isWinner: isWinnerClient,
@@ -416,6 +443,7 @@
                         });
                         setScreen('end');
 
+                        setConfetti(true);
                         if (searchTimerRef.current) {
                             clearInterval(searchTimerRef.current);
                             searchTimerRef.current = null;
@@ -423,6 +451,7 @@
                         setSearchTime(0);
 
                         setTimeout(() => {
+                            setConfetti(false);
                             resetGameClientState(); // Tüm oyun state'ini temizle
                             setScreen('lobby');
                             if (isRanked && playerData && !playerData.isGuest) {
@@ -696,11 +725,6 @@
                             <p className="text-gray-300 text-sm tracking-widest uppercase">⚡ Profesyonel Online Oyun ⚡</p>
                         </div>
 
-                        {/* NAVİGASYON */}
-                        <div className="flex justify-center gap-3 mb-6">
-                            <button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold">🏆 Skor Tablosu</button>
-                        </div>
-
                         <div className="w-full max-w-sm bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
                             {/* Player Info */}
                             {playerData && (
@@ -747,10 +771,19 @@
                                         playerName: playerData.username
                                     });
                                 }}
-                                disabled={!connected || searching}
-                                className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4 flex items-center justify-center gap-2"
+                                disabled={!connected || searching || !playerData}
+                                className="w-full bg-gradient-to-r from-red-700 to-red-900 hover:from-red-600 hover:to-red-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4 flex items-center justify-center gap-3"
                             >
-                                <span>🏆</span> {!playerData?.isGuest ? '⚔️ DERECELİ MAÇ ARA' : '🎮 MAÇ ARA (CASUAL)'}
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v11.494m-9-5.747h18" /></svg>
+                                {!playerData?.isGuest ? 'DERECELİ MAÇ ARA' : 'MAÇ ARA (CASUAL)'}
+                            </button>
+
+                            <button 
+                                onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} 
+                                className="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4 flex items-center justify-center gap-3"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                                Skor Tablosu
                             </button>
 
                             <div className="flex items-center gap-2 my-4">
@@ -1030,6 +1063,32 @@
                     </div>
                 );
             }
+
+            // --- STYLES ---
+
+            /* Stil tanımlamaları buraya gelecek */
+            return null;
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<DominoGame />);
+    </script>
+
+    <style>
+        /* Konfeti Stilleri */
+        .confetti-container {
+            overflow: hidden;
+            z-index: 100; /* Diğer içeriklerin üzerinde görünmesi için */
+        }
+
+        .confetti {
+            width: 10px;
+            height: 10px;
+            background-color: #f09; /* Rastgele renkler de kullanabilirsiniz */
+            position: absolute;
+            border-radius: 50%;
+            animation: confetti-fall 3s linear infinite;
+        }
 
             return null;
         };
