@@ -12,7 +12,6 @@ let isReconnecting = false;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 let isWaitingForCancelConfirmation = false; // Yeni: İptal onayı bekleniyor mu?
-let heartbeatInterval = null; // YENİ: Heartbeat için
 
     // --- WebSocket Eventleri ---
     socket.onopen = onSocketOpen;
@@ -112,22 +111,12 @@ function onSocketOpen() {
     connectionStatus.classList.remove('text-yellow-400');
     connectionStatus.classList.add('text-green-500');
     
-    // YENİ: Sunucuyu uyanık tutmak için heartbeat (kalp atışı) başlat
-    clearInterval(heartbeatInterval);
-    heartbeatInterval = setInterval(() => {
-        // Bağlantı açıksa sunucuya ping gönder
-        if (socket.readyState === WebSocket.OPEN) {
-            sendSocketMessage('ping');
-        }
-    }, 25000); // 25 saniyede bir
 }
 
 function onSocketClose(event) {
     console.log('Sunucu bağlantısı kesildi:', event.reason || 'Bilinmeyen neden');
     connectionStatus.textContent = 'Bağlantı kesildi';
     connectionStatus.className = 'text-red-500';
-    // YENİ: Heartbeat'i durdur
-    clearInterval(heartbeatInterval);
     // Otomatik yeniden bağlanma mantığı
     if (!isReconnecting) {
         isReconnecting = true;
@@ -147,9 +136,6 @@ function onSocketMessage(event) {
 
     switch (data.type) {
         case 'connected':
-            // Sunucu yeniden başlatılmış olabilir, oyuncu verilerini yeniden gönderelim.
-            // Bu kısım, sunucu tarafında oyuncu oturumlarını nasıl yönettiğinize bağlı olarak geliştirilebilir.
-            // Şimdilik sadece yeniden bağlanma mantığına odaklanıyoruz.
             console.log('Sunucu onayı:', data.message);
             // --- YENİ: Yeniden bağlanma kontrolü ---
             if (data.isReconnect === false) { // Sadece ilk bağlantıda sıfırla
@@ -324,14 +310,8 @@ function handleGameStart(data) {
 }
 
 function handleGameUpdate(data) {
-    console.log('🔄 Oyun durumu güncellendi', data.gameState);
-    // --- DÜZELTME: Yeniden bağlanma sonrası donmayı engelle ---
-    // Gelen yeni durumu mevcut gameState üzerine yaz.
-    // Bu, özellikle yeniden bağlandıktan sonra oyunun doğru senkronize olmasını sağlar.
-    gameState.board = data.gameState.board;
-    gameState.players = data.gameState.players;
-    gameState.currentPlayer = data.gameState.currentPlayer;
-    updateGameUI(data.gameState); // Arayüzü yeni veriyle güncelle
+    console.log('🔄 Oyun durumu güncellendi');
+    updateGameUI(data.gameState);
 }
 
 // --- WebSocket Mesaj Gönderme ---
@@ -613,23 +593,27 @@ function joinRoom(roomCode) {
 
 // Oyun durumunu sıfırla
 function resetGameState() {
-    // --- DÜZELTME: Oyuncu istatistiklerini (elo, win/loss) koru, sadece oyun tahtasını sıfırla ---
-    const statsToKeep = gameState.playerStats; // Mevcut istatistikleri sakla
-
-    gameState.board = [];
-    // currentPlayerId zaten handleGameStart içinde ayarlanıyor, burada sıfırlamak sorun yaratabilir.
-    // gameState.currentPlayerId = null; 
-    gameState.selectedPiece = null;
-    gameState.myColor = null;
-    gameState.isMyTurn = false;
-    gameState.roomCode = null;
-    gameState.isSearching = false;
-    gameState.gameStarted = false;
-    // isGuest ve playerStats'ı koru
-    // gameState.isGuest = true; // Bu, oyuncu giriş yaptıysa sorun yaratır.
-    gameState.opponentStats = {
-        username: '',
-        elo: 0
+    gameState = {
+        board: [],
+        currentPlayerId: null,
+        currentTurn: 'red',
+        selectedPiece: null,
+        myColor: null,
+        isMyTurn: false,
+        roomCode: null,
+        isSearching: false,
+        gameStarted: false,
+        isGuest: false,
+        playerStats: {
+            elo: 0,
+            wins: 0,
+            losses: 0,
+            draws: 0
+        },
+        opponentStats: {
+            username: '',
+            elo: 0
+        }
     };
     
     // Arayüzü güncelle
