@@ -77,6 +77,41 @@
     </script>
 
     <style>
+        /* Özel Taş Stili */
+        .domino-tile {
+            transition: all 0.3s ease;
+            transform-style: preserve-3d;
+            transform: perspective(1000px) rotateX(15deg);
+        }
+        
+        .domino-tile:hover {
+            transform: perspective(1000px) rotateX(15deg) translateY(-10px);
+            z-index: 10;
+        }
+        
+        .domino-hand {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 4px;
+            padding: 10px 5px;
+            min-height: 140px;
+            transform: perspective(1000px) rotateX(15deg);
+            transform-origin: bottom;
+        }
+        
+        .domino-hand.crowded {
+            gap: 2px;
+        }
+        
+        .domino-hand.crowded .domino-tile {
+            transform: perspective(1000px) rotateX(15deg) scale(0.9);
+        }
+        
+        .domino-hand.crowded .domino-tile:hover {
+            transform: perspective(1000px) rotateX(15deg) scale(1) translateY(-10px);
+        }
+        
         /* Yeşil Çuha Masa Dokusu */
         body { 
             background-color: #1b4d3e;
@@ -686,7 +721,7 @@
 
             if (screen === 'lobby') {
                 return (
-                    <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10">
+                    <div className="fixed inset-0 flex flex-col items-center justify-center p-4 md:p-6 bg-gradient-to-br from-green-900 to-green-800 overflow-auto">
                         {notification && <Toast message={notification.message} type={notification.type} />}
                         
                         <div className="text-center mb-10 animate-float">
@@ -697,7 +732,7 @@
                         </div>
 
                         {/* NAVİGASYON */}
-                        <div className="w-full max-w-sm bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
+                        <div className="w-full max-w-sm bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10 my-auto">
                             {/* Player Info */}
                             {playerData && (
                                 <div className="mb-6 text-center">
@@ -876,7 +911,7 @@
                 const isHandCrowded = myHand.length > 7;
 
                 return (
-                    <div className="fixed inset-0 flex flex-col h-full w-full">
+                <div className="fixed inset-0 flex flex-col h-screen w-full bg-gradient-to-br from-green-900 to-green-800">
                          {notification && <Toast message={notification.message} type={notification.type} />}
                         
                         {/* ÜST PANEL: Rakip */}
@@ -916,14 +951,14 @@
                         </div>
 
                         {/* ORTA PANEL: Masa ve Board */}
-                        <div className="relative w-full" style={{
-                            minHeight: '180px',
+                        <div className="flex-1 w-full flex items-center justify-center" style={{
+                            minHeight: '30vh',
                             maxWidth: '100%',
                             margin: '0 auto',
                             padding: '10px 0',
                             overflowX: 'auto',
                             overflowY: 'hidden',
-                            position: 'relative',
+                            position: 'relative'
                             WebkitOverflowScrolling: 'touch',
                             scrollBehavior: 'smooth'
                         }}>
@@ -1005,7 +1040,34 @@
                         </div>
 
                         {/* ALT PANEL: Oyuncu Eli */}
-                        <div className="bg-gradient-to-t from-black/90 via-table-dark to-transparent pb-6 pt-2 px-2 z-20">
+                        <div className="bg-gradient-to-t from-black/90 via-table-dark to-transparent pb-6 pt-2 px-2 z-20 mt-auto">
+                            <div className={`domino-hand ${myHand.length > 7 ? 'crowded' : ''}`}>
+                                {myHand.map((tile, index) => (
+                                    <div 
+                                        key={index}
+                                        className={`domino-tile relative w-12 h-20 sm:w-14 sm:h-24 cursor-pointer transition-transform duration-200 hover:z-10 ${
+                                            selectedTileIndex === index ? 'transform -translate-y-4' : ''
+                                        }`}
+                                        onClick={() => handleTileSelect(index)}
+                                    >
+                                        <div className="absolute inset-0 bg-white rounded-lg shadow-lg flex flex-col justify-between p-1.5">
+                                            <div className="flex justify-between">
+                                                <span className="text-xs font-bold">{tile[0]}</span>
+                                                <span className="text-xs font-bold">{tile[1]}</span>
+                                            </div>
+                                            <div className="flex justify-center items-center flex-1">
+                                                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center mx-auto">
+                                                    <span className="text-sm font-bold">{tile[0] === tile[1] ? tile[0] : ''}</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-xs font-bold">{tile[1]}</span>
+                                                <span className="text-xs font-bold">{tile[0]}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                             
                             {/* Kontrol Butonları */}
                             <div className="flex justify-between items-center px-4 mb-2">
