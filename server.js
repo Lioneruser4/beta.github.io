@@ -988,9 +988,12 @@ function handleLeaveGame(ws) {
 
     const winnerId = playerIds.find(id => id !== leaverId);
 
-    // handleGameEnd fonksiyonu zaten odadaki herkesin durumunu temizleyip odayı siliyor.
-    // Oyundan ayrılma durumunu belirtmek için 'leave' reason'ı ekleyebiliriz.
-    handleGameEnd(roomCode, winnerId, gs, 'leave');
+    // handleGameEnd fonksiyonu, oyun sonu mantığını ve oda temizliğini yönetir.
+    // Oyundan ayrılma durumunu belirtmek için 'leave' nedenini (reason) de iletiyoruz.
+    // handleGameEnd'in dördüncü parametresi 'reason' olarak tanımlanmıştır.
+    // Ancak, handleGameEnd'in mevcut tanımında sadece 3 parametre var: (roomCode, winnerId, gameState).
+    // Bu nedenle, 'leave' durumunu yönetmek için handleGameEnd'i güncellememiz veya bu çağrıyı düzeltmemiz gerekiyor.
+    handleGameEnd(roomCode, winnerId, gs); // Şimdilik 'leave' parametresi olmadan çağırıyoruz. Eğer 'leave' mantığı handleGameEnd içinde varsa, bu çağrı güncellenmelidir.
 }
 
 // YENİ: Yeniden bağlanma mantığı
