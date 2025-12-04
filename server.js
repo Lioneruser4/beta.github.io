@@ -423,6 +423,7 @@ wss.on('connection', (ws, req) => {
         try {
             const data = JSON.parse(message);
             switch (data.type) {
+                case 'ping': ws.send(JSON.stringify({ type: 'pong' })); break; // İstemci heartbeat'ine yanıt
                 case 'findMatch': handleFindMatch(ws, data); break;
                 case 'cancelSearch': handleCancelSearch(ws); break;
                 case 'createRoom': handleCreateRoom(ws, data); break;
@@ -686,6 +687,19 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
         const isDraw = winnerId === 'DRAW';
         let eloChanges = null;
 
+        // --- YENİ: Oyunun bitiş nedenini belirle ---
+        let reason = 'finished'; // Normal bitiş
+        if (!isDraw && gameState.players[winnerId].hand.length > 0) {
+            // Eğer kazananın elinde hala taş varsa, oyun kilitlenmiştir.
+            reason = 'blocked';
+        }
+        // Oyundan ayrılma durumu 'leave' olarak ayrıca ele alınır.
+        // Bu blok sadece normal oyun sonları için.
+        const finalScores = reason === 'blocked' ? {
+            [player1Id]: gameState.players[player1Id].hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0),
+            [player2Id]: gameState.players[player2Id].hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0)
+        } : null;
+
         // Guest kontrolu - Guest varsa ELO guncellemesi yapma
         const player1IsGuest = room.players[player1Id].isGuest;
         const player2IsGuest = room.players[player2Id].isGuest;
@@ -786,10 +800,12 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
             winner: winnerId, 
             winnerName: isDraw ? 'Beraberlik' : gameState.players[winnerId].name,
             isRanked: isRankedMatch,
+            reason: reason, // 'finished', 'blocked'
             eloChanges: eloChanges ? {
                 winner: eloChanges.winnerChange,
                 loser: eloChanges.loserChange
-            } : null
+            } : null,
+            finalScores: finalScores
         });
 
         // --- DÜZELTME: Oyun bittiğinde her iki oyuncunun da oda bilgisini temizle ---
@@ -807,7 +823,8 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
             type: 'gameEnd', 
             winner: winnerId, 
             winnerName: winnerId === 'DRAW' ? 'Beraberlik' : gameState.players[winnerId].name,
-            isRanked: false
+            isRanked: false,
+            reason: 'error'
         });
 
         // Hata durumunda da oyuncuların oda bilgilerini temizle
