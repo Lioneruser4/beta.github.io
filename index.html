@@ -170,19 +170,7 @@
     <div id="root" class="container"></div>
 
     <script type="text/babel">
-        // React ve diğer bağımlılıkların yüklendiğinden emin ol
-        if (typeof React === 'undefined' || typeof ReactDOM === 'undefined' || typeof Babel === 'undefined') {
-            console.error('Gerekli kütüphaneler yüklenemedi! Lütfen internet bağlantınızı kontrol edin.');
-            document.getElementById('root').innerHTML = `
-                <div style="color: white; text-align: center; padding: 2rem;">
-                    <h2>Uygulama yüklenirken bir hata oluştu</h2>
-                    <p>Lütfen internet bağlantınızı kontrol edip sayfayı yenileyin.</p>
-                    <button onclick="window.location.reload()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #3b82f6; border: none; border-radius: 0.5rem; color: white; cursor: pointer;">
-                        Sayfayı Yenile
-                    </button>
-                </div>`;
-        } else {
-            const { useState, useEffect, useRef, useMemo } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
 
         // Telegram WebApp Initialization
         const tg = window.Telegram?.WebApp;
@@ -191,15 +179,8 @@
             tg.expand();
         }
 
-        // API Base URL - Render backend URL'si
-        const API_URL = 'https://mario-io-1.onrender.com';
-        
-        // Hata ayıklama için konsola yazdır
-        console.log('Backend URL:', API_URL);
-        
-        // React uygulamasını başlat
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<DominoGame />);
+        // API Base URL
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
 
         // --- BİLEŞENLER ---
         
@@ -538,8 +519,8 @@
                         console.log('🎮 Oyun başlıyor...', data.gameState);
                         setGameState(data.gameState);
                         setScreen('game');
-                        localStorage.setItem('dominoPlayerId', data.gameState.playerId); // Oyuncu ID'sini kaydet
-                        localStorage.setItem('dominoRoomCode', roomCode); // State'deki oda kodunu kaydet
+                        localStorage.setItem('dominoPlayerId', data.gameState.playerId);
+                        localStorage.setItem('dominoRoomCode', data.roomCode);
                         setSelectedTileIndex(null);
                         setValidMoves([]);
                         setSearching(false);
@@ -925,7 +906,7 @@
                                 {opponent?.photoUrl ? (
                                     <img
                                         src={opponent.photoUrl}
-                                        alt={opponent?.name || opponent?.username || 'Rakip'}
+                                        alt={opponent.name || opponent.username || 'Rakip'}
                                         className="w-10 h-10 rounded-full border-2 border-yellow-400 shadow-lg object-cover"
                                     />
                                 ) : (
@@ -935,11 +916,11 @@
                                 )}
                                 <div>
                                     <div className="text-white text-sm font-bold shadow-black drop-shadow-md">
-                                        {opponent?.name || 'Rakip'}
+                                        {opponent?.name || opponent?.username || 'Rakip'}
                                     </div>
                                     <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
                                         🎲 {(() => {
-                                            const oppName = opponent?.name;
+                                            const oppName = opponent?.name || opponent?.username;
                                             const oppEntry = Object.values(gameState.players).find(p => p.name === oppName);
                                             return (oppEntry && oppEntry.hand ? oppEntry.hand.length : 0);
                                         })()} Taş
@@ -1060,9 +1041,8 @@
             return null;
         };
 
-            const root = ReactDOM.createRoot(document.getElementById('root'));
-            root.render(<DominoGame />);
-        }
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<DominoGame />);
     </script>
 </body>
 </html>
