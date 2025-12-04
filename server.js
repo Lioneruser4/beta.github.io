@@ -493,6 +493,20 @@ wss.on('close', () => clearInterval(pingInterval));
 
 // --- OYUN MANTIKLARI ---
 
+function cleanupPlayerState(telegramId) {
+    if (!telegramId) return;
+
+    // Kuyruktan kaldır
+    const queueIndex = matchQueue.findIndex(p => p.telegramId === telegramId);
+    if (queueIndex !== -1) {
+        matchQueue.splice(queueIndex, 1);
+        console.log(`🧹 Temizlik: ${telegramId} ID'li oyuncu maç arama kuyruğundan kaldırıldı.`);
+    }
+
+    // Not: Aktif oyun odalarından çıkarmak daha karmaşık ve riskli olabilir.
+    // Şimdilik sadece kuyruğu temizlemek, "zaten kuyrukta" hatasını önleyecektir.
+}
+
 function handleFindMatch(ws, data) {
     if (ws.playerId && playerConnections.has(ws.playerId)) {
         const existingInQueue = matchQueue.find(p => p.playerId === ws.playerId);
@@ -503,6 +517,9 @@ function handleFindMatch(ws, data) {
             return sendMessage(ws, { type: 'error', message: 'Zaten bir oyundasınız' });
         }
     }
+
+    // --- YENİ: Maç aramadan önce oyuncunun eski durumunu temizle ---
+    cleanupPlayerState(data.telegramId);
 
     const playerId = ws.playerId || generateRoomCode();
     ws.playerId = playerId;
