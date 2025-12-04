@@ -190,100 +190,6 @@
             );
         };
 
-        // 4. Yılan Düzeninde Oyun Tahtası (YENİ)
-        const DominoBoard = ({ board }) => {
-            const boardRef = useRef(null);
-            const [layout, setLayout] = useState([]);
-
-            useEffect(() => {
-                if (!boardRef.current) return;
-
-                const calculateLayout = () => {
-                    if (board.length === 0) {
-                        setLayout([]);
-                        return;
-                    }
-
-                    const containerWidth = boardRef.current.offsetWidth;
-                    const containerHeight = boardRef.current.offsetHeight;
-                    const TILE_WIDTH = 40; // sm:w-10
-                    const TILE_HEIGHT = 80; // sm:h-20
-
-                    let x = containerWidth / 2;
-                    let y = containerHeight / 2;
-                    let direction = 'right'; // 'right', 'down', 'left', 'up'
-                    
-                    const newLayout = [];
-                    let currentSegmentLength = 0;
-
-                    board.forEach((tile, index) => {
-                        const isDouble = tile[0] === tile[1];
-                        const tileW = isDouble ? TILE_WIDTH : TILE_HEIGHT;
-                        const tileH = isDouble ? TILE_HEIGHT : TILE_WIDTH;
-
-                        newLayout.push({ tile, x, y, isDouble, direction });
-
-                        // Bir sonraki pozisyonu hesapla
-                        if (direction === 'right') {
-                            x += tileW;
-                            if (x + TILE_HEIGHT > containerWidth - 20) { // Kenara yaklaştı, dön
-                                direction = 'down';
-                                y += tileH / 2 + TILE_WIDTH / 2;
-                            }
-                        } else if (direction === 'down') {
-                            y += tileW;
-                            if (y + TILE_HEIGHT > containerHeight - 20) {
-                                direction = 'left';
-                                x -= tileH / 2 + TILE_WIDTH / 2;
-                            }
-                        } else if (direction === 'left') {
-                            x -= tileW;
-                            if (x - TILE_HEIGHT < 20) {
-                                direction = 'up';
-                                y -= tileH / 2 + TILE_WIDTH / 2;
-                            }
-                        } else if (direction === 'up') {
-                            y -= tileW;
-                            if (y - TILE_HEIGHT < 20) {
-                                direction = 'right';
-                                x += tileH / 2 + TILE_WIDTH / 2;
-                            }
-                        }
-                    });
-                    setLayout(newLayout);
-                };
-
-                calculateLayout();
-                window.addEventListener('resize', calculateLayout);
-                return () => window.removeEventListener('resize', calculateLayout);
-            }, [board]);
-
-            const getRotationClass = (dir, isDouble) => {
-                if (isDouble) return (dir === 'right' || dir === 'left') ? 'rotate-90' : '';
-                return (dir === 'down' || dir === 'up') ? 'rotate-90' : '';
-            };
-
-            return (
-                <div ref={boardRef} className="w-full h-full relative">
-                    {board.length === 0 ? (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="text-white/30 text-xl font-bold border-4 border-dashed border-white/10 rounded-3xl p-6">
-                                {selectedTileIndex !== null ? '👇 Taşı Buraya Koy' : 'Taş Seç ve Başla'}
-                            </div>
-                        </div>
-                    ) : (
-                        layout.map(({ tile, x, y, isDouble, direction }, index) => (
-                            <div key={index} className="absolute transition-all duration-500" style={{ left: `${x}px`, top: `${y}px`, transform: 'translate(-50%, -50%)' }}>
-                                <div className={getRotationClass(direction, isDouble)}>
-                                    <DominoTile values={tile} disabled={true} scale={0.9} />
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
-            );
-        };
-
         // 3. Bildirim Toast
         const Toast = ({ message, type }) => {
             const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600', warning: 'bg-yellow-600' };
@@ -307,7 +213,6 @@
             const [gameState, setGameState] = useState(null);
             const [searchTime, setSearchTime] = useState(0);
             
-            // Oyun state'i
             // Oyun İçi State
             const [selectedTileIndex, setSelectedTileIndex] = useState(null);
             const [validMoves, setValidMoves] = useState([]); // ['left', 'right', 'both']
@@ -316,7 +221,6 @@
             const [endInfo, setEndInfo] = useState(null);
             const [opponent, setOpponent] = useState(null);
             
-            const myPlayerIdRef = useRef(null); // Sayfa yenilense bile ID'yi tutmak için
             const wsRef = useRef(null);
             const boardScrollRef = useRef(null);
             const searchTimerRef = useRef(null);
@@ -442,19 +346,7 @@
                 const ws = new WebSocket(wsUrl);
 
                 ws.onopen = () => { setConnected(true); showNotification('Sunucuya Bağlandı', 'success'); };
-                ws.onclose = () => {
-                    setConnected(false); 
-                    showNotification('Bağlantı koptu, yeniden deneniyor...', 'error');
-                    
-                    // *** YENİ: Bağlantı koptuğunda arama durumunu sıfırla ***
-                    setSearching(false);
-                    if (searchTimerRef.current) {
-                        clearInterval(searchTimerRef.current);
-                        searchTimerRef.current = null;
-                    }
-                    setSearchTime(0);
-                    setTimeout(connectToServer, 3000);
-                };
+                ws.onclose = () => { setConnected(false); setTimeout(connectToServer, 3000); };
                 ws.onmessage = (e) => {
                     try {
                         const data = JSON.parse(e.data);
@@ -468,19 +360,6 @@
                 console.log('📨 Server mesajı:', data.type, data);
                 
                 switch(data.type) {
-                    case 'connected':
-                        // Sunucuya bağlandık. Eğer devam eden bir oyunumuz varsa, yeniden bağlanma isteği gönderelim.
-                        const storedPlayerId = localStorage.getItem('dominoPlayerId');
-                        const storedRoomCode = localStorage.getItem('dominoRoomCode');
-                        if (storedPlayerId && storedRoomCode) {
-                            console.log(`♻️ Kayıtlı oyun bulundu. Yeniden bağlanma isteği: ${storedPlayerId}`);
-                            sendMessage({
-                                type: 'reconnectGame',
-                                playerId: storedPlayerId,
-                                roomCode: storedRoomCode
-                            });
-                        }
-                        break;
                     case 'roomCreated':
                         setRoomCode(data.roomCode);
                         break;
@@ -488,8 +367,6 @@
                         console.log('🎮 Oyun başlıyor...', data.gameState);
                         setGameState(data.gameState);
                         setScreen('game');
-                        localStorage.setItem('dominoPlayerId', data.gameState.playerId);
-                        localStorage.setItem('dominoRoomCode', data.roomCode);
                         setSelectedTileIndex(null);
                         setValidMoves([]);
                         setSearching(false);
@@ -507,7 +384,7 @@
                             setGameState(prevState => ({
                                 ...prevState,
                                 ...data.gameState,
-                                playerId: prevState.playerId // playerId'yi koru
+                                playerId: prevState?.playerId || data.gameState.playerId
                             }));
                             setSelectedTileIndex(null);
                             setValidMoves([]);
@@ -537,8 +414,6 @@
                             isWinner: isWinnerClient,
                             eloChange,
                         });
-                        localStorage.removeItem('dominoPlayerId');
-                        localStorage.removeItem('dominoRoomCode');
                         setScreen('end');
 
                         if (searchTimerRef.current) {
@@ -547,9 +422,13 @@
                         }
                         setSearchTime(0);
 
-                        // OYUN SONU BEKLEMESİNİ KALDIR VE ANINDA LOBİYE DÖN
-                        resetGameClientState(); // Tüm oyun state'ini temizle
-                        setScreen('lobby');
+                        setTimeout(() => {
+                            resetGameClientState(); // Tüm oyun state'ini temizle
+                            setScreen('lobby');
+                            if (isRanked && playerData && !playerData.isGuest) {
+                                initializeTelegramAuth();
+                            }
+                        }, 3000);
                         break;
                     case 'searchCancelled':
                         showNotification('Arama iptal edildi', 'info');
@@ -573,17 +452,6 @@
                         }
                         setSearchTime(0);
                         break;
-                    case 'opponentDisconnected':
-                        showNotification('Rakibin bağlantısı koptu, bekleniyor...', 'warning');
-                        break;
-                    case 'opponentReconnected':
-                        showNotification('Rakip yeniden bağlandı!', 'success');
-                        break;
-                    // *** YENİ: Anlık puan güncellemesi için ***
-                    case 'statsUpdate':
-                        console.log('📊 Oyuncu verileri güncellendi:', data.player);
-                        setPlayerData(prevData => ({ ...prevData, ...data.player }));
-                        break;
                 }
             };
 
@@ -600,7 +468,7 @@
 
             // --- OYUN MANTIĞI ---
 
-            const myPlayerId = gameState?.playerId; // Bu artık sabit kalmalı
+            const myPlayerId = gameState?.playerId;
             const isMyTurn = gameState?.currentPlayer === myPlayerId;
             const myHand = gameState?.players[myPlayerId]?.hand || [];
             const marketSize = gameState?.market?.length || 0;
@@ -680,13 +548,12 @@
 
             const drawFromMarket = () => {
                 if (!isMyTurn || !canDrawFromMarket) return;
-                // YENİ KONTROL: Elinde oynanabilir taş varsa pazardan çekmeyi engelle
+                // Elinde oynanabilir taş varsa pazardan çekmeyi engelle
                 const canPlayFromHand = myHand.some(tile => calculateValidMoves(tile).length > 0);
-                if (gameState.board.length > 0 && canPlayFromHand) { // Tahta boş değilken kontrol et
-                    showNotification('Elinde oynanabilir taş varken pazardan çekemezsin!', 'warning');
-                    return;
-                }
-
+                if (gameState.board.length > 0 && canPlayFromHand) {
+                     showNotification('Elinde oynanabilir taş varken pazardan çekemezsin!', 'warning');
+                     return; // Fonksiyondan tamamen çık
+                 }
                 sendMessage({ type: 'drawFromMarket' });
                 showNotification('🎲 Pazardan taş çekiliyor...', 'info');
             };
@@ -704,8 +571,6 @@
 
                 // Lokal state temizle ve lobiye dön
                 resetGameClientState();
-                localStorage.removeItem('dominoPlayerId');
-                localStorage.removeItem('dominoRoomCode');
                 setScreen('lobby');
             };
 
@@ -1046,23 +911,56 @@
 
                         {/* ORTA PANEL: Masa ve Board */}
                         <div className="flex-1 relative overflow-hidden flex items-center justify-center w-full">
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                {/* YENİ YILAN DÜZENİ TAHTASI */}
-                                <DominoBoard board={gameState.board} />
-                            </div>
+                            {/* Yatay Kaydırma Alanı */}
+                            <div 
+                                ref={boardScrollRef}
+                                className="w-full h-full overflow-x-auto overflow-y-hidden hide-scrollbar flex items-center px-8"
+                                style={{ scrollBehavior: 'smooth' }}
+                            >
+                                <div className="flex items-center gap-1 mx-auto min-w-max py-10">
+                                    
+                                    {/* SOL IŞIKLI GÖSTERGE */}
+                                    {validMoves.includes('left') && selectedTileIndex !== null && gameState.board.length > 0 && (
+                                        <div className="mr-2 sm:mr-3 flex items-center" onClick={() => playTile('left')}>
+                                            <div className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer">
+                                                <div className="absolute inset-0 bg-yellow-400/20 rounded-lg valid-zone"></div>
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-yellow-400/10 rounded-md border-2 border-yellow-400 border-dashed animate-glow-pulse"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
 
-                            {/* Oynama Bölgeleri (Eski Sistem) */}
-                            {validMoves.includes('left') && selectedTileIndex !== null && gameState.board.length > 0 && (
-                                <div onClick={() => playTile('left')} className="absolute left-4 top-1/2 -translate-y-1/2 w-16 h-32 rounded-2xl cursor-pointer flex items-center justify-center valid-zone">
-                                    <div className="w-12 h-24 bg-yellow-400/10 rounded-lg border-2 border-dashed border-yellow-400"></div>
-                                </div>
-                            )}
-                            {validMoves.includes('right') && selectedTileIndex !== null && gameState.board.length > 0 && (
-                                <div onClick={() => playTile('right')} className="absolute right-4 top-1/2 -translate-y-1/2 w-16 h-32 rounded-2xl cursor-pointer flex items-center justify-center valid-zone">
-                                    <div className="w-12 h-24 bg-yellow-400/10 rounded-lg border-2 border-dashed border-yellow-400"></div>
-                                </div>
-                            </div>
+                                    {/* TAHTADAKİ TAŞLAR */}
+                                    {gameState.board.length === 0 ? (
+                                        <div className="text-white/30 text-xl font-bold border-4 border-dashed border-white/10 rounded-3xl p-6">
+                                            {selectedTileIndex !== null ? '👇 Taşı Buraya Koy' : 'Taş Seç ve Başla'}
+                                        </div>
+                                    ) : (
+                                        gameState.board.map((tile, i) => (
+                                            <DominoTile 
+                                                key={i} 
+                                                values={tile} 
+                                                vertical={tile[0] === tile[1]}
+                                                disabled={true}
+                                                scale={0.95}
+                                                animateIn={i === gameState.board.length - 1 || i === 0}
+                                            />
+                                        ))
+                                    )}
 
+                                    {/* SAĞ IŞIKLI GÖSTERGE */}
+                                    {validMoves.includes('right') && selectedTileIndex !== null && gameState.board.length > 0 && (
+                                        <div className="ml-2 sm:ml-3 flex items-center" onClick={() => playTile('right')}>
+                                            <div className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer">
+                                                <div className="absolute inset-0 bg-yellow-400/20 rounded-lg valid-zone"></div>
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-yellow-400/10 rounded-md border-2 border-yellow-400 border-dashed animate-glow-pulse"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
                                     {/* İLK HAMLE (ORTAYA) */}
                                     {validMoves.includes('start') && selectedTileIndex !== null && (
                                         <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-30 animate-slide-up" onClick={() => playTile('start')}>
@@ -1071,6 +969,8 @@
                                             </div>
                                         </div>
                                     )}
+                                </div>
+                            </div>
                         </div>
 
                         {/* ALT PANEL: Oyuncu Eli */}
