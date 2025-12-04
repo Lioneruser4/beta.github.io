@@ -82,9 +82,12 @@ function calculateElo(winnerElo, loserElo, winnerLevel) {
     };
 }
 
-// Level Calculation - Every 100 points = 1 level
+// --- DÜZELTME: Seviye Hesaplama Mantığı ---
+// Seviye 1: 0-149 ELO
+// Seviye 2: 150-299 ELO
+// Seviye 3: 300-449 ELO ... vb.
 function calculateLevel(elo) {
-    return Math.floor(elo / 100) + 1; // Start at level 1 (0 ELO)
+    return Math.floor(elo / 150) + 1; // Her 150 puanda bir seviye atlar, 1'den başlar.
 }
 
 // API Endpoints
@@ -198,6 +201,42 @@ app.get('/api/player/:telegramId/matches', async (req, res) => {
     } catch (error) {
         console.error('Matches error:', error);
         res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+// --- YENİ: Admin API Endpoint'leri ---
+
+// Admin yetki kontrolü için middleware
+const adminAuth = (req, res, next) => {
+    const adminTelegramId = '976640409'; // Sizin Telegram ID'niz
+    const requestorId = req.body.telegramId || req.query.telegramId;
+
+    if (requestorId === adminTelegramId) {
+        next(); // Yetkili, devam et
+    } else {
+        res.status(403).json({ error: 'Yetkiniz yok' });
+    }
+};
+
+app.post('/api/admin/reset-all-stats', adminAuth, async (req, res) => {
+    try {
+        console.log(`🚨 ADMIN ACTION: ${req.body.telegramId} tüm istatistikleri sıfırlıyor.`);
+        await Player.updateMany({}, {
+            $set: {
+                elo: 0,
+                level: 1,
+                wins: 0,
+                losses: 0,
+                draws: 0,
+                totalGames: 0,
+                winStreak: 0,
+                bestWinStreak: 0
+            }
+        });
+        res.json({ success: true, message: 'Tüm oyuncu istatistikleri başarıyla sıfırlandı.' });
+    } catch (error) {
+        console.error('Admin reset error:', error);
+        res.status(500).json({ error: 'İstatistikler sıfırlanırken bir hata oluştu.' });
     }
 });
 
