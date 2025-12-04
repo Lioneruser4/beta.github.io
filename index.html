@@ -697,10 +697,6 @@
                         </div>
 
                         {/* NAVİGASYON */}
-                        <div className="flex justify-center gap-3 mb-6">
-                            <button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold">🏆 Skor Tablosu</button>
-                        </div>
-
                         <div className="w-full max-w-sm bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
                             {/* Player Info */}
                             {playerData && (
@@ -751,6 +747,16 @@
                                 className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4 flex items-center justify-center gap-2"
                             >
                                 <span>🏆</span> {!playerData?.isGuest ? '⚔️ DERECELİ MAÇ ARA' : '🎮 MAÇ ARA (CASUAL)'}
+                            </button>
+
+                            <button 
+                                onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} 
+                                className="w-full mb-6 px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all duration-300 shadow-lg hover:shadow-purple-500/30"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                                </svg>
+                                Skor Tablosu
                             </button>
 
                             <div className="flex items-center gap-2 my-4">
@@ -910,37 +916,38 @@
                         </div>
 
                         {/* ORTA PANEL: Masa ve Board */}
-                        <div className="flex-1 relative w-full flex items-center justify-center" style={{
+                        <div className="relative w-full" style={{
                             minHeight: '180px',
                             maxWidth: '100%',
                             margin: '0 auto',
                             padding: '10px 0',
-                            overflow: 'hidden',
-                            position: 'relative'
+                            overflowX: 'auto',
+                            overflowY: 'hidden',
+                            position: 'relative',
+                            WebkitOverflowScrolling: 'touch',
+                            scrollBehavior: 'smooth'
                         }}>
                             {/* Yatay Kaydırma Alanı */}
                             <div 
                                 ref={boardScrollRef}
-                                className="w-full h-full overflow-x-auto overflow-y-visible hide-scrollbar"
+                                className="h-full hide-scrollbar"
                                 style={{
-                                    display: 'flex',
+                                    display: 'inline-flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center',
+                                    justifyContent: 'flex-start',
                                     minHeight: '140px',
-                                    padding: '20px 0',
-                                    WebkitOverflowScrolling: 'touch',
-                                    scrollBehavior: 'smooth',
+                                    padding: '20px 10px',
                                     boxSizing: 'border-box',
-                                    maxWidth: '100%',
-                                    margin: '0 auto',
+                                    minWidth: '100%',
                                     position: 'relative'
                                 }}>
-                                <div className="flex items-center justify-center gap-1 px-4" style={{
-                                    display: 'inline-flex',
+                                <div className="flex items-center justify-center gap-1" style={{
+                                    display: 'flex',
                                     flexShrink: 0,
-                                    minWidth: 'max-content',
                                     height: '100%',
-                                    alignItems: 'center'
+                                    alignItems: 'center',
+                                    margin: '0 auto',
+                                    position: 'relative'
                                 }}>
                                     
                                     {/* SOL IŞIKLI GÖSTERGE */}
