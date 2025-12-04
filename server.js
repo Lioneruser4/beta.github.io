@@ -62,6 +62,7 @@ const rankedQueue = [];
 const casualQueue = [];
 const playerConnections = new Map(); // playerId -> ws
 const playerSessions = new Map(); // telegramId -> player data
+const disconnectedPlayers = new Map(); // playerId -> { roomCode, timer }
 
 // ELO Calculation - Win-based system
 function calculateElo(winnerElo, loserElo, winnerLevel) {
@@ -411,6 +412,7 @@ wss.on('connection', (ws, req) => {
                 case 'drawFromMarket': handleDrawFromMarket(ws); break;
                 case 'pass': handlePass(ws); break; // Pas geçme eklendi
                 case 'leaveGame': handleLeaveGame(ws); break;
+                case 'reconnectGame': handleReconnectGame(ws, data); break; // Yeniden bağlanma
             }
         } catch (error) {
             console.error('Hata:', error);
@@ -760,27 +762,6 @@ async function sendUpdatedStats(telegramId) {
     }
 }
 
-// Oyuncunun oyun sonu istatistiklerini güncelleyen ve gönderen yardımcı fonksiyon
-async function sendUpdatedStats(telegramId) {
-    if (!telegramId) return;
-
-    const player = await Player.findOne({ telegramId });
-    if (!player) return;
-
-    const ws = Array.from(playerConnections.values()).find(client => client.telegramId === telegramId && client.readyState === WebSocket.OPEN);
-    if (ws) {
-        sendMessage(ws, {
-            type: 'statsUpdate',
-            player: {
-                elo: player.elo,
-                wins: player.wins,
-                losses: player.losses,
-                draws: player.draws,
-            }
-        });
-    }
-}
-
 async function handleGameEnd(roomCode, winnerId, gameState) {
     const room = rooms.get(roomCode);
     if (!room) return;
@@ -796,9 +777,10 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
         const isDraw = winnerId === 'DRAW';
         let eloChanges = null;
 
-        // Guest kontrolu - Guest varsa ELO guncellemesi yapma
+        // ELO güncellemesi için kontrol: Maç 'ranked' olmalı VE her iki oyuncu da misafir (guest) olmamalı.
         const player1IsGuest = room.players[player1Id].isGuest;
         const player2IsGuest = room.players[player2Id].isGuest;
+        // *** KRİTİK DÜZELTME: Oda tipinin 'ranked' olup olmadığını kontrol et ***
         const isRankedMatch = room.type === 'ranked' && !player1IsGuest && !player2IsGuest;
 
         if (isRankedMatch) {
@@ -953,6 +935,11 @@ function handleDrawFromMarket(ws) {
     const gs = room.gameState;
     if (gs.currentPlayer !== ws.playerId) return sendMessage(ws, { type: 'error', message: 'Sıra sizde değil' });
 
+    // YENİ KONTROL: Oyunun ilk hamlesi yapılmadan pazardan taş çekilemez.
+    if (gs.board.length === 0) {
+        return sendMessage(ws, { type: 'error', message: 'Oyuna başlamak için önce bir taş oynamalısınız!' });
+    }
+
     const player = gs.players[ws.playerId];
     
     // Pazarda taş var mı?
@@ -995,10 +982,12 @@ function handleDrawFromMarket(ws) {
 
 function handleLeaveGame(ws) {
     const room = rooms.get(ws.roomCode);
+    const roomCode = ws.roomCode; // Oda kodunu sakla
+    ws.roomCode = null; // *** KRİTİK: Oyuncunun oda bilgisini hemen temizle ***
+
     if (!room || !room.gameState || !ws.playerId) {
         // Oyuncu bir odada değilse veya oyun başlamamışsa, sadece bağlantı bilgilerini temizle
-        ws.roomCode = null;
-        return;
+        return; // Zaten temizlendi, çık
     }
 
     const gs = room.gameState;
@@ -1006,9 +995,8 @@ function handleLeaveGame(ws) {
     // Eğer oyunda 2 oyuncu yoksa (beklenmedik durum), odayı temizle
     if (playerIds.length !== 2) {
         // Kalan oyuncuya (varsa) ayrılma bilgisi gönder
-        broadcastToRoom(ws.roomCode, { type: 'opponentLeft', roomCleared: true });
-        rooms.delete(ws.roomCode);
-        ws.roomCode = null;
+        broadcastToRoom(roomCode, { type: 'opponentLeft', roomCleared: true });
+        rooms.delete(roomCode);
         return;
     }
 
@@ -1027,17 +1015,34 @@ function handleLeaveGame(ws) {
     
     // Oyunu sonlandır (ELO hesaplaması vb. için)
     // Not: handleGameEnd fonksiyonu zaten odayı siliyor.
-    handleGameEnd(ws.roomCode, winnerId, gs);
-
-    // Ayrılan oyuncunun oda bilgisini temizle
-    ws.roomCode = null;
+    handleGameEnd(roomCode, winnerId, gs);
 }
 
 function handleDisconnect(ws) {
-    console.log(`🔌 Oyuncu ayrıldı: ${ws.playerName || 'Bilinmeyen'}`);
-    handleLeaveGame(ws); // Ayrılma mantığını yeniden kullan
+    console.log(`🔌 Bağlantı koptu: ${ws.playerName || ws.playerId || 'Bilinmeyen'}`);
 
-    if (ws.playerId) playerConnections.delete(ws.playerId);
+    if (ws.roomCode && rooms.has(ws.roomCode)) {
+        const room = rooms.get(ws.roomCode);
+        // Oyun başlamışsa yeniden bağlanma sürecini başlat
+        if (room.gameState) {
+            console.log(`⏳ Oyuncu ${ws.playerId} için yeniden bağlanma süreci başlatıldı.`);
+            broadcastToRoom(ws.roomCode, { type: 'opponentDisconnected' }, ws.playerId);
+
+            const timer = setTimeout(() => {
+                console.log(`⏰ Oyuncu ${ws.playerId} zamanında bağlanamadı. Oyundan atılıyor.`);
+                handleLeaveGame(ws); // Zaman aşımında oyundan at
+                disconnectedPlayers.delete(ws.playerId);
+            }, 30000); // 30 saniye bekleme süresi
+
+            disconnectedPlayers.set(ws.playerId, { roomCode: ws.roomCode, timer });
+            playerConnections.delete(ws.playerId); // Eski bağlantıyı sil
+            return; // handleLeaveGame'i hemen çağırma
+        }
+    }
+
+    // Oyun başlamamışsa veya odada değilse, normal ayrılma işlemi yap
+    handleLeaveGame(ws);
+    playerConnections.delete(ws.playerId);
     
     const rankedIdx = rankedQueue.findIndex(p => p.ws === ws);
     if (rankedIdx !== -1) {
