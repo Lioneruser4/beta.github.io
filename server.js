@@ -523,7 +523,7 @@ function handleFindMatch(ws, data) {
         sendMessage(p1.ws, { type: 'matchFound', roomCode, opponent: room.players[p2.playerId], gameType });
         sendMessage(p2.ws, { type: 'matchFound', roomCode, opponent: room.players[p1.playerId], gameType });
 
-        // CRITICAL FIX: Send gameStart immediately to both players
+        // İYİLEŞTİRME: Oyuncuların eşleşme ekranını görmesi için 3 saniye bekle
         setTimeout(() => {
             const gameStartMsg = { type: 'gameStart', gameState: { ...gameState, playerId: p1.playerId } };
             sendMessage(p1.ws, gameStartMsg);
@@ -532,7 +532,7 @@ function handleFindMatch(ws, data) {
             sendMessage(p2.ws, gameStartMsg2);
             
             console.log(`✅ Oyun başladı: ${roomCode}`);
-        }, 500);
+        }, 3000); // 500ms'den 3000ms'ye çıkarıldı
     } else {
         sendMessage(ws, { type: 'searchStatus', message: 'Rakip aranıyor...' });
     }
@@ -741,6 +741,15 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
                 loser: eloChanges.loserChange
             } : null
         });
+
+        // --- DÜZELTME: Oyun bittiğinde her iki oyuncunun da oda bilgisini temizle ---
+        // Bu, oyuncuların yeni bir eşleşme ararken "zaten oyundasınız" hatası almasını önler.
+        playerIds.forEach(pid => {
+            const playerSocket = playerConnections.get(pid);
+            if (playerSocket) {
+                playerSocket.roomCode = null;
+            }
+        });
         rooms.delete(roomCode);
     } catch (error) {
         console.error('❌ Game end error:', error);
@@ -750,6 +759,15 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
             winnerName: winnerId === 'DRAW' ? 'Beraberlik' : gameState.players[winnerId].name,
             isRanked: false
         });
+
+        // Hata durumunda da oyuncuların oda bilgilerini temizle
+        if (room) {
+            const playerIds = Object.keys(room.players);
+            playerIds.forEach(pid => {
+                const playerSocket = playerConnections.get(pid);
+                if (playerSocket) playerSocket.roomCode = null;
+            });
+        }
         rooms.delete(roomCode);
     }
 }
@@ -790,6 +808,13 @@ function handleDrawFromMarket(ws) {
 
     const gs = room.gameState;
     if (gs.currentPlayer !== ws.playerId) return sendMessage(ws, { type: 'error', message: 'Sıra sizde değil' });
+
+    // --- DÜZELTME: İlk hamlede pazardan taş çekmeyi engelle ---
+    // Eğer oyunun ilk hamlesiyse (turn: 1) ve oyuncunun elinde başlaması gereken çift taş varsa,
+    // pazardan taş çekmesine izin verme.
+    if (gs.turn === 1 && gs.startingDouble > -1) {
+        return sendMessage(ws, { type: 'error', message: `Oyuna başlamak için [${gs.startingDouble}|${gs.startingDouble}] taşını oynamalısınız.` });
+    }
 
     const player = gs.players[ws.playerId];
     
@@ -850,9 +875,6 @@ function handleLeaveGame(ws) {
 
     handleGameEnd(ws.roomCode, winnerId, gs);
 
-    // Oyun bitti, bu soketin oda bilgisini temizle ki tekrar eşleşme arayabilsin
-    ws.roomCode = null;
-    // playerId bağlantı için dursun ama aktif oda ilişkisi kalmasın
 }
 
 function handleDisconnect(ws) {
