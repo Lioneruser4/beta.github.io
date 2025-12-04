@@ -910,14 +910,38 @@
                         </div>
 
                         {/* ORTA PANEL: Masa ve Board */}
-                        <div className="flex-1 relative overflow-hidden flex items-center justify-center w-full">
+                        <div className="flex-1 relative w-full flex items-center justify-center" style={{
+                            minHeight: '180px',
+                            maxWidth: '100%',
+                            margin: '0 auto',
+                            padding: '10px 0',
+                            overflow: 'hidden',
+                            position: 'relative'
+                        }}>
                             {/* Yatay Kaydırma Alanı */}
                             <div 
                                 ref={boardScrollRef}
-                                className="w-full h-full overflow-x-auto overflow-y-hidden hide-scrollbar flex items-center px-8"
-                                style={{ scrollBehavior: 'smooth' }}
-                            >
-                                <div className="flex items-center gap-1 mx-auto min-w-max py-10">
+                                className="w-full h-full overflow-x-auto overflow-y-visible hide-scrollbar"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    minHeight: '140px',
+                                    padding: '20px 0',
+                                    WebkitOverflowScrolling: 'touch',
+                                    scrollBehavior: 'smooth',
+                                    boxSizing: 'border-box',
+                                    maxWidth: '100%',
+                                    margin: '0 auto',
+                                    position: 'relative'
+                                }}>
+                                <div className="flex items-center justify-center gap-1 px-4" style={{
+                                    display: 'inline-flex',
+                                    flexShrink: 0,
+                                    minWidth: 'max-content',
+                                    height: '100%',
+                                    alignItems: 'center'
+                                }}>
                                     
                                     {/* SOL IŞIKLI GÖSTERGE */}
                                     {validMoves.includes('left') && selectedTileIndex !== null && gameState.board.length > 0 && (
