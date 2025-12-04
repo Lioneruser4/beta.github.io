@@ -481,6 +481,14 @@ function handleFindMatch(ws, data) {
         }
     }
 
+    // --- YENİ: Misafir kullanıcıların dereceli maç aramasını engelle ---
+    // İstemci tarafında bu kontrol olsa da, sunucu tarafında da olması güvenliği artırır.
+    // 'ranked' bir maç arıyorsa ve misafirse, reddet.
+    const gameTypeRequest = data.gameType || 'ranked'; // Varsayılan olarak ranked kabul edelim
+    if (gameTypeRequest === 'ranked' && ws.isGuest) {
+        return sendMessage(ws, { type: 'error', message: 'Misafir kullanıcılar dereceli maç arayamaz.' });
+    }
+
     playerConnections.set(playerId, ws);
     matchQueue.push({ 
         ws, 
@@ -497,8 +505,11 @@ function handleFindMatch(ws, data) {
     console.log(`✅ ${ws.playerName} (${playerType}) kuyrukta - Toplam: ${matchQueue.length}`);
 
     if (matchQueue.length >= 2) {
-        let p1 = matchQueue.shift();
-        let p2 = matchQueue.shift();
+        // --- YENİ: Sadece aynı türden oyuncuları eşleştir (ranked vs ranked, casual vs casual) ---
+        const potentialOpponents = matchQueue.filter(p => p.ws !== ws && p.isGuest === ws.isGuest);
+        if (potentialOpponents.length === 0) return sendMessage(ws, { type: 'searchStatus', message: 'Uygun rakip bekleniyor...' });
+        let p1 = matchQueue.splice(matchQueue.findIndex(p => p.ws === ws), 1)[0];
+        let p2 = matchQueue.splice(matchQueue.findIndex(p => p.ws === potentialOpponents[0].ws), 1)[0];
 
         // Aynı Telegram hesabının kendi kendisiyle eşleşmesini engelle
         if (!p1.isGuest && !p2.isGuest && p1.telegramId && p2.telegramId && p1.telegramId === p2.telegramId) {
@@ -572,21 +583,29 @@ function handleCancelSearch(ws) {
 }
 
 function handleCreateRoom(ws, data) {
+    // --- DÜZELTME: Oyuncu bilgilerini doğru şekilde ata ---
     const roomCode = generateRoomCode();
-    const playerId = generateRoomCode();
-    ws.playerId = playerId;
-    ws.playerName = data.playerName;
+    ws.playerId = data.telegramId || `guest_${Date.now()}`;
+    ws.playerName = data.playerName || data.username || 'Guest';
     ws.roomCode = roomCode;
-    playerConnections.set(playerId, ws);
+    ws.isGuest = !data.telegramId;
+    playerConnections.set(ws.playerId, ws);
 
     rooms.set(roomCode, {
         code: roomCode,
-        players: { [playerId]: { name: data.playerName } },
+        players: { 
+            [ws.playerId]: { 
+                name: ws.playerName,
+                telegramId: data.telegramId,
+                isGuest: ws.isGuest
+            } 
+        },
         type: 'private',
-        host: playerId
+        host: ws.playerId
     });
 
     sendMessage(ws, { type: 'roomCreated', roomCode });
+    console.log(`🏠 Özel oda oluşturuldu: ${roomCode} - Kurucu: ${ws.playerName}`);
 }
 
 function handleJoinRoom(ws, data) {
@@ -595,24 +614,31 @@ function handleJoinRoom(ws, data) {
         return sendMessage(ws, { type: 'error', message: 'Oda bulunamadı veya dolu' });
     }
 
-    const playerId = generateRoomCode();
-    ws.playerId = playerId;
-    ws.playerName = data.playerName;
+    // --- DÜZELTME: Oyuncu bilgilerini doğru şekilde ata ---
+    ws.playerId = data.telegramId || `guest_${Date.now()}`;
+    ws.playerName = data.playerName || data.username || 'Guest';
     ws.roomCode = data.roomCode;
-    playerConnections.set(playerId, ws);
-    room.players[playerId] = { name: data.playerName };
+    ws.isGuest = !data.telegramId;
+    playerConnections.set(ws.playerId, ws);
+    room.players[ws.playerId] = { 
+        name: ws.playerName,
+        telegramId: data.telegramId,
+        isGuest: ws.isGuest
+    };
 
     const hostId = room.host;
-    const gameState = initializeGame(data.roomCode, hostId, playerId);
+    const joinerId = ws.playerId;
+    const gameState = initializeGame(data.roomCode, hostId, joinerId);
 
     setTimeout(() => {
-        sendGameState(data.roomCode, hostId);
-        sendGameState(data.roomCode, playerId);
+        sendGameState(data.roomCode, hostId, gameState);
+        sendGameState(data.roomCode, joinerId, gameState);
         // Herkese oyunun başladığını bildir
-        [hostId, playerId].forEach(pid => {
+        [hostId, joinerId].forEach(pid => {
             const socket = playerConnections.get(pid);
-            if(socket) socket.send(JSON.stringify({ type: 'gameStart', gameState: {...gameState, playerId: pid} }));
+            if(socket) sendMessage(socket, { type: 'gameStart', gameState: {...gameState, playerId: pid} });
         });
+        console.log(`✅ ${ws.playerName}, ${room.players[hostId].name}'in odasına katıldı: ${data.roomCode}`);
     }, 500);
 }
 
