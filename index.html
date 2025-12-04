@@ -219,13 +219,11 @@
             const [notification, setNotification] = useState(null);
             const [searching, setSearching] = useState(false);
             const [endInfo, setEndInfo] = useState(null);
-            const [confetti, setConfetti] = useState(false);
             const [opponent, setOpponent] = useState(null);
             
             const wsRef = useRef(null);
             const boardScrollRef = useRef(null);
             const searchTimerRef = useRef(null);
-            const heartbeatIntervalRef = useRef(null);
 
             // Oyun state'ini temizlemek için merkezi bir fonksiyon
             const resetGameClientState = () => {
@@ -247,25 +245,8 @@
             useEffect(() => {
                 initializeTelegramAuth();
                 connectToServer();
-                return () => { 
-                    if (wsRef.current) wsRef.current.close(); 
-                    if (heartbeatIntervalRef.current) {
-                        clearInterval(heartbeatIntervalRef.current);
-                    }
-                };
+                return () => { if (wsRef.current) wsRef.current.close(); };
             }, []);
-
-            // Sunucuya yeniden bağlandığında veya playerData yüklendiğinde oyun durumunu iste
-            useEffect(() => {
-                if (connected && playerData && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                    sendMessage({
-                        type: 'reconnect',
-                        telegramId: playerData.telegramId, // Misafirler için null olabilir
-                        username: playerData.username // Misafirler için kullanılır
-                    });
-                    console.log('🔄 Yeniden bağlantı algılandı, sunucudan oyun durumu isteniyor.');
-                }
-            }, [connected, playerData]); // connected ve playerData değiştiğinde tetiklenir
 
             // Telegram Auth
             const initializeTelegramAuth = async () => {
@@ -355,7 +336,6 @@
                 }
             }, [gameState?.board]);
 
-            // WebSocket bağlantısını oluştur
             const connectToServer = () => {
                 let wsUrl = 'wss://beta-github-io.onrender.com';
                 // Test için Localhost kontrolü
@@ -365,61 +345,14 @@
 
                 const ws = new WebSocket(wsUrl);
 
-                ws.onopen = () => {
-                    console.log('🌐 Sunucuya bağlandı');
-                    setConnected(true);
-                    
-                    // Eğer daha önce bir oyunda isek, yeniden bağlanma isteği gönder
-                    if (playerData && (roomCode || gameState)) {
-                        console.log('🔄 Oyun durumu kontrol ediliyor...');
-                        sendMessage({
-                            type: 'reconnect',
-                            roomCode: roomCode || (gameState ? gameState.roomCode : null),
-                            playerId: playerData.telegramId || playerData.username,
-                            username: playerData.username
-                        });
-                    }
-                    
-                    showNotification('Sunucuya Bağlandı', 'success');
-
-                    // --- HEARTBEAT (KALP ATIŞI) MEKANİZMASI ---
-                    // Önceki interval'i temizle
-                    if (heartbeatIntervalRef.current) {
-                        clearInterval(heartbeatIntervalRef.current);
-                    }
-                    // Her 25 saniyede bir ping göndererek bağlantıyı canlı tut
-                    heartbeatIntervalRef.current = setInterval(() => {
-                        sendMessage({ type: 'ping' });
-                    }, 25000); // 25 saniye
-
-                };
-                
-                ws.onclose = () => {
-                    console.log('❌ Sunucu bağlantısı kesildi, yeniden bağlanılıyor...');
-                    setConnected(false);
-                    // Bağlantı koptuğunda, 3 saniye sonra tekrar dene
-                    setTimeout(connectToServer, 3000);
-                    // Heartbeat'i durdur
-                    if (heartbeatIntervalRef.current) {
-                        clearInterval(heartbeatIntervalRef.current);
-                    }
-                };
-                
-                ws.onerror = (error) => {
-                    console.error('WebSocket hatası:', error);
-                    showNotification('Bağlantı hatası, yeniden deneniyor...', 'error');
-                };
-
+                ws.onopen = () => { setConnected(true); showNotification('Sunucuya Bağlandı', 'success'); };
+                ws.onclose = () => { setConnected(false); setTimeout(connectToServer, 3000); };
                 ws.onmessage = (e) => {
                     try {
                         const data = JSON.parse(e.data);
-                        console.log('📨 Gelen mesaj:', data.type);
                         handleServerMessage(data);
-                    } catch(err) { 
-                        console.error('Mesaj işleme hatası:', err);
-                    }
+                    } catch(err) { console.error(err); }
                 };
-                
                 wsRef.current = ws;
             };
 
@@ -427,43 +360,6 @@
                 console.log('📨 Server mesajı:', data.type, data);
                 
                 switch(data.type) {
-                    case 'pong':
-                        // Sunucudan pong mesajı geldi, bağlantı canlı.
-                        console.log('❤️ Pong alındı, bağlantı aktif.');
-                        break;
-                    case 'reconnectSuccess':
-                        console.log('🔁 Yeniden bağlanma başarılı, oyun durumu yükleniyor...');
-                        if (data.gameState) {
-                            setGameState(data.gameState);
-                            setRoomCode(data.roomCode);
-                            setScreen('game');
-                            showNotification('Oyuna yeniden bağlandınız', 'success');
-                        }
-                        break;
-                        
-                    case 'reconnectFailed':
-                        console.log('❌ Yeniden bağlanılamadı:', data.message);
-                        resetGameClientState();
-                        setScreen('lobby');
-                        showNotification(data.message || 'Oyuna yeniden bağlanılamadı', 'error');
-                        break;
-                        
-                    case 'opponentReconnected':
-                        if (gameState && data.playerId) {
-                            setGameState(prev => ({
-                                ...prev,
-                                players: {
-                                    ...prev.players,
-                                    [data.playerId]: {
-                                        ...prev.players[data.playerId],
-                                        connected: true
-                                    }
-                                }
-                            }));
-                            showNotification(data.message || 'Rakibiniz oyuna geri döndü', 'info');
-                        }
-                        break;
-                        
                     case 'roomCreated':
                         setRoomCode(data.roomCode);
                         break;
@@ -485,24 +381,11 @@
                     case 'gameUpdate':
                         console.log('🔄 Oyun güncelleniyor...', data.gameState);
                         if (data.gameState && data.gameState.board) {
-                            setGameState(currentGameState => {
-                                let newPlayerId = currentGameState?.playerId;
-
-                                // Eğer playerId henüz ayarlanmamışsa, gelen gameState'deki oyunculardan çıkarmaya çalış
-                                // Bu, özellikle yeniden bağlantı veya ilk oyun durumu senkronizasyonu için önemlidir.
-                                if (!newPlayerId && playerData) {
-                                    const playerEntries = Object.entries(data.gameState.players || {});
-                                    const foundEntry = playerEntries.find(([id, player]) =>
-                                        (playerData.telegramId && player.telegramId === playerData.telegramId) ||
-                                        (!playerData.telegramId && player.name === playerData.username)
-                                    );
-                                    if (foundEntry) {
-                                        newPlayerId = foundEntry[0]; // Anahtar, playerId'dir
-                                        console.log(`✅ Client playerId tespit edildi: ${newPlayerId}`);
-                                    }
-                                }
-                                return { ...currentGameState, ...data.gameState, playerId: newPlayerId };
-                            });
+                            setGameState(prevState => ({
+                                ...prevState,
+                                ...data.gameState,
+                                playerId: prevState?.playerId || data.gameState.playerId
+                            }));
                             setSelectedTileIndex(null);
                             setValidMoves([]);
                         }
@@ -526,7 +409,6 @@
                         const eloMsg = data.eloChanges ? ` (ELO: ${eloChange > 0 ? '+' : ''}${eloChange})` : '';
 
                         setEndInfo({
-
                             winnerName: data.winnerName,
                             isRanked,
                             isWinner: isWinnerClient,
@@ -534,7 +416,6 @@
                         });
                         setScreen('end');
 
-                        setConfetti(true);
                         if (searchTimerRef.current) {
                             clearInterval(searchTimerRef.current);
                             searchTimerRef.current = null;
@@ -542,7 +423,6 @@
                         setSearchTime(0);
 
                         setTimeout(() => {
-                            setConfetti(false);
                             resetGameClientState(); // Tüm oyun state'ini temizle
                             setScreen('lobby');
                             if (isRanked && playerData && !playerData.isGuest) {
@@ -576,26 +456,8 @@
             };
 
             const sendMessage = (msg) => {
-                if (wsRef.current) {
-                    if (wsRef.current.readyState === WebSocket.OPEN) {
-                        console.log('📤 Gönderilen mesaj:', msg.type, msg);
-                        wsRef.current.send(JSON.stringify(msg));
-                    } else {
-                        console.warn('WebSocket bağlantısı açık değil, mesaj gönderilemedi:', msg.type);
-                        // Bağlantı kapalıysa, tekrar bağlanmayı dene
-                        if (wsRef.current.readyState === WebSocket.CLOSED) {
-                            console.log('Bağlantı kapalı, yeniden bağlanılıyor...');
-                            connectToServer();
-                            // Kısa bir bekleme süresi sonra tekrar dene
-                            setTimeout(() => {
-                                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                                    wsRef.current.send(JSON.stringify(msg));
-                                }
-                            }, 1000);
-                        }
-                    }
-                } else {
-                    console.error('WebSocket bağlantısı kurulmamış');
+                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                    wsRef.current.send(JSON.stringify(msg));
                 }
             };
 
@@ -834,6 +696,11 @@
                             <p className="text-gray-300 text-sm tracking-widest uppercase">⚡ Profesyonel Online Oyun ⚡</p>
                         </div>
 
+                        {/* NAVİGASYON */}
+                        <div className="flex justify-center gap-3 mb-6">
+                            <button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold">🏆 Skor Tablosu</button>
+                        </div>
+
                         <div className="w-full max-w-sm bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
                             {/* Player Info */}
                             {playerData && (
@@ -869,6 +736,29 @@
                                     setSearchTime(0);
                                     
                                     // Timer başlat
+                                    searchTimerRef.current = setInterval(() => {
+                                        setSearchTime(prev => prev + 1);
+                                    }, 1000);
+                                    
+                                    // Server'a gönder
+                                    sendMessage({ 
+                                        type: 'findMatch', 
+                                        ...playerData,
+                                        playerName: playerData.username
+                                    });
+                                }}
+                                disabled={!connected || searching}
+                                className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4 flex items-center justify-center gap-2"
+                            >
+                                <span>🏆</span> {!playerData?.isGuest ? '⚔️ DERECELİ MAÇ ARA' : '🎮 MAÇ ARA (CASUAL)'}
+                            </button>
+
+                            <div className="flex items-center gap-2 my-4">
+                                <div className="h-px bg-white/10 flex-1"></div>
+                                <span className="text-xs text-gray-500 uppercase">veya</span>
+                                <div className="h-px bg-white/10 flex-1"></div>
+                            </div>
+
                             <div className="grid grid-cols-2 gap-3">
                                 <button 
                                     onClick={() => {
@@ -1140,32 +1030,6 @@
                     </div>
                 );
             }
-
-            // --- STYLES ---
-
-            /* Stil tanımlamaları buraya gelecek */
-            return null;
-        };
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<DominoGame />);
-    </script>
-
-    <style>
-        /* Konfeti Stilleri */
-        .confetti-container {
-            overflow: hidden;
-            z-index: 100; /* Diğer içeriklerin üzerinde görünmesi için */
-        }
-
-        .confetti {
-            width: 10px;
-            height: 10px;
-            background-color: #f09; /* Rastgele renkler de kullanabilirsiniz */
-            position: absolute;
-            border-radius: 50%;
-            animation: confetti-fall 3s linear infinite;
-        }
 
             return null;
         };
