@@ -747,7 +747,7 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
                 });
                 await match.save();
 
-                console.log(`🏆 RANKED Maç bitti: ${winner.username} kazandı! ELO: ${eloChanges.winnerChange > 0 ? '+' : ''}${eloChanges.winnerChange}`);
+                console.log(` RANKED Maç bitti: ${winner.username} kazandı! ELO: ${eloChanges.winnerChange > 0 ? '+' : ''}${eloChanges.winnerChange}`);
             } else {
                 player1.draws += 1;
                 player1.totalGames += 1;
@@ -778,7 +778,7 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
             }
         } else {
             // Casual (Guest) maç - ELO guncellenmez
-            console.log(`🎮 CASUAL Maç bitti: ${isDraw ? 'Beraberlik' : gameState.players[winnerId].name + ' kazandı'}`);
+            console.log(` CASUAL Maç bitti: ${isDraw ? 'Beraberlik' : gameState.players[winnerId].name + ' kazandı'}`);
         }
 
         broadcastToRoom(roomCode, { 
@@ -927,7 +927,7 @@ function handleLeaveGame(ws) {
 
 }
 
-// YENİ: Yeniden bağlanma mantığı
+// Yeniden bağlanma mantığı
 function handleReconnect(ws, data) {
     const { roomCode, playerId } = data;
     const room = rooms.get(roomCode);
@@ -939,7 +939,29 @@ function handleReconnect(ws, data) {
         if (playerInfo.disconnectTimer) {
             clearTimeout(playerInfo.disconnectTimer);
             playerInfo.disconnectTimer = null;
-            console.log(`✅ Oyuncu ${playerInfo.name} (${playerId}) zamanında yeniden bağlandı: ${roomCode}`);
+            console.log(`✅ Oyuncu ${playerInfo.name} (${playerId}) yeniden bağlandı: ${roomCode}`);
+        }
+
+        // Eğer oyuncu daha önce oyundan ayrılmışsa, oyuna geri döndür
+        if (playerInfo.leftGame) {
+            playerInfo.leftGame = false;
+            console.log(`🔄 Oyuncu ${playerInfo.name} (${playerId}) oyuna geri döndü`);
+            
+            // Oyun durumunu güncelle
+            if (room.gameState) {
+                room.gameState.players[playerId].connected = true;
+                // Eğer sıra bu oyuncuya aitse, zamanlayıcıyı sıfırla
+                if (room.gameState.currentPlayer === playerId) {
+                    // Zamanlayıcıyı sıfırla
+                    if (room.gameState.turnTimer) {
+                        clearTimeout(room.gameState.turnTimer);
+                    }
+                    // Yeni zamanlayıcı başlat
+                    room.gameState.turnTimer = setTimeout(() => {
+                        handlePass(ws); // Otomatik pas
+                    }, 30000); // 30 saniye
+                }
+            }
         }
 
         // Yeni WebSocket bağlantısını oyuncuyla ilişkilendir
@@ -948,14 +970,31 @@ function handleReconnect(ws, data) {
         ws.playerName = playerInfo.name;
         playerConnections.set(playerId, ws);
 
+        // Oyun durumunu güncelle
+        if (room.gameState) {
+            room.gameState.players[playerId].connected = true;
+        }
+
         // Oyuncuya güncel oyun durumunu ve yeniden bağlandığına dair onayı gönder
-        sendMessage(ws, { type: 'connected', message: 'Oyuna yeniden bağlandınız', isReconnect: true });
-        sendGameState(roomCode, playerId);
+        sendMessage(ws, { 
+            type: 'reconnectSuccess', 
+            message: 'Oyuna yeniden bağlandınız',
+            gameState: room.gameState,
+            roomCode: roomCode
+        });
 
         // Rakibe, oyuncunun geri döndüğünü bildir
-        broadcastToRoom(roomCode, { type: 'opponentReconnected', message: `${playerInfo.name} oyuna geri döndü.` }, playerId);
+        broadcastToRoom(roomCode, { 
+            type: 'opponentReconnected', 
+            message: `${playerInfo.name} oyuna geri döndü.`,
+            playerId: playerId
+        }, playerId);
     } else {
-        sendMessage(ws, { type: 'error', message: 'Geçerli bir oyun bulunamadı. Lobiye yönlendiriliyorsunuz.' });
+        // Eğer oyuncu bir oyunda değilse veya oyun bulunamadıysa
+        sendMessage(ws, { 
+            type: 'reconnectFailed', 
+            message: 'Devam eden bir oyun bulunamadı. Lobiye yönlendiriliyorsunuz.' 
+        });
     }
 }
 
