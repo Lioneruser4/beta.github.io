@@ -79,6 +79,13 @@ const gameResultMessage = document.getElementById('game-result-message');
 const eloChangeDisplay = document.getElementById('elo-change');
 const backToLobbyBtn = document.getElementById('back-to-lobby-btn');
 
+// YENİ: Kilitlenen oyun puan detayları elementleri
+const blockedGameDetails = document.getElementById('blocked-game-details');
+const finalScorePlayerName = document.getElementById('final-score-player-name');
+const finalScorePlayerPoints = document.getElementById('final-score-player-points');
+const finalScoreOpponentName = document.getElementById('final-score-opponent-name');
+const finalScoreOpponentPoints = document.getElementById('final-score-opponent-points');
+
 // Oyuncu istatistik elementleri
 const playerEloElement = document.getElementById('player-elo');
 const playerWinsElement = document.getElementById('player-wins');
@@ -104,9 +111,6 @@ function onSocketOpen() {
     connectionStatus.classList.remove('text-yellow-400');
     connectionStatus.classList.add('text-green-500');
     
-    // Oyun durumunu sıfırla
-    resetGameState();
-    showScreen('main');
 }
 
 function onSocketClose(event) {
@@ -181,7 +185,7 @@ function onSocketMessage(event) {
 }
 
 function handleGameEnd(data) {
-    // data: { winner, winnerName, isRanked, eloChanges }
+    // data: { winner, winnerName, isRanked, eloChanges, reason, finalScores }
     const isWinner = data.winner === gameState.currentPlayerId;
     const isDraw = data.winner === 'DRAW';
     let title = '';
@@ -200,6 +204,22 @@ function handleGameEnd(data) {
 
     gameResultTitle.textContent = title;
     gameResultMessage.textContent = message;
+
+    // --- YENİ: Kilitlenen oyun detaylarını göster ---
+    if (data.reason === 'blocked' && data.finalScores) {
+        blockedGameDetails.classList.remove('hidden');
+        const opponentId = Object.keys(data.finalScores).find(id => id !== gameState.currentPlayerId);
+
+        finalScorePlayerName.textContent = gameState.playerStats.username || 'Siz';
+        finalScorePlayerPoints.textContent = data.finalScores[gameState.currentPlayerId];
+
+        finalScoreOpponentName.textContent = gameState.opponentStats.username || 'Rakip';
+        finalScoreOpponentPoints.textContent = data.finalScores[opponentId];
+
+        gameResultMessage.textContent = "En az puana sahip olduğunuz için kazandınız!";
+    } else {
+        blockedGameDetails.classList.add('hidden');
+    }
 
     if (data.isRanked && data.eloChanges) {
         const change = isWinner ? data.eloChanges.winner : data.eloChanges.loser;
@@ -237,7 +257,7 @@ function handleGameEnd(data) {
         if (postGameLobby.classList.contains('hidden') === false) {
             backToLobbyBtn.onclick(); // Lobiye dönme butonunun işlevini çağır
         }
-    }, 3000); // 3 saniye bekle
+    }, 5000); // 5 saniye bekle
 }
 
 function handleError(error) {
@@ -266,7 +286,7 @@ function handleMatchFound(data) {
     // --- YENİ: Eşleşme bulundu ekranını doldur ---
     matchPlayer1Name.textContent = gameState.playerStats.username || 'Siz';
     matchPlayer1Elo.textContent = `(${gameState.playerStats.elo || 0} ELO)`;
-    // matchPlayer1Photo.src = gameState.playerStats.photoUrl || 'https://via.placeholder.com/100'; // Kendi fotoğrafınız varsa
+    matchPlayer1Photo.src = gameState.playerStats.photoUrl || 'https://via.placeholder.com/100'; // Kendi fotoğrafınız varsa
 
     matchPlayer2Name.textContent = data.opponent.name;
     matchPlayer2Elo.textContent = `(${data.opponent.elo || 0} ELO)`;
