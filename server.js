@@ -963,24 +963,35 @@ function handleDrawFromMarket(ws) {
 }
 
 function handleLeaveGame(ws) {
-    const room = rooms.get(ws.roomCode);
-    if (!room || !room.gameState || !ws.playerId) {
+    const roomCode = ws.roomCode;
+    const leaverId = ws.playerId;
+
+    if (!roomCode || !leaverId) {
+        return;
+    }
+
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState) {
+        // Oda zaten kapanmış olabilir, oyuncunun durumunu temizle
+        if (ws) ws.roomCode = null;
         return;
     }
 
     const gs = room.gameState;
     const playerIds = Object.keys(gs.players);
+
+    // Eğer odada sadece 1 kişi varsa (rakip hiç bağlanmadıysa vs), odayı sadece sil.
     if (playerIds.length !== 2) {
-        rooms.delete(ws.roomCode);
-        ws.roomCode = null;
+        rooms.delete(roomCode);
+        if (ws) ws.roomCode = null;
         return;
     }
 
-    const leaverId = ws.playerId;
     const winnerId = playerIds.find(id => id !== leaverId);
 
-    handleGameEnd(ws.roomCode, winnerId, gs);
-
+    // handleGameEnd fonksiyonu zaten odadaki herkesin durumunu temizleyip odayı siliyor.
+    // Oyundan ayrılma durumunu belirtmek için 'leave' reason'ı ekleyebiliriz.
+    handleGameEnd(roomCode, winnerId, gs, 'leave');
 }
 
 // YENİ: Yeniden bağlanma mantığı
@@ -1035,7 +1046,7 @@ function handleDisconnect(ws) {
             // 60 saniye sonra oyunu bitir
             room.players[ws.playerId].disconnectTimer = setTimeout(() => {
                 console.log(`⏰ ${ws.playerName} yeniden bağlanmadı. Oyun sonlandırılıyor.`);
-                handleLeaveGame(ws); // Oyundan ayrılmış gibi işlem yap
+                handleLeaveGame(ws); // Oyundan ayrılmış gibi işlem yap (bu fonksiyon artık her iki oyuncuyu da temizliyor)
             }, 60000); // 60 saniye
         }
     }
