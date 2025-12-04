@@ -254,20 +254,42 @@ function initializeGame(roomCode, player1Id, player2Id) {
 
     const room = rooms.get(roomCode);
     
-    // En yüksek çifti bul (6|6, 5|5, 4|4, ...)
-    let startingPlayer = player1Id;
-    let highestDouble = -1;
-    
-    for (let player of [player1Id, player2Id]) {
-        const hand = player === player1Id ? player1Hand : player2Hand;
-        for (let tile of hand) {
-            if (tile[0] === tile[1] && tile[0] > highestDouble) {
-                highestDouble = tile[0];
+    // --- DÜZELTME: En küçük çifti bulan oyuncu başlar ---
+    let startingPlayer = null;
+    let startingDouble = -1;
+
+    // Öncelik sırası: 1-1, 2-2, ..., 6-6
+    for (let i = 1; i <= 6; i++) {
+        for (const player of [player1Id, player2Id]) {
+            const hand = player === player1Id ? player1Hand : player2Hand;
+            if (hand.some(tile => tile[0] === i && tile[1] === i)) {
                 startingPlayer = player;
+                startingDouble = i;
+                break; // Bu çift için oyuncu bulundu, diğer oyuncuya bakma
+            }
+        }
+        if (startingPlayer) break; // En küçük çift bulundu, döngüden çık
+    }
+    
+    // Eğer 1-1'den 6-6'ya kadar çift bulunamazsa, 0-0'ı kontrol et
+    if (!startingPlayer) {
+        for (const player of [player1Id, player2Id]) {
+            const hand = player === player1Id ? player1Hand : player2Hand;
+            if (hand.some(tile => tile[0] === 0 && tile[1] === 0)) {
+                startingPlayer = player;
+                startingDouble = 0;
+                break;
             }
         }
     }
     
+    // Eğer hiçbir oyuncuda çift taş yoksa, rastgele bir oyuncu seç
+    if (!startingPlayer) {
+        startingPlayer = [player1Id, player2Id][Math.floor(Math.random() * 2)];
+        startingDouble = -1; // Çift taş olmadığını belirtmek için
+        console.log('ℹ️ Kimsede çift taş yok, rastgele başlangıç yapılıyor.');
+    }
+
     room.gameState = {
         board: [],
         players: {
@@ -278,11 +300,11 @@ function initializeGame(roomCode, player1Id, player2Id) {
         currentPlayer: startingPlayer,
         turn: 1,
         lastMove: null,
-        startingDouble: highestDouble
+        startingDouble: startingDouble
     };
 
     rooms.set(roomCode, room);
-    console.log(`🎮 Oyun başlatıldı - Başlayan: ${startingPlayer === player1Id ? room.players[player1Id].name : room.players[player2Id].name} (${highestDouble}|${highestDouble})`);
+    console.log(`🎮 Oyun başlatıldı - Başlayan: ${startingPlayer === player1Id ? room.players[player1Id].name : room.players[player2Id].name} (${startingDouble !== -1 ? startingDouble + '|' + startingDouble : 'Rastgele'})`);
     return room.gameState;
 }
 
@@ -408,6 +430,7 @@ wss.on('connection', (ws, req) => {
                 case 'playTile': handlePlayTile(ws, data); break;
                 case 'drawFromMarket': handleDrawFromMarket(ws); break;
                 case 'leaveGame': handleLeaveGame(ws); break;
+                case 'reconnectToGame': handleReconnect(ws, data); break; // YENİ: Yeniden bağlanma isteği
             }
         } catch (error) {
             console.error('Hata:', error);
@@ -415,7 +438,7 @@ wss.on('connection', (ws, req) => {
     });
 
     ws.on('close', () => handleDisconnect(ws));
-    sendMessage(ws, { type: 'connected', message: 'Sunucuya bağlandınız' });
+    sendMessage(ws, { type: 'connected', message: 'Sunucuya bağlandınız', isReconnect: false });
 });
 
 const pingInterval = setInterval(() => {
@@ -486,8 +509,9 @@ function handleFindMatch(ws, data) {
             return;
         }
         const roomCode = generateRoomCode();
-        
-        const gameType = (p1.isGuest || p2.isGuest) ? 'casual' : 'ranked';
+
+        // --- DÜZELTME: Her iki oyuncu da misafir değilse, maç her zaman 'ranked' olmalıdır ---
+        const gameType = (p1.isGuest || p2.isGuest) ? 'casual' : 'ranked'; // 'casual' yerine 'friendly' de olabilir
         console.log(`🎮 Maç oluşturuluyor (${gameType.toUpperCase()}): ${p1.playerName} vs ${p2.playerName}`);
 
         const room = {
@@ -877,22 +901,63 @@ function handleLeaveGame(ws) {
 
 }
 
+// YENİ: Yeniden bağlanma mantığı
+function handleReconnect(ws, data) {
+    const { roomCode, playerId } = data;
+    const room = rooms.get(roomCode);
+
+    if (room && room.players[playerId]) {
+        const playerInfo = room.players[playerId];
+
+        // Eğer oyuncu için bir "terk etme" zamanlayıcısı varsa, iptal et
+        if (playerInfo.disconnectTimer) {
+            clearTimeout(playerInfo.disconnectTimer);
+            playerInfo.disconnectTimer = null;
+            console.log(`✅ Oyuncu ${playerInfo.name} (${playerId}) zamanında yeniden bağlandı: ${roomCode}`);
+        }
+
+        // Yeni WebSocket bağlantısını oyuncuyla ilişkilendir
+        ws.playerId = playerId;
+        ws.roomCode = roomCode;
+        ws.playerName = playerInfo.name;
+        playerConnections.set(playerId, ws);
+
+        // Oyuncuya güncel oyun durumunu ve yeniden bağlandığına dair onayı gönder
+        sendMessage(ws, { type: 'connected', message: 'Oyuna yeniden bağlandınız', isReconnect: true });
+        sendGameState(roomCode, playerId);
+
+        // Rakibe, oyuncunun geri döndüğünü bildir
+        broadcastToRoom(roomCode, { type: 'opponentReconnected', message: `${playerInfo.name} oyuna geri döndü.` }, playerId);
+    } else {
+        sendMessage(ws, { type: 'error', message: 'Geçerli bir oyun bulunamadı. Lobiye yönlendiriliyorsunuz.' });
+    }
+}
+
 function handleDisconnect(ws) {
     console.log(`🔌 Oyuncu ayrıldı: ${ws.playerName || 'Bilinmeyen'}`);
     
-    if (ws.playerId) playerConnections.delete(ws.playerId);
-    
+    // Kuyruktan çıkar
     const qIdx = matchQueue.findIndex(p => p.ws === ws);
     if (qIdx !== -1) {
         matchQueue.splice(qIdx, 1);
         console.log(`❌ Kuyruktan çıkarıldı - Kalan: ${matchQueue.length}`);
     }
 
-    if (ws.roomCode) {
-        console.log(`🏠 Odadan ayrıldı: ${ws.roomCode}`);
-        broadcastToRoom(ws.roomCode, { type: 'playerDisconnected' });
-        rooms.delete(ws.roomCode);
+    // Eğer oyuncu bir odadaysa, hemen silme, bir süre bekle
+    if (ws.roomCode && ws.playerId) {
+        const room = rooms.get(ws.roomCode);
+        if (room && room.players[ws.playerId]) {
+            console.log(`⏳ ${ws.playerName} için 60 saniyelik yeniden bağlanma süresi başladı.`);
+            broadcastToRoom(ws.roomCode, { type: 'opponentDisconnected', message: 'Rakibin bağlantısı koptu. Yeniden bağlanması bekleniyor...' }, ws.playerId);
+
+            // 60 saniye sonra oyunu bitir
+            room.players[ws.playerId].disconnectTimer = setTimeout(() => {
+                console.log(`⏰ ${ws.playerName} yeniden bağlanmadı. Oyun sonlandırılıyor.`);
+                handleLeaveGame(ws); // Oyundan ayrılmış gibi işlem yap
+            }, 60000); // 60 saniye
+        }
     }
+    if (ws.playerId) playerConnections.delete(ws.playerId);
 }
 
 const PORT = process.env.PORT || 10000;
