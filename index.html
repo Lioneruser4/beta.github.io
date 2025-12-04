@@ -170,7 +170,19 @@
     <div id="root" class="container"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo } = React;
+        // React ve diğer bağımlılıkların yüklendiğinden emin ol
+        if (typeof React === 'undefined' || typeof ReactDOM === 'undefined' || typeof Babel === 'undefined') {
+            console.error('Gerekli kütüphaneler yüklenemedi! Lütfen internet bağlantınızı kontrol edin.');
+            document.getElementById('root').innerHTML = `
+                <div style="color: white; text-align: center; padding: 2rem;">
+                    <h2>Uygulama yüklenirken bir hata oluştu</h2>
+                    <p>Lütfen internet bağlantınızı kontrol edip sayfayı yenileyin.</p>
+                    <button onclick="window.location.reload()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #3b82f6; border: none; border-radius: 0.5rem; color: white; cursor: pointer;">
+                        Sayfayı Yenile
+                    </button>
+                </div>`;
+        } else {
+            const { useState, useEffect, useRef, useMemo } = React;
 
         // Telegram WebApp Initialization
         const tg = window.Telegram?.WebApp;
@@ -1041,8 +1053,9 @@
             return null;
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<DominoGame />);
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<DominoGame />);
+        }
     </script>
 </body>
 </html>
