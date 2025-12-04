@@ -610,7 +610,7 @@
 
             const myPlayerId = gameState?.playerId; // Bu artık sabit kalmalı
             const isMyTurn = gameState?.currentPlayer === myPlayerId;
-            const myHand = gameState?.players[myPlayerId]?.hand || [];
+            const myHand = gameState?.players?.[myPlayerId]?.hand || [];
             const marketSize = gameState?.market?.length || 0;
             const canDrawFromMarket = marketSize > 0;
 
