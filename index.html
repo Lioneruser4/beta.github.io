@@ -396,12 +396,9 @@
                         break;
                     case 'gameUpdate':
                         console.log('🔄 Oyun güncelleniyor...', data.gameState);
-                        if (data.gameState && data.gameState.board) {
-                            setGameState(prevState => ({
-                                ...prevState,
-                                ...data.gameState,
-                                playerId: prevState?.playerId || data.gameState.playerId
-                            }));
+                        if (data.gameState) {
+                            // DÜZELTME: Yeniden bağlanma sonrası donmayı engellemek için state'i tamamen gelen veriyle değiştir.
+                            setGameState(data.gameState);
                             setSelectedTileIndex(null);
                             setValidMoves([]);
                         }
@@ -815,8 +812,8 @@
                                 <button 
                                     onClick={() => {
                                         if(!playerData) return showNotification('İsim giriniz', 'error');
-                                        if(roomCode) return;
-                                        sendMessage({ type: 'createRoom', ...playerData });
+                                        if(roomCode) return; // Zaten bir oda kurulmuşsa tekrar kurma
+                                        sendMessage({ type: 'createRoom', ...playerData, playerName: playerData.username });
                                     }}
                                     disabled={roomCode !== ''}
                                     className="bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-semibold transition-colors"
@@ -833,7 +830,7 @@
                                         className="w-full h-full bg-black/30 border border-white/10 rounded-xl px-2 text-center text-white font-mono uppercase focus:ring-1 focus:ring-yellow-400"
                                     />
                                     <button 
-                                        onClick={() => sendMessage({ type: 'joinRoom', roomCode: joinCode, ...playerData })}
+                                        onClick={() => sendMessage({ type: 'joinRoom', roomCode: joinCode, ...playerData, playerName: playerData.username })}
                                         className="absolute right-1 top-1 bottom-1 bg-yellow-500 text-white px-3 rounded-lg hover:bg-yellow-400"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" /></svg>
