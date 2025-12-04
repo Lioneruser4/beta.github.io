@@ -132,7 +132,16 @@ function onSocketMessage(event) {
 
     switch (data.type) {
         case 'connected':
-            console.log('Sunucu doğruladı:', data.message);
+            console.log('Sunucu onayı:', data.message);
+            // --- YENİ: Yeniden bağlanma kontrolü ---
+            if (data.isReconnect === false) { // Sadece ilk bağlantıda sıfırla
+                const storedRoomCode = localStorage.getItem('domino_roomCode');
+                const storedPlayerId = localStorage.getItem('domino_playerId');
+                if (storedRoomCode && storedPlayerId) {
+                    console.log('🔄 Kayıtlı oyun bulundu, yeniden bağlanma deneniyor...');
+                    sendSocketMessage('reconnectToGame', { roomCode: storedRoomCode, playerId: storedPlayerId });
+                }
+            }
             break;
         case 'searchStatus':
             rankedStatus.textContent = data.message;
@@ -159,6 +168,13 @@ function onSocketMessage(event) {
             break;
         case 'error':
             handleError(data);
+            break;
+        // --- YENİ: Rakip bağlantı durumları ---
+        case 'opponentDisconnected':
+            showModal(data.message, 'warning');
+            break;
+        case 'opponentReconnected':
+            showModal(data.message, 'info');
             break;
         // Diğer sunucu mesaj tipleri buraya eklenebilir
     }
@@ -209,6 +225,9 @@ function handleGameEnd(data) {
     gameState.roomCode = null;
     gameState.gameStarted = false;
     gameState.isSearching = false;
+    // --- DÜZELTME: Oyun bitince localStorage'ı temizle ---
+    localStorage.removeItem('domino_roomCode');
+    localStorage.removeItem('domino_playerId');
 
     showScreen('post-game');
 
@@ -237,7 +256,6 @@ function handleMatchFound(data) {
     gameState.roomCode = data.roomCode;
     gameState.opponentStats = {
         username: data.opponent.name,
-        elo: data.opponent.elo
         elo: data.opponent.elo,
         photoUrl: data.opponent.photoUrl
     };
@@ -245,8 +263,6 @@ function handleMatchFound(data) {
     clearInterval(searchTimer);
     searchTimer = null;
     
-    // Oyunun başlamasını bekle (gameStart mesajı ile)
-    rankedStatus.textContent = `Rakip bulundu: ${data.opponent.name}. Oyun başlıyor...`;
     // --- YENİ: Eşleşme bulundu ekranını doldur ---
     matchPlayer1Name.textContent = gameState.playerStats.username || 'Siz';
     matchPlayer1Elo.textContent = `(${gameState.playerStats.elo || 0} ELO)`;
@@ -262,7 +278,11 @@ function handleMatchFound(data) {
 function handleGameStart(data) {
     console.log('🎮 Oyun başlıyor:', data);
     gameState.gameStarted = true;
-    gameState.currentPlayerId = data.gameState.playerId; // Kendi ID'mizi alıyoruz
+    gameState.currentPlayerId = data.gameState.playerId; // Sunucunun bize atadığı ID
+    
+    // --- YENİ: Yeniden bağlanma için bilgileri kaydet ---
+    localStorage.setItem('domino_roomCode', gameState.roomCode);
+    localStorage.setItem('domino_playerId', gameState.currentPlayerId);
     
     // Oyun ekranını göster
     showScreen('game');
@@ -522,6 +542,10 @@ function leaveGame() {
     // Beklemeden direkt lobiye dön ve oyun durumunu sıfırla.
     // Oyun durumunu sıfırla
     resetGameState();
+    // --- DÜZELTME: Oyundan çıkınca localStorage'ı temizle ---
+    localStorage.removeItem('domino_roomCode');
+    localStorage.removeItem('domino_playerId');
+    
     showScreen('main');
 }
 
