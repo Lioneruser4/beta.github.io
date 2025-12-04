@@ -224,6 +224,7 @@
             const wsRef = useRef(null);
             const boardScrollRef = useRef(null);
             const searchTimerRef = useRef(null);
+            const heartbeatRef = useRef(null); // YENİ: Kalp atışı için ref
 
             // Oyun state'ini temizlemek için merkezi bir fonksiyon
             const resetGameClientState = () => {
@@ -345,8 +346,22 @@
 
                 const ws = new WebSocket(wsUrl);
 
-                ws.onopen = () => { setConnected(true); showNotification('Sunucuya Bağlandı', 'success'); };
-                ws.onclose = () => { setConnected(false); setTimeout(connectToServer, 3000); };
+                ws.onopen = () => { 
+                    setConnected(true); 
+                    showNotification('Sunucuya Bağlandı', 'success'); 
+                    // YENİ: Kalp atışı başlat
+                    if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+                    heartbeatRef.current = setInterval(() => {
+                        if (ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({ type: 'ping' }));
+                        }
+                    }, 25000); // 25 saniyede bir
+                };
+                ws.onclose = () => { 
+                    setConnected(false); 
+                    if (heartbeatRef.current) clearInterval(heartbeatRef.current); // Kalp atışını durdur
+                    setTimeout(connectToServer, 3000); 
+                };
                 ws.onmessage = (e) => {
                     try {
                         const data = JSON.parse(e.data);
