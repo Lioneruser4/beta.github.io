@@ -396,38 +396,6 @@ function sendMessage(ws, message) {
 
 // --- WEBSOCKET EVENTLERİ ---
 
-wss.on('connection', (ws, req) => {
-    ws.isAlive = true;
-    ws.on('pong', () => ws.isAlive = true);
-
-    ws.on('message', (message) => {
-        try {
-            const data = JSON.parse(message);
-            switch (data.type) {
-                case 'findMatch': handleFindMatch(ws, data); break;
-                case 'cancelSearch': handleCancelSearch(ws); break;
-                case 'createRoom': handleCreateRoom(ws, data); break;
-                case 'joinRoom': handleJoinRoom(ws, data); break;
-                case 'playTile': handlePlayTile(ws, data); break;
-                case 'drawFromMarket': handleDrawFromMarket(ws); break;
-                case 'pass': handlePass(ws); break; // Pas geçme eklendi
-                case 'leaveGame': handleLeaveGame(ws); break;
-                case 'reconnectGame': handleReconnectGame(ws, data); break; // Yeniden bağlanma
-            }
-        } catch (error) {
-            console.error('Hata:', error);
-        }
-    });
-
-    ws.on('close', () => handleDisconnect(ws));
-    // Her yeni bağlantıya benzersiz bir ID ata
-    const playerId = generateRoomCode();
-    ws.playerId = playerId;
-    playerConnections.set(playerId, ws);
-
-    sendMessage(ws, { type: 'connected', message: 'Sunucuya bağlandınız' });
-});
-
 const pingInterval = setInterval(() => {
     wss.clients.forEach((ws) => {
         if (ws.isAlive === false) return ws.terminate();
@@ -460,12 +428,18 @@ function isPlayerActive(telegramId) {
 // --- OYUN MANTIKLARI ---
 
 function handleFindMatch(ws, data) {
-    // Oyuncunun zaten bir odada veya kuyrukta olup olmadığını kontrol et
-    if (ws.roomCode || rankedQueue.some(p => p.ws === ws) || casualQueue.some(p => p.ws === ws)) {
-        return sendMessage(ws, { type: 'error', message: 'Zaten bir oyundasınız veya eşleşme arıyorsunuz.' });
+    if (ws.playerId && playerConnections.has(ws.playerId)) {
+        const existingInQueue = matchQueue.find(p => p.playerId === ws.playerId);
+        if (existingInQueue) {
+            return sendMessage(ws, { type: 'error', message: 'Zaten kuyrukta bekliyorsunuz' });
+        } // Bu kontrol yeni sistemle gereksiz kalacak ama zararı yok.
+        if (ws.roomCode) {
+            return sendMessage(ws, { type: 'error', message: 'Zaten bir oyundasınız' });
+        }
     }
 
-    const playerId = ws.playerId; // Bağlantı kurulduğunda atanan ID'yi kullan
+    const playerId = ws.playerId || generateRoomCode();
+    ws.playerId = playerId;
     ws.playerName = data.playerName || data.username || 'Guest';
     ws.telegramId = data.telegramId || null; // null ise guest
     ws.photoUrl = data.photoUrl || null;
@@ -479,6 +453,8 @@ function handleFindMatch(ws, data) {
             return sendMessage(ws, { type: 'error', message: 'Bu hesap zaten aktif bir oyunda veya eşleşme arıyor.' });
         }
     }
+
+    playerConnections.set(playerId, ws);
 
     const playerInfo = {
         ws, 
@@ -656,9 +632,11 @@ function handleCancelSearch(ws) {
 
 function handleCreateRoom(ws, data) {
     const roomCode = generateRoomCode();
-    const playerId = ws.playerId; // Bağlantıda atanan ID'yi kullan
+    const playerId = generateRoomCode();
+    ws.playerId = playerId;
     ws.playerName = data.playerName;
     ws.roomCode = roomCode;
+    playerConnections.set(playerId, ws);
 
     rooms.set(roomCode, {
         code: roomCode,
@@ -676,9 +654,11 @@ function handleJoinRoom(ws, data) {
         return sendMessage(ws, { type: 'error', message: 'Oda bulunamadı veya dolu' });
     }
 
-    const playerId = ws.playerId; // Bağlantıda atanan ID'yi kullan
+    const playerId = generateRoomCode();
+    ws.playerId = playerId;
     ws.playerName = data.playerName;
     ws.roomCode = data.roomCode;
+    playerConnections.set(playerId, ws);
     room.players[playerId] = { name: data.playerName };
 
     const hostId = room.host;
