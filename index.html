@@ -225,6 +225,7 @@
             const wsRef = useRef(null);
             const boardScrollRef = useRef(null);
             const searchTimerRef = useRef(null);
+            const heartbeatIntervalRef = useRef(null);
 
             // Oyun state'ini temizlemek için merkezi bir fonksiyon
             const resetGameClientState = () => {
@@ -246,7 +247,12 @@
             useEffect(() => {
                 initializeTelegramAuth();
                 connectToServer();
-                return () => { if (wsRef.current) wsRef.current.close(); };
+                return () => { 
+                    if (wsRef.current) wsRef.current.close(); 
+                    if (heartbeatIntervalRef.current) {
+                        clearInterval(heartbeatIntervalRef.current);
+                    }
+                };
             }, []);
 
             // Sunucuya yeniden bağlandığında veya playerData yüklendiğinde oyun durumunu iste
@@ -349,6 +355,7 @@
                 }
             }, [gameState?.board]);
 
+            // WebSocket bağlantısını oluştur
             const connectToServer = () => {
                 let wsUrl = 'wss://beta-github-io.onrender.com';
                 // Test için Localhost kontrolü
@@ -358,14 +365,61 @@
 
                 const ws = new WebSocket(wsUrl);
 
-                ws.onopen = () => { setConnected(true); showNotification('Sunucuya Bağlandı', 'success'); };
-                ws.onclose = () => { setConnected(false); setTimeout(connectToServer, 3000); };
+                ws.onopen = () => {
+                    console.log('🌐 Sunucuya bağlandı');
+                    setConnected(true);
+                    
+                    // Eğer daha önce bir oyunda isek, yeniden bağlanma isteği gönder
+                    if (playerData && (roomCode || gameState)) {
+                        console.log('🔄 Oyun durumu kontrol ediliyor...');
+                        sendMessage({
+                            type: 'reconnect',
+                            roomCode: roomCode || (gameState ? gameState.roomCode : null),
+                            playerId: playerData.telegramId || playerData.username,
+                            username: playerData.username
+                        });
+                    }
+                    
+                    showNotification('Sunucuya Bağlandı', 'success');
+
+                    // --- HEARTBEAT (KALP ATIŞI) MEKANİZMASI ---
+                    // Önceki interval'i temizle
+                    if (heartbeatIntervalRef.current) {
+                        clearInterval(heartbeatIntervalRef.current);
+                    }
+                    // Her 25 saniyede bir ping göndererek bağlantıyı canlı tut
+                    heartbeatIntervalRef.current = setInterval(() => {
+                        sendMessage({ type: 'ping' });
+                    }, 25000); // 25 saniye
+
+                };
+                
+                ws.onclose = () => {
+                    console.log('❌ Sunucu bağlantısı kesildi, yeniden bağlanılıyor...');
+                    setConnected(false);
+                    // Bağlantı koptuğunda, 3 saniye sonra tekrar dene
+                    setTimeout(connectToServer, 3000);
+                    // Heartbeat'i durdur
+                    if (heartbeatIntervalRef.current) {
+                        clearInterval(heartbeatIntervalRef.current);
+                    }
+                };
+                
+                ws.onerror = (error) => {
+                    console.error('WebSocket hatası:', error);
+                    showNotification('Bağlantı hatası, yeniden deneniyor...', 'error');
+                };
+
                 ws.onmessage = (e) => {
                     try {
                         const data = JSON.parse(e.data);
+                        console.log('📨 Gelen mesaj:', data.type);
                         handleServerMessage(data);
-                    } catch(err) { console.error(err); }
+                    } catch(err) { 
+                        console.error('Mesaj işleme hatası:', err);
+                    }
                 };
+                
                 wsRef.current = ws;
             };
 
@@ -373,6 +427,43 @@
                 console.log('📨 Server mesajı:', data.type, data);
                 
                 switch(data.type) {
+                    case 'pong':
+                        // Sunucudan pong mesajı geldi, bağlantı canlı.
+                        console.log('❤️ Pong alındı, bağlantı aktif.');
+                        break;
+                    case 'reconnectSuccess':
+                        console.log('🔁 Yeniden bağlanma başarılı, oyun durumu yükleniyor...');
+                        if (data.gameState) {
+                            setGameState(data.gameState);
+                            setRoomCode(data.roomCode);
+                            setScreen('game');
+                            showNotification('Oyuna yeniden bağlandınız', 'success');
+                        }
+                        break;
+                        
+                    case 'reconnectFailed':
+                        console.log('❌ Yeniden bağlanılamadı:', data.message);
+                        resetGameClientState();
+                        setScreen('lobby');
+                        showNotification(data.message || 'Oyuna yeniden bağlanılamadı', 'error');
+                        break;
+                        
+                    case 'opponentReconnected':
+                        if (gameState && data.playerId) {
+                            setGameState(prev => ({
+                                ...prev,
+                                players: {
+                                    ...prev.players,
+                                    [data.playerId]: {
+                                        ...prev.players[data.playerId],
+                                        connected: true
+                                    }
+                                }
+                            }));
+                            showNotification(data.message || 'Rakibiniz oyuna geri döndü', 'info');
+                        }
+                        break;
+                        
                     case 'roomCreated':
                         setRoomCode(data.roomCode);
                         break;
@@ -485,8 +576,26 @@
             };
 
             const sendMessage = (msg) => {
-                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                    wsRef.current.send(JSON.stringify(msg));
+                if (wsRef.current) {
+                    if (wsRef.current.readyState === WebSocket.OPEN) {
+                        console.log('📤 Gönderilen mesaj:', msg.type, msg);
+                        wsRef.current.send(JSON.stringify(msg));
+                    } else {
+                        console.warn('WebSocket bağlantısı açık değil, mesaj gönderilemedi:', msg.type);
+                        // Bağlantı kapalıysa, tekrar bağlanmayı dene
+                        if (wsRef.current.readyState === WebSocket.CLOSED) {
+                            console.log('Bağlantı kapalı, yeniden bağlanılıyor...');
+                            connectToServer();
+                            // Kısa bir bekleme süresi sonra tekrar dene
+                            setTimeout(() => {
+                                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                                    wsRef.current.send(JSON.stringify(msg));
+                                }
+                            }, 1000);
+                        }
+                    }
+                } else {
+                    console.error('WebSocket bağlantısı kurulmamış');
                 }
             };
 
@@ -760,38 +869,6 @@
                                     setSearchTime(0);
                                     
                                     // Timer başlat
-                                    searchTimerRef.current = setInterval(() => {
-                                        setSearchTime(prev => prev + 1);
-                                    }, 1000);
-                                    
-                                    // Server'a gönder
-                                    sendMessage({ 
-                                        type: 'findMatch', 
-                                        ...playerData,
-                                        playerName: playerData.username
-                                    });
-                                }}
-                                disabled={!connected || searching || !playerData}
-                                className="w-full bg-gradient-to-r from-red-700 to-red-900 hover:from-red-600 hover:to-red-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4 flex items-center justify-center gap-3"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v11.494m-9-5.747h18" /></svg>
-                                {!playerData?.isGuest ? 'DERECELİ MAÇ ARA' : 'MAÇ ARA (CASUAL)'}
-                            </button>
-
-                            <button 
-                                onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} 
-                                className="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4 flex items-center justify-center gap-3"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                                Skor Tablosu
-                            </button>
-
-                            <div className="flex items-center gap-2 my-4">
-                                <div className="h-px bg-white/10 flex-1"></div>
-                                <span className="text-xs text-gray-500 uppercase">veya</span>
-                                <div className="h-px bg-white/10 flex-1"></div>
-                            </div>
-
                             <div className="grid grid-cols-2 gap-3">
                                 <button 
                                     onClick={() => {
