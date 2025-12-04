@@ -82,12 +82,9 @@ function calculateElo(winnerElo, loserElo, winnerLevel) {
     };
 }
 
-// --- DÜZELTME: Seviye Hesaplama Mantığı ---
-// Seviye 1: 0-149 ELO
-// Seviye 2: 150-299 ELO
-// Seviye 3: 300-449 ELO ... vb.
+// Level Calculation - Every 100 points = 1 level
 function calculateLevel(elo) {
-    return Math.floor(elo / 150) + 1; // Her 150 puanda bir seviye atlar, 1'den başlar.
+    return Math.floor(elo / 100) + 1; // Start at level 1 (0 ELO)
 }
 
 // API Endpoints
@@ -201,42 +198,6 @@ app.get('/api/player/:telegramId/matches', async (req, res) => {
     } catch (error) {
         console.error('Matches error:', error);
         res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
-
-// --- YENİ: Admin API Endpoint'leri ---
-
-// Admin yetki kontrolü için middleware
-const adminAuth = (req, res, next) => {
-    const adminTelegramId = '976640409'; // Sizin Telegram ID'niz
-    const requestorId = req.body.telegramId || req.query.telegramId;
-
-    if (requestorId === adminTelegramId) {
-        next(); // Yetkili, devam et
-    } else {
-        res.status(403).json({ error: 'Yetkiniz yok' });
-    }
-};
-
-app.post('/api/admin/reset-all-stats', adminAuth, async (req, res) => {
-    try {
-        console.log(`🚨 ADMIN ACTION: ${req.body.telegramId} tüm istatistikleri sıfırlıyor.`);
-        await Player.updateMany({}, {
-            $set: {
-                elo: 0,
-                level: 1,
-                wins: 0,
-                losses: 0,
-                draws: 0,
-                totalGames: 0,
-                winStreak: 0,
-                bestWinStreak: 0
-            }
-        });
-        res.json({ success: true, message: 'Tüm oyuncu istatistikleri başarıyla sıfırlandı.' });
-    } catch (error) {
-        console.error('Admin reset error:', error);
-        res.status(500).json({ error: 'İstatistikler sıfırlanırken bir hata oluştu.' });
     }
 });
 
@@ -462,7 +423,6 @@ wss.on('connection', (ws, req) => {
         try {
             const data = JSON.parse(message);
             switch (data.type) {
-                case 'ping': ws.send(JSON.stringify({ type: 'pong' })); break; // İstemci heartbeat'ine yanıt
                 case 'findMatch': handleFindMatch(ws, data); break;
                 case 'cancelSearch': handleCancelSearch(ws); break;
                 case 'createRoom': handleCreateRoom(ws, data); break;
@@ -493,20 +453,6 @@ wss.on('close', () => clearInterval(pingInterval));
 
 // --- OYUN MANTIKLARI ---
 
-function cleanupPlayerState(telegramId) {
-    if (!telegramId) return;
-
-    // Kuyruktan kaldır
-    const queueIndex = matchQueue.findIndex(p => p.telegramId === telegramId);
-    if (queueIndex !== -1) {
-        matchQueue.splice(queueIndex, 1);
-        console.log(`🧹 Temizlik: ${telegramId} ID'li oyuncu maç arama kuyruğundan kaldırıldı.`);
-    }
-
-    // Not: Aktif oyun odalarından çıkarmak daha karmaşık ve riskli olabilir.
-    // Şimdilik sadece kuyruğu temizlemek, "zaten kuyrukta" hatasını önleyecektir.
-}
-
 function handleFindMatch(ws, data) {
     if (ws.playerId && playerConnections.has(ws.playerId)) {
         const existingInQueue = matchQueue.find(p => p.playerId === ws.playerId);
@@ -517,9 +463,6 @@ function handleFindMatch(ws, data) {
             return sendMessage(ws, { type: 'error', message: 'Zaten bir oyundasınız' });
         }
     }
-
-    // --- YENİ: Maç aramadan önce oyuncunun eski durumunu temizle ---
-    cleanupPlayerState(data.telegramId);
 
     const playerId = ws.playerId || generateRoomCode();
     ws.playerId = playerId;
@@ -688,11 +631,12 @@ function handleJoinRoom(ws, data) {
     const gameState = initializeGame(data.roomCode, hostId, joinerId);
 
     setTimeout(() => {
+        sendGameState(data.roomCode, hostId, gameState);
+        sendGameState(data.roomCode, joinerId, gameState);
         // Herkese oyunun başladığını bildir
         [hostId, joinerId].forEach(pid => {
             const socket = playerConnections.get(pid);
-            // gameStart mesajı zaten tüm oyun durumunu içerir.
-            if(socket) sendMessage(socket, { type: 'gameStart', gameState: { ...gameState, playerId: pid } });
+            if(socket) sendMessage(socket, { type: 'gameStart', gameState: {...gameState, playerId: pid} });
         });
         console.log(`✅ ${ws.playerName}, ${room.players[hostId].name}'in odasına katıldı: ${data.roomCode}`);
     }, 500);
@@ -741,19 +685,6 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
 
         const isDraw = winnerId === 'DRAW';
         let eloChanges = null;
-
-        // --- YENİ: Oyunun bitiş nedenini belirle ---
-        let reason = 'finished'; // Normal bitiş
-        if (!isDraw && gameState.players[winnerId].hand.length > 0) {
-            // Eğer kazananın elinde hala taş varsa, oyun kilitlenmiştir.
-            reason = 'blocked';
-        }
-        // Oyundan ayrılma durumu 'leave' olarak ayrıca ele alınır.
-        // Bu blok sadece normal oyun sonları için.
-        const finalScores = reason === 'blocked' ? {
-            [player1Id]: gameState.players[player1Id].hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0),
-            [player2Id]: gameState.players[player2Id].hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0)
-        } : null;
 
         // Guest kontrolu - Guest varsa ELO guncellemesi yapma
         const player1IsGuest = room.players[player1Id].isGuest;
@@ -855,12 +786,10 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
             winner: winnerId, 
             winnerName: isDraw ? 'Beraberlik' : gameState.players[winnerId].name,
             isRanked: isRankedMatch,
-            reason: reason, // 'finished', 'blocked'
             eloChanges: eloChanges ? {
                 winner: eloChanges.winnerChange,
                 loser: eloChanges.loserChange
-            } : null,
-            finalScores: finalScores
+            } : null
         });
 
         // --- DÜZELTME: Oyun bittiğinde her iki oyuncunun da oda bilgisini temizle ---
@@ -878,8 +807,7 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
             type: 'gameEnd', 
             winner: winnerId, 
             winnerName: winnerId === 'DRAW' ? 'Beraberlik' : gameState.players[winnerId].name,
-            isRanked: false,
-            reason: 'error'
+            isRanked: false
         });
 
         // Hata durumunda da oyuncuların oda bilgilerini temizle
@@ -979,38 +907,24 @@ function handleDrawFromMarket(ws) {
 }
 
 function handleLeaveGame(ws) {
-    const roomCode = ws.roomCode;
-    const leaverId = ws.playerId;
-
-    if (!roomCode || !leaverId) {
-        return;
-    }
-
-    const room = rooms.get(roomCode);
-    if (!room || !room.gameState) {
-        // Oda zaten kapanmış olabilir, oyuncunun durumunu temizle
-        if (ws) ws.roomCode = null;
+    const room = rooms.get(ws.roomCode);
+    if (!room || !room.gameState || !ws.playerId) {
         return;
     }
 
     const gs = room.gameState;
     const playerIds = Object.keys(gs.players);
-
-    // Eğer odada sadece 1 kişi varsa (rakip hiç bağlanmadıysa vs), odayı sadece sil.
     if (playerIds.length !== 2) {
-        rooms.delete(roomCode);
-        if (ws) ws.roomCode = null;
+        rooms.delete(ws.roomCode);
+        ws.roomCode = null;
         return;
     }
 
+    const leaverId = ws.playerId;
     const winnerId = playerIds.find(id => id !== leaverId);
 
-    // handleGameEnd fonksiyonu, oyun sonu mantığını ve oda temizliğini yönetir.
-    // Oyundan ayrılma durumunu belirtmek için 'leave' nedenini (reason) de iletiyoruz.
-    // handleGameEnd'in dördüncü parametresi 'reason' olarak tanımlanmıştır.
-    // Ancak, handleGameEnd'in mevcut tanımında sadece 3 parametre var: (roomCode, winnerId, gameState).
-    // Bu nedenle, 'leave' durumunu yönetmek için handleGameEnd'i güncellememiz veya bu çağrıyı düzeltmemiz gerekiyor.
-    handleGameEnd(roomCode, winnerId, gs); // Şimdilik 'leave' parametresi olmadan çağırıyoruz. Eğer 'leave' mantığı handleGameEnd içinde varsa, bu çağrı güncellenmelidir.
+    handleGameEnd(ws.roomCode, winnerId, gs);
+
 }
 
 // YENİ: Yeniden bağlanma mantığı
@@ -1065,7 +979,7 @@ function handleDisconnect(ws) {
             // 60 saniye sonra oyunu bitir
             room.players[ws.playerId].disconnectTimer = setTimeout(() => {
                 console.log(`⏰ ${ws.playerName} yeniden bağlanmadı. Oyun sonlandırılıyor.`);
-                handleLeaveGame(ws); // Oyundan ayrılmış gibi işlem yap (bu fonksiyon artık her iki oyuncuyu da temizliyor)
+                handleLeaveGame(ws); // Oyundan ayrılmış gibi işlem yap
             }, 60000); // 60 saniye
         }
     }
