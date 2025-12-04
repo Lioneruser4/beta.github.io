@@ -1,11 +1,11 @@
-// Socket.io baglantisi
-const socket = io('https://mario-io-1.onrender.com', {
-    reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 5000,
-    timeout: 10000
-});
+// --- DÜZELTME: Sunucu WebSocket kullandığı için socket.io yerine WebSocket API'si kullanılmalı ---
+let socket;
+
+function connectWebSocket() {
+    // Sunucu adresini buraya girin. 'wss://' güvenli bağlantı içindir.
+    // Yerelde çalışıyorsanız: 'ws://localhost:10000'
+    // Render gibi bir serviste ise: 'wss://projenizin-adi.onrender.com'
+    socket = new WebSocket('wss://mario-io-1.onrender.com');
 
 // Yeniden baglanma durumu
 let isReconnecting = false;
@@ -13,6 +13,12 @@ let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 let isWaitingForCancelConfirmation = false; // Yeni: İptal onayı bekleniyor mu?
 
+    // --- WebSocket Eventleri ---
+    socket.onopen = onSocketOpen;
+    socket.onmessage = onSocketMessage;
+    socket.onclose = onSocketClose;
+    socket.onerror = onSocketError;
+}
 // Oyun durumu
 let gameState = {
     board: [],
@@ -47,6 +53,7 @@ const mainLobby = document.getElementById('main-lobby');
 const rankedLobby = document.getElementById('ranked-lobby');
 const friendLobby = document.getElementById('friend-lobby');
 const gameScreen = document.getElementById('game-screen');
+const matchFoundLobby = document.getElementById('match-found-lobby'); // YENİ: Eşleşme bulundu ekranı
 const postGameLobby = document.getElementById('post-game-lobby'); // Yeni ekran
 const connectionStatus = document.getElementById('connection-status');
 const dereceliBtn = document.getElementById('dereceli-btn');
@@ -79,13 +86,20 @@ const playerLossesElement = document.getElementById('player-losses');
 const opponentNameElement = document.getElementById('opponent-name');
 const opponentEloElement = document.getElementById('opponent-elo');
 
+// YENİ: Eşleşme bulundu ekranı elementleri
+const matchPlayer1Photo = document.getElementById('match-player1-photo');
+const matchPlayer1Name = document.getElementById('match-player1-name');
+const matchPlayer1Elo = document.getElementById('match-player1-elo');
+const matchPlayer2Photo = document.getElementById('match-player2-photo');
+const matchPlayer2Name = document.getElementById('match-player2-name');
+const matchPlayer2Elo = document.getElementById('match-player2-elo');
+
 const BOARD_SIZE = 8;
 
-// --- Socket.io Eventleri ---
+// --- WebSocket Event Handlers ---
 
-socket.on('connect', () => {
-    console.log('✅ Servere baglandi');
-    console.log('🔗 Socket ID:', socket.id);
+function onSocketOpen() {
+    console.log('✅ Sunucuya WebSocket ile bağlandı');
     connectionStatus.textContent = 'Servere baglandi!';
     connectionStatus.classList.remove('text-yellow-400');
     connectionStatus.classList.add('text-green-500');
@@ -93,217 +107,121 @@ socket.on('connect', () => {
     // Oyun durumunu sıfırla
     resetGameState();
     showScreen('main');
-});
+}
 
-socket.on('disconnect', (reason) => {
-    console.log('Sunucu bağlantısı kesildi:', reason);
+function onSocketClose(event) {
+    console.log('Sunucu bağlantısı kesildi:', event.reason || 'Bilinmeyen neden');
     connectionStatus.textContent = 'Bağlantı kesildi';
     connectionStatus.className = 'text-red-500';
-    
-    // Eğer oyundaysak, yeniden bağlanmayı dene
-    if (gameState.roomCode && !isReconnecting) {
+    // Otomatik yeniden bağlanma mantığı
+    if (!isReconnecting) {
         isReconnecting = true;
-        reconnectAttempts = 0;
         attemptReconnect();
-    }
-});
-
-socket.on('reconnect', () => {
-    console.log('Sunucuya yeniden bağlanıldı');
-    isReconnecting = false;
-    reconnectAttempts = 0;
-    
-    // Eğer oyundaysak, oyun durumunu senkronize et
-    if (gameState.roomCode) {
-        socket.emit('reconnectToGame', {
-            roomCode: gameState.roomCode,
-            playerId: gameState.playerId
-        });
-    }
-});
-
-socket.on('reconnectFailed', () => {
-    console.error('Yeniden bağlanılamadı');
-    showModal('Sunucuya bağlanılamadı. Lütfen sayfayı yenileyin.', 'error');
-});
-
-// Eşleşme bulunduğunda çağrılır
-function handleMatchFound(data) {
-    console.log('🔵 Eşleşme bulundu:', data);
-    
-    // Eğer zaten bir odadaysanız, bağlantıyı güncelle
-    gameState.roomCode = data.roomCode;
-    gameState.myColor = data.color;
-    gameState.opponent = data.opponent;
-    gameState.currentPlayerId = data.gameState.currentTurn; // Sunucudan gelen currentTurn artık telegramId
-    gameState.isSearching = false;
-    
-    // Oyun ekranını göster
-    showScreen('game');
-    showStatus(`Rakip bulundu: ${data.opponent.username || 'Bilinmeyen'}`);
-    
-    // Oyun tahtasını başlat
-    if (data.gameState) {
-        // DİKKAT: Bu kısım, istemci (checkers) ve sunucu (dominoes) arasındaki uyumsuzluk nedeniyle sorun çıkaracaktır.
-        // Sunucudan gelen domino tahtası verisi, istemcinin checkers tahtası çizim fonksiyonuyla uyumlu değildir.
-        console.warn("Sunucudan gelen oyun durumu (dominoes) istemcinin (checkers) beklediği formatta değil. Tahta çizimi başarısız olabilir.");
-        // Şimdilik sadece gerekli alanları güncelleyelim, tahta çizimi için uyumluluk sağlanmalı.
-        gameState.board = data.gameState.board; // Bu domino taşlarını içerecek (örneğin [[1,2], [2,3]])
-        gameState.currentTurn = data.gameState.currentTurn; // Bu güncel oyuncunun telegramId'si olacak
-        gameState.isMyTurn = gameState.currentTurn === gameState.myColor; // Bu karşılaştırma yanlış olacak (telegramId vs 'red'/'white')
-        updateGameUI(); // UI'ı güncellemeye çalış
     }
 }
 
-// Oda oluşturma başarılı olduğunda
-socket.on('roomCreated', (data) => {
-    console.log('✅ Oda başarıyla oluşturuldu:', data);
-    gameState.roomCode = data.roomCode;
-    gameState.isHost = true;
-    gameState.isSearching = true;
-    
-    // Oda kodunu göster
-    showStatus(`Oda Kodu: ${data.roomCode}\nRakip bekleniyor...`);
-    
-    // Oda kodunu ekranda göster
-    if (roomCodeOutput) {
-        roomCodeOutput.textContent = data.roomCode;
-        roomCodeOutput.classList.remove('hidden');
-    }
-});
+function onSocketError(error) {
+    console.error('WebSocket Hatası:', error);
+    connectionStatus.textContent = 'Bağlantı hatası';
+    connectionStatus.className = 'text-red-500';
+}
 
-// Odaya katılma başarılı olduğunda
-socket.on('joinedRoom', (data) => {
-    console.log('✅ Odaya katıldınız:', data);
-    gameState.roomCode = data.roomCode;
-    gameState.myColor = data.color || 'white';
-    gameState.opponent = data.opponent;
-    gameState.isSearching = false;
-    
-    // Oyun ekranına geç
-    showScreen('game');
-    showStatus(`Oyun başladı! Sıra ${gameState.isMyTurn ? 'sizde' : 'rakibinizde'}`);
-});
+function onSocketMessage(event) {
+    const data = JSON.parse(event.data);
+    console.log('⬅️ Sunucudan mesaj:', data);
 
-// Oda bulunamadı hatası
-socket.on('roomNotFound', (data) => {
-    console.error('❌ Oda bulunamadı:', data);
-    showModal('Oda bulunamadı. Lütfen geçerli bir oda kodu giriniz.', 'error');
-    showScreen('main');
-});
-
-// Oda dolu hatası
-socket.on('roomFull', (data) => {
-    console.error('❌ Oda dolu:', data);
-    showModal('Bu oda dolu. Lütfen başka bir oda seçiniz.', 'error');
-    showScreen('main');
-});
-
-// Socket event listeners
-socket.on('matchFound', (data) => {
-    console.log('🔵 Sunucudan eşleşme bildirimi:', data);
-    try {
-        handleMatchFound(data);
-    } catch (error) {
-        console.error('Eşleşme işlenirken hata:', error);
-        showModal('Eşleşme işlenirken bir hata oluştu', 'error');
-    }
-});
-
-// Kuyruk güncelleme bildirimi
-socket.on('queueUpdate', (data) => {
-    console.log('📊 Kuyruk güncellendi:', data);
-    if (gameState.isSearching) {
-        showStatus(data.message || `Sırada bekleniyor... (${data.position || 1}. sıradasınız)`);
-    }
-});
-
-// Arama iptal edildi bildirimi
-socket.on('searchCancelled', (data) => {
-    console.log('❌ Arama iptal edildi:', data);
-    gameState.isSearching = false;
-    showModal(data.message || 'Arama iptal edildi', 'info');
-    showScreen('main');
-});
-
-socket.on('opponentLeft', (data) => {
-    console.log('Rakip ayrıldı:', data);
-    showModal('Rakibiniz oyundan ayrıldı', 'info');
-    
-    // Eğer oda temizlendiyse, oyuncuyu ana menüye gönder
-    if (data.roomCleared) {
-        setTimeout(() => {
-            resetGameState();
+    switch (data.type) {
+        case 'connected':
+            console.log('Sunucu doğruladı:', data.message);
+            break;
+        case 'searchStatus':
+            rankedStatus.textContent = data.message;
+            break;
+        case 'searchCancelled':
+            gameState.isSearching = false;
+            gameState.roomCode = null;
+            showModal(data.message);
+            clearInterval(searchTimer);
+            searchTimer = null;
             showScreen('main');
-        }, 3000);
+            break;
+        case 'matchFound':
+            handleMatchFound(data);
+            break;
+        case 'gameStart':
+            handleGameStart(data);
+            break;
+        case 'gameUpdate':
+            handleGameUpdate(data);
+            break;
+        case 'gameEnd':
+            handleGameEnd(data);
+            break;
+        case 'error':
+            handleError(data);
+            break;
+        // Diğer sunucu mesaj tipleri buraya eklenebilir
     }
-});
+}
 
-socket.on('searchStatus', (data) => {
-    console.log('🔍 Axtaris statusu:', data);
-    rankedStatus.textContent = data.message;
-});
-
-socket.on('searchCancelled', (data) => {
-    gameState.isSearching = false;
-    gameState.roomCode = null;
-    showModal(data.message);
-    clearInterval(searchTimer);
-    searchTimer = null;
-    showScreen('main');
-});
-
-socket.on('roomCreated', (data) => {
-    gameState.roomCode = data.roomCode;
-    gameState.myColor = 'red';
-    roomCodeOutput.textContent = data.roomCode;
-    console.log('🏠 Oda yaradildi:', data.roomCode);
-});
-
-socket.on('opponentJoined', (data) => {
-    gameState.gameStarted = true;
-    gameState.isMyTurn = gameState.myColor === 'red';
-    gameState.board = createInitialBoard();
-    console.log('👥 Raqib qosuldu! Oyun baslayir...');
-    showScreen('game');
-    updateGameUI();
-});
-
-socket.on('gameUpdate', (data) => {
-    // DİKKAT: Sunucudan gelen domino oyun durumu istemcinin checkers oyun durumuyla uyumsuz.
-    // Bu kısım, istemcinin domino oyununa göre güncellenmesi gerektiği anlamına gelir.
-    gameState.board = data.gameState.board; // Domino taşları
-    gameState.currentTurn = data.gameState.currentTurn; // Güncel oyuncunun telegramId'si
-    gameState.isMyTurn = gameState.currentTurn === gameState.myColor; // Bu hala yanlış, myColor 'red'/'white' iken currentTurn telegramId
-    updateGameUI();
-});
-
-socket.on('gameOver', (data) => {
-    // data objesi: { winner: 'red'/'white', reason: 'win'/'leave', eloChange: 15 }
-    const isWinner = data.winner === gameState.myColor;
+function handleGameEnd(data) {
+    // data: { winner, winnerName, isRanked, eloChanges }
+    const isWinner = data.winner === gameState.currentPlayerId;
+    const isDraw = data.winner === 'DRAW';
     let title = '';
     let message = '';
 
-    if (data.reason === 'leave') {
-        title = 'Raqib Oyundan Cixdi!';
-        message = 'Siz qazandiniz!';
+    if (isDraw) {
+        title = '⚖️ BERABERE ⚖️';
+        message = 'Oyun berabere bitti.';
+    } else if (isWinner) {
+        title = '🎉 QAZANDINIZ! 🎉';
+        message = 'Tebrikler! Gozel oyun idi.';
     } else {
-        title = isWinner ? '🎉 QAZANDINIZ! 🎉' : '😔 MEGLUB OLDUNUZ 😔';
-        message = isWinner ? 'Tebrikler! Gozel oyun idi.' : 'Novbeti sefer ugurlar!';
+        title = '😔 MEGLUB OLDUNUZ 😔';
+        message = 'Novbeti sefer ugurlar!';
     }
 
     gameResultTitle.textContent = title;
     gameResultMessage.textContent = message;
 
-    if (data.eloChange !== undefined && data.eloChange !== null) {
-        const sign = data.eloChange >= 0 ? '+' : '';
-        eloChangeDisplay.textContent = `${sign}${data.eloChange} Puan`;
-        eloChangeDisplay.className = `text-2xl font-bold ${data.eloChange >= 0 ? 'text-green-400' : 'text-red-400'}`;
+    if (data.isRanked && data.eloChanges) {
+        const change = isWinner ? data.eloChanges.winner : data.eloChanges.loser;
+        const sign = change >= 0 ? '+' : '';
+        eloChangeDisplay.textContent = `${sign}${change} Puan`;
+        eloChangeDisplay.className = `text-2xl font-bold ${change >= 0 ? 'text-green-400' : 'text-red-400'}`;
+        
+        // --- DÜZELTME: Puanı anlık olarak güncelle ---
+        if (!isDraw) {
+            gameState.playerStats.elo += change;
+            if (isWinner) gameState.playerStats.wins++;
+            else gameState.playerStats.losses++;
+        } else {
+            gameState.playerStats.draws++;
+        }
+        updatePlayerStats(); // Lobiye dönmeden önce UI'ı güncelle
+    } else {
+        eloChangeDisplay.textContent = 'Derecesiz Maç';
+        eloChangeDisplay.className = 'text-2xl font-bold text-gray-400';
     }
-    showScreen('post-game');
-});
+    
+    // Oyun durumunu temizle
+    gameState.roomCode = null;
+    gameState.gameStarted = false;
+    gameState.isSearching = false;
 
-socket.on('error', (error) => {
+    showScreen('post-game');
+
+    // --- DÜZELTME: 3 saniye sonra otomatik olarak ana lobiye dön ---
+    setTimeout(() => {
+        // Eğer hala oyun sonu ekranındaysak (kullanıcı butona basmadıysa)
+        if (postGameLobby.classList.contains('hidden') === false) {
+            backToLobbyBtn.onclick(); // Lobiye dönme butonunun işlevini çağır
+        }
+    }, 3000); // 3 saniye bekle
+}
+
+function handleError(error) {
     console.error('Hata:', error);
     gameState.isSearching = false;
     gameState.roomCode = null;
@@ -311,10 +229,62 @@ socket.on('error', (error) => {
     searchTimer = null;
     showModal(error.message || 'Bir hata oluştu');
     showScreen('main');
-});
+}
+
+function handleMatchFound(data) {
+    console.log('🔵 Eşleşme bulundu:', data);
+    // Gerekli oyun durumlarını ayarla
+    gameState.roomCode = data.roomCode;
+    gameState.opponentStats = {
+        username: data.opponent.name,
+        elo: data.opponent.elo
+        elo: data.opponent.elo,
+        photoUrl: data.opponent.photoUrl
+    };
+    gameState.isSearching = false;
+    clearInterval(searchTimer);
+    searchTimer = null;
+    
+    // Oyunun başlamasını bekle (gameStart mesajı ile)
+    rankedStatus.textContent = `Rakip bulundu: ${data.opponent.name}. Oyun başlıyor...`;
+    // --- YENİ: Eşleşme bulundu ekranını doldur ---
+    matchPlayer1Name.textContent = gameState.playerStats.username || 'Siz';
+    matchPlayer1Elo.textContent = `(${gameState.playerStats.elo || 0} ELO)`;
+    // matchPlayer1Photo.src = gameState.playerStats.photoUrl || 'https://via.placeholder.com/100'; // Kendi fotoğrafınız varsa
+
+    matchPlayer2Name.textContent = data.opponent.name;
+    matchPlayer2Elo.textContent = `(${data.opponent.elo || 0} ELO)`;
+    matchPlayer2Photo.src = data.opponent.photoUrl || 'https://via.placeholder.com/100';
+
+    showScreen('match-found'); // Yeni ekranı göster
+}
+
+function handleGameStart(data) {
+    console.log('🎮 Oyun başlıyor:', data);
+    gameState.gameStarted = true;
+    gameState.currentPlayerId = data.gameState.playerId; // Kendi ID'mizi alıyoruz
+    
+    // Oyun ekranını göster
+    showScreen('game');
+    updateGameUI(data.gameState);
+}
+
+function handleGameUpdate(data) {
+    console.log('🔄 Oyun durumu güncellendi');
+    updateGameUI(data.gameState);
+}
+
+// --- WebSocket Mesaj Gönderme ---
+function sendSocketMessage(type, payload = {}) {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        const message = JSON.stringify({ type, ...payload });
+        socket.send(message);
+    } else {
+        console.error('WebSocket bağlantısı açık değil. Mesaj gönderilemedi:', type);
+    }
+}
 
 // --- Yardimci Funksiyalar ---
-
 function showModal(message) {
     modalMessage.textContent = message;
     messageModal.classList.remove('hidden');
@@ -326,6 +296,7 @@ function showScreen(screen) {
     rankedLobby.classList.add('hidden');
     friendLobby.classList.add('hidden');
     gameScreen.classList.add('hidden');
+    matchFoundLobby.classList.add('hidden'); // Yeni ekranı gizle
     postGameLobby.classList.add('hidden');
 
     if (screen === 'main') {
@@ -347,6 +318,8 @@ function showScreen(screen) {
         gameScreen.classList.remove('hidden');
         clearInterval(searchTimer);
         searchTimer = null;
+    } else if (screen === 'match-found') { // Yeni ekranı göster
+        matchFoundLobby.classList.remove('hidden');
     } else if (screen === 'post-game') {
         postGameLobby.classList.remove('hidden');
     } else {
@@ -365,171 +338,24 @@ function startSearchTimer() {
     }, 1000);
 }
 
-function createInitialBoard() {
-    const board = [];
-    for (let r = 0; r < BOARD_SIZE; r++) {
-        board[r] = new Array(BOARD_SIZE).fill(0);
-        for (let c = 0; c < BOARD_SIZE; c++) {
-            if ((r + c) % 2 !== 0) {
-                if (r < 3) {
-                    board[r][c] = 1; // Kirmizi
-                } else if (r > 4) {
-                    board[r][c] = 2; // Ag
-                }
-            }
-        }
-    }
-    return board;
-}
-
 function generateRoomCode() {
     return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
-function getPiecePlayer(pieceValue) {
-    if (pieceValue === 1 || pieceValue === 3) return 'red';
-    if (pieceValue === 2 || pieceValue === 4) return 'white';
-    return null;
-}
-
-function isValidCell(r, c) { 
-    return r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE; 
-}
-
-function findJumps(board, r, c, player) {
-    const piece = board[r][c];
-    const isKingPiece = piece === 3 || piece === 4;
-    const jumps = [];
-    const directions = isKingPiece ? [[-1, -1], [-1, 1], [1, -1], [1, 1]] :
-        player === 'red' ? [[1, -1], [1, 1]] : [[-1, -1], [-1, 1]];
-
-    for (const [dr, dc] of directions) {
-        const capturedR = r + dr;
-        const capturedC = c + dc;
-        const landR = r + 2 * dr;
-        const landC = c + 2 * dc;
-
-        if (isValidCell(landR, landC) && board[landR][landC] === 0) {
-            const capturedPieceValue = board[capturedR][capturedC];
-            const capturedPlayer = getPiecePlayer(capturedPieceValue);
-
-            if (capturedPlayer && capturedPlayer !== player) {
-                jumps.push({ from: { r, c }, to: { r: landR, c: landC }, captured: { r: capturedR, c: capturedC } });
-            }
-        }
-    }
-    return jumps;
-}
-
-function findValidMoves(board, r, c, player) {
-    const moves = [];
-    const piece = board[r][c];
-    const isKingPiece = piece === 3 || piece === 4;
-    
-    const jumps = findJumps(board, r, c, player);
-    if (jumps.length > 0) return jumps;
-    
-    const directions = isKingPiece ? [[-1, -1], [-1, 1], [1, -1], [1, 1]] :
-        player === 'red' ? [[1, -1], [1, 1]] : [[-1, -1], [-1, 1]];
-
-    for (const [dr, dc] of directions) {
-        const newR = r + dr;
-        const newC = c + dc;
-
-        if (isValidCell(newR, newC) && board[newR][newC] === 0) {
-            moves.push({ from: { r, c }, to: { r: newR, c: newC } });
-        }
-    }
-    return moves;
-}
-
-function isValidMove(board, fromR, fromC, toR, toC, player) {
-    const moves = findValidMoves(board, fromR, fromC, player);
-    return moves.some(move => move.to.r === toR && move.to.c === toC);
-}
-
 // --- UI Funksiyalari ---
 
-function drawBoard() {
-    boardElement.innerHTML = '';
-    
-    for (let r = 0; r < BOARD_SIZE; r++) {
-        for (let c = 0; c < BOARD_SIZE; c++) {
-            const cell = document.createElement('div');
-            const isDark = (r + c) % 2 !== 0;
-
-            cell.className = 'cell ' + (isDark ? 'cell-black' : 'cell-white');
-            cell.dataset.r = r;
-            cell.dataset.c = c;
-            cell.onclick = () => handleCellClick(r, c);
-
-            const pieceValue = gameState.board[r] && gameState.board[r][c];
-            if (pieceValue && pieceValue !== 0) {
-                const pieceElement = document.createElement('div');
-                const piecePlayer = getPiecePlayer(pieceValue);
-                const isKingPiece = pieceValue === 3 || pieceValue === 4;
-
-                pieceElement.className = 'piece ' + 
-                    (piecePlayer === 'red' ? 'piece-black' : 'piece-white') + 
-                    (isKingPiece ? ' piece-king ' + (piecePlayer === 'red' ? 'piece-king-black' : 'piece-king-white') : '');
-
-                pieceElement.innerHTML = isKingPiece ? '👑' : '●';
-
-                if (gameState.selectedPiece && gameState.selectedPiece.r === r && gameState.selectedPiece.c === c) {
-                    pieceElement.classList.add('selected');
-                }
-
-                if (gameState.currentTurn === piecePlayer && gameState.isMyTurn) {
-                    pieceElement.classList.add('current-turn-piece');
-                }
-
-                cell.appendChild(pieceElement);
-            }
-
-            if (gameState.selectedPiece && gameState.isMyTurn) {
-                if (isValidMove(gameState.board, gameState.selectedPiece.r, gameState.selectedPiece.c, r, c, gameState.myColor)) {
-                    cell.classList.add('valid-move');
-                }
-            }
-
-            boardElement.appendChild(cell);
-        }
-    }
-}
-
-function updateGameUI() {
+function updateGameUI(newGameState) {
     if (!gameState.gameStarted) return;
     
     turnText.textContent = gameState.isMyTurn ? 'Sizdir!' : 'Raqibdir';
     currentTurnDisplay.className = 'w-full max-w-md mb-4 p-4 rounded-xl bg-gray-800 shadow-xl text-center ' + 
         (gameState.isMyTurn ? 'bg-green-700' : 'bg-yellow-700');
     
-    drawBoard();
-}
-
-// --- Event Handlers ---
-
-function handleCellClick(r, c) {
-    // DİKKAT: Bu fonksiyon checkers oyununa özeldir. Domino oyununda hücre tıklaması farklı çalışır.
-    // Bu fonksiyonun domino oyununa göre yeniden yazılması gerekmektedir.
-    // Şimdilik, eğer sunucu domino oyunu ise bu fonksiyon çalışmayacaktır.
-    console.warn("handleCellClick fonksiyonu checkers oyununa özeldir ve domino oyunu için uyumlu değildir.");
-    // Aşağıdaki kod checkers için geçerlidir, domino için değil.
-    if (!gameState.isMyTurn || !gameState.gameStarted) {
-        console.log("Sıra sizde değil veya oyun başlamadı.");
-        return;
-    }
-    // ... (checkers logic)
-
-        if (isValidMove(gameState.board, fromR, fromC, r, c, gameState.myColor)) {
-            socket.emit('makeMove', {
-                roomCode: gameState.roomCode,
-                from: { r: fromR, c: fromC },
-                to: { r, c }
-            });
-            gameState.selectedPiece = null;
-        }
-    }
+    // Domino oyununun UI güncelleme mantığı buraya gelecek.
+    // Örneğin, oyuncunun elindeki taşları, masadaki taşları vb. gösterme.
+    // Şimdilik sadece sıra bilgisini güncelliyoruz.
+    gameState.board = newGameState.board;
+    gameState.isMyTurn = newGameState.currentPlayer === gameState.currentPlayerId;
 }
 
 // --- Button Eventleri ---
@@ -560,19 +386,10 @@ function startMatchmaking(isGuest = false) {
     
     console.log('📤 Sunucuya eşleşme isteği gönderiliyor:', playerData);
     
-    socket.emit('findMatch', playerData, (response) => {
-        if (response && response.error) {
-            console.error('❌ Eşleşme hatası:', response.error);
-            showModal(`Eşleşme hatası: ${response.error}`, 'error');
-            gameState.isSearching = false;
-            showScreen('main');
-            return;
-        }
-        console.log('✅ Eşleşme isteği alındı');
-    });
+    sendSocketMessage('findMatch', playerData);
     
-    showScreen('searching');
-    showStatus('Eşleşme aranıyor...');
+    showScreen('ranked'); // 'searching' ekranı yerine 'ranked' lobisini göster
+    rankedStatus.textContent = 'Eşleşme aranıyor...';
     startSearchTimer();
 }
 
@@ -580,7 +397,7 @@ function startMatchmaking(isGuest = false) {
 function cancelSearch() {
     if (gameState.isSearching) {
         console.log('🔍 Eşleşme araması iptal ediliyor...');
-        socket.emit('cancelSearch');
+        sendSocketMessage('cancelSearch');
         gameState.isSearching = false;
         stopSearchTimer();
         showScreen('main');
@@ -607,7 +424,7 @@ dereceliBtn.onclick = () => {
         gameState.isGuest = false;
         
         // Eşleşme isteği gönder (sadece Telegram kullanıcıları için)
-        socket.emit('findMatch', { 
+        sendSocketMessage('findMatch', { 
             telegramId: 'user123', // TODO: Gerçek uygulamada bu kullanıcı ID'si olacak
             isGuest: false,
             gameType: 'ranked',
@@ -628,7 +445,7 @@ friendBtn.onclick = () => startMatchmaking(true);
 
 cancelRankedBtn.onclick = () => {
     gameState.isSearching = false;
-    socket.emit('cancelSearch');
+    sendSocketMessage('cancelSearch');
 };
 
 createRoomBtn.onclick = () => {
@@ -652,7 +469,7 @@ createRoomBtn.onclick = () => {
     showScreen('friend'); // 'searching' ekranı yerine 'friend' lobisini göster
     
     // Sunucuya oda oluşturma isteği gönder
-    socket.emit('createRoom', { 
+    sendSocketMessage('createRoom', { 
         roomCode,
         playerName: gameState.playerName || 'Oyuncu',
         isGuest: gameState.isGuest || false
@@ -683,15 +500,12 @@ joinRoomBtn.onclick = () => {
     
     gameState.roomCode = roomCode;
     gameState.myColor = 'white';
-    socket.emit('joinRoom', { roomCode });
+    sendSocketMessage('joinRoom', { roomCode });
 };
 
 backToLobbyBtn.onclick = () => {
     // Oyun durumunu sıfırla
     resetGameState();
-    
-    // Sunucuya oyundan ayrıldığımızı bildir
-    socket.emit('leaveGame');
     
     // Ana menüye dön
     showScreen('main');
@@ -699,10 +513,13 @@ backToLobbyBtn.onclick = () => {
 
 leaveGameBtn.onclick = () => leaveGame();
 
+// --- DÜZELTME: Oyundan çıkarken direkt lobiye dön ve durumu sıfırla ---
 function leaveGame() {
     if (gameState.roomCode) {
-        socket.emit('leaveGame', { roomCode: gameState.roomCode });
+        // Sunucuya oyundan ayrıldığımızı bildir. Sunucu diğer oyuncuya haber verecek.
+        sendSocketMessage('leaveGame');
     }
+    // Beklemeden direkt lobiye dön ve oyun durumunu sıfırla.
     // Oyun durumunu sıfırla
     resetGameState();
     showScreen('main');
@@ -723,7 +540,7 @@ function joinRoom(roomCode) {
     gameState.isHost = false;
     gameState.isSearching = true;
     
-    socket.emit('joinRoom', {
+    sendSocketMessage('joinRoom', {
         roomCode,
         playerName: gameState.playerName || 'Oyuncu',
         isGuest: gameState.isGuest || false
@@ -756,7 +573,7 @@ function resetGameState() {
     };
     
     // Arayüzü güncelle
-    updatePlayerStats();
+    updatePlayerStats(); // Sıfırlanmış verilerle UI'ı temizle
 }
 
 // Oyuncu istatistiklerini güncelle
@@ -785,16 +602,16 @@ function updatePlayerStats() {
 // Yeniden bağlanma denemesi
 function attemptReconnect() {
     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-        showModal('Sunucuya bağlanılamadı. Lütfen sayfayı yenileyin.', 'error');
+        showModal('Sunucuya yeniden bağlanılamadı. Lütfen sayfayı yenileyin.', 'error');
         return;
     }
     
     reconnectAttempts++;
     console.log(`Yeniden bağlanma denemesi ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`);
     
-    // 2 saniye sonra tekrar dene
+    // 2 saniye sonra yeni bir WebSocket bağlantısı kurmayı dene
     setTimeout(() => {
-        socket.connect();
+        connectWebSocket();
     }, 2000);
 }
 
@@ -814,4 +631,5 @@ modalCloseBtn.onclick = () => {
 document.addEventListener('DOMContentLoaded', () => {
     connectionStatus.textContent = 'Servere qosulur...';
     connectionStatus.classList.add('text-yellow-400', 'animate-pulse');
+    connectWebSocket(); // Sayfa yüklendiğinde WebSocket bağlantısını başlat
 });
