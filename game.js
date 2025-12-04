@@ -228,10 +228,15 @@ socket.on('searchCancelled', (data) => {
 
 socket.on('opponentLeft', (data) => {
     console.log('Rakip ayrıldı:', data);
-    showModal('Rakibiniz oyundan ayrıldı. Kazandınız!', 'info');
-    // Anında lobiye dön
-    resetGameState();
-    showScreen('main');
+    showModal('Rakibiniz oyundan ayrıldı', 'info');
+    
+    // Eğer oda temizlendiyse, oyuncuyu ana menüye gönder
+    if (data.roomCleared) {
+        setTimeout(() => {
+            resetGameState();
+            showScreen('main');
+        }, 3000);
+    }
 });
 
 socket.on('searchStatus', (data) => {
@@ -306,13 +311,6 @@ socket.on('error', (error) => {
     searchTimer = null;
     showModal(error.message || 'Bir hata oluştu');
     showScreen('main');
-});
-
-// Yeni: Sunucudan gelen anlık istatistik güncellemesini işler
-socket.on('statsUpdate', (data) => {
-    console.log('📊 İstatistikler güncellendi:', data.player);
-    gameState.playerStats = { ...gameState.playerStats, ...data.player };
-    updatePlayerStats(); // UI'ı güncelle
 });
 
 // --- Yardimci Funksiyalar ---
