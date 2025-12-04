@@ -191,8 +191,15 @@
             tg.expand();
         }
 
-        // API Base URL
-        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
+        // API Base URL - Render backend URL'si
+        const API_URL = 'https://mario-io-1.onrender.com';
+        
+        // Hata ayıklama için konsola yazdır
+        console.log('Backend URL:', API_URL);
+        
+        // React uygulamasını başlat
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<DominoGame />);
 
         // --- BİLEŞENLER ---
         
