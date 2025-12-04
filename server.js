@@ -671,12 +671,11 @@ function handleJoinRoom(ws, data) {
     const gameState = initializeGame(data.roomCode, hostId, joinerId);
 
     setTimeout(() => {
-        sendGameState(data.roomCode, hostId, gameState);
-        sendGameState(data.roomCode, joinerId, gameState);
         // Herkese oyunun başladığını bildir
         [hostId, joinerId].forEach(pid => {
             const socket = playerConnections.get(pid);
-            if(socket) sendMessage(socket, { type: 'gameStart', gameState: {...gameState, playerId: pid} });
+            // gameStart mesajı zaten tüm oyun durumunu içerir.
+            if(socket) sendMessage(socket, { type: 'gameStart', gameState: { ...gameState, playerId: pid } });
         });
         console.log(`✅ ${ws.playerName}, ${room.players[hostId].name}'in odasına katıldı: ${data.roomCode}`);
     }, 500);
