@@ -8,7 +8,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Domino 101 Pro - Telegram Game</title>
     
-    <!-- Telegram WebApp SDK -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -16,7 +17,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
     
     <script>
         tailwind.config = {
@@ -33,13 +34,18 @@
                             face: '#fdfdfd',
                             side: '#e2e2e2',
                             shadow: '#00000040'
-                        }
+                        },
+                        // Kan Kırmızısı
+                        ranked: '#990000', 
+                        rankedhover: '#cc0000',
+                        rankedactive: '#660000',
                     },
                     boxShadow: {
                         '3d': '0px 4px 0px #c7c7c7, 0px 6px 6px rgba(0,0,0,0.4)', // Taşın 3D kalınlığı
                         '3d-active': '0px 2px 0px #c7c7c7, 0px 3px 3px rgba(0,0,0,0.4)',
                         'inner-pip': 'inset 0 1px 2px rgba(0,0,0,0.6)',
-                        'glow': '0 0 15px #fbbf24, 0 0 5px #fbbf24' // İpucu parlaması
+                        'glow': '0 0 15px #fbbf24, 0 0 5px #fbbf24', // İpucu parlaması
+                        'ranked-glow': '0 0 15px rgba(204,0,0,0.8), 0 0 5px rgba(204,0,0,0.5)',
                     },
                     animation: {
                         'slide-up': 'slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
@@ -48,7 +54,8 @@
                         'slide-in': 'slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
                         'celebrate': 'celebrate 1s ease-out',
                         'glow-pulse': 'glowPulse 2s ease-in-out infinite',
-                        'shake': 'shake 0.5s ease-in-out'
+                        'shake': 'shake 0.5s ease-in-out',
+                        'ranked-pulse': 'rankedPulse 1.5s infinite',
                     },
                     keyframes: {
                         slideUp: { '0%': { transform: 'translateY(100%)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
@@ -69,6 +76,10 @@
                             '0%, 100%': { transform: 'translateX(0)' },
                             '25%': { transform: 'translateX(-10px)' },
                             '75%': { transform: 'translateX(10px)' }
+                        },
+                        rankedPulse: {
+                            '0%, 100%': { transform: 'scale(1)', boxShadow: '0 0 10px rgba(153, 0, 0, 0.7)' },
+                            '50%': { transform: 'scale(1.02)', boxShadow: '0 0 20px rgba(204, 0, 0, 1)' }
                         }
                     }
                 }
@@ -90,8 +101,20 @@
         
         .pip-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 100%; padding: 2px; }
         .pip { background-color: #111; border-radius: 50%; width: 5px; height: 5px; margin: auto; box-shadow: inset 0 1px 1px rgba(255,255,255,0.2); }
-        /* Kırmızı noktalar (bazı setlerde olur ama burada siyah klasik yaptık) */
         
+        /* Tahta kaydırma sorununu çözmek için özel stil */
+        .board-container {
+             /* Yatayda taşlar ekrana sığmadığında aşağı sarmalama (wrap) yapar */
+            display: flex;
+            flex-wrap: wrap; 
+            justify-content: center;
+            align-items: center;
+            gap: 0.25rem; /* gap-1 */
+            padding-top: 2.5rem; /* py-10 */
+            padding-bottom: 2.5rem;
+            min-width: 100%;
+        }
+
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
@@ -124,6 +147,23 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Tahtanın Düzgün Görüntülenmesi için: Zoom out etkisi */
+        .game-board-view {
+             /* Tüm tahta alanı için maksimum genişlik ve ekranı doldurma */
+             max-width: 100vw;
+             max-height: 100%;
+             overflow-x: auto;
+             overflow-y: hidden;
+             display: flex;
+             align-items: center;
+             justify-content: flex-start; /* Başlangıçta soldan başlasın */
+             padding: 0 50px; /* Kenarlarda boşluk bırakmak için */
+        }
+        
+        /* Eğer tek satırda sığmıyorsa, zoom out uygulayarak sığdırılabilir 
+           Ancak flex-wrap ile sarmalama daha iyi bir UX sunar. */
+        
     </style>
 </head>
 <body>
@@ -162,6 +202,9 @@
 
         // 2. Domino Taşı (3D Tasarım)
         const DominoTile = ({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false }) => {
+            // Taşın döndürülmüş olup olmadığını belirlemek için, oynanacak uca göre karar vermek gerek
+            // Sunucu zaten doğru sırayla gönderiyor olmalı, bu yüzden sadece görsel yönlendirmeyi kullanıyoruz.
+
             const baseClasses = `
                 relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
                 transition-all duration-300 select-none
@@ -179,12 +222,15 @@
                     className={baseClasses}
                     style={{ transform: isSelected ? 'translateY(-15px) scale(1.1)' : `scale(${scale})` }}
                 >
+                    {/* İlk Yarı */}
                     <div className={`flex-1 flex items-center justify-center ${vertical ? 'border-b' : 'border-r'} border-gray-300`}>
                         <RenderPips number={values[0]} />
                     </div>
+                    {/* İkinci Yarı */}
                     <div className="flex-1 flex items-center justify-center">
                         <RenderPips number={values[1]} />
                     </div>
+                    {/* Orta Çizgi Pimi */}
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-400 border border-gray-500 shadow-inner z-10"></div>
                 </div>
             );
@@ -193,13 +239,44 @@
         // 3. Bildirim Toast
         const Toast = ({ message, type }) => {
             const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600', warning: 'bg-yellow-600' };
+            const icon = { success: 'fa-check-circle', error: 'fa-exclamation-triangle', info: 'fa-info-circle', warning: 'fa-bell' };
             return (
                 <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-2 rounded-full shadow-lg text-white font-medium text-sm animate-slide-up flex items-center gap-2 ${colors[type] || colors.info}`}>
-                    <span>{type === 'success' ? '✓' : type === 'error' ? '!' : 'i'}</span>
+                    <i className={`fas ${icon[type] || icon.info}`}></i>
                     {message}
                 </div>
             );
         };
+        
+        // 4. Seviye İkonu
+        const LevelIcon = ({ level, elo }) => {
+            const safeLevel = Math.min(level || 0, 10);
+            let color = 'text-gray-400';
+            let icon = 'fas fa-user-circle';
+
+            if (safeLevel >= 1 && safeLevel <= 3) {
+                color = 'text-blue-400';
+                icon = 'fas fa-shield-alt'; // Bronz
+            } else if (safeLevel >= 4 && safeLevel <= 6) {
+                color = 'text-silver-400';
+                icon = 'fas fa-medal'; // Gümüş
+            } else if (safeLevel >= 7 && safeLevel <= 9) {
+                color = 'text-yellow-400';
+                icon = 'fas fa-crown'; // Altın
+            } else if (safeLevel >= 10) {
+                color = 'text-red-500';
+                icon = 'fas fa-dragon'; // Efsane
+            }
+
+            return (
+                <div className="flex items-center gap-2">
+                    <i className={`${icon} ${color} text-xl`}></i>
+                    <span className="text-white font-bold text-md">LVL {safeLevel}</span>
+                    <span className="text-gray-300 text-sm">({elo} ELO)</span>
+                </div>
+            );
+        };
+
 
         // --- ANA OYUN ---
 
@@ -222,7 +299,8 @@
             const [opponent, setOpponent] = useState(null);
             
             const wsRef = useRef(null);
-            const boardScrollRef = useRef(null);
+            // Tahtanın genişliğini kontrol etmek yerine, scroll-x'i yönetiyoruz.
+            const boardScrollRef = useRef(null); 
             const searchTimerRef = useRef(null);
 
             // Oyun state'ini temizlemek için merkezi bir fonksiyon
@@ -327,12 +405,14 @@
                 }
             };
 
-            // Otomatik Kaydırma: Oyun güncellendiğinde tahtayı ortala veya sona git
+            // Otomatik Kaydırma: Oyun güncellendiğinde tahtayı ortala veya sona git (Taşlar sarmalladığı için kaydırmaya gerek kalmayabilir, ancak geniş tahtalar için koruyalım)
             useEffect(() => {
                 if (gameState && boardScrollRef.current) {
-                    const scrollWidth = boardScrollRef.current.scrollWidth;
-                    const clientWidth = boardScrollRef.current.clientWidth;
-                    boardScrollRef.current.scrollLeft = (scrollWidth - clientWidth) / 2;
+                    // Tahta genişliği ekranı aşarsa ortala. Aşmazsa justify-center devrede.
+                    const container = boardScrollRef.current;
+                    if (container.scrollWidth > container.clientWidth) {
+                        container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
+                    }
                 }
             }, [gameState?.board]);
 
@@ -474,7 +554,7 @@
             const marketSize = gameState?.market?.length || 0;
             const canDrawFromMarket = marketSize > 0;
 
-            // calculateValidMoves fonksiyonu - EKSİKTİ!
+            // calculateValidMoves fonksiyonu
             const calculateValidMoves = (tile) => {
                 if (!gameState || gameState.board.length === 0) return ['start'];
                 
@@ -528,7 +608,6 @@
                 if (selectedTileIndex === null) return;
                 
                 // Server 'left' veya 'right' bekliyor.
-                // Eğer tahta boşsa server genelde fark etmez ama 'left' gönderelim.
                 const posToSend = position === 'start' ? 'left' : position;
 
                 sendMessage({
@@ -609,7 +688,7 @@
                                 {/* Player Card */}
                                 <div className="text-center mb-8">
                                     {playerData?.photoUrl && (
-                                        <img src={playerData.photoUrl} alt="Profile" className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 animate-pulse" />
+                                        <img src={playerData.photoUrl} alt="Profile" className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 animate-pulse object-cover" />
                                     )}
                                     <h2 className="text-white text-2xl font-bold mb-2">{playerData?.username}</h2>
                                     {!playerData?.isGuest && (
@@ -627,15 +706,15 @@
                                 {/* Searching Animation */}
                                 <div className="mb-8">
                                     <div className="w-32 h-32 mx-auto relative">
-                                        <div className="absolute inset-0 border-8 border-yellow-400/30 rounded-full"></div>
-                                        <div className="absolute inset-0 border-8 border-t-yellow-400 rounded-full animate-spin"></div>
+                                        <div className="absolute inset-0 border-8 border-ranked/30 rounded-full"></div>
+                                        <div className="absolute inset-0 border-8 border-t-ranked rounded-full animate-spin"></div>
                                         <div className="absolute inset-0 flex items-center justify-center">
-                                            <span className="text-5xl">🎯</span>
+                                            <span className="text-5xl">⚔️</span>
                                         </div>
                                     </div>
-                                    <h3 className="text-white text-2xl font-bold text-center mt-6 mb-2">🔍 RAIP ARANIYOR...</h3>
+                                    <h3 className="text-white text-2xl font-black text-center mt-6 mb-2">🔍 RAIP ARANIYOR...</h3>
                                     <p className="text-white/70 text-center text-sm mb-4">
-                                        {!playerData?.isGuest ? '⚔️ DERECELİ MAÇ' : '🎮 CASUAL MAÇ'}
+                                        {!playerData?.isGuest ? '🏆 DERECELİ MAÇ' : '🎮 CASUAL MAÇ'}
                                     </p>
                                     
                                     {/* Timer */}
@@ -645,8 +724,8 @@
                                     </div>
 
                                     {/* İpucu */}
-                                    <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-3 mb-4 text-center">
-                                        <p className="text-blue-300 text-xs">💡 İpucu: Dereceli maçlarda ELO puanınız değişir!</p>
+                                    <div className="bg-ranked/20 border border-ranked/30 rounded-xl p-3 mb-4 text-center">
+                                        <p className="text-rankedhover text-xs">💡 Dereceli maçlarda ELO puanınız değişir!</p>
                                     </div>
                                 </div>
 
@@ -662,9 +741,9 @@
                                         setSearchTime(0);
                                         sendMessage({ type: 'cancelSearch' });
                                     }}
-                                    className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all"
+                                    className="w-full bg-gradient-to-r from-red-600 to-ranked hover:from-red-700 hover:to-rankedhover text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all flex items-center justify-center gap-2"
                                 >
-                                    ❌ ARAMADI İPTAL ET
+                                    <i className="fas fa-times"></i> ARAMAYI İPTAL ET
                                 </button>
                             </div>
                         </div>
@@ -686,37 +765,38 @@
 
             if (screen === 'lobby') {
                 return (
-                    <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10">
+                    <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10 bg-table-base">
                         {notification && <Toast message={notification.message} type={notification.type} />}
                         
-                        <div className="text-center mb-10 animate-float">
+                        <div className="text-center mb-8 animate-float">
                             <h1 className="text-5xl font-black text-white drop-shadow-lg mb-2 tracking-tighter">
-                                🎯 DOMINO <span className="text-yellow-400">101</span> 🏆
+                                <i className="fas fa-dot-circle text-ranked"></i> DOMINO <span className="text-yellow-400">101</span> 
                             </h1>
                             <p className="text-gray-300 text-sm tracking-widest uppercase">⚡ Profesyonel Online Oyun ⚡</p>
                         </div>
 
-                        {/* NAVİGASYON */}
+                        {/* NAVİGASYON - Skor Tablosu */}
                         <div className="flex justify-center gap-3 mb-6">
-                            <button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold">🏆 Skor Tablosu</button>
+                            <button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-black rounded-lg font-bold shadow-md transition-colors flex items-center gap-2">
+                                <i className="fas fa-trophy"></i> Skor Tablosu
+                            </button>
                         </div>
 
                         <div className="w-full max-w-sm bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
                             {/* Player Info */}
                             {playerData && (
                                 <div className="mb-6 text-center">
-                                    {playerData.photoUrl && (
-                                        <img src={playerData.photoUrl} alt="Profile" className="w-20 h-20 rounded-full mx-auto mb-3 border-4 border-yellow-400" />
+                                    {playerData.photoUrl ? (
+                                        <img src={playerData.photoUrl} alt="Profile" className="w-20 h-20 rounded-full mx-auto mb-3 border-4 border-ranked object-cover" />
+                                    ) : (
+                                        <div className="w-20 h-20 rounded-full mx-auto mb-3 bg-gray-700 border-4 border-ranked flex items-center justify-center text-4xl text-white">
+                                            <i className="fas fa-user"></i>
+                                        </div>
                                     )}
-                                    <h2 className="text-white text-2xl font-bold">{playerData.username || playerData.firstName}</h2>
+                                    <h2 className="text-white text-2xl font-extrabold mb-2">{playerData.username || playerData.firstName}</h2>
                                     {!playerData.isGuest && (
-                                        <div className="flex justify-center gap-4 mt-2">
-                                            <span className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-sm font-bold">
-                                                LVL {Math.min(playerData.level || 0, 10)}
-                                            </span>
-                                            <span className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-3 py-1 rounded-full text-sm font-bold">
-                                                {playerData.elo} ELO
-                                            </span>
+                                        <div className="flex justify-center">
+                                            <LevelIcon level={playerData.level} elo={playerData.elo} />
                                         </div>
                                     )}
                                     {playerData.isGuest && (
@@ -725,32 +805,31 @@
                                 </div>
                             )}
 
+                            {/* KAN KIRMIZISI DERECELİ BUTON */}
                             <button 
                                 onClick={() => {
                                     if(!playerData) return showNotification('İsim giriniz', 'error');
                                     if(searching) return;
                                     
-                                    // Özel arama ekranına geç
                                     setScreen('searching');
                                     setSearching(true);
                                     setSearchTime(0);
                                     
-                                    // Timer başlat
                                     searchTimerRef.current = setInterval(() => {
                                         setSearchTime(prev => prev + 1);
                                     }, 1000);
                                     
-                                    // Server'a gönder
                                     sendMessage({ 
                                         type: 'findMatch', 
                                         ...playerData,
-                                        playerName: playerData.username
+                                        playerName: playerData.username,
+                                        gameType: !playerData.isGuest ? 'ranked' : 'casual' // Oyuncu değilse casual
                                     });
                                 }}
                                 disabled={!connected || searching}
-                                className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4 flex items-center justify-center gap-2"
+                                className="w-full bg-ranked hover:bg-rankedhover disabled:opacity-50 disabled:cursor-not-allowed text-white font-black py-4 rounded-xl shadow-ranked-glow transform active:scale-95 transition-all mb-6 flex items-center justify-center gap-3 border-2 border-white/20 animate-ranked-pulse"
                             >
-                                <span>🏆</span> {!playerData?.isGuest ? '⚔️ DERECELİ MAÇ ARA' : '🎮 MAÇ ARA (CASUAL)'}
+                                <i className="fas fa-crosshairs fa-lg"></i> {!playerData?.isGuest ? '⚔️ DERECELİ MAÇ ARA' : '🎮 MAÇ ARA (CASUAL)'} <i className="fas fa-crosshairs fa-lg"></i>
                             </button>
 
                             <div className="flex items-center gap-2 my-4">
@@ -759,6 +838,7 @@
                                 <div className="h-px bg-white/10 flex-1"></div>
                             </div>
 
+                            {/* ODA KUR/KATIL */}
                             <div className="grid grid-cols-2 gap-3">
                                 <button 
                                     onClick={() => {
@@ -767,9 +847,9 @@
                                         sendMessage({ type: 'createRoom', ...playerData, playerName: playerData.username });
                                     }}
                                     disabled={roomCode !== ''}
-                                    className="bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-semibold transition-colors"
+                                    className="bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
                                 >
-                                    🏠 ODA KUR
+                                    <i className="fas fa-home"></i> ODA KUR
                                 </button>
                                 <div className="relative">
                                     <input 
@@ -781,9 +861,9 @@
                                     />
                                     <button 
                                         onClick={() => sendMessage({ type: 'joinRoom', roomCode: joinCode, ...playerData, playerName: playerData.username })}
-                                        className="absolute right-1 top-1 bottom-1 bg-yellow-500 text-white px-3 rounded-lg hover:bg-yellow-400"
+                                        className="absolute right-1 top-1 bottom-1 bg-yellow-500 text-white px-3 rounded-lg hover:bg-yellow-400 flex items-center justify-center"
                                     >
-                                        ➔
+                                        <i className="fas fa-sign-in-alt"></i>
                                     </button>
                                 </div>
                             </div>
@@ -803,16 +883,18 @@
             // --- LEADERBOARD EKRANI (YENİ) ---
             if (screen === 'leaderboard') {
                 return (
-                    <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10">
+                    <div className="flex flex-col items-center justify-start min-h-screen p-6 relative z-10 bg-table-base overflow-y-auto">
                         {notification && <Toast message={notification.message} type={notification.type} />}
                         
-                        <div className="text-center mb-6">
-                            <h1 className="text-4xl font-black text-white drop-shadow-lg mb-2">🏆 SKOR TABLOSU 🏆</h1>
+                        <div className="text-center mb-6 pt-4">
+                            <h1 className="text-4xl font-black text-white drop-shadow-lg mb-2"><i className="fas fa-chart-line text-yellow-400"></i> SKOR TABLOSU <i className="fas fa-chart-line text-yellow-400"></i></h1>
                         </div>
 
-                        <button onClick={() => setScreen('lobby')} className="mb-4 px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold">⬅️ Geri Dön</button>
+                        <button onClick={() => setScreen('lobby')} className="mb-6 px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold transition-colors flex items-center gap-2">
+                            <i className="fas fa-arrow-left"></i> Geri Dön
+                        </button>
 
-                        <div className="w-full max-w-2xl bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
+                        <div className="w-full max-w-2xl bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10 mb-8">
                             {leaderboard.length === 0 ? (
                                 <div className="text-center text-gray-400 py-8">
                                     <p className="text-xl">📊 Skor tablosu yükleniyor...</p>
@@ -820,34 +902,38 @@
                             ) : (
                                 <div className="space-y-3">
                                     {leaderboard.map((player, index) => (
-                                        <div key={player._id} className={`flex items-center gap-4 p-4 rounded-xl ${
-                                            index === 0 ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-2 border-yellow-500' :
-                                            index === 1 ? 'bg-gradient-to-r from-gray-400/20 to-gray-500/20 border-2 border-gray-400' :
-                                            index === 2 ? 'bg-gradient-to-r from-orange-600/20 to-orange-700/20 border-2 border-orange-600' :
+                                        <div key={player._id} className={`flex items-center gap-4 p-4 rounded-xl shadow-lg transition-transform hover:scale-[1.01] ${
+                                            index === 0 ? 'bg-gradient-to-r from-yellow-500/30 to-amber-500/30 border-2 border-yellow-500' :
+                                            index === 1 ? 'bg-gradient-to-r from-gray-400/30 to-gray-500/30 border-2 border-gray-400' :
+                                            index === 2 ? 'bg-gradient-to-r from-orange-600/30 to-orange-700/30 border-2 border-orange-600' :
                                             'bg-white/5 border border-white/10'
                                         }`}>
                                             <div className="text-3xl font-black text-white w-10 text-center">
                                                 {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
                                             </div>
                                             
-                                            {player.photoUrl && (
-                                                <img src={player.photoUrl} alt={player.username} className="w-12 h-12 rounded-full border-2 border-white/30" />
+                                            {player.photoUrl ? (
+                                                <img src={player.photoUrl} alt={player.username} className="w-12 h-12 rounded-full border-2 border-white/30 object-cover" />
+                                            ) : (
+                                                <div className="w-12 h-12 rounded-full bg-gray-600 border-2 border-white/30 flex items-center justify-center text-xl text-white">
+                                                    <i className="fas fa-user"></i>
+                                                </div>
                                             )}
                                             
                                             <div className="flex-1">
                                                 <div className="text-white font-bold text-lg">{player.username || player.firstName}</div>
-                                                <div className="flex gap-2 text-sm">
-                                                    <span className="text-green-400">✓ {player.wins}</span>
-                                                    <span className="text-red-400">✗ {player.losses}</span>
-                                                    <span className="text-yellow-400">🔥 {player.winStreak}</span>
+                                                <div className="flex gap-4 text-sm mt-1">
+                                                    <span className="text-green-400 font-bold"><i className="fas fa-check"></i> {player.wins} Galibiyet</span>
+                                                    <span className="text-red-400 font-bold"><i className="fas fa-times"></i> {player.losses} Mağlubiyet</span>
+                                                    <span className="text-yellow-400 font-bold"><i className="fas fa-fire"></i> {player.winStreak} Seri</span>
                                                 </div>
                                             </div>
                                             
                                             <div className="text-right">
-                                                <div className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-3 py-1 rounded-full text-sm font-bold mb-1">
+                                                <div className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-3 py-1 rounded-full text-sm font-black mb-1 shadow-md">
                                                     {player.elo} ELO
                                                 </div>
-                                                <div className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-xs font-bold">
+                                                <div className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-xs font-bold shadow-sm">
                                                     LVL {Math.min(player.level || 0, 10)}
                                                 </div>
                                             </div>
@@ -863,8 +949,6 @@
             // --- OYUN EKRANI ---
             if (screen === 'game' && gameState) {
                 // Tahtada görsel olarak taşları döndürmek gerekir mi?
-                // Sunucu genellikle [[1,6], [6,2]] diye sıralı atar.
-                // Biz sadece çiziyoruz.
                 
                 // Elimizdeki taş sayısı 7'den fazla mı?
                 const isHandCrowded = myHand.length > 7;
@@ -880,11 +964,11 @@
                                     <img
                                         src={opponent.photoUrl}
                                         alt={opponent.name || opponent.username || 'Rakip'}
-                                        className="w-10 h-10 rounded-full border-2 border-yellow-400 shadow-lg object-cover"
+                                        className="w-10 h-10 rounded-full border-2 border-red-500 shadow-lg object-cover"
                                     />
                                 ) : (
-                                    <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center shadow-lg">
-                                        👤
+                                    <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center shadow-lg text-white">
+                                        <i className="fas fa-user-circle"></i>
                                     </div>
                                 )}
                                 <div>
@@ -892,7 +976,7 @@
                                         {opponent?.name || opponent?.username || 'Rakip'}
                                     </div>
                                     <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
-                                        🎲 {(() => {
+                                        <i className="fas fa-dice"></i> {(() => {
                                             const oppName = opponent?.name || opponent?.username;
                                             const oppEntry = Object.values(gameState.players).find(p => p.name === oppName);
                                             return (oppEntry && oppEntry.hand ? oppEntry.hand.length : 0);
@@ -902,22 +986,27 @@
                             </div>
                             <div className="text-center">
                                 {isMyTurn ? (
-                                    <div className="bg-yellow-500 text-black text-xs font-bold px-4 py-1 rounded-full animate-pulse shadow-glow">⚡ SENİN SIRAN ⚡</div>
+                                    <div className="bg-yellow-500 text-black text-xs font-bold px-4 py-1 rounded-full animate-pulse shadow-glow flex items-center gap-1">
+                                        <i className="fas fa-hourglass-half"></i> SENİN SIRAN 
+                                    </div>
                                 ) : (
-                                    <div className="text-gray-400 text-xs font-medium bg-black/40 px-3 py-1 rounded-full">⏳ Rakip Oynuyor...</div>
+                                    <div className="text-gray-400 text-xs font-medium bg-black/40 px-3 py-1 rounded-full flex items-center gap-1">
+                                        <i className="fas fa-user-clock"></i> Rakip Oynuyor...
+                                    </div>
                                 )}
                             </div>
                         </div>
 
                         {/* ORTA PANEL: Masa ve Board */}
                         <div className="flex-1 relative overflow-hidden flex items-center justify-center w-full">
-                            {/* Yatay Kaydırma Alanı */}
+                            {/* Tahta için dış kapsayıcı: Yatay kaydırma sağlar */}
                             <div 
                                 ref={boardScrollRef}
-                                className="w-full h-full overflow-x-auto overflow-y-hidden hide-scrollbar flex items-center px-8"
+                                className="game-board-view h-full w-full hide-scrollbar"
                                 style={{ scrollBehavior: 'smooth' }}
                             >
-                                <div className="flex items-center gap-1 mx-auto min-w-max py-10">
+                                {/* Tahta içeriği: Taşlar buraya sığmadığında alt satıra geçer (flex-wrap) */}
+                                <div className="board-container">
                                     
                                     {/* SOL IŞIKLI GÖSTERGE */}
                                     {validMoves.includes('left') && selectedTileIndex !== null && gameState.board.length > 0 && (
@@ -934,17 +1023,17 @@
                                     {/* TAHTADAKİ TAŞLAR */}
                                     {gameState.board.length === 0 ? (
                                         <div className="text-white/30 text-xl font-bold border-4 border-dashed border-white/10 rounded-3xl p-6">
-                                            {selectedTileIndex !== null ? '👇 Taşı Buraya Koy' : 'Taş Seç ve Başla'}
+                                            {selectedTileIndex !== null ? <i className="fas fa-hand-point-down"></i> Taşı Buraya Koy <i className="fas fa-hand-point-down"></i> : 'Taş Seç ve Başla'}
                                         </div>
                                     ) : (
                                         gameState.board.map((tile, i) => (
                                             <DominoTile 
                                                 key={i} 
                                                 values={tile} 
-                                                vertical={tile[0] === tile[1]}
+                                                vertical={tile[0] === tile[1]} // Çiftler Dikey (Oyun kuralı gereği)
                                                 disabled={true}
                                                 scale={0.95}
-                                                animateIn={i === gameState.board.length - 1 || i === 0}
+                                                animateIn={true}
                                             />
                                         ))
                                     )}
@@ -964,8 +1053,8 @@
                                     {/* İLK HAMLE (ORTAYA) */}
                                     {validMoves.includes('start') && selectedTileIndex !== null && (
                                         <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-30 animate-slide-up" onClick={() => playTile('start')}>
-                                            <div className="bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold px-8 py-4 rounded-2xl animate-glow-pulse cursor-pointer shadow-glow transform scale-110">
-                                                ✨ OYUNA BAŞLA
+                                            <div className="bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold px-8 py-4 rounded-2xl animate-glow-pulse cursor-pointer shadow-glow transform scale-110 flex items-center gap-2">
+                                                <i className="fas fa-star"></i> OYUNA BAŞLA <i className="fas fa-star"></i>
                                             </div>
                                         </div>
                                     )}
@@ -979,12 +1068,12 @@
                             {/* Kontrol Butonları */}
                             <div className="flex justify-between items-center px-4 mb-2">
                                 <div className="flex items-center gap-3">
-                                    <span className="text-white text-xs font-bold tracking-widest opacity-70">
-                                        🎴 ELİNİZ ({myHand.length})
+                                    <span className="text-white text-xs font-bold tracking-widest opacity-70 flex items-center gap-1">
+                                        <i className="fas fa-hand-paper"></i> ELİNİZ ({myHand.length})
                                     </span>
                                     {marketSize > 0 && (
-                                        <span className="text-yellow-400 text-xs font-bold bg-black/40 px-2 py-1 rounded-full">
-                                            🎲 PAZAR: {marketSize}
+                                        <span className="text-yellow-400 text-xs font-bold bg-black/40 px-2 py-1 rounded-full flex items-center gap-1">
+                                            <i className="fas fa-store-alt"></i> PAZAR: {marketSize}
                                         </span>
                                     )}
                                 </div>
@@ -992,23 +1081,23 @@
                                     {isMyTurn && canDrawFromMarket && validMoves.length === 0 && selectedTileIndex === null && (
                                         <button 
                                             onClick={drawFromMarket}
-                                            className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
+                                            className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse flex items-center gap-1"
                                         >
-                                            🎲 ÇEK
+                                            <i className="fas fa-hand-point-up"></i> ÇEK
                                         </button>
                                     )}
                                     <button
                                         onClick={leaveGameClient}
-                                        className="bg-red-600/80 hover:bg-red-600 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95"
+                                        className="bg-red-600/80 hover:bg-red-600 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 flex items-center gap-1"
                                     >
-                                        🚪 Oyundan Çık
+                                        <i className="fas fa-door-open"></i> Oyundan Çık
                                     </button>
                                 </div>
                             </div>
 
                             {/* Taş Dizilimi */}
-                            <div className="w-full max-w-4xl mx-auto overflow-y-auto max-h-[40vh] p-2">
-                                <div className="flex justify-center gap-2 flex-wrap">
+                            <div className="w-full max-w-4xl mx-auto overflow-x-auto max-h-[25vh] p-2 hide-scrollbar">
+                                <div className="flex justify-center gap-2 flex-nowrap pb-4"> {/* flex-nowrap ile yan yana dizilimi koru */}
                                     {myHand.map((tile, index) => {
                                         const canPlay = isMyTurn && (gameState.board.length === 0 || calculateValidMoves(tile).length > 0);
                                         
@@ -1026,6 +1115,36 @@
                                     })}
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                );
+            }
+            
+            // --- OYUN SONU EKRANI (YENİ) ---
+            if (screen === 'end' && endInfo) {
+                return (
+                    <div className="fixed inset-0 flex items-center justify-center bg-black/90 backdrop-blur-sm z-50 animate-slide-up">
+                        <div className={`bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border ${endInfo.isWinner ? 'border-green-500' : 'border-red-500'} max-w-md w-full text-center animate-celebrate`}>
+                            <div className={`text-6xl mb-4 ${endInfo.isWinner ? 'text-green-400' : 'text-red-400'}`}>
+                                {endInfo.isWinner ? '🎉' : '😔'}
+                            </div>
+                            <h2 className="text-4xl font-black text-white mb-2">
+                                {endInfo.isWinner ? 'ZAFER!' : 'MAĞLUBİYET!'}
+                            </h2>
+                            <p className="text-xl text-gray-300 mb-6">Kazanan: <span className="font-bold text-yellow-400">{endInfo.winnerName}</span></p>
+
+                            {endInfo.isRanked && endInfo.eloChange !== 0 && (
+                                <div className={`p-3 rounded-xl mb-6 ${endInfo.eloChange > 0 ? 'bg-green-500/20 border border-green-500/50' : 'bg-red-500/20 border border-red-500/50'}`}>
+                                    <p className="text-lg font-bold text-white">
+                                        <i className={`fas ${endInfo.eloChange > 0 ? 'fa-arrow-up' : 'fa-arrow-down'}`}></i> ELO DEĞİŞİMİ: 
+                                        <span className={`ml-2 ${endInfo.eloChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                            {endInfo.eloChange > 0 ? '+' : ''}{endInfo.eloChange}
+                                        </span>
+                                    </p>
+                                </div>
+                            )}
+
+                            <p className="text-gray-500 text-sm">3 saniye içinde lobiye dönülecek...</p>
                         </div>
                     </div>
                 );
