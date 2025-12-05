@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="az">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -8,7 +8,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Domino 101 Pro - Telegram Game</title>
     
-    <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -142,7 +141,7 @@
         // API Base URL
         const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
 
-        // --- BİLEŞENLER ---
+        // --- BİLEŞENLER / COMPONENTS ---
 
         // 1. Domino Noktaları (Pips)
         const RenderPips = ({ number }) => {
@@ -201,7 +200,7 @@
             );
         };
 
-        // --- ANA OYUN ---
+        // --- ANA OYUN / MAIN GAME ---
 
         const DominoGame = () => {
             const [screen, setScreen] = useState('loading'); // loading, lobby, searching, game, leaderboard, end
@@ -213,7 +212,7 @@
             const [gameState, setGameState] = useState(null);
             const [searchTime, setSearchTime] = useState(0);
             
-            // Oyun İçi State
+            // Oyun İçi State / In-Game State
             const [selectedTileIndex, setSelectedTileIndex] = useState(null);
             const [validMoves, setValidMoves] = useState([]); // ['left', 'right', 'both']
             const [notification, setNotification] = useState(null);
@@ -262,7 +261,7 @@
                             photoUrl: user.photo_url || null
                         };
 
-                        console.log('📡 Telegram kullanıcısı:', telegramData);
+                        console.log('📡 Telegram istifadəçisi:', telegramData);
 
                         // MongoDB'ye kaydet/güncelle
                         const response = await fetch(`${API_URL}/api/auth/telegram`, {
@@ -278,7 +277,7 @@
                                 isGuest: false,
                                 photoUrl: telegramData.photoUrl || data.player.photoUrl
                             });
-                            console.log('✅ Telegram Auth başarılı:', data.player);
+                            console.log('✅ Telegram Auth uğurlu:', data.player);
                         } else {
                             throw new Error('Auth failed');
                         }
@@ -286,7 +285,7 @@
                         // Normal tarayıcı - Guest mode
                         const guestData = { 
                             isGuest: true, 
-                            username: 'Guest' + Math.floor(Math.random() * 9999),
+                            username: 'Qonaq' + Math.floor(Math.random() * 9999), // Guest -> Qonaq
                             firstName: '',
                             lastName: '',
                             photoUrl: null,
@@ -295,13 +294,13 @@
                             telegramId: null
                         };
                         setPlayerData(guestData);
-                        console.log('👥 Guest mode:', guestData);
+                        console.log('👥 Qonaq rejimi:', guestData);
                     }
                 } catch (error) {
-                    console.error('Auth error:', error);
+                    console.error('Auth xətası:', error);
                     setPlayerData({ 
                         isGuest: true, 
-                        username: 'Guest' + Math.floor(Math.random() * 9999), 
+                        username: 'Qonaq' + Math.floor(Math.random() * 9999), // Guest -> Qonaq
                         firstName: '',
                         lastName: '',
                         photoUrl: null,
@@ -323,7 +322,7 @@
                         setLeaderboard(data.leaderboard);
                     }
                 } catch (error) {
-                    console.error('Leaderboard error:', error);
+                    console.error('Liderlər lövhəsi xətası:', error);
                 }
             };
 
@@ -345,7 +344,7 @@
 
                 const ws = new WebSocket(wsUrl);
 
-                ws.onopen = () => { setConnected(true); showNotification('Sunucuya Bağlandı', 'success'); };
+                ws.onopen = () => { setConnected(true); showNotification('Serverə Qoşuldu / Connected to Server', 'success'); };
                 ws.onclose = () => { setConnected(false); setTimeout(connectToServer, 3000); };
                 ws.onmessage = (e) => {
                     try {
@@ -364,7 +363,7 @@
                         setRoomCode(data.roomCode);
                         break;
                     case 'gameStart':
-                        console.log('🎮 Oyun başlıyor...', data.gameState);
+                        console.log('🎮 Oyun başlayır...', data.gameState);
                         setGameState(data.gameState);
                         setScreen('game');
                         setSelectedTileIndex(null);
@@ -376,10 +375,10 @@
                             searchTimerRef.current = null;
                         }
                         setSearchTime(0);
-                        showNotification('Oyun Başladı!', 'success');
+                        showNotification('Oyun Başladı! / Game Started!', 'success');
                         break;
                     case 'gameUpdate':
-                        console.log('🔄 Oyun güncelleniyor...', data.gameState);
+                        console.log('🔄 Oyun yenilənir...', data.gameState);
                         if (data.gameState && data.gameState.board) {
                             setGameState(prevState => ({
                                 ...prevState,
@@ -405,7 +404,7 @@
                         const eloChange = data.eloChanges
                             ? (isWinnerClient ? data.eloChanges.winner : data.eloChanges.loser)
                             : 0;
-                        const winMsg = `Oyun Bitti! Kazanan: ${data.winnerName}`;
+                        const winMsg = `Oyun Bitdi! Qalib: ${data.winnerName}`; // Oyun Bitti! Kazanan
                         const eloMsg = data.eloChanges ? ` (ELO: ${eloChange > 0 ? '+' : ''}${eloChange})` : '';
 
                         setEndInfo({
@@ -431,7 +430,7 @@
                         }, 3000);
                         break;
                     case 'searchCancelled':
-                        showNotification('Arama iptal edildi', 'info');
+                        showNotification('Axtarış ləğv edildi / Search cancelled', 'info');
                         setSearching(false);
                         setScreen('lobby');
                         if (searchTimerRef.current) {
@@ -443,7 +442,7 @@
                     case 'searchStatus':
                         break;
                     case 'matchFound':
-                        showNotification(`Rakip Bulundu! ${data.gameType === 'ranked' ? '🏆 RANKED' : '🎮 CASUAL'}`, 'success');
+                        showNotification(`Rəqib tapıldı! ${data.gameType === 'ranked' ? '🏆 RANKED' : '🎮 CASUAL'}`, 'success'); // Rakip Bulundu!
                         setSearching(false);
                         setOpponent(data.opponent || null);
                         if (searchTimerRef.current) {
@@ -466,7 +465,7 @@
                 setTimeout(() => setNotification(null), 3000);
             };
 
-            // --- OYUN MANTIĞI ---
+            // --- OYUN MANTIĞI / GAME LOGIC ---
 
             const myPlayerId = gameState?.playerId;
             const isMyTurn = gameState?.currentPlayer === myPlayerId;
@@ -518,7 +517,7 @@
                         setValidMoves(moves);
                         playSound('click');
                     } else {
-                        showNotification('Bu taş uygun değil', 'warning');
+                        showNotification('Bu daş uyğun deyil / This tile is not valid', 'warning');
                     }
                 }
             };
@@ -551,18 +550,18 @@
                 // Elinde oynanabilir taş varsa pazardan çekmeyi engelle
                 const canPlayFromHand = myHand.some(tile => calculateValidMoves(tile).length > 0);
                 if (gameState.board.length > 0 && canPlayFromHand) {
-                     showNotification('Elinde oynanabilir taş varken pazardan çekemezsin!', 'warning');
+                     showNotification('Əlində oynanıla bilən daş varkən bazardan çəkə bilməzsən! / Cannot draw while playable tiles are in hand!', 'warning');
                      return; // Fonksiyondan tamamen çık
                  }
                 sendMessage({ type: 'drawFromMarket' });
-                showNotification('🎲 Pazardan taş çekiliyor...', 'info');
+                showNotification('🎲 Bazardan daş çəkilir... / Drawing tile from market...', 'info');
             };
 
             const leaveGameClient = () => {
                 // Kullanıcıdan onay iste
                 const confirmed = window.confirm(
-                    'Oyundan çıkmak istediğine emin misin?\n\n' +
-                    'Bu eli terk edersen ELO puanı kaybedebilirsin ve el otomatik olarak rakibine yazılacaktır.'
+                    'Oyundan çıxmaq istədiyinizə əminsinizmi? / Are you sure you want to leave the game?\n\n' +
+                    'Bu əli tərk etsəniz ELO balı itirə bilərsiniz və əl avtomatik olaraq rəqibə yazılacaq. / If you leave this hand, you might lose ELO points and the hand will be automatically scored to the opponent.'
                 );
                 if (!confirmed) return;
 
@@ -615,7 +614,7 @@
                                     {!playerData?.isGuest && (
                                         <div className="flex justify-center gap-3">
                                             <span className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-4 py-1 rounded-full text-sm font-bold">
-                                                LVL {Math.min(playerData?.level || 0, 10)}
+                                                SƏVİYYƏ / LVL {Math.min(playerData?.level || 0, 10)}
                                             </span>
                                             <span className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-4 py-1 rounded-full text-sm font-bold">
                                                 {playerData?.elo} ELO
@@ -630,23 +629,28 @@
                                         <div className="absolute inset-0 border-8 border-yellow-400/30 rounded-full"></div>
                                         <div className="absolute inset-0 border-8 border-t-yellow-400 rounded-full animate-spin"></div>
                                         <div className="absolute inset-0 flex items-center justify-center">
-                                            <span className="text-5xl">🎯</span>
+                                            {/* 🎯 iconu yerine - icon/grafik kullanıldığı varsayılmıştır */}
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-white" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zm1 3a1 1 0 100 2h4a1 1 0 100-2H8z" clipRule="evenodd" /></svg>
                                         </div>
                                     </div>
-                                    <h3 className="text-white text-2xl font-bold text-center mt-6 mb-2">🔍 RAIP ARANIYOR...</h3>
+                                    <h3 className="text-white text-2xl font-bold text-center mt-6 mb-2">Axtarılır / Searching...</h3> {/* 🔍 RAIP ARANIYOR... */}
                                     <p className="text-white/70 text-center text-sm mb-4">
-                                        {!playerData?.isGuest ? '⚔️ DERECELİ MAÇ' : '🎮 CASUAL MAÇ'}
+                                        {!playerData?.isGuest ? '⚔️ Dərəcəli Oyun / Ranked Match' : '🎮 Normal Oyun / Casual Match'}
                                     </p>
                                     
                                     {/* Timer */}
                                     <div className="bg-black/30 rounded-xl p-4 text-center mb-6">
-                                        <div className="text-white text-4xl font-mono font-bold">⏱️ {timeString}</div>
-                                        <div className="text-white/60 text-sm mt-1">⏳ Geçen Süre</div>
+                                        <div className="text-white text-4xl font-mono font-bold">
+                                            {/* ⏱️ iconu yerine - icon/grafik kullanıldığı varsayılmıştır */}
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                            {timeString}
+                                        </div>
+                                        <div className="text-white/60 text-sm mt-1">⏳ Keçən Vaxt / Time Elapsed</div>
                                     </div>
 
                                     {/* İpucu */}
                                     <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-3 mb-4 text-center">
-                                        <p className="text-blue-300 text-xs">💡 İpucu: Dereceli maçlarda ELO puanınız değişir!</p>
+                                        <p className="text-blue-300 text-xs">💡 İpucu: Dərəcəli oyunlarda ELO balınız dəyişir! / Tip: Your ELO changes in ranked games!</p>
                                     </div>
                                 </div>
 
@@ -664,7 +668,11 @@
                                     }}
                                     className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all"
                                 >
-                                    ❌ ARAMADI İPTAL ET
+                                    {/* ❌ iconu yerine - icon/grafik kullanıldığı varsayılmıştır */}
+                                    <span className="inline-block mr-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </span>
+                                    Axtarışı Ləğv Et / Cancel Search
                                 </button>
                             </div>
                         </div>
@@ -678,7 +686,7 @@
                     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
                         <div className="text-center">
                             <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                            <p className="text-white text-xl font-bold">Yükleniyor...</p>
+                            <p className="text-white text-xl font-bold">Yüklənir... / Loading...</p>
                         </div>
                     </div>
                 );
@@ -691,14 +699,20 @@
                         
                         <div className="text-center mb-10 animate-float">
                             <h1 className="text-5xl font-black text-white drop-shadow-lg mb-2 tracking-tighter">
-                                🎯 DOMINO <span className="text-yellow-400">101</span> 🏆
-                            </h1>
-                            <p className="text-gray-300 text-sm tracking-widest uppercase">⚡ Profesyonel Online Oyun ⚡</p>
+                                DOMINO <span className="text-yellow-400">101</span>
+                            </h1> {/* 🎯 iconu kaldırıldı */}
+                            <p className="text-gray-300 text-sm tracking-widest uppercase">⚡ Professional Online Oyun / Professional Online Game ⚡</p>
                         </div>
 
                         {/* NAVİGASYON */}
                         <div className="flex justify-center gap-3 mb-6">
-                            <button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold">🏆 Skor Tablosu</button>
+                            <button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold">
+                                {/* 🏆 iconu yerine - icon/grafik kullanıldığı varsayılmıştır */}
+                                <span className="inline-block mr-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline-block" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v5a1 1 0 102 0V7zm-3.5 4a.5.5 0 00-.5.5v2a.5.5 0 001 0v-2a.5.5 0 00-.5-.5zm5 0a.5.5 0 00-.5.5v2a.5.5 0 001 0v-2a.5.5 0 00-.5-.5z" clipRule="evenodd" /></svg>
+                                </span>
+                                Liderlər Lövhəsi / Leaderboard
+                            </button>
                         </div>
 
                         <div className="w-full max-w-sm bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
@@ -712,7 +726,7 @@
                                     {!playerData.isGuest && (
                                         <div className="flex justify-center gap-4 mt-2">
                                             <span className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-sm font-bold">
-                                                LVL {Math.min(playerData.level || 0, 10)}
+                                                SƏVİYYƏ / LVL {Math.min(playerData.level || 0, 10)}
                                             </span>
                                             <span className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-3 py-1 rounded-full text-sm font-bold">
                                                 {playerData.elo} ELO
@@ -720,14 +734,14 @@
                                         </div>
                                     )}
                                     {playerData.isGuest && (
-                                        <p className="text-yellow-400 text-sm mt-2">👥 Guest Mode (ELO sistemi yok)</p>
+                                        <p className="text-yellow-400 text-sm mt-2">👥 Qonaq Rejimi (ELO sistemi yoxdur) / Guest Mode (No ELO system)</p>
                                     )}
                                 </div>
                             )}
 
                             <button 
                                 onClick={() => {
-                                    if(!playerData) return showNotification('İsim giriniz', 'error');
+                                    if(!playerData) return showNotification('Adınızı daxil edin / Enter your name', 'error');
                                     if(searching) return;
                                     
                                     // Özel arama ekranına geç
@@ -750,32 +764,40 @@
                                 disabled={!connected || searching}
                                 className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4 flex items-center justify-center gap-2"
                             >
-                                <span>🏆</span> {!playerData?.isGuest ? '⚔️ DERECELİ MAÇ ARA' : '🎮 MAÇ ARA (CASUAL)'}
+                                <span className="inline-block">
+                                    {/* 🏆 iconu yerine - icon/grafik kullanıldığı varsayılmıştır */}
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline-block" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v5a1 1 0 102 0V7zm-3.5 4a.5.5 0 00-.5.5v2a.5.5 0 001 0v-2a.5.5 0 00-.5-.5zm5 0a.5.5 0 00-.5.5v2a.5.5 0 001 0v-2a.5.5 0 00-.5-.5z" clipRule="evenodd" /></svg>
+                                </span> 
+                                {!playerData?.isGuest ? 'Dərəcəli / Ranked' : 'Normal / Casual'} Oyun Axtar
                             </button>
 
                             <div className="flex items-center gap-2 my-4">
                                 <div className="h-px bg-white/10 flex-1"></div>
-                                <span className="text-xs text-gray-500 uppercase">veya</span>
+                                <span className="text-xs text-gray-500 uppercase">yaxud / or</span>
                                 <div className="h-px bg-white/10 flex-1"></div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <button 
                                     onClick={() => {
-                                        if(!playerData) return showNotification('İsim giriniz', 'error');
+                                        if(!playerData) return showNotification('Adınızı daxil edin / Enter your name', 'error');
                                         if(roomCode) return;
                                         sendMessage({ type: 'createRoom', ...playerData, playerName: playerData.username });
                                     }}
                                     disabled={roomCode !== ''}
                                     className="bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-semibold transition-colors"
                                 >
-                                    🏠 Otağ Yarat / Create Room
+                                    {/* 🏠 iconu yerine - icon/grafik kullanıldığı varsayılmıştır */}
+                                    <span className="inline-block mr-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline-block" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" /></svg>
+                                    </span>
+                                    Otaq Yarat / Create Room
                                 </button>
                                 <div className="relative">
                                     <input 
                                         value={joinCode}
                                         onChange={e => setJoinCode(e.target.value.toUpperCase())}
-                                        placeholder="KOD"
+                                        placeholder="KOD / CODE"
                                         maxLength={4}
                                         className="w-full h-full bg-black/30 border border-white/10 rounded-xl px-2 text-center text-white font-mono uppercase focus:ring-1 focus:ring-yellow-400"
                                     />
@@ -790,9 +812,9 @@
 
                             {roomCode && (
                                 <div className="mt-4 p-4 bg-green-500/20 border border-green-500/30 rounded-xl text-center animate-pulse">
-                                    <p className="text-green-400 text-xs mb-1">📱 ODA KODU</p>
-                                    <p className="text-3xl font-mono text-white font-bold tracking-widest cursor-pointer" onClick={() => { navigator.clipboard.writeText(roomCode); showNotification('📋 Kod kopyalandı!', 'success'); }}>{roomCode}</p>
-                                    <p className="text-xs text-gray-400 mt-2">⏳ Arkadaşın bekleniyor...</p>
+                                    <p className="text-green-400 text-xs mb-1">📱 OTAQ KODU / ROOM CODE</p>
+                                    <p className="text-3xl font-mono text-white font-bold tracking-widest cursor-pointer" onClick={() => { navigator.clipboard.writeText(roomCode); showNotification('📋 Kod köçürüldü! / Code copied!', 'success'); }}>{roomCode}</p>
+                                    <p className="text-xs text-gray-400 mt-2">⏳ Dostunuz gözlənilir... / Waiting for your friend...</p>
                                 </div>
                             )}
                         </div>
@@ -807,15 +829,27 @@
                         {notification && <Toast message={notification.message} type={notification.type} />}
                         
                         <div className="text-center mb-6">
-                            <h1 className="text-4xl font-black text-white drop-shadow-lg mb-2">🏆 SKOR TABLOSU 🏆</h1>
+                            <h1 className="text-4xl font-black text-white drop-shadow-lg mb-2">
+                                {/* 🏆 iconu yerine - icon/grafik kullanıldığı varsayılmıştır */}
+                                <span className="inline-block mr-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 inline-block" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v5a1 1 0 102 0V7zm-3.5 4a.5.5 0 00-.5.5v2a.5.5 0 001 0v-2a.5.5 0 00-.5-.5zm5 0a.5.5 0 00-.5.5v2a.5.5 0 001 0v-2a.5.5 0 00-.5-.5z" clipRule="evenodd" /></svg>
+                                </span>
+                                LİDERLƏR LÖVHƏSİ / LEADERBOARD
+                            </h1>
                         </div>
 
-                        <button onClick={() => setScreen('lobby')} className="mb-4 px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold">⬅️ Geri Dön</button>
+                        <button onClick={() => setScreen('lobby')} className="mb-4 px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold">
+                            {/* ⬅️ iconu yerine - icon/grafik kullanıldığı varsayılmıştır */}
+                            <span className="inline-block mr-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                            </span>
+                            Geri Qayıt / Go Back
+                        </button>
 
                         <div className="w-full max-w-2xl bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
                             {leaderboard.length === 0 ? (
                                 <div className="text-center text-gray-400 py-8">
-                                    <p className="text-xl">📊 Elo Ranked Stats...</p>
+                                    <p className="text-xl">📊 Elo Dərəcəli Statistika / Elo Ranked Stats...</p>
                                 </div>
                             ) : (
                                 <div className="space-y-3">
@@ -837,9 +871,9 @@
                                             <div className="flex-1">
                                                 <div className="text-white font-bold text-lg">{player.username || player.firstName}</div>
                                                 <div className="flex gap-2 text-sm">
-                                                    <span className="text-green-400">✓ {player.wins}</span>
-                                                    <span className="text-red-400">✗ {player.losses}</span>
-                                                    <span className="text-yellow-400">🔥 {player.winStreak}</span>
+                                                    <span className="text-green-400">Qalibiyyət / Wins: {player.wins}</span>
+                                                    <span className="text-red-400">Məğlubiyyət / Losses: {player.losses}</span>
+                                                    <span className="text-yellow-400">Qalib Silsiləsi / Win Streak: {player.winStreak}</span>
                                                 </div>
                                             </div>
                                             
@@ -848,7 +882,7 @@
                                                     {player.elo} ELO
                                                 </div>
                                                 <div className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-xs font-bold">
-                                                    LVL {Math.min(player.level || 0, 10)}
+                                                    SƏVİYYƏ / LVL {Math.min(player.level || 0, 10)}
                                                 </div>
                                             </div>
                                         </div>
@@ -860,7 +894,7 @@
                 );
             }
 
-            // --- OYUN EKRANI ---
+            // --- OYUN EKRANI / GAME SCREEN ---
             if (screen === 'game' && gameState) {
                 // Tahtada görsel olarak taşları döndürmek gerekir mi?
                 // Sunucu genellikle [[1,6], [6,2]] diye sıralı atar.
@@ -879,32 +913,49 @@
                                 {opponent?.photoUrl ? (
                                     <img
                                         src={opponent.photoUrl}
-                                        alt={opponent.name || opponent.username || 'Rakip'}
+                                        alt={opponent.name || opponent.username || 'Rəqib / Opponent'}
                                         className="w-10 h-10 rounded-full border-2 border-yellow-400 shadow-lg object-cover"
                                     />
                                 ) : (
                                     <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center shadow-lg">
-                                        👤
+                                        {/* 👤 iconu yerine - icon/grafik kullanıldığı varsayılmıştır */}
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
                                     </div>
                                 )}
                                 <div>
                                     <div className="text-white text-sm font-bold shadow-black drop-shadow-md">
-                                        {opponent?.name || opponent?.username || 'Rakip'}
+                                        {opponent?.name || opponent?.username || 'Rəqib / Opponent'}
                                     </div>
                                     <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
-                                        🎲 {(() => {
+                                        {/* 🎲 iconu yerine - icon/grafik kullanıldığı varsayılmıştır */}
+                                        <span className="inline-block mr-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c1.657 0 3 .895 3 2s-1.343 2-3 2a3 3 0 01-3-2c0-1.105 1.343-2 3-2zM12 8V7M8 12H7M17 12h-1M12 17v-1" /></svg>
+                                        </span>
+                                        {(() => {
                                             const oppName = opponent?.name || opponent?.username;
                                             const oppEntry = Object.values(gameState.players).find(p => p.name === oppName);
                                             return (oppEntry && oppEntry.hand ? oppEntry.hand.length : 0);
-                                        })()} Taş
+                                        })()} Daş / Tiles
                                     </div>
                                 </div>
                             </div>
                             <div className="text-center">
                                 {isMyTurn ? (
-                                    <div className="bg-yellow-500 text-black text-xs font-bold px-4 py-1 rounded-full animate-pulse shadow-glow">⚡ SENİN SIRAN ⚡</div>
+                                    <div className="bg-yellow-500 text-black text-xs font-bold px-4 py-1 rounded-full animate-pulse shadow-glow">
+                                        {/* ⚡ iconu yerine - icon/grafik kullanıldığı varsayılmıştır */}
+                                        <span className="inline-block mr-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                        </span>
+                                        SƏNİN NÖVBƏN / YOUR TURN
+                                    </div>
                                 ) : (
-                                    <div className="text-gray-400 text-xs font-medium bg-black/40 px-3 py-1 rounded-full">⏳ Rakip Oynuyor...</div>
+                                    <div className="text-gray-400 text-xs font-medium bg-black/40 px-3 py-1 rounded-full">
+                                        {/* ⏳ iconu yerine - icon/grafik kullanıldığı varsayılmıştır */}
+                                        <span className="inline-block mr-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        </span>
+                                        Rəqib Oynayır... / Opponent is playing...
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -934,7 +985,8 @@
                                     {/* TAHTADAKİ TAŞLAR */}
                                     {gameState.board.length === 0 ? (
                                         <div className="text-white/30 text-xl font-bold border-4 border-dashed border-white/10 rounded-3xl p-6">
-                                            {selectedTileIndex !== null ? '👇 Taşı Buraya Koy' : 'Taş Seç ve Başla'}
+                                            {/* 👇 iconu kaldırıldı */}
+                                            {selectedTileIndex !== null ? 'Daşı Bura Qoy / Place Tile Here' : 'Daş Seçin və Başlayın / Select Tile and Start'}
                                         </div>
                                     ) : (
                                         gameState.board.map((tile, i) => (
@@ -965,7 +1017,11 @@
                                     {validMoves.includes('start') && selectedTileIndex !== null && (
                                         <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-30 animate-slide-up" onClick={() => playTile('start')}>
                                             <div className="bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold px-8 py-4 rounded-2xl animate-glow-pulse cursor-pointer shadow-glow transform scale-110">
-                                                ✨ OYUNA BAŞLA
+                                                {/* ✨ iconu yerine - icon/grafik kullanıldığı varsayılmıştır */}
+                                                <span className="inline-block mr-1">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+                                                </span>
+                                                OYUNA BAŞLA / START GAME
                                             </div>
                                         </div>
                                     )}
@@ -980,11 +1036,19 @@
                             <div className="flex justify-between items-center px-4 mb-2">
                                 <div className="flex items-center gap-3">
                                     <span className="text-white text-xs font-bold tracking-widest opacity-70">
-                                        🎴 ELİNİZ ({myHand.length})
+                                        {/* 🎴 iconu yerine - icon/grafik kullanıldığı varsayılmıştır */}
+                                        <span className="inline-block mr-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v4m-7 5h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                        </span>
+                                        ƏLİNİZ / YOUR HAND ({myHand.length})
                                     </span>
                                     {marketSize > 0 && (
                                         <span className="text-yellow-400 text-xs font-bold bg-black/40 px-2 py-1 rounded-full">
-                                            🎲 PAZAR: {marketSize}
+                                            {/* 🎲 iconu yerine - icon/grafik kullanıldığı varsayılmıştır */}
+                                            <span className="inline-block mr-1">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c1.657 0 3 .895 3 2s-1.343 2-3 2a3 3 0 01-3-2c0-1.105 1.343-2 3-2zM12 8V7M8 12H7M17 12h-1M12 17v-1" /></svg>
+                                            </span>
+                                            BAZAR: {marketSize} / MARKET: {marketSize}
                                         </span>
                                     )}
                                 </div>
@@ -994,14 +1058,22 @@
                                             onClick={drawFromMarket}
                                             className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
                                         >
-                                            🎲 ÇEK
+                                            {/* 🎲 iconu yerine - icon/grafik kullanıldığı varsayılmıştır */}
+                                            <span className="inline-block mr-1">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c1.657 0 3 .895 3 2s-1.343 2-3 2a3 3 0 01-3-2c0-1.105 1.343-2 3-2zM12 8V7M8 12H7M17 12h-1M12 17v-1" /></svg>
+                                            </span>
+                                            ÇƏK / DRAW
                                         </button>
                                     )}
                                     <button
                                         onClick={leaveGameClient}
                                         className="bg-red-600/80 hover:bg-red-600 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95"
                                     >
-                                        🚪 Oyundan Çık
+                                        {/* 🚪 iconu yerine - icon/grafik kullanıldığı varsayılmıştır */}
+                                        <span className="inline-block mr-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                                        </span>
+                                        Oyundan Çıx / Leave Game
                                     </button>
                                 </div>
                             </div>
