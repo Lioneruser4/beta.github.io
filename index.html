@@ -161,9 +161,6 @@
              padding: 0 50px; /* Kenarlarda boşluk bırakmak için */
         }
         
-        /* Eğer tek satırda sığmıyorsa, zoom out uygulayarak sığdırılabilir 
-           Ancak flex-wrap ile sarmalama daha iyi bir UX sunar. */
-        
     </style>
 </head>
 <body>
@@ -202,9 +199,6 @@
 
         // 2. Domino Taşı (3D Tasarım)
         const DominoTile = ({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false }) => {
-            // Taşın döndürülmüş olup olmadığını belirlemek için, oynanacak uca göre karar vermek gerek
-            // Sunucu zaten doğru sırayla gönderiyor olmalı, bu yüzden sadece görsel yönlendirmeyi kullanıyoruz.
-
             const baseClasses = `
                 relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
                 transition-all duration-300 select-none
@@ -299,7 +293,6 @@
             const [opponent, setOpponent] = useState(null);
             
             const wsRef = useRef(null);
-            // Tahtanın genişliğini kontrol etmek yerine, scroll-x'i yönetiyoruz.
             const boardScrollRef = useRef(null); 
             const searchTimerRef = useRef(null);
 
@@ -329,9 +322,14 @@
             // Telegram Auth
             const initializeTelegramAuth = async () => {
                 try {
+                    // Telegram verisi yüklenene kadar bekleriz, bu yüzden başlangıçta 'loading' gösterilmesi normaldir.
+                    // Yüklenmezse Guest Mode'a geçer.
+                    let user;
                     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                        // Telegram WebApp - Otomatik giriş
-                        const user = tg.initDataUnsafe.user;
+                        user = tg.initDataUnsafe.user;
+                    }
+                    
+                    if (user) {
                         const telegramData = {
                             telegramId: user.id.toString(),
                             username: user.username || user.first_name || 'User',
@@ -340,9 +338,6 @@
                             photoUrl: user.photo_url || null
                         };
 
-                        console.log('📡 Telegram kullanıcısı:', telegramData);
-
-                        // MongoDB'ye kaydet/güncelle
                         const response = await fetch(`${API_URL}/api/auth/telegram`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -356,7 +351,6 @@
                                 isGuest: false,
                                 photoUrl: telegramData.photoUrl || data.player.photoUrl
                             });
-                            console.log('✅ Telegram Auth başarılı:', data.player);
                         } else {
                             throw new Error('Auth failed');
                         }
@@ -373,10 +367,10 @@
                             telegramId: null
                         };
                         setPlayerData(guestData);
-                        console.log('👥 Guest mode:', guestData);
                     }
                 } catch (error) {
                     console.error('Auth error:', error);
+                    // Hata durumunda da Guest Mode'a geçiş yap
                     setPlayerData({ 
                         isGuest: true, 
                         username: 'Guest' + Math.floor(Math.random() * 9999), 
@@ -388,6 +382,7 @@
                         telegramId: null
                     });
                 } finally {
+                    // Veri gelsin veya gelmesin, lobiye geç
                     setScreen('lobby');
                 }
             };
@@ -405,10 +400,9 @@
                 }
             };
 
-            // Otomatik Kaydırma: Oyun güncellendiğinde tahtayı ortala veya sona git (Taşlar sarmalladığı için kaydırmaya gerek kalmayabilir, ancak geniş tahtalar için koruyalım)
+            // Otomatik Kaydırma
             useEffect(() => {
                 if (gameState && boardScrollRef.current) {
-                    // Tahta genişliği ekranı aşarsa ortala. Aşmazsa justify-center devrede.
                     const container = boardScrollRef.current;
                     if (container.scrollWidth > container.clientWidth) {
                         container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
@@ -444,13 +438,11 @@
                         setRoomCode(data.roomCode);
                         break;
                     case 'gameStart':
-                        console.log('🎮 Oyun başlıyor...', data.gameState);
                         setGameState(data.gameState);
                         setScreen('game');
                         setSelectedTileIndex(null);
                         setValidMoves([]);
                         setSearching(false);
-                        // Timer durdur
                         if (searchTimerRef.current) {
                             clearInterval(searchTimerRef.current);
                             searchTimerRef.current = null;
@@ -459,7 +451,6 @@
                         showNotification('Oyun Başladı!', 'success');
                         break;
                     case 'gameUpdate':
-                        console.log('🔄 Oyun güncelleniyor...', data.gameState);
                         if (data.gameState && data.gameState.board) {
                             setGameState(prevState => ({
                                 ...prevState,
@@ -485,8 +476,6 @@
                         const eloChange = data.eloChanges
                             ? (isWinnerClient ? data.eloChanges.winner : data.eloChanges.loser)
                             : 0;
-                        const winMsg = `Oyun Bitti! Kazanan: ${data.winnerName}`;
-                        const eloMsg = data.eloChanges ? ` (ELO: ${eloChange > 0 ? '+' : ''}${eloChange})` : '';
 
                         setEndInfo({
                             winnerName: data.winnerName,
@@ -503,7 +492,7 @@
                         setSearchTime(0);
 
                         setTimeout(() => {
-                            resetGameClientState(); // Tüm oyun state'ini temizle
+                            resetGameClientState(); 
                             setScreen('lobby');
                             if (isRanked && playerData && !playerData.isGuest) {
                                 initializeTelegramAuth();
@@ -572,26 +561,17 @@
             const handleTileClick = (index, tile) => {
                 if (!isMyTurn) return;
                 
-                // Zaten seçiliyse seçimi kaldır
                 if (selectedTileIndex === index) {
                     setSelectedTileIndex(null);
                     setValidMoves([]);
                     return;
                 }
 
-                // Geçerli hamleleri hesapla
                 if (gameState.board.length === 0) {
-                    // İlk hamle her yere yapılabilir
                     setSelectedTileIndex(index);
                     setValidMoves(['start']); 
                 } else {
-                    const leftEnd = gameState.board[0][0];
-                    const rightEnd = gameState.board[gameState.board.length - 1][1];
-                    const moves = [];
-
-                    // Basit mantık: Eşleşiyor mu?
-                    if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
-                    if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
+                    const moves = calculateValidMoves(tile);
 
                     if (moves.length > 0) {
                         setSelectedTileIndex(index);
@@ -607,7 +587,6 @@
             const playTile = (position) => {
                 if (selectedTileIndex === null) return;
                 
-                // Server 'left' veya 'right' bekliyor.
                 const posToSend = position === 'start' ? 'left' : position;
 
                 sendMessage({
@@ -616,44 +595,49 @@
                     position: posToSend
                 });
                 
-                // Seçimi temizle (Optimistik UI)
                 setSelectedTileIndex(null);
                 setValidMoves([]);
             };
 
-            const passTurn = () => {
-                sendMessage({ type: 'pass' });
-            };
-
             const drawFromMarket = () => {
                 if (!isMyTurn || !canDrawFromMarket) return;
-                // Elinde oynanabilir taş varsa pazardan çekmeyi engelle
                 const canPlayFromHand = myHand.some(tile => calculateValidMoves(tile).length > 0);
+                
                 if (gameState.board.length > 0 && canPlayFromHand) {
                      showNotification('Elinde oynanabilir taş varken pazardan çekemezsin!', 'warning');
-                     return; // Fonksiyondan tamamen çık
+                     return;
                  }
                 sendMessage({ type: 'drawFromMarket' });
                 showNotification('🎲 Pazardan taş çekiliyor...', 'info');
             };
 
             const leaveGameClient = () => {
-                // Kullanıcıdan onay iste
                 const confirmed = window.confirm(
                     'Oyundan çıkmak istediğine emin misin?\n\n' +
                     'Bu eli terk edersen ELO puanı kaybedebilirsin ve el otomatik olarak rakibine yazılacaktır.'
                 );
                 if (!confirmed) return;
 
-                // Sunucuya haber ver
                 sendMessage({ type: 'leaveGame' });
-
-                // Lokal state temizle ve lobiye dön
                 resetGameClientState();
                 setScreen('lobby');
             };
 
-            // --- SEARCHING LOBBY ---
+            // --- EKRAN KONTROLLERİ ---
+
+            // --- LOADING EKRANI ---
+            if (screen === 'loading') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                            <p className="text-white text-xl font-bold">Yükleniyor...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            // --- SEARCHING EKRANI ---
             if (screen === 'searching') {
                 const minutes = Math.floor(searchTime / 60);
                 const seconds = searchTime % 60;
@@ -661,7 +645,6 @@
                 
                 return (
                     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6 relative overflow-hidden">
-                        {/* Animated Background */}
                         <div className="absolute inset-0 overflow-hidden">
                             {[...Array(20)].map((_, i) => 
                                 <div
@@ -687,8 +670,12 @@
                             <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20">
                                 {/* Player Card */}
                                 <div className="text-center mb-8">
-                                    {playerData?.photoUrl && (
+                                    {playerData?.photoUrl ? (
                                         <img src={playerData.photoUrl} alt="Profile" className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 animate-pulse object-cover" />
+                                    ) : (
+                                        <div className="w-24 h-24 rounded-full mx-auto mb-4 bg-gray-700 border-4 border-yellow-400 flex items-center justify-center text-4xl text-white">
+                                            <i className="fas fa-user"></i>
+                                        </div>
                                     )}
                                     <h2 className="text-white text-2xl font-bold mb-2">{playerData?.username}</h2>
                                     {!playerData?.isGuest && (
@@ -752,17 +739,6 @@
             }
 
             // --- LOBBY EKRANI ---
-            if (screen === 'loading') {
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-                        <div className="text-center">
-                            <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                            <p className="text-white text-xl font-bold">Yükleniyor...</p>
-                        </div>
-                    </div>
-                );
-            }
-
             if (screen === 'lobby') {
                 return (
                     <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10 bg-table-base">
@@ -793,7 +769,7 @@
                                             <i className="fas fa-user"></i>
                                         </div>
                                     )}
-                                    <h2 className="text-white text-2xl font-extrabold mb-2">{playerData.username || playerData.firstName}</h2>
+                                    <h2 className="text-white text-2xl font-extrabold mb-2">{playerData.username || playerData.firstName || 'Misafir'}</h2>
                                     {!playerData.isGuest && (
                                         <div className="flex justify-center">
                                             <LevelIcon level={playerData.level} elo={playerData.elo} />
@@ -808,7 +784,7 @@
                             {/* KAN KIRMIZISI DERECELİ BUTON */}
                             <button 
                                 onClick={() => {
-                                    if(!playerData) return showNotification('İsim giriniz', 'error');
+                                    if(!playerData) return showNotification('Oyuncu verisi bekleniyor...', 'error');
                                     if(searching) return;
                                     
                                     setScreen('searching');
@@ -823,7 +799,7 @@
                                         type: 'findMatch', 
                                         ...playerData,
                                         playerName: playerData.username,
-                                        gameType: !playerData.isGuest ? 'ranked' : 'casual' // Oyuncu değilse casual
+                                        gameType: !playerData.isGuest ? 'ranked' : 'casual'
                                     });
                                 }}
                                 disabled={!connected || searching}
@@ -842,7 +818,7 @@
                             <div className="grid grid-cols-2 gap-3">
                                 <button 
                                     onClick={() => {
-                                        if(!playerData) return showNotification('İsim giriniz', 'error');
+                                        if(!playerData) return showNotification('Oyuncu verisi bekleniyor...', 'error');
                                         if(roomCode) return;
                                         sendMessage({ type: 'createRoom', ...playerData, playerName: playerData.username });
                                     }}
@@ -880,7 +856,7 @@
                 );
             }
 
-            // --- LEADERBOARD EKRANI (YENİ) ---
+            // --- LEADERBOARD EKRANI ---
             if (screen === 'leaderboard') {
                 return (
                     <div className="flex flex-col items-center justify-start min-h-screen p-6 relative z-10 bg-table-base overflow-y-auto">
@@ -948,9 +924,6 @@
 
             // --- OYUN EKRANI ---
             if (screen === 'game' && gameState) {
-                // Tahtada görsel olarak taşları döndürmek gerekir mi?
-                
-                // Elimizdeki taş sayısı 7'den fazla mı?
                 const isHandCrowded = myHand.length > 7;
 
                 return (
@@ -1097,7 +1070,7 @@
 
                             {/* Taş Dizilimi */}
                             <div className="w-full max-w-4xl mx-auto overflow-x-auto max-h-[25vh] p-2 hide-scrollbar">
-                                <div className="flex justify-center gap-2 flex-nowrap pb-4"> {/* flex-nowrap ile yan yana dizilimi koru */}
+                                <div className="flex justify-center gap-2 flex-nowrap pb-4">
                                     {myHand.map((tile, index) => {
                                         const canPlay = isMyTurn && (gameState.board.length === 0 || calculateValidMoves(tile).length > 0);
                                         
@@ -1120,7 +1093,7 @@
                 );
             }
             
-            // --- OYUN SONU EKRANI (YENİ) ---
+            // --- OYUN SONU EKRANI ---
             if (screen === 'end' && endInfo) {
                 return (
                     <div className="fixed inset-0 flex items-center justify-center bg-black/90 backdrop-blur-sm z-50 animate-slide-up">
