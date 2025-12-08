@@ -111,8 +111,7 @@
         .valid-zone::after {
             content: '';
             position: absolute;
-            /* Düzeltme: inset değeri -8px olmalı ki parlamanın kenarlığı kaplaması sağlansın */
-            inset: -8px;
+            inset: -4px;
             background: rgba(251, 191, 36, 0.2);
             border-radius: 10px;
             filter: blur(10px);
@@ -125,6 +124,68 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* Taşlar için responsive boyutlar */
+        @media (max-width: 640px) {
+            .domino-tile {
+                width: 30px;
+                height: 60px;
+                font-size: 0.7rem;
+            }
+            .pip {
+                width: 6px;
+                height: 6px;
+            }
+        }
+        
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .domino-tile {
+                width: 35px;
+                height: 70px;
+                font-size: 0.8rem;
+            }
+            .pip {
+                width: 8px;
+                height: 8px;
+            }
+        }
+        
+        @media (min-width: 1025px) {
+            .domino-tile {
+                width: 40px;
+                height: 80px;
+                font-size: 0.9rem;
+            }
+            .pip {
+                width: 10px;
+                height: 10px;
+            }
+        }
+        
+        .domino-tile {
+            transition: all 0.3s ease;
+            transform-style: preserve-3d;
+            flex-shrink: 0;
+            margin: 2px 0;
+            transform: rotate(90deg);
+            transform-origin: center;
+        }
+        
+        .domino-hand {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-wrap: nowrap;
+            gap: 2px;
+            padding: 5px;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            scroll-behavior: smooth;
+            padding-right: 5px;
+        }
     </style>
 </head>
 <body>
@@ -136,12 +197,12 @@
         // Telegram WebApp Initialization
         const tg = window.Telegram?.WebApp;
         if (tg) {
-            // tg.ready();
-            // tg.expand();
+            tg.ready();
+            tg.expand();
         }
 
         // API Base URL
-        const API_URL = 'https://beta-github-io.onrender.com';
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
 
         // --- BİLEŞENLER ---
 
@@ -162,7 +223,7 @@
         };
 
         // 2. Domino Taşı (3D Tasarım)
-        const DominoTile = ({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false, style = {} }) => {
+        const DominoTile = ({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false }) => {
             const baseClasses = `
                 relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
                 transition-all duration-300 select-none
@@ -178,9 +239,7 @@
                 <div 
                     onClick={onClick}
                     className={baseClasses}
-                    style={{ 
-                        ...style,
-                        transform: isSelected ? 'translateY(-15px) scale(1.1)' : `scale(${scale})` }}
+                    style={{ transform: isSelected ? 'translateY(-15px) scale(1.1)' : `scale(${scale})` }}
                 >
                     <div className={`flex-1 flex items-center justify-center ${vertical ? 'border-b' : 'border-r'} border-gray-300`}>
                         <RenderPips number={values[0]} />
@@ -225,7 +284,7 @@
             const [opponent, setOpponent] = useState(null);
             
             const wsRef = useRef(null);
-            const boardContainerRef = useRef(null);
+            const boardScrollRef = useRef(null);
             const searchTimerRef = useRef(null);
 
             // Oyun state'ini temizlemek için merkezi bir fonksiyon
@@ -276,14 +335,12 @@
 
                         const data = await response.json();
                         if (data.success) {
-                            // DÜZELTME: Sunucudan gelen veri ile Telegram'dan gelen güncel veriyi birleştir.
-                            // Bu, kullanıcı adının her zaman en güncel haliyle kullanılmasını sağlar.
                             setPlayerData({
-                                ...data.player, // Sunucudan gelen ELO, level vb.
-                                ...telegramData, // Telegram'dan gelen güncel username, photoUrl vb.
+                                ...data.player,
                                 isGuest: false,
+                                photoUrl: telegramData.photoUrl || data.player.photoUrl
                             });
-                            console.log('✅ Telegram Auth başarılı:', { ...data.player, ...telegramData });
+                            console.log('✅ Telegram Auth başarılı:', data.player);
                         } else {
                             throw new Error('Auth failed');
                         }
@@ -332,10 +389,22 @@
                 }
             };
 
+            // Otomatik Kaydırma: Oyun güncellendiğinde tahtayı ortala veya sona git
+            useEffect(() => {
+                if (gameState && boardScrollRef.current) {
+                    const scrollWidth = boardScrollRef.current.scrollWidth;
+                    const clientWidth = boardScrollRef.current.clientWidth;
+                    boardScrollRef.current.scrollLeft = (scrollWidth - clientWidth) / 2;
+                }
+            }, [gameState?.board]);
 
             const connectToServer = () => {
-                const wsUrl = 'wss://beta-github-io.onrender.com';
-                
+                let wsUrl = 'wss://beta-github-io.onrender.com';
+                // Test için Localhost kontrolü
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    wsUrl = `ws://${window.location.hostname}:10000`;
+                }
+
                 const ws = new WebSocket(wsUrl);
 
                 ws.onopen = () => { setConnected(true); showNotification('Sunucuya Bağlandı', 'success'); };
@@ -359,13 +428,6 @@
                     case 'gameStart':
                         console.log('🎮 Oyun başlıyor...', data.gameState);
                         setGameState(data.gameState);
-                        // --- DÜZELTME: Rakip bilgisini burada da ayarla ---
-                        // Bu, oyun başladığında rakip bilgilerinin ve oyun ekranının
-                        // senkronize bir şekilde güncellenmesini sağlar.
-                        const myId = data.gameState.playerId;
-                        const opponentId = Object.keys(data.gameState.players).find(id => id !== myId);
-                        const opponentData = data.gameState.players[opponentId];
-                        setOpponent({ name: opponentData.name, ...opponentData });
                         setScreen('game');
                         setSelectedTileIndex(null);
                         setValidMoves([]);
@@ -867,101 +929,6 @@
                 // Biz sadece çiziyoruz.
                 
                 // Elimizdeki taş sayısı 7'den fazla mı?
-
-                // --- YENİ: Tahta Yerleşim Hesaplaması ---
-                const calculatedBoard = useMemo(() => {
-                    if (!gameState || !gameState.board || gameState.board.length === 0 || !boardContainerRef.current) {
-                        return [];
-                    }
-
-                    const container = boardContainerRef.current;
-                    const containerWidth = container.clientWidth;
-                    const containerHeight = container.clientHeight;
-
-                    // Taş boyutları (CSS'deki sm breakpoint'e göre)
-                    const TILE_WIDTH = 40; // sm:w-10
-                    const TILE_HEIGHT = 80; // sm:h-20
-                    const GAP = 4; // gap-1
-                    const PADDING = 32; // px-8
-
-                    const board = gameState.board;
-                    const positions = [];
-                    
-                    let x = containerWidth / 2;
-                    let y = containerHeight / 2;
-                    let direction = 'right'; // 'right', 'left', 'up', 'down'
-
-                    // İlk taşı ortala
-                    const firstTile = board[0];
-                    const isFirstVertical = firstTile[0] === firstTile[1];
-                    positions.push({
-                        tile: firstTile,
-                        x: x - (isFirstVertical ? TILE_WIDTH / 2 : TILE_HEIGHT / 2),
-                        y: y - (isFirstVertical ? TILE_HEIGHT / 2 : TILE_WIDTH / 2),
-                        vertical: isFirstVertical
-                    });
-
-                    let rightX = x + (isFirstVertical ? TILE_WIDTH / 2 : TILE_HEIGHT / 2);
-                    let leftX = x - (isFirstVertical ? TILE_WIDTH / 2 : TILE_HEIGHT / 2);
-                    let topY = y - (isFirstVertical ? TILE_HEIGHT / 2 : TILE_WIDTH / 2);
-                    let bottomY = y + (isFirstVertical ? TILE_HEIGHT / 2 : TILE_WIDTH / 2);
-
-                    let currentDirection = 'horizontal'; // 'horizontal' or 'vertical'
-
-                    for (let i = 1; i < board.length; i++) {
-                        const tile = board[i];
-                        const isVertical = tile[0] === tile[1];
-                        const tileW = isVertical ? TILE_WIDTH : TILE_HEIGHT;
-                        const tileH = isVertical ? TILE_HEIGHT : TILE_WIDTH;
-
-                        let nextX = rightX + GAP;
-                        let nextY = y - tileH / 2;
-
-                        // Ekran kenarına çarpma kontrolü
-                        if (nextX + tileW > containerWidth - PADDING) {
-                            // Sağa gidemiyor, aşağı dön
-                            nextX = rightX - tileW / 2;
-                            nextY = bottomY + GAP;
-                            currentDirection = 'vertical_down';
-                        }
-
-                        if (currentDirection === 'vertical_down') {
-                             nextX = rightX - tileW / 2;
-                             nextY = bottomY + GAP;
-                             if (nextY + tileH > containerHeight - PADDING) {
-                                 // Aşağı da gidemiyor, sola dön
-                                 currentDirection = 'horizontal_left';
-                                 nextX = rightX - tileW - GAP;
-                                 nextY = bottomY - tileH / 2;
-                             }
-                        }
-                        
-                        if (currentDirection === 'horizontal_left') {
-                            nextX = leftX - tileW - GAP;
-                            nextY = y - tileH / 2; // Bu satırda bir mantık hatası olabilir, şimdilik basit tutalım
-                            if (nextX < PADDING) {
-                                // Sola da gidemiyor, yukarı dön
-                                currentDirection = 'vertical_up';
-                                nextX = leftX - tileW / 2;
-                                nextY = topY - tileH - GAP;
-                            }
-                        }
-
-                        positions.push({ tile, x: nextX, y: nextY, vertical: isVertical });
-
-                        // Yeni sınırları güncelle (Bu kısım basitleştirilmiştir)
-                        rightX = Math.max(rightX, nextX + tileW);
-                        leftX = Math.min(leftX, nextX);
-                        bottomY = Math.max(bottomY, nextY + tileH);
-                        topY = Math.min(topY, nextY);
-                    }
-
-                    // Bu sadece sağa doğru genişleyen basit bir versiyon.
-                    // Gerçek bir oyunda sola ve sağa dallanma olur, bu da hesaplamayı çok daha karmaşık hale getirir.
-                    // Şimdilik bu "saran" mantık, yılan gibi uzama sorununu çözecektir.
-                    return positions;
-                }, [gameState?.board, boardContainerRef.current]);
-
                 const isHandCrowded = myHand.length > 7;
 
                 return (
@@ -1006,61 +973,65 @@
 
                         {/* ORTA PANEL: Masa ve Board */}
                         <div className="flex-1 relative overflow-hidden flex items-center justify-center w-full">
-                            {/* YENİ: Mutlak Konumlandırma için Konteyner */}
-                            <div ref={boardContainerRef} className="w-full h-full relative">
-                                {/* TAHTADAKİ TAŞLAR */}
-                                {gameState.board.length === 0 ? (
-                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white/30 text-xl font-bold border-4 border-dashed border-white/10 rounded-3xl p-6">
-                                        {selectedTileIndex !== null ? '👇 Taşı Buraya Koy' : 'Taş Seç ve Başla'}
-                                    </div>
-                                ) : (
-                                    calculatedBoard.map((pos, i) => (
-                                        <DominoTile 
-                                            key={i} 
-                                            values={pos.tile} 
-                                            vertical={pos.vertical}
-                                            disabled={true}
-                                            scale={0.95}
-                                            style={{
-                                                position: 'absolute',
-                                                left: `${pos.x}px`,
-                                                top: `${pos.y}px`,
-                                                transition: 'left 0.5s, top 0.5s'
-                                            }}
-                                        />
-                                    ))
-                                )}
-
-                                {/* Oynama Alanları (Placeholder - Bu mantık daha da geliştirilebilir) */}
-                                {validMoves.includes('left') && selectedTileIndex !== null && gameState.board.length > 0 && (
-                                    <div className="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2" onClick={() => playTile('left')}>
-                                        <div className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer">
-                                            <div className="absolute inset-0 bg-yellow-400/20 rounded-lg valid-zone"></div>
-                                            <div className="absolute inset-0 flex items-center justify-center">
-                                                <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-yellow-400/10 rounded-md border-2 border-yellow-400 border-dashed animate-glow-pulse"></div>
+                            {/* Yatay Kaydırma Alanı */}
+                            <div 
+                                ref={boardScrollRef}
+                                className="w-full h-full overflow-x-auto overflow-y-hidden hide-scrollbar flex items-center px-8"
+                                style={{ scrollBehavior: 'smooth' }}
+                            >
+                                <div className="flex items-center gap-1 mx-auto min-w-max py-10">
+                                    
+                                    {/* SOL IŞIKLI GÖSTERGE */}
+                                    {validMoves.includes('left') && selectedTileIndex !== null && gameState.board.length > 0 && (
+                                        <div className="mr-2 sm:mr-3 flex items-center" onClick={() => playTile('left')}>
+                                            <div className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer">
+                                                <div className="absolute inset-0 bg-yellow-400/20 rounded-lg valid-zone"></div>
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-yellow-400/10 rounded-md border-2 border-yellow-400 border-dashed animate-glow-pulse"></div>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
-                                {validMoves.includes('right') && selectedTileIndex !== null && gameState.board.length > 0 && (
-                                    <div className="absolute top-1/2 right-1/4 translate-x-1/2 -translate-y-1/2" onClick={() => playTile('right')}>
-                                        <div className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer">
-                                            <div className="absolute inset-0 bg-yellow-400/20 rounded-lg valid-zone"></div>
-                                            <div className="absolute inset-0 flex items-center justify-center">
-                                                <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-yellow-400/10 rounded-md border-2 border-yellow-400 border-dashed animate-glow-pulse"></div>
+                                    )}
+
+                                    {/* TAHTADAKİ TAŞLAR */}
+                                    {gameState.board.length === 0 ? (
+                                        <div className="text-white/30 text-xl font-bold border-4 border-dashed border-white/10 rounded-3xl p-6">
+                                            {selectedTileIndex !== null ? '👇 Taşı Buraya Koy' : 'Taş Seç ve Başla'}
+                                        </div>
+                                    ) : (
+                                        gameState.board.map((tile, i) => (
+                                            <DominoTile 
+                                                key={i} 
+                                                values={tile} 
+                                                vertical={tile[0] === tile[1]}
+                                                disabled={true}
+                                                scale={0.95}
+                                                animateIn={i === gameState.board.length - 1 || i === 0}
+                                            />
+                                        ))
+                                    )}
+
+                                    {/* SAĞ IŞIKLI GÖSTERGE */}
+                                    {validMoves.includes('right') && selectedTileIndex !== null && gameState.board.length > 0 && (
+                                        <div className="ml-2 sm:ml-3 flex items-center" onClick={() => playTile('right')}>
+                                            <div className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer">
+                                                <div className="absolute inset-0 bg-yellow-400/20 rounded-lg valid-zone"></div>
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-yellow-400/10 rounded-md border-2 border-yellow-400 border-dashed animate-glow-pulse"></div>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
-
-                                {/* İLK HAMLE (ORTAYA) */}
-                                {validMoves.includes('start') && selectedTileIndex !== null && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-30 animate-slide-up" onClick={() => playTile('start')}>
-                                        <div className="bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold px-8 py-4 rounded-2xl animate-glow-pulse cursor-pointer shadow-glow transform scale-110">
-                                            ✨ OYUNA BAŞLA
+                                    )}
+                                    
+                                    {/* İLK HAMLE (ORTAYA) */}
+                                    {validMoves.includes('start') && selectedTileIndex !== null && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-30 animate-slide-up" onClick={() => playTile('start')}>
+                                            <div className="bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold px-8 py-4 rounded-2xl animate-glow-pulse cursor-pointer shadow-glow transform scale-110">
+                                                ✨ OYUNA BAŞLA
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
                         </div>
 
