@@ -141,7 +141,7 @@
         }
 
         // API Base URL
-        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://domino-101-pro.onrender.com';
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
 
         // --- BİLEŞENLER ---
 
@@ -276,12 +276,14 @@
 
                         const data = await response.json();
                         if (data.success) {
+                            // DÜZELTME: Sunucudan gelen veri ile Telegram'dan gelen güncel veriyi birleştir.
+                            // Bu, kullanıcı adının her zaman en güncel haliyle kullanılmasını sağlar.
                             setPlayerData({
-                                ...data.player,
+                                ...data.player, // Sunucudan gelen ELO, level vb.
+                                ...telegramData, // Telegram'dan gelen güncel username, photoUrl vb.
                                 isGuest: false,
-                                photoUrl: telegramData.photoUrl || data.player.photoUrl
                             });
-                            console.log('✅ Telegram Auth başarılı:', data.player);
+                            console.log('✅ Telegram Auth başarılı:', { ...data.player, ...telegramData });
                         } else {
                             throw new Error('Auth failed');
                         }
@@ -332,7 +334,7 @@
 
 
             const connectToServer = () => {
-                let wsUrl = 'wss://domino-101-pro.onrender.com';
+                let wsUrl = 'wss://beta-github-io.onrender.com';
                 // Test için Localhost kontrolü
                 if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
                     wsUrl = `ws://${window.location.hostname}:10000`;
