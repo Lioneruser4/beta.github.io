@@ -542,7 +542,8 @@ function handleFindMatch(ws, data) {
                     photoUrl: p2.photoUrl,
                     level: p2.level,
                     elo: p2.elo,
-                    isGuest: p2.isGuest
+                    isGuest: p2.isGuest,
+                    isConnected: true // Yeni: Bağlantı durumu eklendi
                 } 
             },
             type: gameType,
@@ -597,7 +598,8 @@ function handleCreateRoom(ws, data) {
             [ws.playerId]: { 
                 name: ws.playerName,
                 telegramId: data.telegramId,
-                isGuest: ws.isGuest
+                isGuest: ws.isGuest,
+                isConnected: true // Yeni: Bağlantı durumu eklendi
             } 
         },
         type: 'private',
@@ -623,7 +625,8 @@ function handleJoinRoom(ws, data) {
     room.players[ws.playerId] = { 
         name: ws.playerName,
         telegramId: data.telegramId,
-        isGuest: ws.isGuest
+        isGuest: ws.isGuest,
+        isConnected: true // Yeni: Bağlantı durumu eklendi
     };
 
     const hostId = room.host;
@@ -796,12 +799,17 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
         // Bu, oyuncuların yeni bir eşleşme ararken "zaten oyundasınız" hatası almasını önler.
         playerIds.forEach(pid => {
             const playerSocket = playerConnections.get(pid);
+            if (playerSocket) playerConnections.delete(pid); // Yeni: Bağlantıyı playerConnections'tan da sil
             if (playerSocket) {
                 playerSocket.roomCode = null;
             }
         });
         rooms.delete(roomCode);
     } catch (error) {
+        // Hata durumunda da oyuncuların oda bilgilerini temizle
+        // ve playerConnections'tan da sil
+        // Ayrıca varsa disconnectTimer'ı da temizle
+        
         console.error('❌ Game end error:', error);
         broadcastToRoom(roomCode, { 
             type: 'gameEnd', 
@@ -811,11 +819,15 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
         });
 
         // Hata durumunda da oyuncuların oda bilgilerini temizle
+        // ve playerConnections'tan da sil
         if (room) {
             const playerIds = Object.keys(room.players);
             playerIds.forEach(pid => {
                 const playerSocket = playerConnections.get(pid);
-                if (playerSocket) playerSocket.roomCode = null;
+                if (playerSocket) {
+                    playerSocket.roomCode = null;
+                    playerConnections.delete(pid); // Yeni: Bağlantıyı playerConnections'tan da sil
+                }
             });
         }
         rooms.delete(roomCode);
@@ -920,11 +932,44 @@ function handleLeaveGame(ws) {
         return;
     }
 
+    // Rakibin disconnectTimer'ı varsa temizle
+    const opponentId = playerIds.find(id => id !== ws.playerId);
+    if (opponentId && room.players[opponentId] && room.players[opponentId].disconnectTimer) {
+        clearTimeout(room.players[opponentId].disconnectTimer);
+        room.players[opponentId].disconnectTimer = null;
+        console.log(`ℹ️ ${ws.playerName} oyundan ayrıldığı için ${room.players[opponentId].name}'in bağlantı kesilme zamanlayıcısı iptal edildi.`);
+    }
+
     const leaverId = ws.playerId;
     const winnerId = playerIds.find(id => id !== leaverId);
 
     handleGameEnd(ws.roomCode, winnerId, gs);
 
+}
+
+// YENİ FONKSİYON: Zaman aşımı nedeniyle oyunu sonlandırır
+function endGameDueToTimeout(roomCode, disconnectedPlayerId) {
+    const room = rooms.get(roomCode);
+    if (!room) return;
+
+    // Oyuncunun hala bağlantısız olup olmadığını kontrol et
+    const playerInfo = room.players[disconnectedPlayerId];
+    if (playerInfo && !playerInfo.isConnected) {
+        console.log(`⏰ ${playerInfo.name} (${disconnectedPlayerId}) yeniden bağlanmadı. Oyun sonlandırılıyor.`);
+        const playerIds = Object.keys(room.players);
+        const winnerId = playerIds.find(id => id !== disconnectedPlayerId);
+        
+        const gameState = room.gameState;
+        if (gameState) {
+            handleGameEnd(roomCode, winnerId, gameState);
+        } else {
+            console.log(`⚠️ Oyun durumu bulunamadı, odayı temizliyor: ${roomCode}`);
+            rooms.delete(roomCode);
+            playerIds.forEach(pid => { const playerSocket = playerConnections.get(pid); if (playerSocket) playerSocket.roomCode = null; });
+        }
+    } else {
+        console.log(`✅ Oyuncu ${disconnectedPlayerId} zaten yeniden bağlanmış veya durumu değişmiş, zamanlayıcı iptal edildi.`);
+    }
 }
 
 // YENİ: Yeniden bağlanma mantığı
@@ -941,7 +986,10 @@ function handleReconnect(ws, data) {
             playerInfo.disconnectTimer = null;
             console.log(`✅ Oyuncu ${playerInfo.name} (${playerId}) zamanında yeniden bağlandı: ${roomCode}`);
         }
+        // Oyuncunun bağlantı durumunu güncelle
+        playerInfo.isConnected = true;
 
+    
         // Yeni WebSocket bağlantısını oyuncuyla ilişkilendir
         ws.playerId = playerId;
         ws.roomCode = roomCode;
@@ -954,38 +1002,52 @@ function handleReconnect(ws, data) {
 
         // Rakibe, oyuncunun geri döndüğünü bildir
         broadcastToRoom(roomCode, { type: 'opponentReconnected', message: `${playerInfo.name} oyuna geri döndü.` }, playerId);
-    } else {
+    } else { // Oda veya oyuncu bulunamadıysa
         sendMessage(ws, { type: 'error', message: 'Geçerli bir oyun bulunamadı. Lobiye yönlendiriliyorsunuz.' });
+        // Eğer playerId varsa ve bu WS hala onunla ilişkilendirilmişse, playerConnections'tan sil
+        if (playerId && playerConnections.get(playerId) === ws) {
+            playerConnections.delete(playerId);
+        }
     }
 }
 
 function handleDisconnect(ws) {
     console.log(`🔌 Oyuncu ayrıldı: ${ws.playerName || 'Bilinmeyen'}`);
     
-    // Kuyruktan çıkar
+    // Eşleşme kuyruğundan çıkar
     const qIdx = matchQueue.findIndex(p => p.ws === ws);
     if (qIdx !== -1) {
         matchQueue.splice(qIdx, 1);
         console.log(`❌ Kuyruktan çıkarıldı - Kalan: ${matchQueue.length}`);
     }
 
-    // Eğer oyuncu bir odadaysa, hemen silme, bir süre bekle
+    // Eğer oyuncu bir odadaysa, hemen silme, yeniden bağlanması için bir süre bekle
     if (ws.roomCode && ws.playerId) {
         const room = rooms.get(ws.roomCode);
         if (room && room.players[ws.playerId]) {
-            console.log(`⏳ ${ws.playerName} için 60 saniyelik yeniden bağlanma süresi başladı.`);
-            broadcastToRoom(ws.roomCode, { type: 'opponentDisconnected', message: 'Rakibin bağlantısı koptu. Yeniden bağlanması bekleniyor...' }, ws.playerId);
+            // Sadece bu WebSocket, oyuncunun mevcut aktif bağlantısıysa işlem yap
+            if (playerConnections.get(ws.playerId) === ws) {
+                room.players[ws.playerId].isConnected = false; // Oyuncuyu bağlantısız olarak işaretle
+                playerConnections.delete(ws.playerId); // Bu eski WebSocket'i playerConnections'tan kaldır
 
-            // 60 saniye sonra oyunu bitir
-            room.players[ws.playerId].disconnectTimer = setTimeout(() => {
-                console.log(`⏰ ${ws.playerName} yeniden bağlanmadı. Oyun sonlandırılıyor.`);
-                handleLeaveGame(ws); // Oyundan ayrılmış gibi işlem yap
-            }, 60000); // 60 saniye
+                console.log(`⏳ ${ws.playerName} (${ws.playerId}) için 60 saniyelik yeniden bağlanma süresi başladı.`);
+                broadcastToRoom(ws.roomCode, { type: 'opponentDisconnected', message: 'Rakibin bağlantısı koptu. Yeniden bağlanması bekleniyor...' }, ws.playerId);
+
+                // 60 saniye sonra oyunu sonlandır
+                room.players[ws.playerId].disconnectTimer = setTimeout(() => {
+                    endGameDueToTimeout(ws.roomCode, ws.playerId);
+                }, 60000); // 60 saniye
+            } else {
+                console.log(`ℹ️ Eski bir WebSocket bağlantısı kapandı, ancak oyuncu ${ws.playerId} zaten yeniden bağlanmış.`);
+            }
         }
+    } else if (ws.playerId && playerConnections.get(ws.playerId) === ws) {
+        // Odada değilse ama bir playerId'si varsa (örn: kuyrukta veya yeni bağlanmış), playerConnections'tan sil
+        playerConnections.delete(ws.playerId);
     }
-    if (ws.playerId) playerConnections.delete(ws.playerId);
 }
 
+// ... (rest of the code)
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Domino Sunucusu çalışıyor: Port ${PORT}`);
