@@ -141,7 +141,7 @@
         }
 
         // API Base URL
-        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
+        const API_URL = 'https://beta-github-io.onrender.com';
 
         // --- BİLEŞENLER ---
 
@@ -334,12 +334,8 @@
 
 
             const connectToServer = () => {
-                let wsUrl = 'wss://beta-github-io.onrender.com';
-                // Test için Localhost kontrolü
-                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                    wsUrl = `ws://${window.location.hostname}:10000`;
-                }
-
+                const wsUrl = 'wss://beta-github-io.onrender.com';
+                
                 const ws = new WebSocket(wsUrl);
 
                 ws.onopen = () => { setConnected(true); showNotification('Sunucuya Bağlandı', 'success'); };
@@ -363,6 +359,13 @@
                     case 'gameStart':
                         console.log('🎮 Oyun başlıyor...', data.gameState);
                         setGameState(data.gameState);
+                        // --- DÜZELTME: Rakip bilgisini burada da ayarla ---
+                        // Bu, oyun başladığında rakip bilgilerinin ve oyun ekranının
+                        // senkronize bir şekilde güncellenmesini sağlar.
+                        const myId = data.gameState.playerId;
+                        const opponentId = Object.keys(data.gameState.players).find(id => id !== myId);
+                        const opponentData = data.gameState.players[opponentId];
+                        setOpponent({ name: opponentData.name, ...opponentData });
                         setScreen('game');
                         setSelectedTileIndex(null);
                         setValidMoves([]);
