@@ -573,13 +573,23 @@
 
             // --- OYUN MANTIĞI / GAME LOGIC ---
 
-            const myPlayerId = playerData?.telegramId || 'guest-' + playerData?.username;
+            const myPlayerId = useMemo(() => {
+                return playerData?.telegramId || `guest-${playerData?.username}`;
+            }, [playerData]);
+
             const isMyTurn = gameState?.currentPlayer === myPlayerId;
-            const myHand = gameState?.players[myPlayerId]?.hand || [];
+            
+            // DÜZƏLİŞ: myHand-i useMemo ilə təyin edirik. Bu, gameState dəyişdikdə
+            // React-in komponenti yenidən render etməsini və əlinizin ekranda görünməsini təmin edir.
+            const myHand = useMemo(() => {
+                if (!gameState || !playerData) return [];
+                const myId = playerData.telegramId || `guest-${playerData.username}`;
+                return gameState.players?.[myId]?.hand || [];
+            }, [gameState, playerData]);
+
             const marketSize = gameState?.market?.length || 0;
             const canDrawFromMarket = marketSize > 0;
 
-            // calculateValidMoves fonksiyonu
             const calculateValidMoves = (tile) => {
                 if (!gameState || gameState.board.length === 0) return ['start'];
                 
@@ -648,9 +658,10 @@
                 );
                 if (!confirmed) return;
 
+                // DÜZƏLİŞ: Oyundan çıxanda artıq dərhal lobbiyə qayıtmırıq.
+                // Sunucuya 'leaveGame' mesajı göndəririk və sunucunun 'gameEnd' mesajı ilə
+                // oyunu bitirməsini gözləyirik. Bu, hər iki oyunçunun da nəticəni görməsini təmin edir.
                 sendMessage({ type: 'leaveGame' });
-                resetGameClientState();
-                setScreen('lobby');
             };
 
             // --- XÜSUSİ LOBBİLƏR ---
@@ -1123,13 +1134,6 @@
             
             if (screen === 'game' && gameState) {
                 
-                // DÜZƏLİŞ: myId və myHand dəyişənlərini birbaşa render içində yenidən hesablamaq,
-                // gameState yeniləndikdə dərhal ən son məlumatın istifadə olunmasını təmin edir.
-                const myId = playerData?.telegramId || `guest-${playerData?.username}`;
-                const myHand = gameState?.players?.[myId]?.hand || [];
-                
-                // DÜZƏLİŞ: currentOpponent məlumatını opponentData state-dən alırıq.
-                const currentOpponentInfo = opponentData || {}; // Əgər null-dırsa boş obyekt istifadə et
 
                 return (
                     <div className="fixed inset-0 flex flex-col h-full w-full">
@@ -1138,11 +1142,11 @@
                         {/* ÜST PANEL: Rakip */}
                         <div className="h-16 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between px-4 z-20">
                             <div className="flex items-center gap-3">
-                                {/* DÜZƏLİŞ: Rəqib məlumatları üçün opponentData istifadə olunur */}
-                                {currentOpponentInfo?.photoUrl ? (
+                                {/* DÜZƏLİŞ: Rəqib məlumatları üçün opponentData state-i istifadə olunur */}
+                                {opponentData?.photoUrl ? (
                                     <img
-                                        src={currentOpponentInfo.photoUrl}
-                                        alt={currentOpponentInfo.name || 'Rəqib'}
+                                        src={opponentData.photoUrl}
+                                        alt={opponentData.name || 'Rəqib'}
                                         className="w-10 h-10 rounded-full border-2 border-yellow-400 shadow-lg object-cover"
                                     />
                                 ) : (
@@ -1152,23 +1156,23 @@
                                 )}
                                 <div>
                                     <div className="text-white text-sm font-bold shadow-black drop-shadow-md">
-                                        {currentOpponentInfo.name || currentOpponentInfo.username || 'Rəqib'}
+                                        {opponentData?.name || opponentData?.username || 'Rəqib'}
                                     </div>
                                     <div className="flex gap-2">
                                         {/* ELO */}
                                         <div className="text-xs text-blue-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
-                                            {currentOpponentInfo.elo || 0} ELO
+                                            {opponentData?.elo || 0} ELO
                                         </div>
                                         {/* LEVEL */}
                                         <div className="text-xs text-yellow-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
-                                            LVL {currentOpponentInfo.level || 0}
+                                            LVL {opponentData?.level || 0}
                                         </div>
                                         {/* HAND SIZE */}
                                         <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
                                             <span className="inline-block mr-1">
                                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c1.657 0 3 .895 3 2s-1.343 2-3 2a3 3 0 01-3-2c0-1.105 1.343-2 3-2zM12 8V7M8 12H7M17 12h-1M12 17v-1" /></svg>
                                             </span>
-                                            {currentOpponentInfo.handSize || 0} Daş
+                                            {opponentData?.handSize || 0} Daş
                                         </div>
                                     </div>
                                 </div>
