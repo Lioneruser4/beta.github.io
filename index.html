@@ -166,25 +166,63 @@
             transition: all 0.3s ease;
             transform-style: preserve-3d;
             flex-shrink: 0;
-            margin: 2px 0;
-            transform: rotate(90deg);
-            transform-origin: center;
+            margin: 2px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 4px;
+            border-radius: 4px;
+            background: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            min-width: 30px;
+            height: 60px;
+        }
+        
+        .domino-tile .pip {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
         }
         
         .domino-hand {
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            flex-wrap: nowrap;
-            gap: 2px;
-            padding: 5px;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            align-content: flex-start;
+            gap: 8px;
+            padding: 10px;
             width: 100%;
-            height: 100%;
+            max-height: 200px;
             overflow-y: auto;
             scrollbar-width: none;
             -ms-overflow-style: none;
             scroll-behavior: smooth;
-            padding-right: 5px;
+        }
+        
+        @media (max-width: 640px) {
+            .domino-tile {
+                min-width: 28px;
+                height: 56px;
+                margin: 1px;
+            }
+            .domino-hand {
+                gap: 4px;
+                padding: 5px;
+            }
+        }
+        
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .domino-tile {
+                min-width: 32px;
+                height: 64px;
+            }
+        }
+        
+        @media (min-width: 1025px) {
+            .domino-tile {
+                min-width: 36px;
+                height: 72px;
+            }
         }
     </style>
 </head>
@@ -641,6 +679,60 @@
                         showNotification('Bu taş uygun değil', 'warning');
                     }
                 }
+                
+                const checkGameEnd = () => {
+                    const myHand = gameState.players[playerData.id]?.hand || [];
+                    const opponentHand = gameState.players[opponent.id]?.hand || [];
+                    const boneyard = gameState.boneyard || [];
+                    
+                    // Eğer bir oyuncunun elinde taş kalmadıysa oyun biter
+                    if (myHand.length === 0) {
+                        setEndInfo({ winner: playerData.id, reason: 'Tebrikler! Tüm taşlarını oynadın!' });
+                        setScreen('end');
+                        return true;
+                    }
+                    
+                    // Rakibin elinde taş kalmadıysa oyun biter
+                    if (opponentHand.length === 0) {
+                        setEndInfo({ winner: opponent.id, reason: 'Rakip tüm taşlarını oynadı!' });
+                        setScreen('end');
+                        return true;
+                    }
+                    
+                    // Eğer hiç hamle yapılamıyorsa ve pazarda taş kalmadıysa
+                    if (validMoves.length === 0 && boneyard.length === 0) {
+                        // En az puanı olan kazanır
+                        const myScore = calculateScore(myHand);
+                        const opponentScore = calculateScore(opponentHand);
+                        
+                        if (myScore < opponentScore) {
+                            setEndInfo({ 
+                                winner: playerData.id, 
+                                reason: `Kazandınız! (${myScore} - ${opponentScore})` 
+                            });
+                        } else if (opponentScore < myScore) {
+                            setEndInfo({ 
+                                winner: opponent.id, 
+                                reason: `Kaybettiniz! (${myScore} - ${opponentScore})` 
+                            });
+                        } else {
+                            setEndInfo({ 
+                                winner: null, 
+                                reason: `Berabere! (${myScore} - ${opponentScore})` 
+                            });
+                        }
+                        
+                        setScreen('end');
+                        return true;
+                    }
+                    
+                    return false;
+                };
+                
+                // El puanını hesapla
+                const calculateScore = (tiles) => {
+                    return tiles.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
+                };
             };
 
             // Taşı Oynama
@@ -674,6 +766,73 @@
                      showNotification('Elinde oynanabilir taş varken pazardan çekemezsin!', 'warning');
                      return; // Fonksiyondan tamamen çık
                  }
+                const drawTile = () => {
+                    if (gameState.boneyard.length > 0) {
+                        const newTile = gameState.boneyard[0];
+                        const updatedHand = [...myHand, newTile];
+                        const updatedBoneyard = gameState.boneyard.slice(1);
+                        
+                        // Eğer çekilen taşla hamle yapılabiliyorsa, otomatik yap
+                        const canPlayWithNewTile = checkValidMoves(updatedHand, gameState.board).length > 0;
+                        
+                        const updatedGameState = {
+                            ...gameState,
+                            boneyard: updatedBoneyard,
+                            players: {
+                                ...gameState.players,
+                                [playerData.id]: {
+                                    ...gameState.players[playerData.id],
+                                    hand: updatedHand
+                                }
+                            }
+                        };
+                        
+                        setGameState(updatedGameState);
+                        setMyHand(updatedHand);
+                        
+                        // Sunucuya bildir
+                        sendMessage({
+                            type: 'drawTile',
+                            playerId: playerData.id,
+                            tile: newTile,
+                            canPlay: canPlayWithNewTile
+                        });
+                        
+                        // Eğer çekilen taşla hamle yapılabiliyorsa kullanıcıya bildir
+                        if (canPlayWithNewTile) {
+                            showNotification('Yeni çektiğin taşla hamle yapabilirsin!', 'info');
+                        } else if (updatedBoneyard.length === 0) {
+                            // Eğer pazarda taş kalmadıysa ve hamle yapılamıyorsa
+                            showNotification('Hamle yapamıyorsun. Sıranı geçiyorsun.', 'warning');
+                            
+                            // Otomatik olarak sırayı geç
+                            setTimeout(() => {
+                                sendMessage({
+                                    type: 'passTurn',
+                                    playerId: playerData.id
+                                });
+                                
+                                // Rakibin sırasına geç
+                                setGameState({
+                                    ...updatedGameState,
+                                    currentPlayer: opponent.id
+                                });
+                            }, 1000);
+                        }
+                        
+                        return true;
+                    }
+                    
+                    // Eğer pazarda taş kalmadıysa ve hamle yapılamıyorsa oyunu bitir
+                    if (validMoves.length === 0) {
+                        checkGameEnd();
+                    }
+                    
+                    return false;
+                };
+                
+                if (drawTile()) return;
+                
                 sendMessage({ type: 'drawFromMarket' });
                 showNotification('🎲 Pazardan taş çekiliyor...', 'info');
             };
@@ -692,6 +851,29 @@
                 // Lokal state temizle ve lobiye dön
                 resetGameClientState();
                 setScreen('lobby');
+            };
+
+            // Geçerli hamleleri kontrol et
+            const checkValidMoves = (hand, board) => {
+                if (!hand || !board || board.length === 0) {
+                    return [];
+                }
+                
+                const leftEnd = board[0][0];
+                const rightEnd = board[board.length - 1][1];
+                
+                return hand.reduce((moves, tile, index) => {
+                    if (tile[0] === leftEnd || tile[1] === leftEnd) {
+                        moves.push({ index, position: 'left' });
+                    }
+                    if (tile[0] === rightEnd || tile[1] === rightEnd) {
+                        // Eğer taşın diğer tarafına da uyuyorsa, sadece bir kez ekle
+                        if (!(tile[0] === leftEnd && tile[1] === rightEnd && leftEnd === rightEnd)) {
+                            moves.push({ index, position: 'right' });
+                        }
+                    }
+                    return moves;
+                }, []);
             };
 
             // --- SEARCHING LOBBY ---
