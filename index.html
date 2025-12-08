@@ -270,6 +270,9 @@
 
         // API Base URL
         const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
+        // WebSocket URL
+        const WS_URL = window.location.hostname === 'localhost' ? 'ws://localhost:10000' : 'wss://beta-github-io.onrender.com';
+
 
         // --- BİLEŞENLER ---
 
@@ -383,36 +386,15 @@
             }, [gameState, roomCode]);
 
             // Sayfa yüklendiğinde kayıtlı oyun durumunu kontrol et
-            useEffect(() => {
-                const savedGame = localStorage.getItem('dominoGameState');
-                if (savedGame) {
-                    const { gameState: savedState, roomCode: savedRoomCode, timestamp } = JSON.parse(savedGame);
-                    // 1 saatten eski kayıtları temizle
-                    if (Date.now() - timestamp < 3600000) {
-                        setGameState(savedState);
-                        setRoomCode(savedRoomCode);
-                    } else {
-                        localStorage.removeItem('dominoGameState');
-                    }
+            useEffect(() => {                
+                // İlk kullanıcı verilerini al, sonra sunucuya bağlan.
+                const initialize = async () => {
+                    await initializeTelegramAuth();
+                    connectToServer();
                 }
                 
-                // Oyun durumu değişikliklerini dinle
-                const handleBeforeUnload = (e) => {
-                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                        // Sunucuya çıkış bildirimi gönder
-                        wsRef.current.send(JSON.stringify({
-                            type: 'playerLeft',
-                            roomCode: roomCode,
-                            playerId: playerData?.id
-                        }));
-                    }
-                };
-                
-                window.addEventListener('beforeunload', handleBeforeUnload);
-                
                 // İlk bağlantıyı kurQ
-                initializeTelegramAuth();
-                connectToServer();
+                initialize();
                 
                 // Sayfa kapatılırken temizlik yap
                 return () => {
@@ -421,7 +403,7 @@
                         wsRef.current.close();
                     }
                 };
-            }, [roomCode, playerData?.id]);
+            }, []); // Sadece bir kez çalışmalı
 
             // Telegram Auth
             const initializeTelegramAuth = async () => {
@@ -520,27 +502,16 @@
                     setConnected(true);
                     showNotification('Sunucuya bağlandı', 'success');
                     
-                    // Eğer daha önce oyun içindeydik, oyun durumunu yeniden yükle
+                    // Eğer localStorage'da kayıtlı bir oyun varsa, yeniden bağlanmayı dene
                     const savedGame = localStorage.getItem('dominoGameState');
-                    if (savedGame) {
+                    if (savedGame && playerData) {
                         const { gameState: savedState, roomCode: savedRoomCode } = JSON.parse(savedGame);
-                        console.log('Kayıtlı oyun durumu yükleniyor...');
+                        console.log('Kayıtlı oyun durumu için yeniden bağlanma deneniyor...');
                         
                         ws.send(JSON.stringify({
-                            type: 'reconnect',
-                            roomCode: savedRoomCode || roomCode,
-                            playerId: playerData?.id,
-                            gameState: savedState || gameState,
-                            timestamp: Date.now()
-                        }));
-                    } else if (gameState && roomCode && playerData) {
-                        console.log('Mevcut oyun durumu yükleniyor...');
-                        ws.send(JSON.stringify({
-                            type: 'reconnect',
-                            roomCode: roomCode,
-                            playerId: playerData.id,
-                            gameState: gameState,
-                            timestamp: Date.now()
+                            type: 'reconnectToGame', // Düzeltildi: 'reconnect' -> 'reconnectToGame'
+                            roomCode: savedRoomCode,
+                            playerId: savedState.playerId
                         }));
                     }
                 };
@@ -594,59 +565,6 @@
             const handleServerMessage = (data) => {
                 console.log('📨 Server mesajı:', data.type, data);
                 
-                // Rakip bağlantısı koptuğunda veya çıktığında
-                if (data.type === 'playerDisconnected') {
-                    setEndInfo({
-                        winner: playerData.id,
-                        reason: 'Rakip oyundan ayrıldı. Kazandınız!'
-                    });
-                    setScreen('end');
-                    return;
-                }
-                
-                // Bağlantı yeniden kurulduğunda oyun durumunu güncelle
-                if (data.type === 'gameState' || data.type === 'reconnectSuccess') {
-                    // Eğer oyun bitmişse
-                    if (data.state.gameOver) {
-                        setEndInfo({
-                            winner: data.state.winner,
-                            reason: data.state.winner === playerData.id 
-                                ? 'Tebrikler! Kazandınız!' 
-                                : 'Üzgünüm, kaybettiniz.'
-                        });
-                        setScreen('end');
-                        return;
-                    }
-                    
-                    // Eğer rakibin bağlantısı kopmuşsa
-                    if (data.state.players[opponent?.id]?.disconnected) {
-                        setEndInfo({
-                            winner: playerData.id,
-                            reason: 'Rakip bağlantısı koptu. Kazandınız!'
-                        });
-                        setScreen('end');
-                        return;
-                    }
-                    
-                    // Oyun devam ediyorsa durumu güncelle
-                    setGameState(data.state);
-                    setRoomCode(data.roomCode || roomCode);
-                    setOpponent(data.opponent || opponent);
-                    setScreen('game');
-                    
-                    // Geçerli hamleleri güncelle
-                    if (data.validMoves) {
-                        setValidMoves(data.validMoves);
-                    }
-                    
-                    // Eğer sıra bu oyuncudaysa seçili taşı sıfırla
-                    if (data.currentPlayerId === playerData?.id) {
-                        setSelectedTileIndex(null);
-                    }
-                    
-                    return;
-                }
-                
                 // Rakip oyundan çıktığında
                 if (data.type === 'opponentLeft') {
                     setEndInfo({
@@ -654,6 +572,12 @@
                         reason: 'Rakip oyundan ayrıldı. Kazandınız!'
                     });
                     setScreen('end');
+                    return;
+                }
+
+                // Rakibin bağlantısı koptuğunda veya geri geldiğinde bilgilendirme
+                if (data.type === 'opponentDisconnected' || data.type === 'opponentReconnected') {
+                    showNotification(data.message, 'info');
                     return;
                 }
                 
@@ -680,12 +604,18 @@
                         console.log('🔄 Oyun güncelleniyor...', data.gameState);
                         if (data.gameState && data.gameState.board) {
                             setGameState(prevState => ({
+                                // Önceki state'i koru, sadece yeni gelen verileri güncelle
                                 ...prevState,
                                 ...data.gameState,
                                 playerId: prevState?.playerId || data.gameState.playerId
                             }));
                             setSelectedTileIndex(null);
                             setValidMoves([]);
+                        }
+                        break;
+                    case 'connected': // Yeniden bağlanma başarılı mesajı
+                        if (data.isReconnect) {
+                            showNotification(data.message, 'success');
                         }
                         break;
                     case 'error':
@@ -819,60 +749,6 @@
                         showNotification('Bu taş uygun değil', 'warning');
                     }
                 }
-                
-                const checkGameEnd = () => {
-                    const myHand = gameState.players[playerData.id]?.hand || [];
-                    const opponentHand = gameState.players[opponent.id]?.hand || [];
-                    const boneyard = gameState.boneyard || [];
-                    
-                    // Eğer bir oyuncunun elinde taş kalmadıysa oyun biter
-                    if (myHand.length === 0) {
-                        setEndInfo({ winner: playerData.id, reason: 'Tebrikler! Tüm taşlarını oynadın!' });
-                        setScreen('end');
-                        return true;
-                    }
-                    
-                    // Rakibin elinde taş kalmadıysa oyun biter
-                    if (opponentHand.length === 0) {
-                        setEndInfo({ winner: opponent.id, reason: 'Rakip tüm taşlarını oynadı!' });
-                        setScreen('end');
-                        return true;
-                    }
-                    
-                    // Eğer hiç hamle yapılamıyorsa ve pazarda taş kalmadıysa
-                    if (validMoves.length === 0 && boneyard.length === 0) {
-                        // En az puanı olan kazanır
-                        const myScore = calculateScore(myHand);
-                        const opponentScore = calculateScore(opponentHand);
-                        
-                        if (myScore < opponentScore) {
-                            setEndInfo({ 
-                                winner: playerData.id, 
-                                reason: `Kazandınız! (${myScore} - ${opponentScore})` 
-                            });
-                        } else if (opponentScore < myScore) {
-                            setEndInfo({ 
-                                winner: opponent.id, 
-                                reason: `Kaybettiniz! (${myScore} - ${opponentScore})` 
-                            });
-                        } else {
-                            setEndInfo({ 
-                                winner: null, 
-                                reason: `Berabere! (${myScore} - ${opponentScore})` 
-                            });
-                        }
-                        
-                        setScreen('end');
-                        return true;
-                    }
-                    
-                    return false;
-                };
-                
-                // El puanını hesapla
-                const calculateScore = (tiles) => {
-                    return tiles.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
-                };
             };
 
             // Taşı Oynama
@@ -906,72 +782,6 @@
                      showNotification('Elinde oynanabilir taş varken pazardan çekemezsin!', 'warning');
                      return; // Fonksiyondan tamamen çık
                  }
-                const drawTile = () => {
-                    if (gameState.boneyard.length > 0) {
-                        const newTile = gameState.boneyard[0];
-                        const updatedHand = [...myHand, newTile];
-                        const updatedBoneyard = gameState.boneyard.slice(1);
-                        
-                        // Eğer çekilen taşla hamle yapılabiliyorsa, otomatik yap
-                        const canPlayWithNewTile = checkValidMoves(updatedHand, gameState.board).length > 0;
-                        
-                        const updatedGameState = {
-                            ...gameState,
-                            boneyard: updatedBoneyard,
-                            players: {
-                                ...gameState.players,
-                                [playerData.id]: {
-                                    ...gameState.players[playerData.id],
-                                    hand: updatedHand
-                                }
-                            }
-                        };
-                        
-                        setGameState(updatedGameState);
-                        setMyHand(updatedHand);
-                        
-                        // Sunucuya bildir
-                        sendMessage({
-                            type: 'drawTile',
-                            playerId: playerData.id,
-                            tile: newTile,
-                            canPlay: canPlayWithNewTile
-                        });
-                        
-                        // Eğer çekilen taşla hamle yapılabiliyorsa kullanıcıya bildir
-                        if (canPlayWithNewTile) {
-                            showNotification('Yeni çektiğin taşla hamle yapabilirsin!', 'info');
-                        } else if (updatedBoneyard.length === 0) {
-                            // Eğer pazarda taş kalmadıysa ve hamle yapılamıyorsa
-                            showNotification('Hamle yapamıyorsun. Sıranı geçiyorsun.', 'warning');
-                            
-                            // Otomatik olarak sırayı geç
-                            setTimeout(() => {
-                                sendMessage({
-                                    type: 'passTurn',
-                                    playerId: playerData.id
-                                });
-                                
-                                // Rakibin sırasına geç
-                                setGameState({
-                                    ...updatedGameState,
-                                    currentPlayer: opponent.id
-                                });
-                            }, 1000);
-                        }
-                        
-                        return true;
-                    }
-                    
-                    // Eğer pazarda taş kalmadıysa ve hamle yapılamıyorsa oyunu bitir
-                    if (validMoves.length === 0) {
-                        checkGameEnd();
-                    }
-                    
-                    return false;
-                };
-                
-                if (drawTile()) return;
                 
                 sendMessage({ type: 'drawFromMarket' });
                 showNotification('🎲 Pazardan taş çekiliyor...', 'info');
