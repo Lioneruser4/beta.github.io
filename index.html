@@ -304,10 +304,48 @@
                 // Basit bip sesleri veya mp3 eklenebilir. Şimdilik boş bırakıyorum hata vermesin diye.
             };
 
+            // Oyun durumu değiştiğinde localStorage'a kaydet
             useEffect(() => {
+                if (gameState && roomCode) {
+                    localStorage.setItem('dominoGameState', JSON.stringify({
+                        gameState,
+                        roomCode,
+                        timestamp: Date.now()
+                    }));
+                }
+            }, [gameState, roomCode]);
+
+            // Sayfa yüklendiğinde kayıtlı oyun durumunu kontrol et
+            useEffect(() => {
+                const savedGame = localStorage.getItem('dominoGameState');
+                if (savedGame) {
+                    const { gameState: savedState, roomCode: savedRoomCode, timestamp } = JSON.parse(savedGame);
+                    // 1 saatten eski kayıtları temizle
+                    if (Date.now() - timestamp < 3600000) {
+                        setGameState(savedState);
+                        setRoomCode(savedRoomCode);
+                    } else {
+                        localStorage.removeItem('dominoGameState');
+                    }
+                }
+                
                 initializeTelegramAuth();
                 connectToServer();
-                return () => { if (wsRef.current) wsRef.current.close(); };
+                
+                // Sayfa kapatılırken temizlik yap
+                const handleBeforeUnload = () => {
+                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                        wsRef.current.close();
+                    }
+                };
+                
+                window.addEventListener('beforeunload', handleBeforeUnload);
+                return () => {
+                    window.removeEventListener('beforeunload', handleBeforeUnload);
+                    if (wsRef.current) {
+                        wsRef.current.close();
+                    }
+                };
             }, []);
 
             // Telegram Auth
@@ -420,6 +458,26 @@
 
             const handleServerMessage = (data) => {
                 console.log('📨 Server mesajı:', data.type, data);
+                
+                // Bağlantı yeniden kurulduğunda oyun durumunu güncelle
+                if (data.type === 'gameState' || data.type === 'reconnectSuccess') {
+                    setGameState(data.state);
+                    setRoomCode(data.roomCode || roomCode);
+                    setOpponent(data.opponent || opponent);
+                    setScreen('game');
+                    
+                    // Geçerli hamleleri güncelle
+                    if (data.validMoves) {
+                        setValidMoves(data.validMoves);
+                    }
+                    
+                    // Eğer sıra bu oyuncudaysa seçili taşı sıfırla
+                    if (data.currentPlayerId === playerData?.id) {
+                        setSelectedTileIndex(null);
+                    }
+                    
+                    return;
+                }
                 
                 switch(data.type) {
                     case 'roomCreated':
