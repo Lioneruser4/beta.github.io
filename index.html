@@ -184,8 +184,8 @@
             return (
                 <div className="pip-grid">
                     {[...Array(9)].map((_, i) => (
-                        // DÜZƏLİŞ: opacity 0.5-dən 1-ə dəyişdirildi. Daşlar daha aydın görünsün
-                        <div key={i} className="pip" style={{ opacity: activePips.includes(i) ? 1 : 0.1 }}></div>
+                        // DÜZƏLİŞ: Daşların görünməməsi problemini həll etmək üçün, görünməyən nöqtələrin opacity dəyəri 0.1-dən 0-a endirildi.
+                        <div key={i} className="pip" style={{ opacity: activePips.includes(i) ? 1 : 0 }}></div>
                     ))}
                 </div>
             );
@@ -494,7 +494,8 @@
                         break;
                     case 'gameEnd':
                         const isRanked = data.isRanked;
-                        const isWinnerClient = data.winner === myId;
+                        // DÜZƏLİŞ: Qalibi müəyyən edərkən köhnə 'myId' yerinə hər zaman aktual olan 'myPlayerId' istifadə olunur. Bu, hər iki oyunçunun da eyni nəticəni görməsinin qarşısını alır.
+                        const isWinnerClient = data.winner === myPlayerId;
                         // Ən son opponent datası istifadə olunur
                         const finalOpponent = opponentData || getOpponentInfo(data.gameState, myId); 
                         
@@ -1311,17 +1312,14 @@
                             </div>
 
                             {/* Taş Dizilimi */}
-                            <div className="w-full max-w-4xl mx-auto overflow-x-auto max-h-[12vh] p-2 hide-scrollbar"> 
-                                {/* DÜZƏLİŞ: Əldəki daş sayı artdıqca, daşların ölçüsünü və aralığını azaldaraq ekrana sığmasını təmin edirik. */}
-                                <div className={`flex justify-center flex-nowrap ${myHand.length > 10 ? 'gap-1' : 'gap-2'}`}>
+                            {/* DÜZƏLİŞ: Daşların görünməməsi problemini həll etmək üçün, daşların olduğu qutunun hündürlüyü artırıldı (max-h-[40vh]) və daşların avtomatik alt sətirə keçməsi üçün 'flex-wrap' istifadə edildi. Bu, köhnə, işlək versiyadakı kodla eynidir. */}
+                            <div className="w-full max-w-4xl mx-auto overflow-y-auto max-h-[40vh] p-2 hide-scrollbar">
+                                <div className="flex justify-center gap-2 flex-wrap">
                                     {myHand.map((tile, index) => {
                                         const canPlay = isMyTurn && (gameState.board.length === 0 || calculateValidMoves(tile).length > 0);
-                                        // Əldəki daş sayı 10-dan çoxdursa, daşları kiçilt
-                                        const handScale = myHand.length > 10 ? 0.85 : 1;
                                         
                                         return (
                                             <DominoTile 
-                                                scale={handScale}
                                                 key={index}
                                                 values={tile}
                                                 onClick={() => handleTileClick(index, tile)}
