@@ -124,135 +124,6 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        
-        /* Taşlar için responsive boyutlar */
-        @media (max-width: 640px) {
-            .domino-tile {
-                width: 30px;
-                height: 60px;
-                font-size: 0.7rem;
-            }
-            .pip {
-                width: 6px;
-                height: 6px;
-            }
-        }
-        
-        @media (min-width: 641px) and (max-width: 1024px) {
-            .domino-tile {
-                width: 35px;
-                height: 70px;
-                font-size: 0.8rem;
-            }
-            .pip {
-                width: 8px;
-                height: 8px;
-            }
-        }
-        
-        @media (min-width: 1025px) {
-            .domino-tile {
-                width: 40px;
-                height: 80px;
-                font-size: 0.9rem;
-            }
-            .pip {
-                width: 10px;
-                height: 10px;
-            }
-        }
-        
-        .domino-tile {
-            transition: all 0.3s ease;
-            transform-style: preserve-3d;
-            flex-shrink: 0;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 3px;
-            border-radius: 2px;
-            background: #fff;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-            width: 30px;
-            height: 60px;
-            position: relative;
-        }
-        
-        .domino-tile .pip {
-            display: flex;
-            justify-content: space-around;
-            width: 100%;
-        }
-        
-        .domino-hand {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            align-content: flex-start;
-            gap: 4px;
-            padding: 5px;
-            width: 100%;
-            max-height: 180px;
-            overflow-y: auto;
-            scrollbar-width: none;
-            -ms-overflow-style: none;
-            scroll-behavior: smooth;
-        }
-        
-        /* Oyun tahtası için özel stiller */
-        .game-board {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            padding: 10px;
-            overflow: hidden;
-        }
-        
-        .board-row {
-            display: flex;
-            flex-wrap: nowrap;
-            justify-content: center;
-            margin: 2px 0;
-            width: 100%;
-        }
-        
-        .board-tile {
-            margin: 0 1px;
-        }
-        
-        .board-tile.vertical {
-            transform: rotate(90deg);
-            margin: 10px -10px;
-        }
-        
-        @media (max-width: 640px) {
-            .domino-tile {
-                min-width: 28px;
-                height: 56px;
-                margin: 1px;
-            }
-            .domino-hand {
-                gap: 4px;
-                padding: 5px;
-            }
-        }
-        
-        @media (min-width: 641px) and (max-width: 1024px) {
-            .domino-tile {
-                min-width: 32px;
-                height: 64px;
-            }
-        }
-        
-        @media (min-width: 1025px) {
-            .domino-tile {
-                min-width: 36px;
-                height: 72px;
-            }
-        }
     </style>
 </head>
 <body>
@@ -270,9 +141,6 @@
 
         // API Base URL
         const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
-        // WebSocket URL
-        const WS_URL = window.location.hostname === 'localhost' ? 'ws://localhost:10000' : 'wss://beta-github-io.onrender.com';
-
 
         // --- BİLEŞENLER ---
 
@@ -374,36 +242,11 @@
                 // Basit bip sesleri veya mp3 eklenebilir. Şimdilik boş bırakıyorum hata vermesin diye.
             };
 
-            // Oyun durumu değiştiğinde localStorage'a kaydet
             useEffect(() => {
-                if (gameState && roomCode) {
-                    localStorage.setItem('dominoGameState', JSON.stringify({
-                        gameState,
-                        roomCode,
-                        timestamp: Date.now()
-                    }));
-                }
-            }, [gameState, roomCode]);
-
-            // Sayfa yüklendiğinde kayıtlı oyun durumunu kontrol et
-            useEffect(() => {                
-                // İlk kullanıcı verilerini al, sonra sunucuya bağlan.
-                const initialize = async () => {
-                    await initializeTelegramAuth();
-                    connectToServer();
-                }
-                
-                // İlk bağlantıyı kurQ
-                initialize();
-                
-                // Sayfa kapatılırken temizlik yap
-                return () => {
-                    window.removeEventListener('beforeunload', handleBeforeUnload);
-                    if (wsRef.current) {
-                        wsRef.current.close();
-                    }
-                };
-            }, []); // Sadece bir kez çalışmalı
+                initializeTelegramAuth();
+                connectToServer();
+                return () => { if (wsRef.current) wsRef.current.close(); };
+            }, []);
 
             // Telegram Auth
             const initializeTelegramAuth = async () => {
@@ -494,65 +337,16 @@
             }, [gameState?.board]);
 
             const connectToServer = () => {
-                console.log('🌐 Sunucuya bağlanılıyor...');
-                const ws = new WebSocket(WS_URL);
-                
-                ws.onopen = () => {
-                    console.log('✅ WebSocket bağlantısı kuruldu');
-                    setConnected(true);
-                    showNotification('Sunucuya bağlandı', 'success');
-                    
-                    // Eğer localStorage'da kayıtlı bir oyun varsa, yeniden bağlanmayı dene
-                    const savedGame = localStorage.getItem('dominoGameState');
-                    if (savedGame && playerData) {
-                        const { gameState: savedState, roomCode: savedRoomCode } = JSON.parse(savedGame);
-                        console.log('Kayıtlı oyun durumu için yeniden bağlanma deneniyor...');
-                        
-                        ws.send(JSON.stringify({
-                            type: 'reconnectToGame', // Düzeltildi: 'reconnect' -> 'reconnectToGame'
-                            roomCode: savedRoomCode,
-                            playerId: savedState.playerId
-                        }));
-                    }
-                };
-                
-                // Bağlantı koptuğunda yeniden bağlan
-                let reconnectAttempts = 0;
-                const maxReconnectAttempts = 5;
-                let reconnectTimeout;
-                
-                const attemptReconnect = () => {
-                    if (reconnectAttempts < maxReconnectAttempts) {
-                        reconnectAttempts++;
-                        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // Üstel geri çekilme
-                        
-                        showNotification(`Bağlantı kesildi. Yeniden deniyor... (${reconnectAttempts}/${maxReconnectAttempts})`, 'warning');
-                        
-                        reconnectTimeout = setTimeout(() => {
-                            if (ws.readyState === WebSocket.CLOSED) {
-                                connectToServer();
-                            }
-                        }, delay);
-                    } else {
-                        showNotification('Sunucuya bağlanılamadı. Lütfen sayfayı yenileyin.', 'error');
-                    }
-                };
-                
-                ws.onclose = (event) => {
-                    console.log('❌ WebSocket bağlantısı kapandı:', event);
-                    setConnected(false);
-                    
-                    // Eğer beklenmeyen bir kapanışsa yeniden bağlanmayı dene
-                    if (!event.wasClean) {
-                        attemptReconnect();
-                    }
-                };
-                
-                ws.onerror = (error) => {
-                    console.error('WebSocket hatası:', error);
-                    setConnected(false);
-                };
+                let wsUrl = 'wss://beta-github-io.onrender.com';
+                // Test için Localhost kontrolü
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    wsUrl = `ws://${window.location.hostname}:10000`;
+                }
 
+                const ws = new WebSocket(wsUrl);
+
+                ws.onopen = () => { setConnected(true); showNotification('Sunucuya Bağlandı', 'success'); };
+                ws.onclose = () => { setConnected(false); setTimeout(connectToServer, 3000); };
                 ws.onmessage = (e) => {
                     try {
                         const data = JSON.parse(e.data);
@@ -564,22 +358,6 @@
 
             const handleServerMessage = (data) => {
                 console.log('📨 Server mesajı:', data.type, data);
-                
-                // Rakip oyundan çıktığında
-                if (data.type === 'opponentLeft') {
-                    setEndInfo({
-                        winner: playerData.id,
-                        reason: 'Rakip oyundan ayrıldı. Kazandınız!'
-                    });
-                    setScreen('end');
-                    return;
-                }
-
-                // Rakibin bağlantısı koptuğunda veya geri geldiğinde bilgilendirme
-                if (data.type === 'opponentDisconnected' || data.type === 'opponentReconnected') {
-                    showNotification(data.message, 'info');
-                    return;
-                }
                 
                 switch(data.type) {
                     case 'roomCreated':
@@ -604,18 +382,12 @@
                         console.log('🔄 Oyun güncelleniyor...', data.gameState);
                         if (data.gameState && data.gameState.board) {
                             setGameState(prevState => ({
-                                // Önceki state'i koru, sadece yeni gelen verileri güncelle
                                 ...prevState,
                                 ...data.gameState,
                                 playerId: prevState?.playerId || data.gameState.playerId
                             }));
                             setSelectedTileIndex(null);
                             setValidMoves([]);
-                        }
-                        break;
-                    case 'connected': // Yeniden bağlanma başarılı mesajı
-                        if (data.isReconnect) {
-                            showNotification(data.message, 'success');
                         }
                         break;
                     case 'error':
@@ -782,7 +554,6 @@
                      showNotification('Elinde oynanabilir taş varken pazardan çekemezsin!', 'warning');
                      return; // Fonksiyondan tamamen çık
                  }
-                
                 sendMessage({ type: 'drawFromMarket' });
                 showNotification('🎲 Pazardan taş çekiliyor...', 'info');
             };
@@ -801,29 +572,6 @@
                 // Lokal state temizle ve lobiye dön
                 resetGameClientState();
                 setScreen('lobby');
-            };
-
-            // Geçerli hamleleri kontrol et
-            const checkValidMoves = (hand, board) => {
-                if (!hand || !board || board.length === 0) {
-                    return [];
-                }
-                
-                const leftEnd = board[0][0];
-                const rightEnd = board[board.length - 1][1];
-                
-                return hand.reduce((moves, tile, index) => {
-                    if (tile[0] === leftEnd || tile[1] === leftEnd) {
-                        moves.push({ index, position: 'left' });
-                    }
-                    if (tile[0] === rightEnd || tile[1] === rightEnd) {
-                        // Eğer taşın diğer tarafına da uyuyorsa, sadece bir kez ekle
-                        if (!(tile[0] === leftEnd && tile[1] === rightEnd && leftEnd === rightEnd)) {
-                            moves.push({ index, position: 'right' });
-                        }
-                    }
-                    return moves;
-                }, []);
             };
 
             // --- SEARCHING LOBBY ---
@@ -1162,11 +910,11 @@
                         </div>
 
                         {/* ORTA PANEL: Masa ve Board */}
-                        <div className="flex-1 relative overflow-auto flex items-center justify-center w-full p-4">
-                            {/* Oyun Tahtası */}
+                        <div className="flex-1 relative overflow-hidden flex items-center justify-center w-full">
+                            {/* Yatay Kaydırma Alanı */}
                             <div 
                                 ref={boardScrollRef}
-                                className="w-full h-full flex flex-wrap justify-center items-center gap-2"
+                                className="w-full h-full overflow-x-auto overflow-y-hidden hide-scrollbar flex items-center px-8"
                                 style={{ scrollBehavior: 'smooth' }}
                             >
                                 <div className="flex items-center gap-1 mx-auto min-w-max py-10">
@@ -1264,48 +1012,6 @@
                                     {myHand.map((tile, index) => {
                                         const canPlay = isMyTurn && (gameState.board.length === 0 || calculateValidMoves(tile).length > 0);
                                         
-                                        const renderBoard = () => {
-                                            if (!gameState?.board || gameState.board.length === 0) {
-                                                return <div className="text-gray-500 text-center py-4">İlk taşı sen at!</div>;
-                                            }
-
-                                            // Taşları daha iyi göstermek için grupla
-                                            const chunkSize = 6; // Her satırda maksimum 6 taş
-                                            const boardChunks = [];
-                                            
-                                            for (let i = 0; i < gameState.board.length; i += chunkSize) {
-                                                const chunk = gameState.board.slice(i, i + chunkSize);
-                                                boardChunks.push(chunk);
-                                            }
-
-                                            return (
-                                                <div className="w-full max-w-4xl mx-auto">
-                                                    {boardChunks.map((chunk, chunkIndex) => (
-                                                        <div key={chunkIndex} className="flex flex-wrap justify-center gap-1 mb-1">
-                                                            {chunk.map((tile, tileIndex) => {
-                                                                const globalIndex = chunkIndex * chunkSize + tileIndex;
-                                                                const isSelected = selectedTileIndex === globalIndex;
-                                                                
-                                                                return (
-                                                                    <div 
-                                                                        key={globalIndex}
-                                                                        className={`domino-tile ${isSelected ? 'ring-2 ring-yellow-400 scale-105' : ''} transition-all duration-200`}
-                                                                        onClick={() => handleBoardTileClick(tile, globalIndex)}
-                                                                    >
-                                                                        <div className="flex flex-col items-center justify-between h-full p-1">
-                                                                            <span className="text-sm font-bold">{tile[0]}</span>
-                                                                            <div className="w-4 h-0.5 bg-gray-400 my-1"></div>
-                                                                            <span className="text-sm font-bold">{tile[1]}</span>
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            );
-                                        };
-
                                         return (
                                             <DominoTile 
                                                 key={index}
