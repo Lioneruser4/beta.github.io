@@ -469,6 +469,36 @@ const pingInterval = setInterval(() => {
 
 wss.on('close', () => clearInterval(pingInterval));
 
+// 🔥 YENİ: Eşleştirme mantığı
+function tryMatchmaking() {
+    console.log(`🔄 Eşleştirme denemesi yapılıyor. Kuyruk: ${matchQueue.length}`);
+    for (let i = 0; i < matchQueue.length; i++) {
+        for (let j = i + 1; j < matchQueue.length; j++) {
+            const p1 = matchQueue[i];
+            const p2 = matchQueue[j];
+
+            // Aynı türde oyuncuları eşleştir (misafir vs misafir, kayıtlı vs kayıtlı)
+            if (p1.isGuest === p2.isGuest) {
+                // Kendisiyle eşleşmeyi engelle (aynı telegramId)
+                if (!p1.isGuest && !p2.isGuest && p1.telegramId && p2.telegramId && p1.telegramId === p2.telegramId) {
+                    continue;
+                }
+
+                console.log(`✅ Eşleşme bulundu: ${p1.playerName} vs ${p2.playerName}`);
+
+                // Oyuncuları kuyruktan çıkar (indeksleri sondan başlayarak silmek önemli)
+                matchQueue.splice(j, 1);
+                matchQueue.splice(i, 1);
+
+                // Oyunu başlat
+                startMatch(p1, p2);
+                return; // Bir çift eşleşti, döngüden çık
+            }
+        }
+    }
+    console.log('🏁 Uygun eşleşme bulunamadı.');
+}
+
 // Oyun Mantıkları
 function handleFindMatch(ws, data) {
     if (ws.playerId && playerConnections.has(ws.playerId)) {
@@ -516,20 +546,14 @@ function handleFindMatch(ws, data) {
 
     const playerType = ws.isGuest ? 'GUEST' : `LVL ${ws.level}, ELO ${ws.elo}`;
     console.log(`✅ ${ws.playerName} (${playerType}) kuyrukta - Toplam: ${matchQueue.length}`);
+    sendMessage(ws, { type: 'searchStatus', message: 'Rakip aranıyor...' });
 
-    if (matchQueue.length >= 2) {
-        const potentialOpponents = matchQueue.filter(p => p.ws !== ws && p.isGuest === ws.isGuest);
-        if (potentialOpponents.length === 0) return sendMessage(ws, { type: 'searchStatus', message: 'Uygun rakip bekleniyor...' });
-        
-        let p1 = matchQueue.splice(matchQueue.findIndex(p => p.ws === ws), 1)[0];
-        let p2 = matchQueue.splice(matchQueue.findIndex(p => p.ws === potentialOpponents[0].ws), 1)[0];
+    // Eşleştirmeyi dene
+    tryMatchmaking();
+}
 
-        if (!p1.isGuest && !p2.isGuest && p1.telegramId && p2.telegramId && p1.telegramId === p2.telegramId) {
-            matchQueue.unshift(p2);
-            console.log('⚠️ Aynı Telegram hesabı kendi kendisiyle eşleşmeye çalıştı, engellendi');
-            return;
-        }
-        
+// 🔥 YENİ: Maç başlatma fonksiyonu
+function startMatch(p1, p2) {
         const roomCode = generateRoomCode();
         const gameType = (p1.isGuest || p2.isGuest) ? 'casual' : 'ranked';
         console.log(`🎮 Maç oluşturuluyor (${gameType.toUpperCase()}): ${p1.playerName} vs ${p2.playerName}`);
@@ -611,11 +635,7 @@ function handleFindMatch(ws, data) {
             
             console.log(`✅ Oyun başladı: ${roomCode}`);
         }, 3000);
-    } else {
-        sendMessage(ws, { type: 'searchStatus', message: 'Rakip aranıyor...' });
-    }
 }
-
 // 🔥 YENİ: Geliştirilmiş reconnect fonksiyonu
 function handleReconnect(ws, data) {
     const { roomCode, playerId } = data;
