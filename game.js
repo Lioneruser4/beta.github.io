@@ -347,7 +347,8 @@ function startCasualSearch(){
         username: `Guest_${Math.floor(Math.random()*1000)}`
     };
     send(payload);
-    showScreen('friend');
+    showScreen('ranked'); // 'friend' yerine 'ranked' (arama ekranı)
+    document.getElementById('ranked-status').textContent = 'Rakip Aranıyor...';
 }
 
 function createPrivateRoom(){
