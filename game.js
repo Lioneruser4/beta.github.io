@@ -381,34 +381,48 @@ function updateGameUI(newGameState) {
 function startMatchmaking(isGuest = false) {
     if (gameState.isSearching || isWaitingForCancelConfirmation) {
         console.log('⚠️ Zaten eşleşme aranıyor veya iptal onayı bekleniyor. Yeni arama başlatılamaz.');
-        showModal('Zaten eşleşme aranıyor veya önceki aramanın iptali bekleniyor.', 'info');
+        showStatus('Zaten eşleşme aranıyor!');
         return;
-    }
-    if (isGuest && !gameState.isGuest) { // If trying to start guest match but not guest
-        // This might be a redundant check depending on UI flow
-        // For now, assume it's okay to proceed
     }
     
     console.log(`🔄 Eşleşme başlatılıyor: ${isGuest ? 'Misafir Modu' : 'Sıralı Maç'}`);
     
+    // Oyun durumunu güncelle
     gameState.isSearching = true;
     gameState.isGuest = isGuest;
     gameState.gameType = isGuest ? 'friendly' : 'ranked';
     
+    // Kullanıcı bilgilerini hazırla
+    const playerId = isGuest ? `guest_${Date.now()}` : (gameState.playerId || `user_${Math.floor(Math.random() * 10000)}`);
+    const username = isGuest ? `Misafir_${Math.floor(Math.random() * 1000)}` : (gameState.playerStats?.username || 'Oyuncu');
+    const elo = gameState.playerStats?.elo || 1000;
+    
+    // Oyun durumunu güncelle
+    gameState.currentPlayerId = playerId;
+    
+    // Sunucuya gönderilecek veri
     const playerData = {
-        telegramId: isGuest ? `guest_${Date.now()}` : 'user123', // TODO: Gerçek uygulamada bu kullanıcı kimliği olacak
-        isGuest,
-        gameType: gameState.gameType,
-        timestamp: Date.now()
+        playerId: playerId,
+        isGuest: isGuest,
+        username: username,
+        elo: elo
     };
     
     console.log('📤 Sunucuya eşleşme isteği gönderiliyor:', playerData);
     
+    // Sunucuya isteği gönder
     sendSocketMessage('findMatch', playerData);
     
-    showScreen('ranked'); // 'searching' ekranı yerine 'ranked' lobisini göster
-    rankedStatus.textContent = 'Eşleşme aranıyor...';
+    // UI'ı güncelle
+    showScreen('ranked');
+    const searchStatus = document.getElementById('search-status');
+    if (searchStatus) {
+        searchStatus.textContent = 'Eşleşme aranıyor...';
+    }
+    
+    // Arama zamanlayıcısını başlat
     startSearchTimer();
+    showStatus('Eşleşme aranıyor...');
 }
 
 // Arama iptal etme fonksiyonu
