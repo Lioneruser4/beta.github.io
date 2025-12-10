@@ -345,7 +345,25 @@
 
                 const ws = new WebSocket(wsUrl);
 
-                ws.onopen = () => { setConnected(true); showNotification('Sunucuya Bağlandı', 'success'); };
+                // wsRef'i hemen güncelleyelim ki sendMessage doğru WebSocket nesnesini kullansın.
+                wsRef.current = ws;
+
+                ws.onopen = () => {
+                    setConnected(true);
+                    showNotification('Sunucuya Bağlandı', 'success');
+
+                    // --- YENİDEN BAĞLANMA MANTIĞI ---
+                    // Oyun ortasında bağlantı koptuysa, sunucuya yeniden bağlandığımızı bildirelim.
+                    // wsRef'in güncellenmesini beklemeden doğrudan ws nesnesini kullanmak daha güvenilirdir.
+                    if (gameState && gameState.playerId && gameState.roomCode) {
+                        console.log('♻️ Oyuna yeniden bağlanılıyor...', { playerId: gameState.playerId, roomCode: gameState.roomCode });
+                        ws.send(JSON.stringify({
+                            type: 'reconnect',
+                            playerId: gameState.playerId,
+                            roomCode: gameState.roomCode
+                        }));
+                    }
+                };
                 ws.onclose = () => { setConnected(false); setTimeout(connectToServer, 3000); };
                 ws.onmessage = (e) => {
                     try {
@@ -353,7 +371,6 @@
                         handleServerMessage(data);
                     } catch(err) { console.error(err); }
                 };
-                wsRef.current = ws;
             };
 
             const handleServerMessage = (data) => {
@@ -384,7 +401,7 @@
                             setGameState(prevState => ({
                                 ...prevState,
                                 ...data.gameState,
-                                playerId: prevState?.playerId || data.gameState.playerId
+                                playerId: prevState?.playerId || data.gameState.players[myPlayerId]?.id || data.gameState.playerId
                             }));
                             setSelectedTileIndex(null);
                             setValidMoves([]);
