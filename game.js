@@ -1,11 +1,9 @@
-// --- DOMINO OYUNU DÜZELTİLMİŞ KOD (WebSocket Reconnection Fix) ---
+// --- DOMINO OYUNU DÜZELTİLMİŞ KOD ---
 
 let socket;
-// Bu değişkenleri fonksiyon dışına taşıdık (Global Scope) ki sıfırlanmasınlar
 let isReconnecting = false;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
-let isWaitingForCancelConfirmation = false;
 
 // Oyun durumu
 let gameState = {
@@ -19,6 +17,9 @@ let gameState = {
     isSearching: false,
     gameStarted: false,
     isGuest: true,
+    playerHand: [], // Oyuncunun elindeki taşlar
+    opponentHandCount: 0, // Rakibin elindeki taş sayısı
+    marketCount: 0, // Pazarda kalan taş sayısı
     playerStats: {
         elo: 0,
         wins: 0,
@@ -31,7 +32,8 @@ let gameState = {
         username: '',
         elo: 0,
         photoUrl: ''
-    }
+    },
+    gameEnded: false
 };
 
 // Timer
@@ -65,6 +67,13 @@ const messageModal = document.getElementById('message-modal');
 const modalMessage = document.getElementById('modal-message');
 const modalCloseBtn = document.getElementById('modal-close-btn');
 
+// Oyun alanı elementleri
+const playerHandElement = document.getElementById('player-hand');
+const opponentHandElement = document.getElementById('opponent-hand');
+const marketCountElement = document.getElementById('market-count');
+const drawTileBtn = document.getElementById('draw-tile-btn');
+const passTurnBtn = document.getElementById('pass-turn-btn');
+
 // Oyun sonu ekranı elementleri
 const gameResultTitle = document.getElementById('game-result-title');
 const gameResultMessage = document.getElementById('game-result-message');
@@ -91,11 +100,8 @@ const matchPlayer2Photo = document.getElementById('match-player2-photo');
 const matchPlayer2Name = document.getElementById('match-player2-name');
 const matchPlayer2Elo = document.getElementById('match-player2-elo');
 
-const BOARD_SIZE = 8;
-
 // --- WebSocket Bağlantı Fonksiyonu ---
 function connectWebSocket() {
-    // Render URL'niz
     const serverUrl = 'wss://mario-io-1.onrender.com';
     
     console.log('🌐 Sunucuya bağlanılıyor:', serverUrl);
@@ -108,7 +114,6 @@ function connectWebSocket() {
 }
 
 // --- WebSocket Event Handlers ---
-
 function onSocketOpen() {
     console.log('✅ Sunucuya WebSocket ile bağlandı');
     connectionStatus.textContent = 'Servere bağlandı!';
@@ -118,7 +123,6 @@ function onSocketOpen() {
     isReconnecting = false;
     reconnectAttempts = 0;
 
-    // 1. Durum: Sayfa yenilenmeden kopma olduysa (gameState hafızada duruyorsa)
     if (gameState.gameStarted && gameState.roomCode && gameState.currentPlayerId) {
         console.log('🔄 Anlık kopma tespit edildi, oyuna tekrar bağlanılıyor...');
         sendSocketMessage('reconnectToGame', { 
@@ -126,7 +130,6 @@ function onSocketOpen() {
             playerId: gameState.currentPlayerId 
         });
     }
-    // 2. Durum: Sayfa yenilendiyse (localStorage kontrolü connected mesajında yapılır)
 }
 
 function onSocketClose(event) {
@@ -134,7 +137,6 @@ function onSocketClose(event) {
     connectionStatus.textContent = 'Bağlantı kesildi, tekrar bağlanılıyor...';
     connectionStatus.className = 'text-red-500 animate-pulse';
     
-    // Otomatik yeniden bağlanma
     if (!isReconnecting) {
         isReconnecting = true;
         setTimeout(attemptReconnect, 1000);
@@ -143,7 +145,6 @@ function onSocketClose(event) {
 
 function onSocketError(error) {
     console.error('⚠️ WebSocket Hatası:', error);
-    // Hata durumunda close tetikleneceği için burada reconnect çağırmıyoruz
 }
 
 function attemptReconnect() {
@@ -158,13 +159,10 @@ function attemptReconnect() {
     connectWebSocket();
 }
 
-// --- YENİ EKLENEN FONKSİYON: Mesaj Gönderme ---
-// Taş atılamama sorunu genelde socket'in hazır olmamasından kaynaklanır.
 function sendSocketMessage(type, payload = {}) {
     if (socket && socket.readyState === WebSocket.OPEN) {
         const message = JSON.stringify({ type, ...payload });
         socket.send(message);
-        // console.log(`📤 Gönderildi: ${type}`, payload); // Log kirliliği yapmaması için kapalı
     } else {
         console.error('🚫 Socket açık değil, mesaj gönderilemedi:', type);
         showModal('Sunucu bağlantısı yok. Lütfen bekleyin...', 'warning');
@@ -178,7 +176,6 @@ function onSocketMessage(event) {
     
         switch (data.type) {
             case 'connected':
-                // Sayfa yenilendiğinde LocalStorage kontrolü
                 if (data.isReconnect === false) { 
                     const storedRoomCode = localStorage.getItem('domino_roomCode');
                     const storedPlayerId = localStorage.getItem('domino_playerId');
@@ -218,8 +215,10 @@ function onSocketMessage(event) {
                 break;
             case 'opponentReconnected':
                 showModal(data.message || 'Rakip tekrar bağlandı!', 'info');
-                // Kısa süre sonra modalı kapat
                 setTimeout(() => messageModal.classList.add('hidden'), 2000);
+                break;
+            case 'info':
+                showModal(data.message, 'info');
                 break;
         }
     } catch (e) {
@@ -228,7 +227,6 @@ function onSocketMessage(event) {
 }
 
 // --- Oyun Mantığı Handlers ---
-
 function handleMatchFound(data) {
     gameState.roomCode = data.roomCode;
     gameState.opponentStats = {
@@ -239,7 +237,6 @@ function handleMatchFound(data) {
     gameState.isSearching = false;
     stopSearchTimer();
     
-    // Eşleşme ekranını doldur
     if(matchPlayer1Name) matchPlayer1Name.textContent = gameState.playerStats.username || 'Siz';
     if(matchPlayer1Elo) matchPlayer1Elo.textContent = `(${gameState.playerStats.elo || 0})`;
     if(matchPlayer2Name) matchPlayer2Name.textContent = data.opponent.name || 'Rakip';
@@ -251,74 +248,214 @@ function handleMatchFound(data) {
 function handleGameStart(data) {
     console.log('🎮 Oyun başladı!');
     gameState.gameStarted = true;
-    gameState.currentPlayerId = data.gameState.playerId; // Sunucunun atadığı ID
+    gameState.currentPlayerId = data.gameState.playerId;
+    gameState.gameEnded = false;
     
-    // LocalStorage kaydı (Reconnection için)
     localStorage.setItem('domino_roomCode', gameState.roomCode);
     localStorage.setItem('domino_playerId', gameState.currentPlayerId);
     
     showScreen('game');
-    updateGameUI(data.gameState); // İlk durumu çiz
+    updateGameUI(data.gameState);
 }
 
 function handleGameUpdate(data) {
     console.log('🔄 Oyun durumu güncelleniyor...', data);
     
-    // Eğer bağlantı koptuysa ve tekrar geldiyse, bu veriyle oyunu senkronize et
     if (!gameState.gameStarted) {
          gameState.gameStarted = true;
          showScreen('game');
     }
 
-    // Kritik verileri güncelle
     gameState.board = data.board || [];
-    gameState.currentTurn = data.currentTurn; // 'red' veya 'white' vb.
+    gameState.currentTurn = data.currentTurn;
     
-    // Eğer sunucu playerId göndermiyorsa mevcut olanı koru
     if (data.currentPlayerId) gameState.currentPlayerId = data.currentPlayerId;
     
-    // Sıra kontrolü (Sunucudan gelen currentTurn, benim ID'me veya Rengime eşit mi?)
-    // NOT: Sunucu mantığınıza göre burayı kontrol edin. Genelde 'turn' player ID'sidir.
+    // Oyuncunun elindeki taşları güncelle
+    if (data.players && data.players[gameState.currentPlayerId]) {
+        gameState.playerHand = data.players[gameState.currentPlayerId].hand || [];
+    }
+    
+    // Pazardaki taş sayısını güncelle
+    gameState.marketCount = data.market ? data.market.length : 0;
+    
+    // Rakibin elindeki taş sayısını güncelle
+    const opponentId = Object.keys(data.players || {}).find(id => id !== gameState.currentPlayerId);
+    if (opponentId && data.players[opponentId]) {
+        gameState.opponentHandCount = data.players[opponentId].hand ? data.players[opponentId].hand.length : 0;
+    }
+    
+    // Sıra kontrolü
     gameState.isMyTurn = (data.currentTurn === gameState.currentPlayerId);
     
-    // UI Güncelle
     updateGameUI(gameState);
 }
 
 function updateGameUI(state) {
     // 1. Sıra bilgisini güncelle
-    if (state.currentTurn === gameState.currentPlayerId) {
+    if (state.isMyTurn && !state.gameEnded) {
         turnText.textContent = 'Sıra Sizde!';
         currentTurnDisplay.classList.remove('bg-yellow-700');
         currentTurnDisplay.classList.add('bg-green-700');
-    } else {
+    } else if (!state.gameEnded) {
         turnText.textContent = 'Rakip Oynuyor...';
         currentTurnDisplay.classList.remove('bg-green-700');
         currentTurnDisplay.classList.add('bg-yellow-700');
     }
 
-    // 2. Tahtayı çiz (Burada sizin özel domino çizim kodunuz olmalı)
-    // Örnek basit çizim:
-    boardElement.innerHTML = ''; // Temizle
-    
-    // Eğer 'board' verisi varsa
-    if (state.board && Array.isArray(state.board)) {
-        state.board.forEach(piece => {
-            const pieceDiv = document.createElement('div');
-            // Taşları temsil eden basit stil
-            pieceDiv.className = 'domino-piece bg-white text-black p-2 m-1 rounded border border-gray-400';
-            pieceDiv.innerText = `${piece.left} | ${piece.right}`;
-            boardElement.appendChild(pieceDiv);
-        });
+    // 2. Pazardaki taş sayısını göster
+    if (marketCountElement) {
+        marketCountElement.textContent = `Pazar: ${state.marketCount} taş`;
     }
 
-    // NOT: Kendi elinizdeki taşları da çizmeniz lazım. 
-    // Sunucu 'hand' (el) bilgisini 'gameUpdate' içinde gönderiyorsa onu kullanın.
+    // 3. Rakibin elindeki taş sayısını göster
+    if (opponentHandElement) {
+        opponentHandElement.textContent = `Rakip: ${state.opponentHandCount} taş`;
+    }
+
+    // 4. Oyuncunun elindeki taşları göster
+    renderPlayerHand();
+
+    // 5. Tahtayı çiz
+    renderBoard();
+
+    // 6. Buton durumlarını güncelle
+    updateButtonStates();
+}
+
+function renderPlayerHand() {
+    if (!playerHandElement) return;
+    
+    playerHandElement.innerHTML = '';
+    
+    gameState.playerHand.forEach((tile, index) => {
+        const tileElement = document.createElement('div');
+        tileElement.className = 'domino-tile cursor-pointer hover:scale-105 transition-transform';
+        tileElement.innerHTML = `
+            <div class="domino-tile-inner">
+                <div class="domino-left">${tile[0]}</div>
+                <div class="domino-divider"></div>
+                <div class="domino-right">${tile[1]}</div>
+            </div>
+        `;
+        
+        tileElement.onclick = () => selectTileForPlay(index);
+        playerHandElement.appendChild(tileElement);
+    });
+}
+
+function renderBoard() {
+    if (!boardElement) return;
+    
+    boardElement.innerHTML = '';
+    
+    if (gameState.board.length === 0) {
+        boardElement.innerHTML = '<div class="text-gray-500 text-center py-8">Oyun henüz başlamadı</div>';
+        return;
+    }
+    
+    gameState.board.forEach((tile, index) => {
+        const tileElement = document.createElement('div');
+        tileElement.className = 'domino-tile bg-white';
+        tileElement.innerHTML = `
+            <div class="domino-tile-inner">
+                <div class="domino-left">${tile[0]}</div>
+                <div class="domino-divider"></div>
+                <div class="domino-right">${tile[1]}</div>
+            </div>
+        `;
+        boardElement.appendChild(tileElement);
+    });
+}
+
+function updateButtonStates() {
+    // Pazardan çekme butonunu güncelle
+    if (drawTileBtn) {
+        drawTileBtn.disabled = !gameState.isMyTurn || gameState.gameEnded || gameState.marketCount === 0;
+        
+        if (gameState.marketCount === 0) {
+            drawTileBtn.title = "Pazarda taş kalmadı";
+        } else if (!gameState.isMyTurn) {
+            drawTileBtn.title = "Sıranızı bekleyin";
+        } else {
+            drawTileBtn.title = "Pazardan taş çek";
+        }
+    }
+    
+    // Pas butonunu güncelle
+    if (passTurnBtn) {
+        // DOMINO KURALI: Sadece oynayabileceği taş yoksa ve pazarda taş yoksa pas geçebilir
+        const canPlayAnyTile = canPlayAnyTileFromHand();
+        passTurnBtn.disabled = !gameState.isMyTurn || gameState.gameEnded || canPlayAnyTile || gameState.marketCount > 0;
+        
+        if (!gameState.isMyTurn) {
+            passTurnBtn.title = "Sıranızı bekleyin";
+        } else if (canPlayAnyTile) {
+            passTurnBtn.title = "Oynanabilir taşınız var";
+        } else if (gameState.marketCount > 0) {
+            passTurnBtn.title = "Önce pazardan taş çekmelisiniz";
+        } else {
+            passTurnBtn.title = "Pas geç (oynanabilir taşınız yok)";
+        }
+    }
+}
+
+function canPlayAnyTileFromHand() {
+    if (gameState.board.length === 0) {
+        return gameState.playerHand.length > 0;
+    }
+    
+    const leftEnd = gameState.board[0][0];
+    const rightEnd = gameState.board[gameState.board.length - 1][1];
+    
+    return gameState.playerHand.some(tile => 
+        tile[0] === leftEnd || tile[1] === leftEnd ||
+        tile[0] === rightEnd || tile[1] === rightEnd
+    );
+}
+
+function selectTileForPlay(tileIndex) {
+    if (!gameState.isMyTurn || gameState.gameEnded) {
+        showModal("Sıra sizde değil!", "warning");
+        return;
+    }
+    
+    const tile = gameState.playerHand[tileIndex];
+    if (!tile) return;
+    
+    // Taşın oynanıp oynanamayacağını kontrol et
+    if (gameState.board.length === 0) {
+        // İlk taş - sadece çift taşlar oynanabilir (klasik domino kuralı)
+        if (tile[0] !== tile[1]) {
+            showModal("İlk taş çift olmalıdır (0-0, 1-1, ...)", "warning");
+            return;
+        }
+        sendSocketMessage('playTile', { tileIndex, position: 'both' });
+    } else {
+        // Normal hamle - nereye oynayabileceğini kontrol et
+        const leftEnd = gameState.board[0][0];
+        const rightEnd = gameState.board[gameState.board.length - 1][1];
+        
+        let position = null;
+        if (tile[0] === leftEnd || tile[1] === leftEnd) {
+            position = 'left';
+        } else if (tile[0] === rightEnd || tile[1] === rightEnd) {
+            position = 'right';
+        }
+        
+        if (position) {
+            sendSocketMessage('playTile', { tileIndex, position });
+        } else {
+            showModal("Bu taş oynanamaz! Uygun uç bulunamadı.", "error");
+        }
+    }
 }
 
 function handleGameEnd(data) {
     const isWinner = data.winner === gameState.currentPlayerId;
     const isDraw = data.winner === 'DRAW';
+    
+    gameState.gameEnded = true;
     
     let title = isDraw ? '⚖️ BERABERE' : (isWinner ? '🎉 KAZANDINIZ!' : '😔 KAYBETTİNİZ');
     let message = isDraw ? 'Oyun berabere bitti.' : (isWinner ? 'Tebrikler!' : 'Bir dahaki sefere...');
@@ -326,7 +463,6 @@ function handleGameEnd(data) {
     gameResultTitle.textContent = title;
     gameResultMessage.textContent = message;
 
-    // Kilitlenen oyun detayları
     if (data.reason === 'blocked' && data.finalScores) {
         blockedGameDetails.classList.remove('hidden');
         // Skorları yazdır...
@@ -334,7 +470,6 @@ function handleGameEnd(data) {
         blockedGameDetails.classList.add('hidden');
     }
 
-    // ELO Değişimi
     if (data.isRanked && data.eloChanges) {
         const change = isWinner ? data.eloChanges.winner : data.eloChanges.loser;
         eloChangeDisplay.textContent = `${change > 0 ? '+' : ''}${change} Puan`;
@@ -343,7 +478,6 @@ function handleGameEnd(data) {
         eloChangeDisplay.textContent = '';
     }
 
-    // Temizlik
     localStorage.removeItem('domino_roomCode');
     localStorage.removeItem('domino_playerId');
     gameState.gameStarted = false;
@@ -360,14 +494,11 @@ function handleError(data) {
 }
 
 // --- UI Yardımcı Fonksiyonları ---
-
 function showScreen(screenName) {
-    // Tüm ekranları gizle
     [mainLobby, rankedLobby, friendLobby, gameScreen, matchFoundLobby, postGameLobby, loader].forEach(el => {
         if(el) el.classList.add('hidden');
     });
 
-    // İstenen ekranı aç
     if (screenName === 'main') mainLobby.classList.remove('hidden');
     else if (screenName === 'ranked') rankedLobby.classList.remove('hidden');
     else if (screenName === 'friend') friendLobby.classList.remove('hidden');
@@ -380,6 +511,13 @@ function showScreen(screenName) {
 function showModal(msg, type = 'info') {
     if(modalMessage) modalMessage.textContent = msg;
     if(messageModal) messageModal.classList.remove('hidden');
+    
+    // Error mesajları daha uzun göster
+    if (type === 'error') {
+        setTimeout(() => messageModal.classList.add('hidden'), 5000);
+    } else {
+        setTimeout(() => messageModal.classList.add('hidden'), 3000);
+    }
 }
 
 function startSearchTimer() {
@@ -398,8 +536,48 @@ function stopSearchTimer() {
     searchTime = 0;
 }
 
-// --- Buton Eventleri ---
+// --- Oyun Buton Eventleri ---
+if (drawTileBtn) {
+    drawTileBtn.onclick = () => {
+        if (!gameState.isMyTurn || gameState.gameEnded) {
+            showModal("Sıra sizde değil!", "warning");
+            return;
+        }
+        
+        if (gameState.marketCount === 0) {
+            showModal("Pazarda taş kalmadı!", "warning");
+            return;
+        }
+        
+        sendSocketMessage('drawFromMarket');
+    };
+}
 
+if (passTurnBtn) {
+    passTurnBtn.onclick = () => {
+        if (!gameState.isMyTurn || gameState.gameEnded) {
+            showModal("Sıra sizde değil!", "warning");
+            return;
+        }
+        
+        // DOMINO KURALI KONTROLLERİ
+        const canPlay = canPlayAnyTileFromHand();
+        
+        if (canPlay) {
+            showModal("Oynayabileceğiniz taş var! Pas geçemezsiniz.", "error");
+            return;
+        }
+        
+        if (gameState.marketCount > 0) {
+            showModal("Önce pazardan taş çekmelisiniz!", "warning");
+            return;
+        }
+        
+        sendSocketMessage('pass');
+    };
+}
+
+// --- Ana Buton Eventleri ---
 if(dereceliBtn) dereceliBtn.onclick = () => {
     if (gameState.isSearching) return;
     gameState.isSearching = true;
@@ -408,7 +586,7 @@ if(dereceliBtn) dereceliBtn.onclick = () => {
     sendSocketMessage('findMatch', { 
         isGuest: false,
         gameType: 'ranked',
-        telegramId: 'user_' + Math.floor(Math.random()*1000) // Test ID
+        telegramId: 'user_' + Math.floor(Math.random()*1000)
     });
     
     showScreen('ranked');
@@ -464,3 +642,58 @@ if(leaveGameBtn) leaveGameBtn.onclick = () => {
 document.addEventListener('DOMContentLoaded', () => {
     connectWebSocket();
 });
+
+// CSS için domino taşları stili (HTML head kısmına ekleyin veya CSS dosyanıza)
+const style = document.createElement('style');
+style.textContent = `
+.domino-tile {
+    display: inline-block;
+    width: 60px;
+    height: 120px;
+    background: #fff;
+    border: 2px solid #333;
+    border-radius: 8px;
+    margin: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.domino-tile-inner {
+    display: flex;
+    height: 100%;
+}
+
+.domino-left, .domino-right {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: bold;
+    color: #333;
+}
+
+.domino-divider {
+    width: 2px;
+    background: #333;
+    margin: 10px 0;
+}
+
+.domino-tile:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    cursor: pointer;
+}
+
+#board {
+    min-height: 150px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    background: #f5f5f5;
+    border-radius: 10px;
+    margin: 20px 0;
+}
+`;
+document.head.appendChild(style);
