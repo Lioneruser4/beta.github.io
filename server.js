@@ -284,15 +284,24 @@ function initializeGame(roomCode, player1Id, player2Id) {
     room.gameState = {
         board: [],
         players: {
-            [player1Id]: { hand: player1Hand, name: room.players[player1Id].name },
-            [player2Id]: { hand: player2Hand, name: room.players[player2Id].name }
+            [player1Id]: { 
+                hand: player1Hand, 
+                name: room.players[player1Id].name,
+                photoUrl: room.players[player1Id].photoUrl
+            },
+            [player2Id]: { 
+                hand: player2Hand, 
+                name: room.players[player2Id].name,
+                photoUrl: room.players[player2Id].photoUrl
+            }
         },
         market: market,
         currentPlayer: startingPlayer,
         turn: 1,
         lastMove: null,
         startingDouble: startingDouble,
-        consecutivePasses: 0 // YENİ: Ardışık pas sayacı
+        consecutivePasses: 0,
+        roomCode: roomCode // ODANIN KODUNU EKLEDİM
     };
 
     rooms.set(roomCode, room);
@@ -354,7 +363,6 @@ function checkWinner(gameState) {
     const player1Hand = gameState.players[player1Id].hand;
     const player2Hand = gameState.players[player2Id].hand;
 
-    // Her iki oyuncu da pas geçti mi? (ardışık 2 pas)
     if (gameState.consecutivePasses >= 2) {
         console.log('ℹ️ İki oyuncu da pas geçti, oyun sonlandırılıyor...');
         const player1Sum = player1Hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
@@ -406,7 +414,9 @@ function sendGameState(roomCode, playerId) {
         currentPlayer: gameState.currentPlayer,
         turn: gameState.turn,
         playerId: playerId,
-        marketCount: gameState.market.length
+        roomCode: gameState.roomCode,
+        marketCount: gameState.market.length,
+        startingDouble: gameState.startingDouble
     };
 
     try {
@@ -441,7 +451,7 @@ wss.on('connection', (ws, req) => {
                 case 'drawFromMarket': handleDrawFromMarket(ws, data); break;
                 case 'pass': handlePass(ws, data); break;
                 case 'leaveGame': handleLeaveGame(ws); break;
-                case 'reconnectToGame': handleReconnect(ws, data); break;
+                case 'reconnect': handleReconnect(ws, data); break;
             }
         } catch (error) {
             console.error('Hata:', error);
@@ -465,6 +475,8 @@ wss.on('close', () => clearInterval(pingInterval));
 // --- OYUN MANTIKLARI ---
 
 function handleFindMatch(ws, data) {
+    console.log('🔍 Eşleşme aranıyor...', data);
+    
     if (ws.playerId && playerConnections.has(ws.playerId)) {
         const existingInQueue = matchQueue.find(p => p.playerId === ws.playerId);
         if (existingInQueue) {
@@ -559,14 +571,46 @@ function handleFindMatch(ws, data) {
 
         const gameState = initializeGame(roomCode, p1.playerId, p2.playerId);
 
-        sendMessage(p1.ws, { type: 'matchFound', roomCode, opponent: room.players[p2.playerId], gameType });
-        sendMessage(p2.ws, { type: 'matchFound', roomCode, opponent: room.players[p1.playerId], gameType });
+        // 1. ÖNCE matchFound mesajını gönder (hemen)
+        sendMessage(p1.ws, { 
+            type: 'matchFound', 
+            roomCode, 
+            opponent: room.players[p2.playerId], 
+            gameType 
+        });
+        
+        sendMessage(p2.ws, { 
+            type: 'matchFound', 
+            roomCode, 
+            opponent: room.players[p1.playerId], 
+            gameType 
+        });
 
+        // 2. 3 saniye sonra gameStart mesajını gönder
         setTimeout(() => {
-            sendGameState(roomCode, p1.playerId);
-            sendGameState(roomCode, p2.playerId);
+            console.log(`🚀 Oyun başlatılıyor: ${roomCode}`);
+            
+            // HER İKİ OYUNCUYA DA gameStart MESAJI GÖNDER
+            sendMessage(p1.ws, { 
+                type: 'gameStart', 
+                gameState: { 
+                    ...gameState,
+                    playerId: p1.playerId,
+                    roomCode: roomCode
+                } 
+            });
+            
+            sendMessage(p2.ws, { 
+                type: 'gameStart', 
+                gameState: { 
+                    ...gameState,
+                    playerId: p2.playerId,
+                    roomCode: roomCode
+                } 
+            });
+            
             console.log(`✅ Oyun başladı: ${roomCode}`);
-        }, 3000);
+        }, 3000); // 3 saniye bekleyip başlat
     } else {
         sendMessage(ws, { type: 'searchStatus', message: 'Rakip aranıyor...' });
     }
@@ -630,23 +674,51 @@ function handleJoinRoom(ws, data) {
     const gameState = initializeGame(data.roomCode, hostId, joinerId);
 
     setTimeout(() => {
-        sendGameState(data.roomCode, hostId);
-        sendGameState(data.roomCode, joinerId);
+        // HER İKİ OYUNCUYA DA gameStart MESAJI GÖNDER
+        sendMessage(playerConnections.get(hostId), { 
+            type: 'gameStart', 
+            gameState: { 
+                ...gameState,
+                playerId: hostId,
+                roomCode: data.roomCode
+            } 
+        });
+        
+        sendMessage(ws, { 
+            type: 'gameStart', 
+            gameState: { 
+                ...gameState,
+                playerId: joinerId,
+                roomCode: data.roomCode
+            } 
+        });
+        
         console.log(`✅ ${ws.playerName}, ${room.players[hostId].name}'in odasına katıldı: ${data.roomCode}`);
     }, 500);
 }
 
 function handlePlayTile(ws, data) {
     const room = rooms.get(ws.roomCode);
-    if (!room || !room.gameState) return;
+    if (!room || !room.gameState) {
+        console.log('❌ Oda veya oyun durumu bulunamadı:', ws.roomCode);
+        return;
+    }
 
     const gs = room.gameState;
-    if (gs.currentPlayer !== ws.playerId) return sendMessage(ws, { type: 'error', message: 'Sıra sizde değil' });
+    console.log(`🎮 Hamle yapılıyor: ${ws.playerName}, taş index: ${data.tileIndex}, pozisyon: ${data.position}`);
+    
+    if (gs.currentPlayer !== ws.playerId) {
+        console.log(`⚠️ Sıra ${gs.currentPlayer === ws.playerId ? 'sende' : 'rakibinde'}`);
+        return sendMessage(ws, { type: 'error', message: 'Sıra sizde değil' });
+    }
 
     const player = gs.players[ws.playerId];
     const tile = player.hand[data.tileIndex];
 
-    if (!tile) return;
+    if (!tile) {
+        console.log('❌ Taş bulunamadı');
+        return;
+    }
 
     // İlk hamle kontrolü
     if (gs.board.length === 0 && gs.startingDouble > -1) {
@@ -668,7 +740,7 @@ function handlePlayTile(ws, data) {
     // Başarıyla oynandı
     player.hand.splice(data.tileIndex, 1);
     gs.moves = (gs.moves || 0) + 1;
-    gs.consecutivePasses = 0; // Taş oynandığı için pas sayacını sıfırla
+    gs.consecutivePasses = 0;
 
     console.log(`✅ ${player.name} taş oynadı: [${tile}]`);
 
@@ -723,7 +795,7 @@ function handleDrawFromMarket(ws, data) {
     // Pazardan taş çek
     const drawnTile = gs.market.shift();
     player.hand.push(drawnTile);
-    gs.consecutivePasses = 0; // Taş çektiği için pas sayacını sıfırla
+    gs.consecutivePasses = 0;
     
     console.log(`🎲 ${player.name} pazardan taş çekti: [${drawnTile}] - Kalan: ${gs.market.length}`);
     
@@ -1010,7 +1082,17 @@ function handleReconnect(ws, data) {
     ws.roomCode = roomCode;
     playerConnections.set(playerId, ws);
 
-    sendGameState(roomCode, playerId);
+    // HEMEN gameStart MESAJI GÖNDER
+    if (room.gameState) {
+        sendMessage(ws, { 
+            type: 'gameStart', 
+            gameState: { 
+                ...room.gameState,
+                playerId: playerId,
+                roomCode: roomCode
+            } 
+        });
+    }
 
     const otherPlayerId = Object.keys(room.players).find(id => id !== playerId);
     if (otherPlayerId && room.players[otherPlayerId]) {
