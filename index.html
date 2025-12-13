@@ -1053,13 +1053,14 @@
                 const centerY = 0;
                 
                 const board = gameState.board;
-                const TILE_WIDTH = 60; // tile-size-board width
+                const TILE_WIDTH = 60; // .tile-size-board CSS-dəki eni
 
                 // İlk taşı mərkəzə qoy
                 if (board.length > 0) {
                     tiles.push({
                         tile: board[0],
-                        position: { x: centerX, y: centerY }
+                        position: { x: centerX, y: centerY },
+                        rotation: 0
                     });
                 }
 
@@ -1069,9 +1070,10 @@
 
                 // Bu sadələşdirilmiş məntiq daşları sadəcə xətti olaraq düzür.
                 // Daha mürəkkəb (dönməli) məntiq üçün əlavə kod lazımdır.
+                // Daşları bir-birinə bitişik yerləşdir
                 for (let i = 1; i < board.length; i++) {
-                    tiles.push({ tile: board[i], position: { x: rightX, y: centerY } });
-                    rightX += TILE_WIDTH;
+                    tiles.push({ tile: board[i], position: { x: rightX - TILE_WIDTH / 2, y: centerY }, rotation: 0 });
+                    rightX += TILE_WIDTH; // Növbəti daşın mərkəzi üçün mövqeni artır
                 }
                 
                 // Board'u merkeze çek
@@ -1143,13 +1145,13 @@
                 
                 console.log('🎮 Taş oynanıyor:', { tileIndex: selectedTileIndex, position });
                 
-                sendMessage({
+                sendMessage({ 
                     type: 'playTile',
                     tileIndex: selectedTileIndex,
-                    position: position === 'start' ? 'left' : position
+                    position: position,
+                    tile: myHand[selectedTileIndex] // Sunucu tarafında doğrulamayı kolaylaştırır
                 });
                 
-                setSelectedTileIndex(null);
                 setValidMoves([]);
             };
 
@@ -1272,16 +1274,26 @@
 
                         <div className="w-full max-w-md bg-black/40 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
                             {playerData && (
-                                <div className="mb-6 text-center">
+                                <div className="mb-6 text-center flex flex-col items-center">
+                                    {/* Profil Şəkli */}
+                                    {playerData.photoUrl && (
+                                        <img 
+                                            src={playerData.photoUrl} 
+                                            className="w-20 h-20 rounded-full border-4 border-yellow-400 mb-4 shadow-lg"
+                                            alt="Profil"
+                                        />
+                                    )}
+                                    {/* İstifadəçi Adı */}
                                     <h2 className="text-white text-2xl font-bold mb-2">{playerData.username}</h2>
+                                    
+                                    {/* Statistikalar (Səviyyə və ELO) */}
                                     {!playerData.isGuest && (
-                                        <div className="flex justify-center items-center gap-3 mt-2">
-                                            {playerData.photoUrl && <img src={playerData.photoUrl} className="w-8 h-8 rounded-full border-2 border-yellow-400"/>}
+                                        <div className="flex justify-center items-center gap-3 mt-1">
                                             <span className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-sm font-bold">
                                                 SƏV {Math.min(playerData.level || 0, 10)}
                                             </span>
                                             <span className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-3 py-1 rounded-full text-sm font-bold"> 
-                                                {playerData.elo} ELO
+                                                {playerData.elo || 0} ELO
                                             </span>
                                         </div>
                                     )}
@@ -1381,6 +1393,10 @@
                                     <p className="text-xs text-gray-300 mt-2">⏳ Dostunuz gözlənilir...</p>
                                     <button
                                         onClick={() => {
+                                            sendMessage({ 
+                                                type: 'cancelRoom', 
+                                                roomCode: roomCode 
+                                            });
                                             setRoomCode('');
                                             showNotification('Otaq ləğv edildi', 'info');
                                         }}
