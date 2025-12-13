@@ -1,4 +1,5 @@
- <!DOCTYPE html>
+
+  index : <!DOCTYPE html>
 <html lang="az">
 <head>
     <meta charset="UTF-8">
@@ -633,7 +634,10 @@
                     setConnected(false); 
                     if (!event.wasClean) {
                         showNotification('Bağlantı kəsildi. Yenidən cəhd olunur...', 'warning');
-                        if (screen === 'loading') {
+                        // Yükləmə ekranında ilişib qalmanın qarşısını al
+                        if (screen === 'loading' && reconnectAttemptCount > 2) {
+                            showNotification('Serverə qoşulmaq mümkün olmadı. Lobbiyə qayıdılır.', 'error');
+                            setScreen('lobby');
                             // If stuck on loading, go to lobby after a few retries
                             if (reconnectAttemptCount > 2) setScreen('lobby');
                         }
@@ -796,6 +800,7 @@
             // --- İLK YÜKLEME VE AUTH ---
             useEffect(() => {
                 // Bağlantı kontrolü için interval
+                let loadingTimeout;
                 connectionCheckRef.current = setInterval(() => {
                     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                         sendMessage({ type: 'ping' });
@@ -803,12 +808,19 @@
                 }, 15000);
 
                 initializeTelegramAuth();
-                connectToServer();
+                
+                // Yükleme ekranında takılmayı önlemek için timeout
+                loadingTimeout = setTimeout(() => {
+                    if (screen === 'loading') {
+                        showNotification("Yükləmə çox uzun çəkdi. Lobbiyə yönləndirilir...", "warning");
+                        setScreen('lobby');
+                    }
+                }, 10000); // 10 saniye bekle
                 
                 return () => { 
                     if (wsRef.current) wsRef.current.close(); 
                     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-                    if (zoomHintTimeoutRef.current) clearTimeout(zoomHintTimeoutRef.current);
+                    if (loadingTimeout) clearTimeout(loadingTimeout);
                     if (connectionCheckRef.current) clearInterval(connectionCheckRef.current);
                 };
             }, []);
@@ -868,12 +880,15 @@
                     const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
                     const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
                     
+                    // Auth tamamlandıktan sonra WebSocket bağlantısını başlat
+                    connectToServer();
+
                     if (storedRoomCode && storedPlayerId) {
                         console.log('📂 Kayıtlı oyun bulundu, yeniden bağlanılıyor...');
                         setScreen('loading');
                     } else {
                         console.log('🎮 Lobiye yönlendiriliyor...');
-                        setScreen('lobby');
+                        if (screen === 'loading') setScreen('lobby');
                     }
                 }
             };
@@ -1040,31 +1055,28 @@
                 const tiles = [];
                 const centerX = 0;
                 const centerY = 0;
-                let currentX = centerX;
-                let currentY = centerY;
                 
-                // Board'u ortala ve simetrik yap
-                gameState.board.forEach((tile, index) => {
-                    // İlk taşı tam ortaya koy
-                    if (index === 0) {
-                        tiles.push({
-                            tile,
-                            index,
-                            direction: 'right',
-                            position: { x: 0, y: 0 }
-                        });
-                        return;
-                    }
-                    
-                    // Sağa doğru devam et, her taş için 60px boşluk
-                    const x = index * 60;
+                const board = gameState.board;
+                const TILE_WIDTH = 60; // tile-size-board width
+
+                // İlk taşı mərkəzə qoy
+                if (board.length > 0) {
                     tiles.push({
-                        tile,
-                        index,
-                        direction: 'right',
-                        position: { x, y: 0 }
+                        tile: board[0],
+                        position: { x: centerX, y: centerY }
                     });
-                });
+                }
+
+                // Sağ və sol tərəfləri ayrı-ayrılıqda emal et
+                let leftX = centerX - TILE_WIDTH;
+                let rightX = centerX + TILE_WIDTH;
+
+                // Bu sadələşdirilmiş məntiq daşları sadəcə xətti olaraq düzür.
+                // Daha mürəkkəb (dönməli) məntiq üçün əlavə kod lazımdır.
+                for (let i = 1; i < board.length; i++) {
+                    tiles.push({ tile: board[i], position: { x: rightX, y: centerY } });
+                    rightX += TILE_WIDTH;
+                }
                 
                 // Board'u merkeze çek
                 if (tiles.length > 0) {
@@ -1080,20 +1092,23 @@
                     }));
                 }
                 
-                return tiles;
+                return tiles.map((t, i) => ({ ...t, index: i }));
             }, [gameState?.board]);
 
             const calculateValidMoves = (tile) => {
                 if (!gameState || gameState.board.length === 0) return ['start'];
                 
                 const board = gameState.board;
-                const leftEnd = board[0][0]; 
-                const rightEnd = board[board.length - 1][1]; 
+                // Soldakı daşın sol ucu və ya sağdakı daşın sol ucu (əgər tərsinədirsə)
+                const leftEndValue = board[0][0];
+                // Sağdakı daşın sağ ucu
+                const rightEndValue = board[board.length - 1][1];
 
                 const moves = [];
                 
-                if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
-                if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
+                // Daşın hər iki ucunu yoxla
+                if (tile[0] === leftEndValue || tile[1] === leftEndValue) moves.push('left');
+                if (tile[0] === rightEndValue || tile[1] === rightEndValue) moves.push('right');
                 
                 return moves;
             };
@@ -1154,8 +1169,13 @@
                 }
                 
                 // Elinde oynanabilir taş var mı kontrol et
-                const canPlayFromHand = gameState.board.length > 0 && myHand.some(tile => calculateValidMoves(tile).length > 0);
-                if (canPlayFromHand) {
+                // Masa boşsa, hər zaman oynaya bilərsən, bazara getməyə ehtiyac yoxdur.
+                if (gameState.board.length === 0) {
+                    showNotification('İlk siz başlayırsınız! Zəhmət olmasa bir daş seçin.', 'info');
+                    return;
+                }
+
+                if (myHand.some(tile => calculateValidMoves(tile).length > 0)) {
                     showNotification('Elində oynaya biləcəyiniz daş var! Əvvəlcə onu oynayın.', 'error');
                     return;
                 }
