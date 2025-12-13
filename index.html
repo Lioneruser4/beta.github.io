@@ -702,6 +702,7 @@
             const [endInfo, setEndInfo] = useState(null);
             const [opponent, setOpponent] = useState(null);
             const [reconnectAttemptCount, setReconnectAttemptCount] = useState(0);
+            const [authCompleted, setAuthCompleted] = useState(false);
             const MAX_RECONNECT_ATTEMPTS = 5;
             
             // Board Zoom ve Position State
@@ -747,24 +748,6 @@
                 setNotification({ message: msg, type });
                 setTimeout(() => setNotification(null), 3000);
             };
-
-            // --- YÜKLEME EKRANI SORUNU ÇÖZÜMÜ ---
-            useEffect(() => {
-                // 5 saniye sonra yükleme ekranından çık
-                initialLoadTimeoutRef.current = setTimeout(() => {
-                    if (screen === 'loading') {
-                        console.log('🔄 Yükleme ekranından çıkılıyor...');
-                        setScreen('lobby');
-                        showNotification('Oyuna xoş gəldiniz!', 'success');
-                    }
-                }, 5000);
-
-                return () => {
-                    if (initialLoadTimeoutRef.current) {
-                        clearTimeout(initialLoadTimeoutRef.current);
-                    }
-                };
-            }, [screen]);
 
             // --- WebSocket Bağlantı ---
             const attemptReconnect = () => {
@@ -1112,21 +1095,36 @@
             
             // --- İLK YÜKLEME VE AUTH ---
             useEffect(() => {
-                // Bağlantı kontrolü için interval
+                // 5 saniye sonra yükleme ekranında takılı kalırsa lobiye yönlendir.
+                initialLoadTimeoutRef.current = setTimeout(() => {
+                    // Bu timeout sadece component mount olduğunda bir kere kurulur.
+                    // Eğer 5 saniye sonunda hala 'loading' ekranındaysak, bir sorun var demektir.
+                    setScreen(currentScreen => {
+                        if (currentScreen === 'loading') {
+                            console.warn('🔄 Yükleme 5 saniyeden uzun sürdü, lobiye zorla yönlendiriliyor.');
+                            showNotification('Oyuna xoş gəldiniz!', 'info');
+                            return 'lobby';
+                        }
+                        return currentScreen;
+                    });
+                }, 5000);
+
+                // Periyodik olarak sunucuya 'ping' göndererek bağlantıyı canlı tut.
                 connectionCheckRef.current = setInterval(() => {
                     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                         sendMessage({ type: 'ping' });
                     }
                 }, 15000);
 
+                // Başlangıç işlemlerini başlat.
                 initializeTelegramAuth();
                 connectToServer();
                 
                 return () => { 
-                    if (wsRef.current) wsRef.current.close(); 
-                    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-                    if (connectionCheckRef.current) clearInterval(connectionCheckRef.current);
-                    if (initialLoadTimeoutRef.current) clearTimeout(initialLoadTimeoutRef.current);
+                    if (wsRef.current) { wsRef.current.close(); }
+                    if (reconnectTimerRef.current) { clearTimeout(reconnectTimerRef.current); }
+                    if (connectionCheckRef.current) { clearInterval(connectionCheckRef.current); }
+                    if (initialLoadTimeoutRef.current) { clearTimeout(initialLoadTimeoutRef.current); }
                 };
             }, []);
 
@@ -1179,6 +1177,7 @@
                         };
                         setPlayerData(guestData);
                         console.log('👤 Guest modda başlatıldı');
+                        setAuthCompleted(true);
                     }
                 } catch (error) {
                     console.error('Auth xətası:', error);
@@ -1191,16 +1190,19 @@
                         telegramId: null
                     };
                     setPlayerData(guestData);
+                    setAuthCompleted(true);
                 } finally {
-                    const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
-                    const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
-                    
-                    if (storedRoomCode && storedPlayerId) {
-                        console.log('📂 Kayıtlı oyun bulundu, yeniden bağlanılıyor...');
-                        setScreen('loading');
-                    } else {
-                        console.log('🎮 Lobiye yönlendiriliyor...');
-                        setScreen('lobby');
+                    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+                        const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
+                        const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
+                        
+                        if (storedRoomCode && storedPlayerId) {
+                            console.log('📂 Kayıtlı oyun bulundu, yeniden bağlanma denenecek...');
+                            setScreen('loading');
+                        } else {
+                            console.log('🎮 Lobiye yönlendiriliyor...');
+                            setScreen('lobby');
+                        }
                     }
                 }
             };
@@ -1216,8 +1218,6 @@
                     console.error('Leaderboard xətası:', error);
                 }
             };
-
-            // --- TOUCH/PINCH ZOOM HANDLERS ---
             const handleTouchStart = useCallback((e) => {
                 e.preventDefault();
                 
@@ -1260,59 +1260,7 @@
 
                     lastTouchTimeRef.current = currentTime;
                 }
-            }, [boardZoom, boardPosition, showNotification]);
-            
-            // WebSocket bağlantı yönetimi
-            useEffect(() => {
-                let reconnectAttempts = 0;
-                const MAX_RECONNECT_ATTEMPTS = 5;
-                
-                const connect = () => {
-                    if (wsRef.current) {
-                        wsRef.current.close();
-                    }
-                    
-                    const ws = new WebSocket('wss://beta-github-io.onrender.com');
-                    wsRef.current = ws;
-                    
-                    ws.onopen = () => {
-                        console.log('WebSocket bağlantısı kuruldu');
-                        reconnectAttempts = 0;
-                        setConnected(true);
-                    };
-                    
-                    ws.onmessage = (event) => {
-                        try {
-                            const data = JSON.parse(event.data);
-                            handleServerMessage(data);
-                        } catch (error) {
-                            console.error('WebSocket mesaj işleme hatası:', error);
-                        }
-                    };
-                    
-                    ws.onclose = () => {
-                        setConnected(false);
-                        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-                            console.log(`Bağlantı koptu, ${delay}ms sonra yeniden deneniyor...`);
-                            setTimeout(connect, delay);
-                            reconnectAttempts++;
-                        }
-                    };
-                    
-                    ws.onerror = (error) => {
-                        console.error('WebSocket hatası:', error);
-                    };
-                };
-                
-                connect();
-                
-                return () => {
-                    if (wsRef.current) {
-                        wsRef.current.close();
-                    }
-                };
-            }, []);
+            }, [boardZoom, boardPosition]);
 
             const handleTouchMove = useCallback((e) => {
                 e.preventDefault();
@@ -2263,6 +2211,10 @@
         };
 
         // React uygulamasını başlat
+        const App = () => {
+            return <DominoGame />;
+        };
+
         document.addEventListener('DOMContentLoaded', function() {
             try {
                 // Root elementini oluştur
