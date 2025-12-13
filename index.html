@@ -779,50 +779,74 @@
             };
 
             const connectToServer = () => {
-                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return;
-                if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+                if (wsRef.current) {
+                    if (wsRef.current.readyState === WebSocket.OPEN) return;
+                    // Eski bağlantıyı kapat
+                    wsRef.current.close();
+                }
+                
+                if (reconnectTimerRef.current) {
+                    clearTimeout(reconnectTimerRef.current);
+                    reconnectTimerRef.current = null;
+                }
 
                 let wsUrl = 'wss://beta-github-io.onrender.com';
                 if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
                     wsUrl = `ws://${window.location.hostname}:10000`;
                 }
 
-                // PC Telegram için WebSocket bağlantısını güçlendir
+                console.log('🌐 Sunucuya bağlanılıyor:', wsUrl);
                 const ws = new WebSocket(wsUrl);
                 wsRef.current = ws;
 
                 ws.onopen = () => {
-                    console.log('✅ WebSocket bağlantısı açıldı');
+                    console.log('✅ WebSocket bağlantısı başarıyla kuruldu');
                     setConnected(true);
                     setReconnectAttemptCount(0);
-                    showNotification('Serverə qoşuldu', 'success');
+                    showNotification('Sunucuya bağlanıldı', 'success');
 
                     const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
                     const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
                     
                     if (storedRoomCode && storedPlayerId) {
                         console.log('♻️ Kayıtlı oyun bulundu, yeniden bağlanılıyor...');
+                        setScreen('loading');
                         sendMessage({
                             type: 'reconnect',
                             playerId: storedPlayerId,
                             roomCode: storedRoomCode
                         });
                     } else {
+                        console.log('ℹ️ Yeni oyuncu, lobi ekranına yönlendiriliyor...');
                         setScreen('lobby');
                     }
                 };
                 
                 ws.onclose = (event) => { 
                     console.log('❌ WebSocket bağlantısı kapandı:', event.code, event.reason);
-                    setConnected(false); 
+                    setConnected(false);
+                    
+                    // Eğer oyun ekranındaysak veya yükleniyor durumundaysak
+                    if (screen === 'game' || screen === 'loading') {
+                        setScreen('lobby');
+                    }
+                    
                     if (!event.wasClean) {
-                        showNotification('Bağlantı kəsildi. Yenidən cəhd olunur...', 'warning');
+                        const errorMsg = 'Bağlantı kesildi. Yeniden bağlanılıyor...';
+                        console.warn(errorMsg);
+                        showNotification(errorMsg, 'warning');
                         attemptReconnect();
                     }
                 };
                 
                 ws.onerror = (error) => {
-                    console.error('WebSocket error:', error);
+                    console.error('WebSocket hatası:', error);
+                    showNotification('Bağlantı hatası oluştu', 'error');
+                    
+                    // Hata durumunda kullanıcıyı lobiye yönlendir
+                    if (screen !== 'lobby') {
+                        setScreen('lobby');
+                    }
                 };
                 
                 ws.onmessage = (e) => {
@@ -863,11 +887,26 @@
                     case 'reconnectSuccess':
                     case 'gameStart':
                         console.log('🎮 Oyun başladı/tekrar bağlandı!', data.gameState);
-                        setGameState(data.gameState);
+                        // Önce oyun durumunu güncelle
+                        setGameState(prev => ({
+                            ...data.gameState,
+                            playerId: data.gameState.playerId || prev?.playerId,
+                            roomCode: data.gameState.roomCode || prev?.roomCode
+                        }));
+                        
+                        // Sonra ekranı güncelle
                         setScreen('game');
                         setSelectedTileIndex(null);
                         setValidMoves([]);
                         setSearching(false);
+                        
+                        // Arama zamanlayıcısını temizle
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        
+                        // Yerel depolamayı güncelle
                         if (data.gameState.roomCode && data.gameState.playerId) {
                             localStorage.setItem(LOCAL_STORAGE_ROOM, data.gameState.roomCode);
                             localStorage.setItem(LOCAL_STORAGE_PLAYER, data.gameState.playerId);
@@ -2127,10 +2166,43 @@
                 );
             }
 
+            // Yüklenme ekranı
+            if (screen === 'loading') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center p-4">
+                        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-400 mb-4"></div>
+                        <p className="text-white text-xl font-bold mb-2">Oyun aranıyor...</p>
+                        <p className="text-gray-300 text-center max-w-sm">
+                            {searchTime > 0 
+                                ? `${searchTime} saniyedir eşleşme aranıyor...`
+                                : 'Lütfen bekleyin, uygun bir rakip aranıyor...'}
+                        </p>
+                        <button 
+                            onClick={() => {
+                                setScreen('lobby');
+                                setSearching(false);
+                                setSearchTime(0);
+                                if (searchTimerRef.current) {
+                                    clearInterval(searchTimerRef.current);
+                                    searchTimerRef.current = null;
+                                }
+                            }}
+                            className="mt-6 px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition-colors"
+                        >
+                            Aramayı İptal Et
+                        </button>
+                    </div>
+                );
+            }
+
+            // Varsayılan yükleme ekranı
             return (
                 <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center p-4">
-                    <div className="loading-spinner mb-4"></div>
-                    <p className="text-white text-xl font-bold">Yüklənir...</p>
+                    <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-400 mb-4"></div>
+                    <p className="text-white text-xl font-bold">Yükleniyor...</p>
+                    {!connected && (
+                        <p className="text-yellow-300 mt-2">Sunucuya bağlanılıyor...</p>
+                    )}
                 </div>
             );
         };
