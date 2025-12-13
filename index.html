@@ -2263,19 +2263,47 @@
 
         // React uygulamasını başlat
         document.addEventListener('DOMContentLoaded', function() {
-            // Root elementini oluştur ve render et
-            const root = ReactDOM.createRoot(document.getElementById('root'));
-            root.render(<App />);
-            
-            // Telegram PC uygulaması için viewport ayarı
-            if (window.innerWidth > 1024) {
-                const viewport = document.querySelector('meta[name="viewport"]');
-                if (viewport) {
-                    viewport.setAttribute('content', 'width=350, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes');
+            try {
+                // Root elementini oluştur
+                const rootElement = document.getElementById('root');
+                if (!rootElement) {
+                    console.error('Root elementi bulunamadı!');
+                    return;
+                }
+                
+                const root = ReactDOM.createRoot(rootElement);
+                
+                // Uygulamayı render et
+                root.render(
+                    <React.StrictMode>
+                        <App />
+                    </React.StrictMode>
+                );
+                
+                console.log('React uygulaması başlatıldı');
+                
+                // Telegram PC uygulaması için viewport ayarı
+                if (window.innerWidth > 1024) {
+                    const viewport = document.querySelector('meta[name="viewport"]');
+                    if (viewport) {
+                        viewport.setAttribute('content', 'width=350, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes');
+                    }
+                }
+            } catch (error) {
+                console.error('Uygulama başlatılırken hata oluştu:', error);
+                // Hata durumunda kullanıcıya bilgi göster
+                const rootElement = document.getElementById('root');
+                if (rootElement) {
+                    rootElement.innerHTML = `
+                        <div style="color: white; padding: 20px; font-family: Arial, sans-serif;">
+                            <h2>Uygulama yüklenirken bir hata oluştu</h2>
+                            <p>Lütfen sayfayı yenileyin veya daha sonra tekrar deneyin.</p>
+                            <p>Hata detayı: ${error.message}</p>
+                        </div>
+                    `;
                 }
             }
         });
-        root.render(<DominoGame />);
     </script>
 </body>
 </html>
