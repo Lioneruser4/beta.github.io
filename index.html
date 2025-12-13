@@ -541,6 +541,7 @@
             const [endInfo, setEndInfo] = useState(null);
             const [opponent, setOpponent] = useState(null);
             const [reconnectAttemptCount, setReconnectAttemptCount] = useState(0);
+            const [appReady, setAppReady] = useState(false); // Yeni state
             const MAX_RECONNECT_ATTEMPTS = 5;
             
             // Board Zoom ve Position State
@@ -594,6 +595,19 @@
                 reconnectTimerRef.current = setTimeout(connectToServer, 2000 * (reconnectAttemptCount + 1));
             };
 
+            // App hazır olduğunda ekranı dəyişdir
+            useEffect(() => {
+                if (appReady) {
+                    const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
+                    const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
+                    if (storedRoomCode && storedPlayerId) {
+                        // Yeniden qoşulma mesajı onopen-də göndəriləcək
+                    } else {
+                        setScreen('lobby');
+                    }
+                }
+            }, [appReady]);
+
             const connectToServer = () => {
                 if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return;
                 if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
@@ -624,7 +638,7 @@
                             roomCode: storedRoomCode
                         });
                     } else {
-                        setScreen('lobby');
+                        setAppReady(true); // Auth bitib, oyun yoxdur, lobiye hazır
                     }
                 };
                 
@@ -678,7 +692,7 @@
                         
                     case 'reconnectSuccess':
                     case 'gameStart':
-                        console.log('🎮 Oyun başladı/tekrar bağlandı!', data.gameState);
+                        console.log('🎮 Oyun başladı/yenidən qoşuldu!', data.gameState);
                         setGameState(data.gameState);
                         setScreen('game');
                         setSelectedTileIndex(null);
@@ -694,7 +708,7 @@
                             searchTimerRef.current = null;
                         }
                         setSearchTime(0);
-                        showNotification(data.type === 'reconnectSuccess' ? 'Oyuna Davam Edildi!' : 'Oyun Başladı!', 'success');
+                        showNotification(data.type === 'reconnectSuccess' ? 'Oyuna Yenidən Qoşuldunuz!' : 'Oyun Başladı!', 'success');
                         break;
                         
                     case 'gameUpdate':
@@ -733,6 +747,7 @@
                         
                     case 'gameEnd':
                         const isWinner = data.isWinner === true;
+                        const isStalemate = data.reason === 'stalemate';
                         const isLoser = data.isLoser === true;
                         
                         setEndInfo({
@@ -745,9 +760,18 @@
                             eloChange: data.eloChanges ? (isWinner ? data.eloChanges.winner : data.eloChanges.loser) : 0,
                             message: data.message
                         });
-                        setScreen('end');
-                        
-                        resetGameClientState();
+
+                        if (isStalemate) {
+                            // Dalana dirənmə vəziyyətində əvvəlcə hesablama ekranını göstər
+                            setScreen('calculating');
+                            setTimeout(() => {
+                                setScreen('end');
+                                resetGameClientState();
+                            }, 2500); // 2.5 saniyə sonra nəticə ekranına keç
+                        } else {
+                            setScreen('end');
+                            resetGameClientState();
+                        }
                         break;
                         
                     case 'searchCancelled':
@@ -795,8 +819,7 @@
                     }
                 }, 15000);
 
-                initializeTelegramAuth();
-                connectToServer();
+                initializeTelegramAuth().then(() => connectToServer());
                 
                 return () => { 
                     if (wsRef.current) wsRef.current.close(); 
@@ -857,17 +880,6 @@
                         telegramId: null
                     };
                     setPlayerData(guestData);
-                } finally {
-                    const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
-                    const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
-                    
-                    if (storedRoomCode && storedPlayerId) {
-                        console.log('📂 Kayıtlı oyun bulundu, yeniden bağlanılıyor...');
-                        setScreen('loading');
-                    } else {
-                        console.log('🎮 Lobiye yönlendiriliyor...');
-                        setScreen('lobby');
-                    }
                 }
             };
 
@@ -1188,7 +1200,7 @@
 
             // --- RENDER BÖLÜMLERİ ---
             
-            if (screen === 'loading') {
+            if (screen === 'loading' || !appReady) {
                 return (
                     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center p-4">
                         <div className="loading-spinner mb-4"></div>
@@ -1444,6 +1456,21 @@
                                 </div>
                             )}
                         </div>
+                    </div>
+                );
+            }
+
+            if (screen === 'calculating') {
+                return (
+                    <div className="min-h-screen bg-black/90 flex flex-col items-center justify-center p-4 text-center">
+                        <div className="loading-spinner mb-6 border-yellow-400"></div>
+                        <h1 className="text-3xl font-bold text-white mb-2">Oyun Dalana Dirəndi!</h1>
+                        <p className="text-xl font-semibold text-yellow-400 animate-pulse">
+                            Xallar Hesablanır...
+                        </p>
+                        <p className="text-gray-400 mt-4 max-w-sm">
+                            Bazar boşdur və heç bir oyunçunun oynanacaq daşı yoxdur. Əlində ən az xalı olan oyunçu qalib gələcək.
+                        </p>
                     </div>
                 );
             }
