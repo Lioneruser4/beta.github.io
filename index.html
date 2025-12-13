@@ -1944,27 +1944,16 @@
                                     }}
                                 >
                                     {/* DOMINO BOARD TAŞLARI */}
-                                    {renderBoardTiles.length === 0 ? (
-                                        <div className="text-white/30 text-lg md:text-xl font-bold border-4 border-dashed border-white/10 rounded-3xl p-4 md:p-6 text-center">
-                                            {selectedTileIndex !== null ? '👇 Daşı Buraya Qoy' : 'İlk daşı ortaya qoyun'}
-                                        </div>
-                                    ) : (
-                                        renderBoardTiles.map(({ tile, index, direction, position }) => (
-                                            <div 
-                                                key={index}
-                                                className="board-tile"
-                                                style={{
-                                                    left: `${position.x}px`,
-                                                    top: `${position.y}px`,
-                                                    transform: 'translate(-50%, -50%) rotate(90deg)'
-                                                }}
-                                            >
-                                                <DominoTile 
-                                                    values={tile}
-                                                    disabled={true}
-                                                    isBoardTile={true}
-                                                />
+                                    <div className="relative w-full h-full">
+                                        {renderBoardTiles.length === 0 && (
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <div className="text-white/70 text-lg md:text-xl font-bold border-4 border-dashed border-white/20 rounded-3xl p-4 md:p-6 text-center bg-black/30 backdrop-blur-sm">
+                                                    {selectedTileIndex !== null ? '👇 Daşı Buraya Qoy' : 'İlk daşı ortaya qoyun'}
+                                                </div>
                                             </div>
+                                        )}
+                                        {renderBoardTiles}
+                                    </div>
                                         ))
                                     )}
 
