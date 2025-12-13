@@ -514,7 +514,7 @@
             };
 
             const baseClasses = `
-                domino-tile relative flex overflow-hidden horizontal
+                domino-tile relative flex overflow-hidden vertical
                 ${isSelected ? 'selected-tile' : ''}
                 ${!disabled && !isBoardTile ? 'cursor-pointer hover:brightness-110 active:scale-95' : ''}
                 ${disabled ? 'opacity-80 cursor-default' : ''}
@@ -528,7 +528,7 @@
                     onClick={handleClick}
                     className={`${baseClasses} ${sizeClass}`}
                 >
-                    <div className="domino-tile-face border-r-2 border-gray-800">
+                    <div className="domino-tile-face border-b-2 border-gray-800">
                         <RenderPips number={values[0]} />
                     </div>
                     <div className="domino-tile-face">
@@ -949,11 +949,21 @@
                 try {
                     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
                         const user = tg.initDataUnsafe.user;
+                        // Telegram'ın fotoğraf URL'sini düzgün bir şekilde al
+                        let photoUrl = null;
+                        if (user.photo_url) {
+                            // Eğer photo_url varsa direkt kullan
+                            photoUrl = user.photo_url;
+                        } else if (user.photo) {
+                            // Eğer photo objesi varsa, URL oluştur
+                            photoUrl = `https://t.me/i/userpic/320/${user.photo}.jpg`;
+                        }
+                        
                         const telegramData = {
                             telegramId: user.id.toString(),
                             username: user.username || user.first_name || 'İstifadəçi',
                             firstName: user.first_name || '',
-                            photoUrl: user.photo_url || null
+                            photoUrl: photoUrl
                         };
 
                         const response = await fetch(`${API_URL}/api/auth/telegram`, {
@@ -1195,20 +1205,20 @@
                         // Önceki taşa göre pozisyon
                         const prevTile = tiles[index - 1];
                         if (prevTile.direction === 'right') {
-                            x = prevTile.position.x + 65;
+                            x = prevTile.position.x + 40; // Reduced from 65 to 40 for horizontal spacing
                             y = prevTile.position.y;
                             direction = 'right';
                         } else if (prevTile.direction === 'left') {
-                            x = prevTile.position.x - 65;
+                            x = prevTile.position.x - 40; // Reduced from 65 to 40 for horizontal spacing
                             y = prevTile.position.y;
                             direction = 'left';
                         } else if (prevTile.direction === 'up') {
                             x = prevTile.position.x;
-                            y = prevTile.position.y - 40;
+                            y = prevTile.position.y - 25; // Reduced from 40 to 25 for vertical spacing
                             direction = 'up';
                         } else if (prevTile.direction === 'down') {
                             x = prevTile.position.x;
-                            y = prevTile.position.y + 40;
+                            y = prevTile.position.y + 25; // Reduced from 40 to 25 for vertical spacing
                             direction = 'down';
                         }
                     }
@@ -1233,8 +1243,8 @@
                 const height = maxY - minY;
                 
                 // Eğer board çok büyükse, otomatik zoom ayarla
-                if (width > 500 || height > 300) {
-                    const scale = Math.min(500 / (width + 100), 300 / (height + 100));
+                if (width > 500 || height > 200) {  // Reduced height threshold from 300 to 200
+                    const scale = Math.min(500 / (width + 80), 200 / (height + 80));  // Reduced padding from 100 to 80
                     setBoardZoom(scale);
                 }
                 
@@ -1702,9 +1712,13 @@
                             <div className="flex items-center gap-2 md:gap-3">
                                 {opponent?.photoUrl ? (
                                     <img
-                                        src={opponent.photoUrl}
+                                        src={opponent.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(opponent.username) + '&background=FFC107&color=000'}
                                         alt="Rəqib"
                                         className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-yellow-400 shadow-lg object-cover"
+                                        onError={(e) => {
+                                            e.target.onerror = null;
+                                            e.target.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(opponent.username) + '&background=FFC107&color=000';
+                                        }}
                                     />
                                 ) : (
                                     <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center shadow-lg">
@@ -1874,9 +1888,13 @@
                                     <div className="flex items-center gap-2">
                                         {playerData?.photoUrl ? (
                                             <img
-                                                src={playerData.photoUrl}
+                                                src={playerData.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(playerData.username) + '&background=4CAF50&color=fff'}
                                                 alt="Siz"
                                                 className="w-8 h-8 rounded-full border-2 border-green-400 shadow-lg object-cover"
+                                                onError={(e) => {
+                                                    e.target.onerror = null;
+                                                    e.target.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(playerData.username) + '&background=4CAF50&color=fff';
+                                                }}
                                             />
                                         ) : (
                                             <div className="w-8 h-8 rounded-full bg-green-700 border-2 border-green-600 flex items-center justify-center shadow-lg">
