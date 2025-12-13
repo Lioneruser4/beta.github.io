@@ -91,19 +91,82 @@
         }
         
         .domino-tile {
-            display: inline-flex;
+            display: flex;
+            flex-direction: column;
             background: linear-gradient(145deg, #ffffff, #f0f0f0);
             border: 2px solid #222;
-            border-radius: 6px;
+            border-radius: 8px;
             box-shadow: 0 3px 0 #aaa, 0 4px 4px rgba(0,0,0,0.3);
             transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             flex-shrink: 0;
             position: relative;
             overflow: hidden;
-            flex-direction: column; /* Always vertical */
-            width: 30px;
-            height: 60px;
+            width: 40px;
+            height: 80px;
+            transform: rotate(0deg) !important;
+            touch-action: none;
+            user-select: none;
         }
+        
+        /* Ensure board tiles stay vertical */
+        .board-tile {
+            transform: rotate(0deg) !important;
+        }
+        
+        .domino-tile-face {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            position: relative;
+            width: 100%;
+        }
+        
+        .domino-divider {
+            height: 2px;
+            background-color: #666;
+            width: 100%;
+        }
+        
+        .pips-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr;
+            width: 100%;
+            height: 100%;
+            padding: 2px;
+            position: relative;
+            gap: 2px;
+        }
+        
+        .pip {
+            width: 6px;
+            height: 6px;
+            background-color: #222;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        /* Pip positions */
+        .pip-topleft { grid-area: 1 / 1 / 2 / 2; }
+        .pip-topright { grid-area: 1 / 3 / 2 / 4; }
+        .pip-middleleft { grid-area: 2 / 1 / 3 / 2; }
+        .pip-center { grid-area: 2 / 2 / 3 / 3; }
+        .pip-middleright { grid-area: 2 / 3 / 4 / 4; }
+        .pip-bottomleft { grid-area: 3 / 1 / 4 / 2; }
+        .pip-bottomright { grid-area: 3 / 3 / 4 / 4; }
+        
+        /* Pip positions */
+        .pip-top-left { top: 4px; left: 4px; }
+        .pip-top-right { top: 4px; right: 4px; }
+        .pip-middle-left { left: 4px; top: 50%; transform: translateY(-50%); }
+        .pip-middle-right { right: 4px; top: 50%; transform: translateY(-50%); }
+        .pip-bottom-left { bottom: 4px; left: 4px; }
+        .pip-bottom-right { bottom: 4px; right: 4px; }
+        .pip-center { top: 50%; left: 50%; transform: translate(-50%, -50%); }
         
         .domino-tile:active {
             transform: scale(0.95) !important;
@@ -115,6 +178,7 @@
             align-items: center;
             justify-content: center;
             position: relative;
+            padding: 2px;
         }
         
         .domino-divider {
@@ -469,48 +533,51 @@
         // API Base URL
         const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
 
-        // --- BİLEŞENLER ---
+        // DOMINO TAŞI NOKTALARINI RENDER EDEN BİLEŞEN
         const RenderPips = ({ number }) => {
-            const layouts = {
-                0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8],
-                4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8]
+            if (number === 0) return <div className="pips-container"></div>;
+            
+            // Noktaların konumlarını belirle
+            const positions = {
+                1: ['center'],
+                2: ['topleft', 'bottomright'],
+                3: ['topleft', 'center', 'bottomright'],
+                4: ['topleft', 'topright', 'bottomleft', 'bottomright'],
+                5: ['topleft', 'topright', 'center', 'bottomleft', 'bottomright'],
+                6: ['topleft', 'topright', 'middleleft', 'middleright', 'bottomleft', 'bottomright']
             };
-            const activePips = layouts[number] || [];
+            
             return (
-                <div className="pip-grid">
-                    {[...Array(9)].map((_, i) => (
-                        <div key={i} className="pip" style={{ 
-                            opacity: activePips.includes(i) ? 1 : 0.2,
-                            transform: activePips.includes(i) ? 'scale(1)' : 'scale(0.5)',
-                            transition: 'all 0.2s ease'
-                        }}></div>
+                <div className="pips-container">
+                    {positions[number]?.map((pos, index) => (
+                        <div key={index} className={`pip pip-${pos}`}></div>
                     ))}
                 </div>
             );
         };
 
-        const DominoTile = ({ values, onClick, disabled, isSelected, isBoardTile = false }) => {
+        const DominoTile = React.memo(({ values, onClick, selected = false, disabled = false, isBoardTile = false }) => {
             const handleClick = (e) => {
-                e.stopPropagation();
-                if (!disabled && onClick) {
-                    onClick();
+                if (disabled) return;
+                if (onClick) {
+                    onClick(e);
                 }
             };
 
-            const baseClasses = `
-                domino-tile relative flex overflow-hidden
-                ${isSelected ? 'selected-tile' : ''}
-                ${!disabled && !isBoardTile ? 'cursor-pointer hover:brightness-110 active:scale-95' : ''}
-                ${disabled ? 'opacity-80 cursor-default' : ''}
-                tile-slide-in
-            `;
-
-            const sizeClass = isBoardTile ? 'tile-size-board' : 'tile-size-hand';
+            const baseClasses = `domino-tile ${selected ? 'ring-2 ring-yellow-400 scale-110 z-20' : ''} ${!disabled ? 'cursor-pointer hover:scale-105' : 'opacity-90'}`;
 
             return (
                 <div 
                     onClick={handleClick}
-                    className={`${baseClasses} ${sizeClass}`}
+                    className={baseClasses}
+                    role="button"
+                    aria-label={`Domino taşı: ${values[0]}-${values[1]}`}
+                    tabIndex={disabled ? -1 : 0}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            handleClick(e);
+                        }
+                    }}
                 >
                     <div className="domino-tile-face">
                         <RenderPips number={values[0]} />
@@ -521,7 +588,7 @@
                     </div>
                 </div>
             );
-        };
+        });
 
         const Toast = ({ message, type }) => {
             const colors = { 
@@ -1066,7 +1133,59 @@
 
                     lastTouchTimeRef.current = currentTime;
                 }
-            }, [boardZoom, boardPosition]);
+            }, [boardZoom, boardPosition, showNotification]);
+            
+            // WebSocket bağlantı yönetimi
+            useEffect(() => {
+                let reconnectAttempts = 0;
+                const MAX_RECONNECT_ATTEMPTS = 5;
+                
+                const connect = () => {
+                    if (wsRef.current) {
+                        wsRef.current.close();
+                    }
+                    
+                    const ws = new WebSocket('wss://beta-github-io.onrender.com');
+                    wsRef.current = ws;
+                    
+                    ws.onopen = () => {
+                        console.log('WebSocket bağlantısı kuruldu');
+                        reconnectAttempts = 0;
+                        setConnected(true);
+                    };
+                    
+                    ws.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            handleServerMessage(data);
+                        } catch (error) {
+                            console.error('WebSocket mesaj işleme hatası:', error);
+                        }
+                    };
+                    
+                    ws.onclose = () => {
+                        setConnected(false);
+                        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+                            console.log(`Bağlantı koptu, ${delay}ms sonra yeniden deneniyor...`);
+                            setTimeout(connect, delay);
+                            reconnectAttempts++;
+                        }
+                    };
+                    
+                    ws.onerror = (error) => {
+                        console.error('WebSocket hatası:', error);
+                    };
+                };
+                
+                connect();
+                
+                return () => {
+                    if (wsRef.current) {
+                        wsRef.current.close();
+                    }
+                };
+            }, []);
 
             const handleTouchMove = useCallback((e) => {
                 e.preventDefault();
@@ -1162,6 +1281,28 @@
             }, [gameState, myPlayerId]);
 
             // DOMINO BOARD TAŞLARINI PROFESYONEL YERLEŞTİRME
+            // Erişilebilirlik özellikleri için klavye navigasyonu
+            const handleKeyDown = useCallback((e) => {
+                if (e.key === 'Escape') {
+                    setSelectedTileIndex(null);
+                    setValidMoves([]);
+                } else if (e.key === 'Enter' && selectedTileIndex !== null) {
+                    // Seçili taşı oyna
+                    if (validMoves.includes('start')) {
+                        playTile('start');
+                    } else if (validMoves.length > 0) {
+                        playTile(validMoves[0]);
+                    }
+                }
+            }, [selectedTileIndex, validMoves]);
+
+            // Klavye olaylarını dinle
+            useEffect(() => {
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [handleKeyDown]);
+
+            // Taşları render etme işlemi
             const renderBoardTiles = useMemo(() => {
                 if (!gameState?.board || gameState.board.length === 0) return [];
                 
@@ -1222,6 +1363,8 @@
                     setBoardZoom(scale);
                 }
                 
+                // Önbelleği güncelle
+                memoizedTiles.current = tiles;
                 return tiles;
             }, [gameState?.board]);
 
@@ -1256,7 +1399,7 @@
                     return;
                 }
                 
-                // Elinde taş varken pazara gitmeyi engelle
+                // Geçerli hamleleri kontrol et
                 const moves = calculateValidMoves(tile);
                 
                 if (moves.length > 0) {
@@ -1264,15 +1407,9 @@
                     setValidMoves(moves);
                     showNotification('Daş seçildi. Mövqe seçin', 'info');
                 } else {
-                    // Geçerli hamle yoksa, pazara gitmeden uyarı ver
-                    showNotification('Bu daşla oynaya bilməzsiniz! Bazardan çəkmək istəyirsiniz?', 'warning');
-                    // Otomatik pazara gitme yerine kullanıcıya seçenek sun
-                    setTimeout(() => {
-                        const confirmDraw = window.confirm('Elində oynaya biləcəyin daş yoxdur. Bazardan çəkmək istəyirsiniz?');
-                        if (confirmDraw) {
-                            drawFromMarket();
-                        }
-                    }, 500);
+                    // Sadece seçili taşı değiştir, uyarı gösterme
+                    setSelectedTileIndex(null);
+                    setValidMoves([]);
                 }
             };
 
@@ -1613,18 +1750,31 @@
                                                 {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
                                             </div>
                                             
-                                            <div className="flex-1">
-                                                <div className="text-white font-bold text-base md:text-lg">{player.username || player.firstName}</div>
-                                                <div className="flex gap-2 text-xs md:text-sm">
-                                                    <span className="text-green-400">✓ {player.wins}</span>
-                                                    <span className="text-red-400">✗ {player.losses}</span>
-                                                    <span className="text-yellow-400">🔥 {player.winStreak}</span>
+                                            <div className="flex items-center gap-3 flex-1">
+                                                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/20">
+                                                    <img 
+                                                        src={player.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(player.username || 'U')}&background=random`}
+                                                        alt={player.username}
+                                                        className="w-full h-full object-cover"
+                                                        onError={(e) => {
+                                                            e.target.onerror = null;
+                                                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(player.username || 'U')}&background=random`;
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <div className="text-white font-bold text-base md:text-lg">{player.username || player.firstName}</div>
+                                                    <div className="flex gap-2 text-xs md:text-sm">
+                                                        <span className="text-green-400">✓ {player.wins || 0}</span>
+                                                        <span className="text-red-400">✗ {player.losses || 0}</span>
+                                                        <span className="text-yellow-400">🔥 {player.winStreak || 0}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                             
                                             <div className="text-right">
                                                 <div className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-bold mb-1">
-                                                    {player.elo} ELO
+                                                    {player.elo || 0} ELO
                                                 </div>
                                                 <div className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-2 md:px-3 py-1 rounded-full text-xs font-bold">
                                                     SƏV {Math.min(player.level || 0, 10)}
@@ -1684,40 +1834,32 @@
                         {/* ÜST PANEL: Rakip */}
                         <div className="h-14 md:h-16 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between px-3 md:px-4 z-20">
                             <div className="flex items-center gap-2 md:gap-3">
-                                {opponent?.photoUrl ? (
+                                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-yellow-400 shadow-lg">
                                     <img
-                                        src={opponent.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(opponent.username) + '&background=FFC107&color=000'}
+                                        src={opponent?.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(opponent?.username || 'R')}&background=FFC107&color=000`}
                                         alt="Rəqib"
-                                        className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-yellow-400 shadow-lg object-cover"
+                                        className="w-full h-full object-cover"
                                         onError={(e) => {
                                             e.target.onerror = null;
-                                            e.target.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(opponent.username) + '&background=FFC107&color=000';
+                                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(opponent?.username || 'R')}&background=FFC107&color=000`;
                                         }}
                                     />
-                                ) : (
-                                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center shadow-lg">
-                                        👤
-                                    </div>
-                                )}
+                                </div>
                                 <div>
-                                    <div className="text-white text-xs md:text-sm font-bold">
-                                        {opponent?.name || opponent?.username || 'Rəqib'}
-                                    </div>
-                                    <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full">
-                                        🎲 {opponentHandCount}
-                                    </div>
+                                    <div className="text-white font-bold text-sm md:text-base">{opponent?.username || 'Rəqib'}</div>
+                                    <div className="text-yellow-400 text-xs">{opponent?.elo ? opponent.elo + ' ELO' : ''}</div>
                                 </div>
                             </div>
-                            <div className="text-center">
-                                {isMyTurn ? (
-                                    <div className="bg-yellow-500 text-black text-xs font-bold px-3 py-1 rounded-full animate-pulse turn-indicator">
-                                        ⚡ SİZİN NÖVBƏNİZ
-                                    </div>
-                                ) : (
-                                    <div className="text-gray-400 text-xs font-medium bg-black/40 px-3 py-1 rounded-full">
-                                        ⏳ Rəqib Oynayır...
+                            
+                            <div className="flex items-center gap-2">
+                                {gameState?.turn === opponent?.id && (
+                                    <div className="bg-yellow-500 text-black px-2 py-0.5 rounded-full text-xs font-bold animate-pulse">
+                                        NÖVBƏSİ
                                     </div>
                                 )}
+                                <div className="bg-black/50 text-white px-2 py-0.5 rounded-full text-xs font-bold">
+                                    {opponentHandCount} DAŞ
+                                </div>
                             </div>
                         </div>
 
@@ -1752,7 +1894,7 @@
                                                 style={{
                                                     left: `${position.x}px`,
                                                     top: `${position.y}px`,
-                                                    transform: 'translate(-50%, -50%)'
+                                                    transform: 'translate(-50%, -50%) rotate(90deg)'
                                                 }}
                                             >
                                                 <DominoTile 
@@ -1858,40 +2000,36 @@
                         {/* ALT PANEL: Oyuncu Eli - ESKİ DİZİLİM */}
                         <div className="player-hand-section">
                             <div className="flex justify-between items-center px-4 mb-2">
-                                <div className="flex items-center gap-3">
-                                    <div className="flex items-center gap-2">
-                                        {playerData?.photoUrl ? (
-                                            <img
-                                                src={playerData.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(playerData.username) + '&background=4CAF50&color=fff'}
-                                                alt="Siz"
-                                                className="w-8 h-8 rounded-full border-2 border-green-400 shadow-lg object-cover"
-                                                onError={(e) => {
-                                                    e.target.onerror = null;
-                                                    e.target.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(playerData.username) + '&background=4CAF50&color=fff';
-                                                }}
-                                            />
-                                        ) : (
-                                            <div className="w-8 h-8 rounded-full bg-green-700 border-2 border-green-600 flex items-center justify-center shadow-lg">
-                                                👤
-                                            </div>
-                                        )}
-                                        <div>
-                                            <div className="text-white text-sm font-bold">
-                                                {playerData?.username || 'Siz'}
-                                            </div>
-                                            <div className="text-xs text-gray-300">
-                                                🎲 {myHand.length} taş
-                                            </div>
-                                        </div>
+                                <div className="flex justify-between items-center px-4 mb-2">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-green-400 shadow-lg">
+                                        <img
+                                            src={playerData?.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(playerData?.username || 'S')}&background=4CAF50&color=fff`}
+                                            alt="Siz"
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                e.target.onerror = null;
+                                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(playerData?.username || 'S')}&background=4CAF50&color=fff`;
+                                            }}
+                                        />
                                     </div>
-                                    
-                                    {marketSize > 0 && (
-                                        <div className="market-display">
-                                            <span className="text-yellow-400 text-sm font-bold">Bazar: {marketSize}</span>
-                                        </div>
-                                    )}
+                                    <div>
+                                        <div className="text-white font-bold text-sm">{playerData?.username || 'Siz'}</div>
+                                        <div className="text-green-400 text-xs">{playerData?.elo ? playerData.elo + ' ELO' : ''}</div>
+                                    </div>
                                 </div>
                                 
+                                <div className="flex items-center gap-2">
+                                    {isMyTurn && (
+                                        <div className="bg-green-500 text-black px-2 py-0.5 rounded-full text-xs font-bold animate-pulse">
+                                            NÖVBƏNİZ
+                                        </div>
+                                    )}
+                                    <div className="bg-black/50 text-white px-2 py-0.5 rounded-full text-xs font-bold">
+                                        {myHand?.length || 0} DAŞ
+                                    </div>
+                                </div>
+                            </div>    
                                 {isMyTurn ? (
                                     <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white text-sm font-bold px-4 py-2 rounded-full animate-pulse shadow-lg">
                                         ⚡ SİZİN NÖVBƏNİZ
