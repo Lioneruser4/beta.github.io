@@ -624,7 +624,7 @@
                             roomCode: storedRoomCode
                         });
                     } else {
-                        setScreen('lobby');
+                        if (screen === 'loading') setScreen('lobby');
                     }
                 };
                 
@@ -799,20 +799,11 @@
             // --- İLK YÜKLEME VE AUTH ---
             useEffect(() => {
                 // Bağlantı kontrolü için interval
-                let loadingTimeout;
                 connectionCheckRef.current = setInterval(() => {
                     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                         sendMessage({ type: 'ping' });
                     }
                 }, 15000);
-
-                // Yükleme ekranında takılmayı önlemek için timeout
-                loadingTimeout = setTimeout(() => {
-                    if (screen === 'loading') {
-                        showNotification("Yükləmə çox uzun çəkdi. Lobbiyə yönləndirilir...", "warning");
-                        setScreen('lobby');
-                    }
-                }, 15000); // 15 saniyə gözlə
 
                 // Əvvəlcə auth, sonra connect
                 initializeTelegramAuth();
@@ -820,7 +811,6 @@
                 return () => { 
                     if (wsRef.current) wsRef.current.close(); 
                     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-                    if (loadingTimeout) clearTimeout(loadingTimeout); 
                     if (connectionCheckRef.current) clearInterval(connectionCheckRef.current);
                 };
             }, []);
@@ -1151,8 +1141,6 @@
                     position: position,
                     tile: myHand[selectedTileIndex] // Sunucu tarafında doğrulamayı kolaylaştırır
                 });
-                
-                setValidMoves([]);
             };
 
             const drawFromMarket = () => {
