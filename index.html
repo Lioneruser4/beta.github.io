@@ -1656,17 +1656,25 @@
                         <div className="w-full max-w-md bg-black/40 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
                             {playerData && (
                                 <div className="mb-6 text-center">
-                                    <h2 className="text-white text-2xl font-bold mb-2">{playerData.username}</h2>
-                                    {!playerData.isGuest && (
-                                        <div className="flex justify-center gap-3 mt-2">
-                                            <span className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-sm font-bold">
-                                                SƏV {Math.min(playerData.level || 0, 10)}
-                                            </span>
-                                            <span className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-3 py-1 rounded-full text-sm font-bold">
-                                                {playerData.elo} ELO
-                                            </span>
+                                    <div className="flex flex-col items-center">
+                                        <div className="w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden border-2 border-yellow-400 mb-2">
+                                            <img 
+                                                src={playerData.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(playerData.username || 'U')}&background=random`}
+                                                alt={playerData.username}
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    e.target.onerror = null;
+                                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(playerData.username || 'U')}&background=random`;
+                                                }}
+                                            />
                                         </div>
-                                    )}
+                                        <h2 className="text-white text-xl md:text-2xl font-bold">{playerData.username}</h2>
+                                        {!playerData.isGuest && (
+                                            <div className="text-yellow-400 text-sm">
+                                                {playerData.elo || 0} ELO • Səviyyə {playerData.level || 1}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
 
@@ -1896,10 +1904,10 @@
                         {/* ÜST PANEL: Rakip */}
                         <div className="h-14 md:h-16 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between px-3 md:px-4 z-20">
                             <div className="flex items-center gap-2 md:gap-3">
-                                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-yellow-400 shadow-lg">
+                                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full overflow-hidden border-2 border-yellow-400 shadow-lg">
                                     <img
                                         src={opponent?.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(opponent?.username || 'R')}&background=FFC107&color=000`}
-                                        alt="Rəqib"
+                                        alt={opponent?.username || 'Rəqib'}
                                         className="w-full h-full object-cover"
                                         onError={(e) => {
                                             e.target.onerror = null;
@@ -1908,19 +1916,19 @@
                                     />
                                 </div>
                                 <div>
-                                    <div className="text-white font-bold text-sm md:text-base">{opponent?.username || 'Rəqib'}</div>
+                                    <div className="text-white font-bold text-sm">{opponent?.username || 'Rəqib'}</div>
                                     <div className="text-yellow-400 text-xs">{opponent?.elo ? opponent.elo + ' ELO' : ''}</div>
                                 </div>
                             </div>
                             
                             <div className="flex items-center gap-2">
-                                {gameState?.turn === opponent?.id && (
-                                    <div className="bg-yellow-500 text-black px-2 py-0.5 rounded-full text-xs font-bold animate-pulse">
-                                        NÖVBƏSİ
+                                {!isMyTurn && (
+                                    <div className="bg-red-500 text-black px-2 py-0.5 rounded-full text-xs font-bold animate-pulse">
+                                        RƏQİBİN NÖVBƏSİ
                                     </div>
                                 )}
                                 <div className="bg-black/50 text-white px-2 py-0.5 rounded-full text-xs font-bold">
-                                    {opponentHandCount} DAŞ
+                                    {opponentTilesCount} DAŞ
                                 </div>
                             </div>
                         </div>
@@ -2048,15 +2056,14 @@
                             </div>
                         </div>
 
-                        {/* ALT PANEL: Oyuncu Eli - ESKİ DİZİLİM */}
+                        {/* ALT PANEL: Oyuncu Eli */}
                         <div className="player-hand-section">
-                            <div className="flex justify-between items-center px-4 mb-2">
-                                <div className="flex justify-between items-center px-4 mb-2">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-green-400 shadow-lg">
+                            <div className="flex justify-between items-center px-4 py-2 bg-black/40 border-t border-white/10">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-green-400">
                                         <img
                                             src={playerData?.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(playerData?.username || 'S')}&background=4CAF50&color=fff`}
-                                            alt="Siz"
+                                            alt={playerData?.username || 'Siz'}
                                             className="w-full h-full object-cover"
                                             onError={(e) => {
                                                 e.target.onerror = null;
@@ -2071,12 +2078,14 @@
                                 </div>
                                 
                                 <div className="flex items-center gap-2">
-                                    {isMyTurn && (
-                                        <div className="bg-green-500 text-black px-2 py-0.5 rounded-full text-xs font-bold animate-pulse">
+                                    {isMyTurn ? (
+                                        <div className="bg-green-500 text-black px-3 py-1 rounded-full text-xs font-bold animate-pulse">
                                             NÖVBƏNİZ
                                         </div>
+                                    ) : (
+                                        <div className="text-gray-400 text-xs">Gözləyin...</div>
                                     )}
-                                    <div className="bg-black/50 text-white px-2 py-0.5 rounded-full text-xs font-bold">
+                                    <div className="bg-black/50 text-white px-3 py-1 rounded-full text-xs font-bold">
                                         {myHand?.length || 0} DAŞ
                                     </div>
                                 </div>
