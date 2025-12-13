@@ -801,10 +801,14 @@
             // --- İLK YÜKLEME VE AUTH ---
             useEffect(() => {
                 const startApp = async () => {
-                    // Əvvəlcə auth, sonra connect
-                    await initializeTelegramAuth();
-                    connectToServer();
+                    if (startApp.hasRun) return;
+                    startApp.hasRun = true;
+                    
+                    console.log('🚀 Tətbiq başladılır...');
+                    await initializeTelegramAuth(); // Auth-u gözlə
+                    connectToServer(); // Sonra serverə qoşul
                 };
+                startApp.hasRun = false;
 
                 connectionCheckRef.current = setInterval(() => {
                     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -812,8 +816,12 @@
                     }
                 }, 15000);
 
-                // Telegram mühitinin tam hazır olmasını gözlə
-                tg.ready(() => startApp());
+                // Telegram mühitinin hazır olmasını gözlə, amma sonsuza qədər deyil.
+                if (tg) {
+                    tg.ready(() => startApp());
+                }
+                // Ehtiyat planı: Əgər tg.ready 2 saniyə ərzində işə düşməsə, yenə də başla.
+                setTimeout(startApp, 2000);
                 
                 return () => { 
                     if (wsRef.current) wsRef.current.close(); 
