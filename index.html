@@ -1067,13 +1067,17 @@
                     }
 
     return () => {
-        board.removeEventListener('touchstart', handleTouchStart);
-        board.removeEventListener('touchmove', handleTouchMove);
-        board.removeEventListener('touchend', handleTouchEnd);
-        board.removeEventListener('touchcancel', handleTouchEnd);
-        board.removeEventListener('wheel', handleWheel);
+        const board = boardContainerRef.current;
+        if (board) {
+            board.removeEventListener('touchstart', handleTouchStart);
+            board.removeEventListener('touchmove', handleTouchMove);
+            board.removeEventListener('touchend', handleTouchEnd);
+            board.removeEventListener('touchcancel', handleTouchEnd);
+            board.removeEventListener('wheel', handleWheel);
+        }
+        document.removeEventListener('mouseup', handleMouseUp);
     };
-}, [handleTouchStart, handleTouchMove, handleTouchEnd, handleWheel, boardZoom, boardPosition]);
+}, [handleTouchStart, handleTouchMove, handleTouchEnd, handleWheel, handleMouseUp]);
 
 // ... (unchanged code)
                         document.removeEventListener('mouseup', handleMouseUp);
