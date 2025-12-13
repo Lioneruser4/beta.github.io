@@ -916,25 +916,52 @@
                         break;
                         
                     case 'gameEnd':
-                        const isWinner = data.isWinner === true;
-                        const isLoser = data.isLoser === true;
+                        const gameWon = data.isWinner === true || data.winnerId === (playerData?.id || '');
+                        const gameLost = data.isLoser === true || (data.loserId && data.loserId === (playerData?.id || ''));
+                        const isGameDraw = data.isDraw === true;
+                        
+                        // Clear any pending timeouts
+                        if (reconnectTimerRef.current) {
+                            clearTimeout(reconnectTimerRef.current);
+                            reconnectTimerRef.current = null;
+                        }
+                        
+                        // Prepare end game message
+                        let endMessage = data.message || '';
+                        if (!endMessage) {
+                            if (gameWon) {
+                                endMessage = 'Təbriklər! Qalib gəldiniz! 🎉';
+                            } else if (gameLost) {
+                                endMessage = 'Təəssüf ki, məğlub oldunuz. Bir daha cəhd edin!';
+                            } else if (isGameDraw) {
+                                endMessage = 'Oyun bərabərə bitdi!';
+                            }
+                        }
                         
                         setEndInfo({
-                            winnerName: data.winnerName,
-                            loserName: data.loserName,
-                            isRanked: data.isRanked,
-                            isWinner: isWinner,
-                            isLoser: isLoser,
-                            isDraw: data.isDraw,
-                            eloChange: data.eloChanges ? (isWinner ? data.eloChanges.winner : data.eloChanges.loser) : 0,
-                            message: data.message
+                            winnerName: data.winnerName || (gameWon ? (playerData?.username || 'Siz') : ''),
+                            loserName: data.loserName || (gameLost ? (playerData?.username || 'Siz') : ''),
+                            isRanked: data.isRanked || false,
+                            isWinner: gameWon,
+                            isLoser: gameLost,
+                            isDraw: isGameDraw,
+                            eloChange: data.eloChanges 
+                                ? (gameWon ? data.eloChanges.winner : (gameLost ? data.eloChanges.loser : 0))
+                                : 0,
+                            message: endMessage
                         });
+                        
                         setScreen('end');
                         
-                        setTimeout(() => {
-                            resetGameClientState(); 
+                        // Reset game state after a delay
+                        const resetDelay = isGameDraw || gameWon ? 5000 : 3000;
+                        const resetTimer = setTimeout(() => {
+                            resetGameClientState();
                             setScreen('lobby');
-                        }, 5000); 
+                        }, resetDelay);
+                        
+                        // Clean up the timer if component unmounts
+                        return () => clearTimeout(resetTimer);
                         break;
                         
                     case 'searchCancelled':
@@ -961,19 +988,54 @@
                         
                     case 'opponentDisconnected':
                         showNotification('Rəqib bağlantısı kəsildi. 30 saniyə gözlənilir...', 'warning');
+                        // Start a timeout to handle if opponent doesn't reconnect
+                        if (reconnectTimerRef.current) {
+                            clearTimeout(reconnectTimerRef.current);
+                        }
+                        reconnectTimerRef.current = setTimeout(() => {
+                            // If we're still in the game and opponent hasn't reconnected
+                            if (screen === 'game' && gameState) {
+                                setEndInfo({
+                                    winnerName: playerData?.username || 'Siz',
+                                    isWinner: true,
+                                    isLoser: false,
+                                    isDraw: false,
+                                    message: 'Rəqib bağlantısı kəsildiyi üçün qalib gəldiniz!'
+                                });
+                                setScreen('end');
+                                resetGameClientState();
+                            }
+                        }, 30000); // 30 seconds timeout
                         break;
                         
                     case 'opponentReconnected':
                         showNotification('Rəqib yenidən qoşuldu!', 'info');
+                        // Clear any pending timeout since opponent reconnected
+                        if (reconnectTimerRef.current) {
+                            clearTimeout(reconnectTimerRef.current);
+                            reconnectTimerRef.current = null;
+                        }
                         break;
                         
                     case 'opponentTimeout':
-                        showNotification('Rəqib zaman aşımına uğradı. Oyun bitdi.', 'info');
+                    case 'playerLeft':
+                        const isWinner = data.winnerId === (playerData?.id || '');
+                        showNotification(
+                            isWinner ? 'Rəqib oyundan çıxdı! Qalib sizsiniz!' : 'Rəqib oyundan çıxdı!', 
+                            isWinner ? 'success' : 'info'
+                        );
+                        
                         setEndInfo({
-                            winnerName: data.winnerName || playerData?.username,
-                            isWinner: true,
-                            message: 'Rəqib zaman aşımına uğradı'
+                            winnerName: isWinner ? (playerData?.username || 'Siz') : (data.winnerName || 'Rəqib'),
+                            isWinner: isWinner,
+                            isLoser: !isWinner,
+                            isDraw: false,
+                            eloChange: data.eloChanges ? (isWinner ? data.eloChanges.winner : data.eloChanges.loser) : 0,
+                            message: isWinner ? 'Rəqib oyundan çıxdığı üçün qalib gəldiniz!' : 'Rəqib oyundan çıxdı',
+                            isRanked: data.isRanked || false
                         });
+                        
+                        resetGameClientState();
                         setScreen('end');
                         break;
                         
