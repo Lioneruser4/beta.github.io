@@ -886,31 +886,44 @@
                         
                     case 'reconnectSuccess':
                     case 'gameStart':
-                        console.log('🎮 Oyun başladı/tekrar bağlandı!', data.gameState);
-                        // Önce oyun durumunu güncelle
-                        setGameState(prev => ({
-                            ...data.gameState,
-                            playerId: data.gameState.playerId || prev?.playerId,
-                            roomCode: data.gameState.roomCode || prev?.roomCode
-                        }));
-                        
-                        // Sonra ekranı güncelle
-                        setScreen('game');
-                        setSelectedTileIndex(null);
-                        setValidMoves([]);
-                        setSearching(false);
+                        console.log('🎮 Oyun başlıyor! Gelen veri:', data);
                         
                         // Arama zamanlayıcısını temizle
                         if (searchTimerRef.current) {
+                            console.log('Arama zamanlayıcısı temizleniyor...');
                             clearInterval(searchTimerRef.current);
                             searchTimerRef.current = null;
                         }
                         
+                        // Oyun durumunu güncelle
+                        const newGameState = {
+                            ...data.gameState,
+                            playerId: data.gameState.playerId || gameState?.playerId,
+                            roomCode: data.gameState.roomCode || gameState?.roomCode
+                        };
+                        
+                        console.log('Yeni oyun durumu ayarlanıyor:', newGameState);
+                        setGameState(newGameState);
+                        
+                        // Arama durumunu sıfırla
+                        setSearching(false);
+                        setSearchTime(0);
+                        
+                        // Ekranı güncelle
+                        console.log('Oyun ekranına geçiliyor...');
+                        setScreen('game');
+                        setSelectedTileIndex(null);
+                        setValidMoves([]);
+                        
                         // Yerel depolamayı güncelle
-                        if (data.gameState.roomCode && data.gameState.playerId) {
-                            localStorage.setItem(LOCAL_STORAGE_ROOM, data.gameState.roomCode);
-                            localStorage.setItem(LOCAL_STORAGE_PLAYER, data.gameState.playerId);
+                        if (newGameState.roomCode && newGameState.playerId) {
+                            console.log('Yerel depolama güncelleniyor...');
+                            localStorage.setItem(LOCAL_STORAGE_ROOM, newGameState.roomCode);
+                            localStorage.setItem(LOCAL_STORAGE_PLAYER, newGameState.playerId);
                         }
+                        
+                        // Oyun başlangıç bildirimi
+                        showNotification('Oyun başladı! İyi şanslar!', 'success');
                         
                         if (searchTimerRef.current) {
                             clearInterval(searchTimerRef.current);
@@ -1741,23 +1754,36 @@
                                     if(!playerData) return showNotification('Adınızı daxil edin', 'error');
                                     if(searching) return;
                                     
+                                    console.log('Eşleşme aranıyor...');
                                     setScreen('searching');
                                     setSearching(true);
                                     setSearchTime(0);
                                     
+                                    // Eğer önceki bir arama zamanlayıcısı varsa temizle
+                                    if (searchTimerRef.current) {
+                                        clearInterval(searchTimerRef.current);
+                                    }
+                                    
                                     searchTimerRef.current = setInterval(() => {
-                                        setSearchTime(prev => prev + 1);
+                                        setSearchTime(prev => {
+                                            console.log(`Arama süresi: ${prev + 1} saniye`);
+                                            return prev + 1;
+                                        });
                                     }, 1000);
                                     
-                                    sendMessage({ 
+                                    const matchRequest = { 
                                         type: 'findMatch',
                                         telegramId: playerData.telegramId,
                                         username: playerData.username,
                                         playerName: playerData.username,
                                         isGuest: playerData.isGuest,
                                         level: playerData.level,
-                                        elo: playerData.elo
-                                    });
+                                        elo: playerData.elo,
+                                        timestamp: Date.now()
+                                    };
+                                    
+                                    console.log('Eşleşme isteği gönderiliyor:', matchRequest);
+                                    sendMessage(matchRequest);
                                 }}
                                 disabled={!connected || searching}
                                 className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4 flex items-center justify-center gap-2"
@@ -2166,31 +2192,65 @@
                 );
             }
 
-            // Yüklenme ekranı
-            if (screen === 'loading') {
+            // Arama ekranı
+            if (screen === 'searching' || screen === 'loading') {
+                const cancelSearch = () => {
+                    console.log('Arama iptal ediliyor...');
+                    setSearching(false);
+                    setSearchTime(0);
+                    setScreen('lobby');
+                    
+                    if (searchTimerRef.current) {
+                        clearInterval(searchTimerRef.current);
+                        searchTimerRef.current = null;
+                    }
+                    
+                    // Sunucuya arama iptalini bildir
+                    sendMessage({
+                        type: 'cancelSearch',
+                        playerId: playerData?.telegramId
+                    });
+                };
+                
                 return (
-                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center p-4">
-                        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-400 mb-4"></div>
-                        <p className="text-white text-xl font-bold mb-2">Oyun aranıyor...</p>
-                        <p className="text-gray-300 text-center max-w-sm">
+                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center p-6">
+                        <div className="text-center mb-8">
+                            <h1 className="text-3xl md:text-4xl font-black text-white drop-shadow-lg mb-2">
+                                🎮 OYUN ARANIYOR
+                            </h1>
+                            <p className="text-yellow-300 text-sm">Lütfen bekleyiniz...</p>
+                        </div>
+                        
+                        <div className="relative w-32 h-32 mb-6">
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="w-full h-full rounded-full border-4 border-yellow-400 border-t-transparent animate-spin"></div>
+                            </div>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="text-4xl">🎲</div>
+                            </div>
+                        </div>
+                        
+                        <p className="text-gray-300 text-center text-lg mb-2">
                             {searchTime > 0 
                                 ? `${searchTime} saniyedir eşleşme aranıyor...`
-                                : 'Lütfen bekleyin, uygun bir rakip aranıyor...'}
+                                : 'Uygun bir rakip aranıyor...'}
                         </p>
+                        
+                        <div className="w-full max-w-xs bg-black/30 rounded-full h-2.5 mb-8">
+                            <div 
+                                className="bg-yellow-400 h-2.5 rounded-full" 
+                                style={{ width: `${Math.min(searchTime * 5, 100)}%` }}
+                            ></div>
+                        </div>
+                        
                         <button 
-                            onClick={() => {
-                                setScreen('lobby');
-                                setSearching(false);
-                                setSearchTime(0);
-                                if (searchTimerRef.current) {
-                                    clearInterval(searchTimerRef.current);
-                                    searchTimerRef.current = null;
-                                }
-                            }}
-                            className="mt-6 px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition-colors"
+                            onClick={cancelSearch}
+                            className="px-8 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2"
                         >
-                            Aramayı İptal Et
-                        </button>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+                            </svg>
+                            Arama İptal
                     </div>
                 );
             }
