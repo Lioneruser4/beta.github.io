@@ -18,19 +18,44 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     
     <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body { 
             background-color: #1b4d3e;
             background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23153d31' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z'/%3E%3C/g%3E%3C/svg%3E");
             overflow: hidden; 
-            touch-action: pan-x pan-y pinch-zoom;
-            -webkit-tap-highlight-color: transparent;
+            touch-action: none;
             user-select: none;
             -webkit-user-select: none;
             overscroll-behavior: none;
+            font-family: 'Roboto', sans-serif;
+            height: 100vh;
+            width: 100vw;
+            position: fixed;
         }
         
-        .pip-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 100%; padding: 2px; }
-        .pip { background-color: #111; border-radius: 50%; width: 5px; height: 5px; margin: auto; box-shadow: inset 0 1px 1px rgba(255,255,255,0.2); }
+        .pip-grid { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            grid-template-rows: repeat(3, 1fr); 
+            width: 100%; 
+            height: 100%; 
+            padding: 2px; 
+        }
+        
+        .pip { 
+            background-color: #111; 
+            border-radius: 50%; 
+            width: 6px; 
+            height: 6px; 
+            margin: auto; 
+            box-shadow: inset 0 1px 1px rgba(255,255,255,0.2); 
+        }
         
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -40,39 +65,41 @@
             width: 100%;
             height: 50vh;
             position: relative;
-            overflow: auto;
-            touch-action: pan-x pan-y pinch-zoom;
-            background: rgba(27, 77, 62, 0.7);
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
+            overflow: hidden;
+            touch-action: none;
+            background: linear-gradient(135deg, rgba(27, 77, 62, 0.95) 0%, rgba(15, 43, 35, 0.95) 100%);
+            border: 3px solid rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            margin: 10px auto;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.3);
         }
         
         .domino-board-inner {
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            margin: auto;
+            top: 50%;
+            left: 50%;
+            transform-origin: center center;
+            transition: transform 0.15s ease-out;
+            will-change: transform;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: transform 0.1s ease-out;
-            will-change: transform;
-            min-width: fit-content;
-            min-height: fit-content;
-            padding: 20px;
         }
         
         .domino-tile {
             display: inline-flex;
-            background: #fff;
-            border: 2px solid #333;
+            background: linear-gradient(145deg, #ffffff, #f0f0f0);
+            border: 2px solid #222;
             border-radius: 8px;
-            box-shadow: 0 4px 0 #c7c7c7, 0 6px 6px rgba(0,0,0,0.4);
-            transition: all 0.2s ease;
+            box-shadow: 0 4px 0 #aaa, 0 6px 6px rgba(0,0,0,0.3);
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             flex-shrink: 0;
             position: relative;
+            overflow: hidden;
+        }
+        
+        .domino-tile:active {
+            transform: scale(0.95) !important;
         }
         
         .domino-tile.horizontal {
@@ -92,93 +119,239 @@
         }
         
         .domino-divider {
-            background: #333;
+            background: #222;
             position: absolute;
             z-index: 1;
+            box-shadow: 0 0 2px rgba(0,0,0,0.5);
         }
         
         .domino-tile.horizontal .domino-divider {
-            width: 2px;
-            height: 80%;
-            top: 10%;
+            width: 3px;
+            height: 85%;
+            top: 7.5%;
             left: 50%;
             transform: translateX(-50%);
         }
         
         .domino-tile.vertical .domino-divider {
-            height: 2px;
-            width: 80%;
-            left: 10%;
+            height: 3px;
+            width: 85%;
+            left: 7.5%;
             top: 50%;
             transform: translateY(-50%);
         }
         
-        /* Taş pozisyonları için özel class'lar */
-        .domino-direction-right { transform: rotate(0deg); }
-        .domino-direction-left { transform: rotate(180deg); }
-        .domino-direction-up { transform: rotate(-90deg); }
-        .domino-direction-down { transform: rotate(90deg); }
+        /* Taş boyutları */
+        .tile-size-hand {
+            width: 65px;
+            height: 32px;
+            margin: 4px;
+        }
+        
+        .tile-size-board {
+            width: 55px;
+            height: 27px;
+        }
+        
+        /* Seçili taş efekti */
+        .selected-tile {
+            transform: translateY(-8px) scale(1.15) !important;
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.8), 0 6px 0 #aaa, 0 10px 15px rgba(0,0,0,0.4);
+            z-index: 100;
+            border-color: #f59e0b;
+        }
         
         /* Valid Move Indicators */
         .valid-move-indicator {
             position: absolute;
             z-index: 50;
-            border: 3px dashed rgba(251, 191, 36, 0.8);
+            border: 3px dashed rgba(251, 191, 36, 0.9);
             border-radius: 10px;
             background: rgba(251, 191, 36, 0.15);
             animation: pulse-glow 1.5s infinite;
-            pointer-events: none;
+            pointer-events: auto;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        
+        .valid-move-indicator:active {
+            transform: scale(0.95);
+            background: rgba(251, 191, 36, 0.3);
         }
         
         @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.6), 0 0 40px rgba(251, 191, 36, 0.3); }
-            50% { box-shadow: 0 0 30px rgba(251, 191, 36, 0.9), 0 0 60px rgba(251, 191, 36, 0.5); }
-        }
-        
-        /* Pinch Zoom için */
-        .pinch-area {
-            touch-action: none;
-        }
-        
-        /* Dikey el taşları */
-        .hand-tiles-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-            padding: 10px;
-            max-height: 40vh;
-            overflow-y: auto;
-        }
-        
-        .hand-tile-wrapper {
-            display: flex;
-            justify-content: center;
-            width: 100%;
-        }
-        
-        /* Taş boyutları */
-        .tile-size-hand {
-            width: 60px;
-            height: 120px;
-        }
-        
-        .tile-size-board {
-            width: 45px;
-            height: 90px;
+            0%, 100% { 
+                box-shadow: 0 0 15px rgba(251, 191, 36, 0.6), 0 0 30px rgba(251, 191, 36, 0.3); 
+                border-color: rgba(251, 191, 36, 0.9);
+            }
+            50% { 
+                box-shadow: 0 0 25px rgba(251, 191, 36, 0.9), 0 0 50px rgba(251, 191, 36, 0.5); 
+                border-color: rgba(251, 191, 36, 1);
+            }
         }
         
         /* Board taş pozisyonları */
         .board-tile {
             position: absolute;
             transition: all 0.3s ease;
+            pointer-events: none;
         }
         
-        /* Seçili taş efekti */
-        .selected-tile {
-            transform: translateY(-10px) scale(1.1);
-            box-shadow: 0 0 20px rgba(251, 191, 36, 0.8), 0 4px 0 #c7c7c7, 0 6px 6px rgba(0,0,0,0.4);
+        /* El taşları container - YATAY DİZİLİM */
+        .hand-tiles-container {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            padding: 12px 8px;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
+            min-height: 80px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            margin: 0 8px;
+            scroll-snap-type: x mandatory;
+        }
+        
+        .hand-tile-wrapper {
+            scroll-snap-align: center;
+            flex-shrink: 0;
+        }
+        
+        /* Zoom hint */
+        .zoom-hint {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
             z-index: 100;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Game controls */
+        .game-controls {
+            position: absolute;
+            bottom: 70px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 100;
+        }
+        
+        .control-button {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+        
+        .control-button:active {
+            transform: scale(0.9);
+            background: rgba(0, 0, 0, 0.9);
+        }
+        
+        /* Board zoom info */
+        .board-zoom-info {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Animation for new tiles */
+        @keyframes tileSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .tile-slide-in {
+            animation: tileSlideIn 0.3s ease-out;
+        }
+        
+        /* Double tap to reset */
+        .double-tap-hint {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 640px) {
+            .tile-size-hand {
+                width: 60px;
+                height: 30px;
+                margin: 3px;
+            }
+            
+            .tile-size-board {
+                width: 50px;
+                height: 25px;
+            }
+            
+            .domino-board-container {
+                height: 45vh;
+            }
+            
+            .hand-tiles-container {
+                min-height: 70px;
+                padding: 10px 6px;
+            }
+        }
+        
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .tile-size-hand {
+                width: 70px;
+                height: 35px;
+            }
+            
+            .tile-size-board {
+                width: 60px;
+                height: 30px;
+            }
+            
+            .domino-board-container {
+                height: 55vh;
+            }
         }
     </style>
 </head>
@@ -208,40 +381,47 @@
             return (
                 <div className="pip-grid">
                     {[...Array(9)].map((_, i) => (
-                        <div key={i} className="pip" style={{ opacity: activePips.includes(i) ? 1 : 0 }}></div>
+                        <div key={i} className="pip" style={{ 
+                            opacity: activePips.includes(i) ? 1 : 0,
+                            transform: activePips.includes(i) ? 'scale(1)' : 'scale(0)',
+                            transition: 'all 0.2s ease'
+                        }}></div>
                     ))}
                 </div>
             );
         };
 
-        const DominoTile = ({ values, onClick, disabled, isSelected, direction = 'right', isBoardTile = false, style = {} }) => {
-            const isVertical = direction === 'up' || direction === 'down';
-            
+        const DominoTile = ({ values, onClick, disabled, isSelected, isBoardTile = false, style = {} }) => {
+            const handleClick = (e) => {
+                e.stopPropagation();
+                if (!disabled && onClick) {
+                    onClick();
+                }
+            };
+
             const baseClasses = `
-                domino-tile relative flex overflow-hidden bg-white border-2 border-gray-800 rounded-lg
-                transition-all duration-300 select-none
-                ${isVertical ? 'vertical' : 'horizontal'}
-                ${isSelected ? 'selected-tile ring-2 ring-yellow-500' : ''}
-                ${!disabled && !isBoardTile ? 'cursor-pointer active:scale-95 hover:brightness-110' : ''}
+                domino-tile relative flex overflow-hidden horizontal
+                ${isSelected ? 'selected-tile' : ''}
+                ${!disabled && !isBoardTile ? 'cursor-pointer hover:brightness-110' : ''}
                 ${disabled ? 'opacity-90 cursor-default' : ''}
-                ${isBoardTile ? 'shadow-lg' : 'shadow-2xl'}
+                tile-slide-in
             `;
 
             const sizeClass = isBoardTile ? 'tile-size-board' : 'tile-size-hand';
 
             return (
                 <div 
-                    onClick={onClick}
+                    onClick={handleClick}
                     className={`${baseClasses} ${sizeClass}`}
                     style={style}
                 >
-                    <div className={`domino-tile-face ${isVertical ? 'border-b-2' : 'border-r-2'} border-gray-800`}>
+                    <div className="domino-tile-face border-r-2 border-gray-800">
                         <RenderPips number={values[0]} />
                     </div>
                     <div className="domino-tile-face">
                         <RenderPips number={values[1]} />
                     </div>
-                    <div className={`domino-divider ${isVertical ? 'horizontal-divider' : 'vertical-divider'}`}></div>
+                    <div className="domino-divider vertical-divider"></div>
                 </div>
             );
         };
@@ -249,9 +429,11 @@
         const Toast = ({ message, type }) => {
             const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600', warning: 'bg-yellow-600' };
             return (
-                <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full shadow-lg text-white font-medium text-sm animate-slide-up flex items-center gap-2 ${colors[type] || colors.info}`}>
-                    <span>{type === 'success' ? '✓' : type === 'error' ? '✗' : type === 'warning' ? '⚠' : 'ℹ'}</span>
-                    {message}
+                <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full shadow-xl text-white font-medium text-sm animate-slide-up flex items-center gap-2 ${colors[type] || colors.info}`}>
+                    <span className="text-lg">
+                        {type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}
+                    </span>
+                    <span>{message}</span>
                 </div>
             );
         };
@@ -286,12 +468,15 @@
             const [isDragging, setIsDragging] = useState(false);
             const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
             const [pinchStart, setPinchStart] = useState({ distance: 0 });
+            const [showZoomHint, setShowZoomHint] = useState(true);
             
             const wsRef = useRef(null);
             const boardContainerRef = useRef(null);
+            const boardInnerRef = useRef(null);
             const searchTimerRef = useRef(null);
             const reconnectTimerRef = useRef(null);
             const lastTouchTimeRef = useRef(0);
+            const zoomHintTimeoutRef = useRef(null);
 
             // Reset Game State
             const resetGameClientState = () => {
@@ -324,7 +509,6 @@
                 }
                 
                 setReconnectAttemptCount(prev => prev + 1);
-                console.log(`⏳ Yenidən qoşulma cəhdi ${reconnectAttemptCount + 1}/${MAX_RECONNECT_ATTEMPTS}`);
                 reconnectTimerRef.current = setTimeout(connectToServer, 2000 * (reconnectAttemptCount + 1));
             };
 
@@ -349,7 +533,6 @@
                     const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
                     
                     if (storedRoomCode && storedPlayerId) {
-                        console.log('♻️ Qeyd edilmiş oyun tapıldı, yenidən qoşulma mesajı göndərilir...');
                         sendMessage({
                             type: 'reconnect',
                             playerId: storedPlayerId,
@@ -377,15 +560,12 @@
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify(msg));
                 } else {
-                    console.error('🚫 Socket açıq deyil, mesaj göndərilə bilmədi:', msg.type);
                     showNotification('Server bağlantısı yoxdur. Zəhmət olmasa gözləyin...', 'warning');
                 }
             };
             
             // --- Sunucu Mesaj İşleyici ---
             const handleServerMessage = (data) => {
-                console.log('📨 Server mesajı:', data.type, data);
-                
                 switch(data.type) {
                     case 'roomCreated':
                         setRoomCode(data.roomCode);
@@ -394,7 +574,6 @@
                         
                     case 'reconnectSuccess':
                     case 'gameStart':
-                        console.log('🎮 Oyun başladı/tekrar bağlandı!', data.gameState);
                         setGameState(data.gameState);
                         setScreen('game');
                         setSelectedTileIndex(null);
@@ -414,7 +593,6 @@
                         break;
                         
                     case 'gameUpdate':
-                        console.log('🔄 Oyun yenilənir...', data.gameState);
                         if (data.gameState && data.gameState.board) {
                             setGameState(prev => ({
                                 ...data.gameState,
@@ -500,6 +678,7 @@
                 return () => { 
                     if (wsRef.current) wsRef.current.close(); 
                     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+                    if (zoomHintTimeoutRef.current) clearTimeout(zoomHintTimeoutRef.current);
                 };
             }, []);
 
@@ -571,7 +750,7 @@
             // --- TOUCH/PINCH ZOOM HANDLERS ---
             const handleTouchStart = useCallback((e) => {
                 if (e.touches.length === 2) {
-                    // Pinch zoom başladı
+                    e.preventDefault();
                     const touch1 = e.touches[0];
                     const touch2 = e.touches[1];
                     const distance = Math.hypot(
@@ -579,21 +758,29 @@
                         touch2.clientY - touch1.clientY
                     );
                     setPinchStart({ distance });
-                    e.preventDefault();
                 } else if (e.touches.length === 1) {
-                    // Drag başladı
+                    e.preventDefault();
                     setIsDragging(true);
                     setDragStart({
                         x: e.touches[0].clientX - boardPosition.x,
                         y: e.touches[0].clientY - boardPosition.y
                     });
-                    e.preventDefault();
+                    
+                    // Çift tıklama kontrolü
+                    const currentTime = Date.now();
+                    if (currentTime - lastTouchTimeRef.current < 300) {
+                        // Çift tıklama - zoom reset
+                        setBoardZoom(1);
+                        setBoardPosition({ x: 0, y: 0 });
+                        showNotification('Masaya mərkəzləşdirildi', 'info');
+                    }
+                    lastTouchTimeRef.current = currentTime;
                 }
             }, [boardPosition]);
 
             const handleTouchMove = useCallback((e) => {
-                if (e.touches.length === 2) {
-                    // Pinch zoom devam ediyor
+                if (e.touches.length === 2 && pinchStart.distance > 0) {
+                    e.preventDefault();
                     const touch1 = e.touches[0];
                     const touch2 = e.touches[1];
                     const distance = Math.hypot(
@@ -601,53 +788,52 @@
                         touch2.clientY - touch1.clientY
                     );
                     
-                    if (pinchStart.distance > 0) {
-                        const scaleChange = distance / pinchStart.distance;
-                        setBoardZoom(prev => {
-                            const newZoom = prev * scaleChange;
-                            return Math.min(Math.max(newZoom, 0.5), 3);
-                        });
+                    const scaleChange = distance / pinchStart.distance;
+                    setBoardZoom(prev => {
+                        const newZoom = prev * scaleChange;
+                        return Math.min(Math.max(newZoom, 0.5), 3);
+                    });
+                    setPinchStart({ distance });
+                    
+                    // Zoom hint'i gizle
+                    if (showZoomHint) {
+                        setShowZoomHint(false);
                     }
-                    e.preventDefault();
                 } else if (e.touches.length === 1 && isDragging) {
-                    // Drag devam ediyor
+                    e.preventDefault();
                     const newX = e.touches[0].clientX - dragStart.x;
                     const newY = e.touches[0].clientY - dragStart.y;
                     setBoardPosition({ x: newX, y: newY });
-                    e.preventDefault();
                 }
-            }, [isDragging, dragStart, pinchStart]);
+            }, [isDragging, dragStart, pinchStart, showZoomHint]);
 
             const handleTouchEnd = useCallback((e) => {
                 setIsDragging(false);
                 setPinchStart({ distance: 0 });
                 
-                // Çift tıklama kontrolü (reset zoom)
-                const currentTime = new Date().getTime();
-                const timeDiff = currentTime - lastTouchTimeRef.current;
-                
-                if (timeDiff < 300 && e.touches.length === 0) {
-                    // Çift tıklama
-                    setBoardZoom(1);
-                    setBoardPosition({ x: 0, y: 0 });
-                }
-                
-                lastTouchTimeRef.current = currentTime;
-            }, []);
+                // Zoom hint'i 5 saniye sonra göster
+                if (zoomHintTimeoutRef.current) clearTimeout(zoomHintTimeoutRef.current);
+                zoomHintTimeoutRef.current = setTimeout(() => {
+                    if (screen === 'game' && boardZoom === 1) {
+                        setShowZoomHint(true);
+                    }
+                }, 5000);
+            }, [screen, boardZoom]);
 
-            // Mouse drag handlers
+            // Mouse handlers
             const handleMouseDown = useCallback((e) => {
-                if (e.button !== 0) return; // Sadece sol tıklama
+                if (e.button !== 0) return;
+                e.preventDefault();
                 setIsDragging(true);
                 setDragStart({
                     x: e.clientX - boardPosition.x,
                     y: e.clientY - boardPosition.y
                 });
-                e.preventDefault();
             }, [boardPosition]);
 
             const handleMouseMove = useCallback((e) => {
                 if (isDragging) {
+                    e.preventDefault();
                     const newX = e.clientX - dragStart.x;
                     const newY = e.clientY - dragStart.y;
                     setBoardPosition({ x: newX, y: newY });
@@ -658,7 +844,6 @@
                 setIsDragging(false);
             }, []);
 
-            // Wheel zoom handler
             const handleWheel = useCallback((e) => {
                 e.preventDefault();
                 const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
@@ -666,7 +851,12 @@
                     const newZoom = prev * zoomFactor;
                     return Math.min(Math.max(newZoom, 0.5), 3);
                 });
-            }, []);
+                
+                // Zoom hint'i gizle
+                if (showZoomHint) {
+                    setShowZoomHint(false);
+                }
+            }, [showZoomHint]);
 
             useEffect(() => {
                 const boardContainer = boardContainerRef.current;
@@ -676,7 +866,7 @@
                     boardContainer.addEventListener('touchend', handleTouchEnd);
                     boardContainer.addEventListener('mousedown', handleMouseDown);
                     boardContainer.addEventListener('mousemove', handleMouseMove);
-                    boardContainer.addEventListener('mouseup', handleMouseUp);
+                    document.addEventListener('mouseup', handleMouseUp);
                     boardContainer.addEventListener('wheel', handleWheel, { passive: false });
                     
                     return () => {
@@ -685,7 +875,7 @@
                         boardContainer.removeEventListener('touchend', handleTouchEnd);
                         boardContainer.removeEventListener('mousedown', handleMouseDown);
                         boardContainer.removeEventListener('mousemove', handleMouseMove);
-                        boardContainer.removeEventListener('mouseup', handleMouseUp);
+                        document.removeEventListener('mouseup', handleMouseUp);
                         boardContainer.removeEventListener('wheel', handleWheel);
                     };
                 }
@@ -696,7 +886,6 @@
             const isMyTurn = gameState?.currentPlayer === myPlayerId;
             const myHand = gameState?.players?.[myPlayerId]?.hand || []; 
             const marketSize = gameState?.market?.length || 0;
-            const canDrawFromMarket = marketSize > 0;
             
             const opponentHandCount = useMemo(() => {
                 if (!gameState || !gameState.players) return 0;
@@ -705,38 +894,49 @@
                 return gameState.players[opponentId]?.hand?.length || 0;
             }, [gameState, myPlayerId]);
 
-            // DOMINO BOARD TAŞLARINI YERLEŞTİRME
+            // DOMINO BOARD TAŞLARINI PROFESYONEL YERLEŞTİRME
             const renderBoardTiles = useMemo(() => {
                 if (!gameState?.board || gameState.board.length === 0) return [];
                 
                 const tiles = [];
                 const centerX = 0;
                 const centerY = 0;
+                let currentX = centerX;
+                let currentY = centerY;
+                let direction = 'right';
+                let lineLength = 0;
+                const maxLineLength = 8; // Her satırda maksimum 8 taş
                 
                 gameState.board.forEach((tile, index) => {
-                    let x = centerX;
-                    let y = centerY;
-                    let direction = 'right';
+                    // Her 8 taşta bir yön değiştir
+                    if (lineLength >= maxLineLength) {
+                        if (direction === 'right') {
+                            direction = 'down';
+                            currentY += 35;
+                        } else if (direction === 'down') {
+                            direction = 'left';
+                            currentX -= 55;
+                        } else if (direction === 'left') {
+                            direction = 'up';
+                            currentY -= 35;
+                        } else if (direction === 'up') {
+                            direction = 'right';
+                            currentX += 55;
+                        }
+                        lineLength = 0;
+                    }
                     
-                    // Board pozisyonları - domino oyunundaki gibi
-                    if (index === 0) {
-                        // İlk taş ortada
-                        x = centerX;
-                        y = centerY;
-                        direction = 'right';
-                    } else {
-                        // Önceki taşı al
-                        const prevTile = tiles[index - 1];
-                        const prevX = prevTile.position.x;
-                        const prevY = prevTile.position.y;
-                        const prevDirection = prevTile.direction;
-                        
-                        // Yönü belirle - sağa doğru devam et
-                        direction = 'right';
-                        
-                        // Pozisyonu hesapla
-                        x = prevX + 55; // Taşlar arası boşluk
-                        y = prevY;
+                    let x = currentX;
+                    let y = currentY;
+                    
+                    if (direction === 'right') {
+                        x += lineLength * 55;
+                    } else if (direction === 'left') {
+                        x -= lineLength * 55;
+                    } else if (direction === 'down') {
+                        y += lineLength * 35;
+                    } else if (direction === 'up') {
+                        y -= lineLength * 35;
                     }
                     
                     tiles.push({
@@ -745,6 +945,8 @@
                         direction,
                         position: { x, y }
                     });
+                    
+                    lineLength++;
                 });
                 
                 return tiles;
@@ -782,7 +984,7 @@
                 if (moves.length > 0) {
                     setSelectedTileIndex(index);
                     setValidMoves(moves);
-                    showNotification('Taş seçildi. Yerləşdirmək üçün board-da mövqe seçin', 'info');
+                    showNotification('Taş seçildi. Yerləşdirmək üçün mövqe seçin', 'info');
                 } else {
                     showNotification('Bu daşla oynaya bilməzsiniz', 'warning');
                 }
@@ -812,14 +1014,20 @@
                     return;
                 }
                 
-                if (!canDrawFromMarket) {
+                if (marketSize === 0) {
                     showNotification('Bazar boşdur!', 'warning');
                     return;
                 }
                 
-                console.log('🎲 Bazardan taş çekiliyor');
+                // Elinde oynanabilir taş var mı kontrol et
+                const canPlayFromHand = myHand.some(tile => calculateValidMoves(tile).length > 0);
+                if (canPlayFromHand) {
+                    showNotification('Elində oynaya biləcəyiniz daş var! Əvvəlcə onu oynayın.', 'error');
+                    return;
+                }
                 
                 sendMessage({ type: 'drawFromMarket' });
+                showNotification('Bazardan daş çəkilir...', 'info');
             };
 
             const leaveGameClient = () => {
@@ -835,31 +1043,32 @@
                 showNotification('Oyundan ayrıldınız', 'info');
             };
 
+            const resetBoardView = () => {
+                setBoardZoom(1);
+                setBoardPosition({ x: 0, y: 0 });
+                showNotification('Masaya mərkəzləşdirildi', 'info');
+            };
+
             // --- RENDER BÖLÜMLERİ ---
             
-            // LOADING EKRANI
             if (screen === 'loading') {
                 return (
                     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
                         <div className="text-center">
                             <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                             <p className="text-white text-xl font-bold">Yüklənir...</p>
-                            {localStorage.getItem(LOCAL_STORAGE_ROOM) && (
-                                <p className="text-yellow-400 text-sm mt-2 animate-pulse">Oyuna yenidən qoşulur...</p>
-                            )}
                         </div>
                     </div>
                 );
             }
 
-            // SEARCHING LOBBY
             if (screen === 'searching') {
                 const minutes = Math.floor(searchTime / 60);
                 const seconds = searchTime % 60;
                 const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
                 
                 return (
-                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6 relative overflow-hidden">
+                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6">
                         {notification && <Toast message={notification.message} type={notification.type} />}
 
                         <div className="relative z-10 max-w-md w-full">
@@ -898,10 +1107,6 @@
                                         <div className="text-white text-4xl font-mono font-bold">⏱️ {timeString}</div>
                                         <div className="text-white/60 text-sm mt-1">⏳ Keçən Vaxt</div>
                                     </div>
-
-                                    <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-3 mb-4 text-center">
-                                        <p className="text-blue-300 text-xs">💡 İpucu: Rütbəli oyunlarda ELO balınız dəyişir!</p>
-                                    </div>
                                 </div>
 
                                 <button
@@ -925,14 +1130,13 @@
                 );
             }
 
-            // LOBBY EKRANI
             if (screen === 'lobby') {
                 return (
-                    <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10">
+                    <div className="flex flex-col items-center justify-center min-h-screen p-6">
                         {notification && <Toast message={notification.message} type={notification.type} />}
                         
-                        <div className="text-center mb-10 animate-float">
-                            <h1 className="text-5xl font-black text-white drop-shadow-lg mb-2 tracking-tighter">
+                        <div className="text-center mb-10">
+                            <h1 className="text-5xl font-black text-white drop-shadow-lg mb-2">
                                 🎯 DOMINO <span className="text-yellow-400">101</span> 🏆
                             </h1>
                             <p className="text-gray-300 text-sm tracking-widest uppercase">⚡ Professional Online Oyun ⚡</p>
@@ -942,7 +1146,7 @@
                             <button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold">🏆 Skor Tablosu</button>
                         </div>
 
-                        <div className="w-full max-w-sm bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
+                        <div className="w-full max-w-sm bg-black/40 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
                             {playerData && (
                                 <div className="mb-6 text-center">
                                     {playerData.photoUrl && (
@@ -958,9 +1162,6 @@
                                                 {playerData.elo} ELO
                                             </span>
                                         </div>
-                                    )}
-                                    {playerData.isGuest && (
-                                        <p className="text-yellow-400 text-sm mt-2">👥 Qonaq Rejimi (ELO sistemi yoxdur)</p>
                                     )}
                                 </div>
                             )}
@@ -989,12 +1190,6 @@
                             >
                                 <span>🏆</span> {!playerData?.isGuest ? '⚔️ RÜTBƏLİ OYUN AXTAR' : '🎮 OYUN AXTAR (ADİ)'}
                             </button>
-
-                            <div className="flex items-center gap-2 my-4">
-                                <div className="h-px bg-white/10 flex-1"></div>
-                                <span className="text-xs text-gray-500 uppercase">və ya</span>
-                                <div className="h-px bg-white/10 flex-1"></div>
-                            </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <button 
@@ -1028,23 +1223,14 @@
                                     </button>
                                 </div>
                             </div>
-
-                            {roomCode && (
-                                <div className="mt-4 p-4 bg-green-500/20 border border-green-500/30 rounded-xl text-center animate-pulse">
-                                    <p className="text-green-400 text-xs mb-1">📱 OTAQ KODU</p>
-                                    <p className="text-3xl font-mono text-white font-bold tracking-widest cursor-pointer" onClick={() => { navigator.clipboard.writeText(roomCode); showNotification('📋 Kod kopyalandı!', 'success'); }}>{roomCode}</p>
-                                    <p className="text-xs text-gray-400 mt-2">⏳ Dostunuz gözlənilir...</p>
-                                </div>
-                            )}
                         </div>
                     </div>
                 );
             }
 
-            // LEADERBOARD EKRANI
             if (screen === 'leaderboard') {
                 return (
-                    <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10">
+                    <div className="flex flex-col items-center justify-center min-h-screen p-6">
                         {notification && <Toast message={notification.message} type={notification.type} />}
                         
                         <div className="text-center mb-6">
@@ -1053,7 +1239,7 @@
 
                         <button onClick={() => setScreen('lobby')} className="mb-4 px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold">⬅️ Geri Dön</button>
 
-                        <div className="w-full max-w-2xl bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
+                        <div className="w-full max-w-2xl bg-black/40 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
                             {leaderboard.length === 0 ? (
                                 <div className="text-center text-gray-400 py-8">
                                     <p className="text-xl">📊 Skor tablosu yüklənir...</p>
@@ -1101,7 +1287,6 @@
                 );
             }
 
-            // OYUN SONU EKRANI
             if (screen === 'end' && endInfo) {
                 const title = endInfo.isWinner ? '🎉 QAZANDINIZ!' : 
                               endInfo.isLoser ? '😔 UDUZDUNUZ' : 
@@ -1111,9 +1296,9 @@
                                    endInfo.isDraw ? 'text-blue-400' : 'text-gray-400';
                 
                 return (
-                    <div className="min-h-screen bg-table-dark/95 flex items-center justify-center p-6">
-                        <div className="w-full max-w-sm bg-white/10 backdrop-blur-md rounded-2xl p-8 shadow-2xl text-center border border-white/10 animate-slide-up">
-                            <h1 className={`text-4xl font-black mb-4 ${titleColor} animate-celebrate`}>
+                    <div className="min-h-screen bg-black/95 flex items-center justify-center p-6">
+                        <div className="w-full max-w-sm bg-white/10 backdrop-blur-md rounded-2xl p-8 shadow-2xl text-center border border-white/10">
+                            <h1 className={`text-4xl font-black mb-4 ${titleColor}`}>
                                 {title}
                             </h1>
                             
@@ -1121,26 +1306,12 @@
                                 {endInfo.message}
                             </p>
                             
-                            {!endInfo.isDraw && (
-                                <div className="mb-4">
-                                    <p className="text-white text-sm mb-1">Qalib:</p>
-                                    <p className="text-yellow-400 text-xl font-bold">{endInfo.winnerName}</p>
-                                    {endInfo.loserName && (
-                                        <>
-                                            <p className="text-white text-sm mt-3 mb-1">Uduzan:</p>
-                                            <p className="text-gray-400 text-lg">{endInfo.loserName}</p>
-                                        </>
-                                    )}
-                                </div>
-                            )}
-                            
                             {endInfo.isRanked && endInfo.eloChange !== undefined && (
                                 <div className="mb-8">
                                     <h2 className="text-white text-xl font-bold mb-2">ELO DƏYİŞİKLİYİ</h2>
                                     <p className={`text-5xl font-extrabold ${endInfo.eloChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                         {endInfo.eloChange > 0 ? '+' : ''}{endInfo.eloChange}
                                     </p>
-                                    <p className="text-gray-400 text-sm mt-1">Yeni ELO balınız qısa müddət ərzində yenilənəcək.</p>
                                 </div>
                             )}
 
@@ -1152,12 +1323,11 @@
                 );
             }
 
-            // OYUN EKRANI (ANA KISIM)
+            // OYUN EKRANI
             if (screen === 'game' && gameState) {
-                
                 return (
                     <div className="fixed inset-0 flex flex-col h-full w-full bg-table-base">
-                         {notification && <Toast message={notification.message} type={notification.type} />}
+                        {notification && <Toast message={notification.message} type={notification.type} />}
                         
                         {/* ÜST PANEL: Rakip */}
                         <div className="h-16 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between px-4 z-20">
@@ -1174,7 +1344,7 @@
                                     </div>
                                 )}
                                 <div>
-                                    <div className="text-white text-sm font-bold shadow-black drop-shadow-md">
+                                    <div className="text-white text-sm font-bold">
                                         {opponent?.name || opponent?.username || 'Rəqib'}
                                     </div>
                                     <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
@@ -1184,7 +1354,7 @@
                             </div>
                             <div className="text-center">
                                 {isMyTurn ? (
-                                    <div className="bg-yellow-500 text-black text-xs font-bold px-4 py-1 rounded-full animate-pulse shadow-lg">⚡ SİZİN NÖVBƏNİZ ⚡</div>
+                                    <div className="bg-yellow-500 text-black text-xs font-bold px-4 py-1 rounded-full animate-pulse">⚡ SİZİN NÖVBƏNİZ</div>
                                 ) : (
                                     <div className="text-gray-400 text-xs font-medium bg-black/40 px-3 py-1 rounded-full">⏳ Rəqib Oynayır...</div>
                                 )}
@@ -1192,13 +1362,23 @@
                         </div>
 
                         {/* ORTA PANEL: DOMINO BOARD */}
-                        <div className="flex-1 relative overflow-hidden w-full">
-                            {/* Board Container (Pinch & Drag için) */}
+                        <div className="flex-1 relative overflow-hidden w-full px-2">
                             <div 
                                 ref={boardContainerRef}
-                                className="domino-board-container pinch-area"
+                                className="domino-board-container"
                             >
+                                {showZoomHint && boardZoom === 1 && (
+                                    <div className="zoom-hint">
+                                        👆 İki barmaqla böyüt / kiçilt | 👆 Çift toxunma: Mərkəzləşdir
+                                    </div>
+                                )}
+                                
+                                <div className="board-zoom-info">
+                                    Zoom: %{Math.round(boardZoom * 100)}
+                                </div>
+                                
                                 <div 
+                                    ref={boardInnerRef}
                                     className="domino-board-inner"
                                     style={{
                                         transform: `translate(${boardPosition.x}px, ${boardPosition.y}px) scale(${boardZoom})`,
@@ -1208,7 +1388,7 @@
                                     {/* DOMINO BOARD TAŞLARI */}
                                     {renderBoardTiles.length === 0 ? (
                                         <div className="text-white/30 text-xl font-bold border-4 border-dashed border-white/10 rounded-3xl p-6">
-                                            {selectedTileIndex !== null ? '👇 Daşı Buraya Qoy' : 'Daş Seç və Başla'}
+                                            {selectedTileIndex !== null ? '👇 Daşı Buraya Qoy' : 'İlk daşı ortaya qoyun'}
                                         </div>
                                     ) : (
                                         renderBoardTiles.map(({ tile, index, direction, position }) => (
@@ -1222,8 +1402,7 @@
                                                 }}
                                             >
                                                 <DominoTile 
-                                                    values={tile} 
-                                                    direction={direction}
+                                                    values={tile}
                                                     disabled={true}
                                                     isBoardTile={true}
                                                 />
@@ -1239,16 +1418,13 @@
                                                 position: 'absolute',
                                                 left: `${renderBoardTiles[0].position.x - 30}px`,
                                                 top: `${renderBoardTiles[0].position.y}px`,
-                                                width: '60px',
-                                                height: '100px',
-                                                transform: 'translate(-50%, -50%)',
-                                                cursor: 'pointer'
+                                                width: '65px',
+                                                height: '35px',
+                                                transform: 'translate(-50%, -50%)'
                                             }}
                                             onClick={() => playTile('left')}
                                         >
-                                            <div className="absolute inset-0 flex items-center justify-center text-yellow-400 font-bold text-xs">
-                                                SOLA QOY
-                                            </div>
+                                            <div className="text-yellow-400 font-bold text-xs">SOL</div>
                                         </div>
                                     )}
                                     
@@ -1259,20 +1435,16 @@
                                                 position: 'absolute',
                                                 left: `${renderBoardTiles[renderBoardTiles.length - 1].position.x + 30}px`,
                                                 top: `${renderBoardTiles[renderBoardTiles.length - 1].position.y}px`,
-                                                width: '60px',
-                                                height: '100px',
-                                                transform: 'translate(-50%, -50%)',
-                                                cursor: 'pointer'
+                                                width: '65px',
+                                                height: '35px',
+                                                transform: 'translate(-50%, -50%)'
                                             }}
                                             onClick={() => playTile('right')}
                                         >
-                                            <div className="absolute inset-0 flex items-center justify-center text-yellow-400 font-bold text-xs">
-                                                SAĞA QOY
-                                            </div>
+                                            <div className="text-yellow-400 font-bold text-xs">SAĞ</div>
                                         </div>
                                     )}
 
-                                    {/* İLK HAMLE INDICATOR */}
                                     {validMoves.includes('start') && selectedTileIndex !== null && (
                                         <div 
                                             className="valid-move-indicator"
@@ -1281,28 +1453,43 @@
                                                 left: '50%',
                                                 top: '50%',
                                                 width: '70px',
-                                                height: '120px',
-                                                transform: 'translate(-50%, -50%)',
-                                                cursor: 'pointer'
+                                                height: '35px',
+                                                transform: 'translate(-50%, -50%)'
                                             }}
                                             onClick={() => playTile('start')}
                                         >
-                                            <div className="absolute inset-0 flex items-center justify-center text-yellow-400 font-bold text-sm">
-                                                BAŞLA
-                                            </div>
+                                            <div className="text-yellow-400 font-bold text-sm">BAŞLA</div>
                                         </div>
                                     )}
                                 </div>
                             </div>
+                            
+                            {/* Game Controls */}
+                            <div className="game-controls">
+                                <button className="control-button" onClick={resetBoardView} title="Mərkəzləşdir">
+                                    🎯
+                                </button>
+                                <button 
+                                    className="control-button" 
+                                    onClick={drawFromMarket}
+                                    title="Bazardan çək"
+                                    disabled={!isMyTurn || marketSize === 0}
+                                    style={{ opacity: (!isMyTurn || marketSize === 0) ? 0.5 : 1 }}
+                                >
+                                    🎲
+                                </button>
+                            </div>
+                            
+                            <div className="double-tap-hint">
+                                👆 Çift toxun: Mərkəzləşdir
+                            </div>
                         </div>
 
                         {/* ALT PANEL: Oyuncu Eli */}
-                        <div className="bg-gradient-to-t from-black/90 via-table-dark to-transparent pb-4 pt-2 px-2 z-20">
-                            
-                            {/* Kontrol Butonları */}
+                        <div className="bg-gradient-to-t from-black/90 via-table-dark to-transparent pb-4 pt-2 z-20">
                             <div className="flex justify-between items-center px-4 mb-2">
                                 <div className="flex items-center gap-3">
-                                    <span className="text-white text-xs font-bold tracking-widest opacity-70">
+                                    <span className="text-white text-xs font-bold opacity-70">
                                         🎴 ƏLİNİZ ({myHand.length})
                                     </span>
                                     {marketSize > 0 && (
@@ -1311,30 +1498,16 @@
                                         </span>
                                     )}
                                 </div>
-                                <div className="flex gap-2 items-center">
-                                    {isMyTurn && (
-                                        <>
-                                            {canDrawFromMarket && (
-                                                <button 
-                                                    onClick={drawFromMarket}
-                                                    className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95"
-                                                >
-                                                    🎲 ÇƏK
-                                                </button>
-                                            )}
-                                        </>
-                                    )}
-                                    <button
-                                        onClick={leaveGameClient}
-                                        className="bg-red-600/80 hover:bg-red-600 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95"
-                                    >
-                                        🚪 Oyundan Çıx
-                                    </button>
-                                </div>
+                                <button
+                                    onClick={leaveGameClient}
+                                    className="bg-red-600/80 hover:bg-red-600 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95"
+                                >
+                                    🚪 Çıx
+                                </button>
                             </div>
 
-                            {/* DİKEY Taş Dizilimi */}
-                            <div className="hand-tiles-container">
+                            {/* YATAY Taş Dizilimi */}
+                            <div className="hand-tiles-container hide-scrollbar">
                                 {myHand.map((tile, index) => (
                                     <div key={`${tile[0]}-${tile[1]}-${index}`} className="hand-tile-wrapper">
                                         <DominoTile 
@@ -1342,7 +1515,6 @@
                                             onClick={() => handleTileClick(index, tile)}
                                             disabled={!isMyTurn}
                                             isSelected={selectedTileIndex === index}
-                                            direction="vertical"
                                         />
                                     </div>
                                 ))}
