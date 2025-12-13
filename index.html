@@ -128,7 +128,6 @@
             z-index: 1;
             box-shadow: 0 0 2px rgba(0,0,0,0.5);
         }
-        }
         
         /* Taş boyutları */
         .tile-size-hand {
@@ -1066,25 +1065,56 @@
                         showNotification('Masaya mərkəzləşdirildi', 'info');
                     }
 
-    return () => {
-        const board = boardContainerRef.current;
-        if (board) {
-            board.removeEventListener('touchstart', handleTouchStart);
-            board.removeEventListener('touchmove', handleTouchMove);
-            board.removeEventListener('touchend', handleTouchEnd);
-            board.removeEventListener('touchcancel', handleTouchEnd);
-            board.removeEventListener('wheel', handleWheel);
-        }
-        document.removeEventListener('mouseup', handleMouseUp);
-    };
-}, [handleTouchStart, handleTouchMove, handleTouchEnd, handleWheel, handleMouseUp]);
-
-// ... (unchanged code)
-                        document.removeEventListener('mouseup', handleMouseUp);
-                        boardContainer.removeEventListener('wheel', handleWheel);
-                    };
+                    lastTouchTimeRef.current = currentTime;
                 }
-            }, [handleTouchStart, handleTouchMove, handleTouchEnd, handleMouseDown, handleMouseMove, handleMouseUp, handleWheel]);
+            };
+
+            const handleTouchMove = (e) => {
+                e.preventDefault();
+                if (e.touches.length === 2) {
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    const currentDistance = Math.hypot(
+                        touch2.clientX - touch1.clientX,
+                        touch2.clientY - touch1.clientY
+                    );
+                    
+                    if (pinchStart.distance > 0) {
+                        const scale = currentDistance / pinchStart.distance;
+                        const newZoom = Math.min(Math.max(0.5, pinchStart.startZoom * scale), 3);
+                        setBoardZoom(newZoom);
+                    }
+                } else if (isDragging && e.touches.length === 1) {
+                    const x = e.touches[0].clientX - dragStart.x;
+                    const y = e.touches[0].clientY - dragStart.y;
+                    setBoardPosition({ x, y });
+                }
+            };
+
+            const handleTouchEnd = () => {
+                setIsDragging(false);
+                setPinchStart(prev => ({ ...prev, distance: 0 }));
+            };
+
+            // Add event listeners
+            useEffect(() => {
+                const board = boardContainerRef.current;
+                if (!board) return;
+
+                const options = { passive: false };
+                
+                board.addEventListener('touchstart', handleTouchStart, options);
+                board.addEventListener('touchmove', handleTouchMove, options);
+                board.addEventListener('touchend', handleTouchEnd);
+                board.addEventListener('touchcancel', handleTouchEnd);
+
+                return () => {
+                    board.removeEventListener('touchstart', handleTouchStart);
+                    board.removeEventListener('touchmove', handleTouchMove);
+                    board.removeEventListener('touchend', handleTouchEnd);
+                    board.removeEventListener('touchcancel', handleTouchEnd);
+                };
+            }, [handleTouchStart, handleTouchMove, handleTouchEnd]);
 
             // --- TAM EKRAN MOBİL UYUMU ---
             useEffect(() => {
