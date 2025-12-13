@@ -633,12 +633,10 @@
                     setConnected(false); 
                     if (!event.wasClean) {
                         showNotification('Bağlantı kəsildi. Yenidən cəhd olunur...', 'warning');
-                        // Yükləmə ekranında ilişib qalmanın qarşısını al
-                        if (screen === 'loading' && reconnectAttemptCount > 2) {
+                        // Yalnızca yükləmə ekranında ilişib qalarsa lobbiyə at
+                        if (screen === 'loading' && reconnectAttemptCount >= MAX_RECONNECT_ATTEMPTS -1) {
                             showNotification('Serverə qoşulmaq mümkün olmadı. Lobbiyə qayıdılır.', 'error');
                             setScreen('lobby');
-                            // If stuck on loading, go to lobby after a few retries
-                            if (reconnectAttemptCount > 2) setScreen('lobby');
                         }
                         attemptReconnect();
                     }
@@ -798,15 +796,19 @@
             
             // --- İLK YÜKLEME VE AUTH ---
             useEffect(() => {
+                const initialize = async () => {
+                    // Əvvəlcə auth, sonra connect
+                    await initializeTelegramAuth();
+                    connectToServer();
+                };
+
                 // Bağlantı kontrolü için interval
                 connectionCheckRef.current = setInterval(() => {
                     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                         sendMessage({ type: 'ping' });
                     }
                 }, 15000);
-
-                // Əvvəlcə auth, sonra connect
-                initializeTelegramAuth();
+                initialize();
                 
                 return () => { 
                     if (wsRef.current) wsRef.current.close(); 
@@ -872,10 +874,7 @@
                     };
                     setPlayerData(guestData);
                 } finally {
-                    // Auth tamamlandıktan sonra WebSocket bağlantısını başlat
-                    connectToServer();
-
-                    // Let ws.onopen handle the screen transition to lobby.
+                    // Do nothing here, connectToServer will be called after this function resolves.
                 }
             };
 
