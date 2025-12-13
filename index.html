@@ -100,18 +100,13 @@
             flex-shrink: 0;
             position: relative;
             overflow: hidden;
+            flex-direction: column; /* Always vertical */
+            width: 30px;
+            height: 60px;
         }
         
         .domino-tile:active {
             transform: scale(0.95) !important;
-        }
-        
-        .domino-tile.horizontal {
-            flex-direction: row;
-        }
-        
-        .domino-tile.vertical {
-            flex-direction: column;
         }
         
         .domino-tile-face {
@@ -123,26 +118,16 @@
         }
         
         .domino-divider {
-            background: #222;
             position: absolute;
+            left: 0;
+            right: 0;
+            top: 50%;
+            height: 2px;
+            background: #222;
+            transform: translateY(-50%);
             z-index: 1;
             box-shadow: 0 0 2px rgba(0,0,0,0.5);
         }
-        
-        .domino-tile.horizontal .domino-divider {
-            width: 2px;
-            height: 85%;
-            top: 7.5%;
-            left: 50%;
-            transform: translateX(-50%);
-        }
-        
-        .domino-tile.vertical .domino-divider {
-            height: 2px;
-            width: 85%;
-            left: 7.5%;
-            top: 50%;
-            transform: translateY(-50%);
         }
         
         /* Taş boyutları */
@@ -514,7 +499,7 @@
             };
 
             const baseClasses = `
-                domino-tile relative flex overflow-hidden vertical
+                domino-tile relative flex overflow-hidden
                 ${isSelected ? 'selected-tile' : ''}
                 ${!disabled && !isBoardTile ? 'cursor-pointer hover:brightness-110 active:scale-95' : ''}
                 ${disabled ? 'opacity-80 cursor-default' : ''}
@@ -528,13 +513,13 @@
                     onClick={handleClick}
                     className={`${baseClasses} ${sizeClass}`}
                 >
-                    <div className="domino-tile-face border-b-2 border-gray-800">
+                    <div className="domino-tile-face">
                         <RenderPips number={values[0]} />
                     </div>
+                    <div className="domino-divider"></div>
                     <div className="domino-tile-face">
                         <RenderPips number={values[1]} />
                     </div>
-                    <div className="domino-divider vertical-divider"></div>
                 </div>
             );
         };
@@ -657,7 +642,14 @@
             const [boardPosition, setBoardPosition] = useState({ x: 0, y: 0 });
             const [isDragging, setIsDragging] = useState(false);
             const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-            const [pinchStart, setPinchStart] = useState({ distance: 0 });
+            const [pinchStart, setPinchStart] = useState({ 
+            distance: 0,
+            midX: 0,
+            midY: 0,
+            startZoom: 1,
+            startX: 0,
+            startY: 0
+        });
             
             const wsRef = useRef(null);
             const boardContainerRef = useRef(null);
@@ -1034,113 +1026,56 @@
 
             // --- TOUCH/PINCH ZOOM HANDLERS ---
             const handleTouchStart = useCallback((e) => {
+                e.preventDefault();
+                
                 if (e.touches.length === 2) {
-                    e.preventDefault();
+                    // Pinch-to-zoom başlangıcı
                     const touch1 = e.touches[0];
                     const touch2 = e.touches[1];
                     const distance = Math.hypot(
                         touch2.clientX - touch1.clientX,
                         touch2.clientY - touch1.clientY
                     );
-                    setPinchStart({ distance });
+                    
+                    // Orta noktayı hesapla (zoom merkezi için)
+                    const midX = (touch1.clientX + touch2.clientX) / 2;
+                    const midY = (touch1.clientY + touch2.clientY) / 2;
+                    
+                    setPinchStart({ 
+                        distance,
+                        midX,
+                        midY,
+                        startZoom: boardZoom,
+                        startX: boardPosition.x,
+                        startY: boardPosition.y
+                    });
                 } else if (e.touches.length === 1) {
-                    e.preventDefault();
+                    // Tek parmakla kaydırma
                     setIsDragging(true);
                     setDragStart({
                         x: e.touches[0].clientX - boardPosition.x,
                         y: e.touches[0].clientY - boardPosition.y
                     });
                     
-                    // Çift tıklama kontrolü
+                    // Çift dokunma kontrolü
                     const currentTime = Date.now();
                     if (currentTime - lastTouchTimeRef.current < 300) {
-                        // Çift tıklama - zoom reset
+                        // Çift dokunma - zoom reset ve merkezle
                         setBoardZoom(1);
                         setBoardPosition({ x: 0, y: 0 });
                         showNotification('Masaya mərkəzləşdirildi', 'info');
                     }
-                    lastTouchTimeRef.current = currentTime;
-                }
-            }, [boardPosition]);
 
-            const handleTouchMove = useCallback((e) => {
-                if (e.touches.length === 2 && pinchStart.distance > 0) {
-                    e.preventDefault();
-                    const touch1 = e.touches[0];
-                    const touch2 = e.touches[1];
-                    const distance = Math.hypot(
-                        touch2.clientX - touch1.clientX,
-                        touch2.clientY - touch1.clientY
-                    );
-                    
-                    const scaleChange = distance / pinchStart.distance;
-                    setBoardZoom(prev => {
-                        const newZoom = prev * scaleChange;
-                        return Math.min(Math.max(newZoom, 0.5), 3);
-                    });
-                    setPinchStart({ distance });
-                } else if (e.touches.length === 1 && isDragging) {
-                    e.preventDefault();
-                    const newX = e.touches[0].clientX - dragStart.x;
-                    const newY = e.touches[0].clientY - dragStart.y;
-                    setBoardPosition({ x: newX, y: newY });
-                }
-            }, [isDragging, dragStart, pinchStart]);
+    return () => {
+        board.removeEventListener('touchstart', handleTouchStart);
+        board.removeEventListener('touchmove', handleTouchMove);
+        board.removeEventListener('touchend', handleTouchEnd);
+        board.removeEventListener('touchcancel', handleTouchEnd);
+        board.removeEventListener('wheel', handleWheel);
+    };
+}, [handleTouchStart, handleTouchMove, handleTouchEnd, handleWheel, boardZoom, boardPosition]);
 
-            const handleTouchEnd = useCallback((e) => {
-                setIsDragging(false);
-                setPinchStart({ distance: 0 });
-            }, []);
-
-            const handleMouseDown = useCallback((e) => {
-                if (e.button !== 0) return;
-                e.preventDefault();
-                setIsDragging(true);
-                setDragStart({
-                    x: e.clientX - boardPosition.x,
-                    y: e.clientY - boardPosition.y
-                });
-            }, [boardPosition]);
-
-            const handleMouseMove = useCallback((e) => {
-                if (isDragging) {
-                    e.preventDefault();
-                    const newX = e.clientX - dragStart.x;
-                    const newY = e.clientY - dragStart.y;
-                    setBoardPosition({ x: newX, y: newY });
-                }
-            }, [isDragging, dragStart]);
-
-            const handleMouseUp = useCallback(() => {
-                setIsDragging(false);
-            }, []);
-
-            const handleWheel = useCallback((e) => {
-                e.preventDefault();
-                const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-                setBoardZoom(prev => {
-                    const newZoom = prev * zoomFactor;
-                    return Math.min(Math.max(newZoom, 0.5), 3);
-                });
-            }, []);
-
-            useEffect(() => {
-                const boardContainer = boardContainerRef.current;
-                if (boardContainer) {
-                    boardContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
-                    boardContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
-                    boardContainer.addEventListener('touchend', handleTouchEnd);
-                    boardContainer.addEventListener('mousedown', handleMouseDown);
-                    boardContainer.addEventListener('mousemove', handleMouseMove);
-                    document.addEventListener('mouseup', handleMouseUp);
-                    boardContainer.addEventListener('wheel', handleWheel, { passive: false });
-                    
-                    return () => {
-                        boardContainer.removeEventListener('touchstart', handleTouchStart);
-                        boardContainer.removeEventListener('touchmove', handleTouchMove);
-                        boardContainer.removeEventListener('touchend', handleTouchEnd);
-                        boardContainer.removeEventListener('mousedown', handleMouseDown);
-                        boardContainer.removeEventListener('mousemove', handleMouseMove);
+// ... (unchanged code)
                         document.removeEventListener('mouseup', handleMouseUp);
                         boardContainer.removeEventListener('wheel', handleWheel);
                     };
