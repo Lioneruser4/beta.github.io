@@ -644,6 +644,10 @@
                 
                 ws.onerror = (error) => {
                     console.error('WebSocket error:', error);
+                    // İlk bağlantı cəhdi uğursuz olarsa, yenidən cəhd et
+                    if (!connected) {
+                        attemptReconnect();
+                    }
                 };
                 
                 ws.onmessage = (e) => {
