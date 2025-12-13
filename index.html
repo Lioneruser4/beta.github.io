@@ -801,30 +801,29 @@
             
             // --- İLK YÜKLEME VE AUTH ---
             useEffect(() => {
-                // Yükleme ekranında takılmayı önlemek için 5 saniyelik timeout
-                initialLoadTimeoutRef.current = setTimeout(() => {
-                    if (screen === 'loading') {
-                        console.log('🔄 Yükleme ekranı zaman aşımına uğradı, lobiye yönlendiriliyor...');
-                        setScreen('lobby');
-                        showNotification('Oyuna xoş gəldiniz!', 'success');
-                    }
-                }, 5000);
+                const startApp = async () => {
+                    console.log('🚀 Tətbiq başladılır...');
+                    await initializeTelegramAuth(); // 1. Auth prosesini gözlə
+                    connectToServer();              // 2. Sonra serverə qoşul
+                };
 
                 connectionCheckRef.current = setInterval(() => {
                     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                         sendMessage({ type: 'ping' });
                     }
                 }, 15000);
-
-                // Auth ve bağlantı işlemlerini başlat
-                initializeTelegramAuth();
-                connectToServer();
+                
+                // Telegram mühitinin hazır olmasını gözlə, əks halda dərhal başla.
+                if (tg) {
+                    tg.ready(startApp);
+                } else {
+                    startApp();
+                }
                 
                 return () => { 
                     if (wsRef.current) wsRef.current.close(); 
                     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
                     if (connectionCheckRef.current) clearInterval(connectionCheckRef.current);
-                    if (initialLoadTimeoutRef.current) clearTimeout(initialLoadTimeoutRef.current);
                 };
             }, []);
 
@@ -880,14 +879,8 @@
                     };
                     setPlayerData(guestData);
                 } finally {
-                    const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
-                    const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
-                    
-                    if (storedRoomCode && storedPlayerId) {
-                        // Yeniden bağlanma için loading ekranında kal
-                    } else if (screen === 'loading') {
-                        setScreen('lobby'); // Yeni oyuncu ise lobiye geç
-                    }
+                    // Başlatma mantığı artık `useEffect` ve `ws.onopen` içinde merkezileştirildi.
+                    // Burada ekran değiştirme işlemi yapılmamalıdır.
                 }
             };
 
@@ -905,6 +898,11 @@
 
             // --- TOUCH/PINCH ZOOM HANDLERS ---
             const handleTouchStart = useCallback((e) => {
+                // Eğer tıklanan element oynanabilir bir alansa, sürüklemeyi başlatma.
+                if (e.target.closest('.valid-move-indicator')) {
+                    return;
+                }
+
                 if (e.touches.length === 2) {
                     e.preventDefault();
                     const touch1 = e.touches[0];
