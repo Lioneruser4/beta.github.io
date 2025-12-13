@@ -916,9 +916,28 @@
                         break;
                         
                     case 'gameEnd':
+                    case 'playerLeft':
+                    case 'opponentDisconnected':
+                        // Clear any existing reconnect timer
+                        if (reconnectTimerRef.current) {
+                            clearTimeout(reconnectTimerRef.current);
+                            reconnectTimerRef.current = null;
+                        }
+                        
+                        // Determine game result
                         const gameWon = data.isWinner === true || data.winnerId === (playerData?.id || '');
                         const gameLost = data.isLoser === true || (data.loserId && data.loserId === (playerData?.id || ''));
-                        const isGameDraw = data.isDraw === true;
+                        const isGameDraw = data.isDraw === true || (!gameWon && !gameLost);
+                        
+                        // Show appropriate notification
+                        if (data.type === 'playerLeft') {
+                            showNotification(
+                                gameWon ? 'Rəqib oyundan çıxdı! Qalib sizsiniz!' : 'Rəqib oyundan çıxdı!', 
+                                gameWon ? 'success' : 'info'
+                            );
+                        } else if (data.type === 'opponentDisconnected') {
+                            showNotification('Rəqib bağlantısı kəsildi. Oyun bitdi!', 'warning');
+                        }
                         
                         // Clear any pending timeouts
                         if (reconnectTimerRef.current) {
