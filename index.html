@@ -595,19 +595,6 @@
                 reconnectTimerRef.current = setTimeout(connectToServer, 2000 * (reconnectAttemptCount + 1));
             };
 
-            // App hazır olduğunda ekranı dəyişdir
-            useEffect(() => {
-                if (appReady) {
-                    const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
-                    const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
-                    if (storedRoomCode && storedPlayerId) {
-                        // Yeniden qoşulma mesajı onopen-də göndəriləcək
-                    } else {
-                        setScreen('lobby');
-                    }
-                }
-            }, [appReady]);
-
             const connectToServer = () => {
                 if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return;
                 if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
@@ -638,7 +625,7 @@
                             roomCode: storedRoomCode
                         });
                     } else {
-                        setAppReady(true); // Auth bitib, oyun yoxdur, lobiye hazır
+                        // Player data var, oyun yoxdur, lobi artıq göstərilir
                     }
                 };
                 
@@ -819,7 +806,7 @@
                     }
                 }, 15000);
 
-                initializeTelegramAuth().then(() => connectToServer());
+                initializeTelegramAuth();
                 
                 return () => { 
                     if (wsRef.current) wsRef.current.close(); 
@@ -828,6 +815,13 @@
                     if (connectionCheckRef.current) clearInterval(connectionCheckRef.current);
                 };
             }, []);
+
+            // PlayerData hazır olduqda serverə qoşul
+            useEffect(() => {
+                if (playerData) {
+                    connectToServer();
+                }
+            }, [playerData]);
 
             const initializeTelegramAuth = async () => {
                 try {
@@ -880,6 +874,9 @@
                         telegramId: null
                     };
                     setPlayerData(guestData);
+                } finally {
+                    setAppReady(true);
+                    setScreen('lobby');
                 }
             };
 
