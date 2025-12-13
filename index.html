@@ -747,10 +747,7 @@
                         });
                         setScreen('end');
                         
-                        setTimeout(() => {
-                            resetGameClientState(); 
-                            setScreen('lobby');
-                        }, 5000); 
+                        resetGameClientState();
                         break;
                         
                     case 'searchCancelled':
@@ -1089,7 +1086,7 @@
                 return moves;
             };
             
-            const handleTileClick = (index) => {
+            const handleTileClick = useCallback((index) => {
                 if (!isMyTurn) {
                     showNotification('Növbəniz deyil!', 'warning');
                     return;
@@ -1113,9 +1110,9 @@
                 } else {
                     showNotification('Bu daşla oynaya bilməzsiniz', 'warning');
                 }
-            };
+            }, [isMyTurn, myHand, selectedTileIndex, calculateValidMoves]);
 
-            const playTile = (position) => {
+            const playTile = useCallback((position) => {
                 if (selectedTileIndex === null) {
                     showNotification('Əvvəlcə daş seçin', 'warning');
                     return;
@@ -1131,9 +1128,9 @@
                 
                 setSelectedTileIndex(null);
                 setValidMoves([]);
-            };
+            }, [selectedTileIndex, sendMessage]);
 
-            const drawFromMarket = () => {
+            const drawFromMarket = useCallback(() => {
                 if (!isMyTurn) {
                     showNotification('Növbəniz deyil!', 'warning');
                     return;
@@ -1153,7 +1150,22 @@
                 
                 sendMessage({ type: 'drawFromMarket' });
                 showNotification('Bazardan daş çəkilir...', 'info');
-            };
+            }, [isMyTurn, marketSize, myHand, gameState?.board?.length, calculateValidMoves, sendMessage]);
+
+            const passTurn = useCallback(() => {
+                if (!isMyTurn) return;
+                const canPlayFromHand = myHand.some(tile => calculateValidMoves(tile).length > 0);
+                if (canPlayFromHand) {
+                    showNotification('Oynanacaq daşınız var. Pas keçə bilməzsiniz.', 'error');
+                    return;
+                }
+                if (marketSize > 0) {
+                    showNotification('Bazar boş deyil. Əvvəlcə daş çəkin.', 'error');
+                    return;
+                }
+                sendMessage({ type: 'passTurn' });
+                showNotification('Növbə rəqibə ötürülür...', 'info');
+            }, [isMyTurn, myHand, marketSize, calculateValidMoves, sendMessage]);
 
             const leaveGameClient = () => {
                 const confirmed = window.confirm(
@@ -1464,13 +1476,33 @@
                                 </div>
                             )}
 
-                            <div className="p-4 bg-black/30 rounded-lg text-gray-400 text-sm">
-                                ⏳ Avtomatik olaraq lobbiyə qayıdılır...
+                            <div className="mt-8 flex flex-col gap-3">
+                                <button 
+                                    onClick={() => {
+                                        setScreen('lobby');
+                                        // Yeni oyun axtarışını dərhal başlatmaq üçün
+                                        // findMatch(); // findMatch funksiyası yaradıb çağıra bilərsiniz
+                                    }}
+                                    className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-white font-bold py-3 rounded-xl shadow-lg transform active:scale-95 transition-all"
+                                >
+                                    Yeni Oyun Axtar
+                                </button>
+                                <button 
+                                    onClick={() => setScreen('lobby')}
+                                    className="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition-colors"
+                                >
+                                    Lobbiyə Qayıt
+                                </button>
                             </div>
                         </div>
                     </div>
                 );
             }
+
+            const canPlayFromHand = useMemo(() => 
+                myHand.some(tile => calculateValidMoves(tile).length > 0),
+                [myHand, gameState?.board]
+            );
 
             // OYUN EKRANI
             if (screen === 'game' && gameState) {
@@ -1648,6 +1680,17 @@
                                 >
                                     🎲
                                 </button>
+                                {isMyTurn && !canPlayFromHand && marketSize === 0 && (
+                                    <button 
+                                        className="control-button bg-orange-600 border-orange-500 animate-pulse" 
+                                        onClick={passTurn}
+                                        title="Pas Keç"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                                        </svg>
+                                    </button>
+                                )}
                             </div>
                         </div>
 
