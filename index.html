@@ -100,13 +100,18 @@
             flex-shrink: 0;
             position: relative;
             overflow: hidden;
-            flex-direction: column; /* Always vertical */
-            width: 30px;
-            height: 60px;
         }
         
         .domino-tile:active {
             transform: scale(0.95) !important;
+        }
+        
+        .domino-tile.horizontal {
+            flex-direction: row;
+        }
+        
+        .domino-tile.vertical {
+            flex-direction: column;
         }
         
         .domino-tile-face {
@@ -118,15 +123,26 @@
         }
         
         .domino-divider {
-            position: absolute;
-            left: 0;
-            right: 0;
-            top: 50%;
-            height: 2px;
             background: #222;
-            transform: translateY(-50%);
+            position: absolute;
             z-index: 1;
             box-shadow: 0 0 2px rgba(0,0,0,0.5);
+        }
+        
+        .domino-tile.horizontal .domino-divider {
+            width: 2px;
+            height: 85%;
+            top: 7.5%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .domino-tile.vertical .domino-divider {
+            height: 2px;
+            width: 85%;
+            left: 7.5%;
+            top: 50%;
+            transform: translateY(-50%);
         }
         
         /* Taş boyutları */
@@ -498,7 +514,7 @@
             };
 
             const baseClasses = `
-                domino-tile relative flex overflow-hidden
+                domino-tile relative flex overflow-hidden horizontal
                 ${isSelected ? 'selected-tile' : ''}
                 ${!disabled && !isBoardTile ? 'cursor-pointer hover:brightness-110 active:scale-95' : ''}
                 ${disabled ? 'opacity-80 cursor-default' : ''}
@@ -512,13 +528,13 @@
                     onClick={handleClick}
                     className={`${baseClasses} ${sizeClass}`}
                 >
-                    <div className="domino-tile-face">
+                    <div className="domino-tile-face border-r-2 border-gray-800">
                         <RenderPips number={values[0]} />
                     </div>
-                    <div className="domino-divider"></div>
                     <div className="domino-tile-face">
                         <RenderPips number={values[1]} />
                     </div>
+                    <div className="domino-divider vertical-divider"></div>
                 </div>
             );
         };
@@ -641,14 +657,7 @@
             const [boardPosition, setBoardPosition] = useState({ x: 0, y: 0 });
             const [isDragging, setIsDragging] = useState(false);
             const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-            const [pinchStart, setPinchStart] = useState({ 
-            distance: 0,
-            midX: 0,
-            midY: 0,
-            startZoom: 1,
-            startX: 0,
-            startY: 0
-        });
+            const [pinchStart, setPinchStart] = useState({ distance: 0 });
             
             const wsRef = useRef(null);
             const boardContainerRef = useRef(null);
@@ -940,21 +949,11 @@
                 try {
                     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
                         const user = tg.initDataUnsafe.user;
-                        // Telegram'ın fotoğraf URL'sini düzgün bir şekilde al
-                        let photoUrl = null;
-                        if (user.photo_url) {
-                            // Eğer photo_url varsa direkt kullan
-                            photoUrl = user.photo_url;
-                        } else if (user.photo) {
-                            // Eğer photo objesi varsa, URL oluştur
-                            photoUrl = `https://t.me/i/userpic/320/${user.photo}.jpg`;
-                        }
-                        
                         const telegramData = {
                             telegramId: user.id.toString(),
                             username: user.username || user.first_name || 'İstifadəçi',
                             firstName: user.first_name || '',
-                            photoUrl: photoUrl
+                            photoUrl: user.photo_url || null
                         };
 
                         const response = await fetch(`${API_URL}/api/auth/telegram`, {
@@ -1025,10 +1024,38 @@
 
             // --- TOUCH/PINCH ZOOM HANDLERS ---
             const handleTouchStart = useCallback((e) => {
-                e.preventDefault();
-                
                 if (e.touches.length === 2) {
-                    // Pinch-to-zoom başlangıcı
+                    e.preventDefault();
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    const distance = Math.hypot(
+                        touch2.clientX - touch1.clientX,
+                        touch2.clientY - touch1.clientY
+                    );
+                    setPinchStart({ distance });
+                } else if (e.touches.length === 1) {
+                    e.preventDefault();
+                    setIsDragging(true);
+                    setDragStart({
+                        x: e.touches[0].clientX - boardPosition.x,
+                        y: e.touches[0].clientY - boardPosition.y
+                    });
+                    
+                    // Çift tıklama kontrolü
+                    const currentTime = Date.now();
+                    if (currentTime - lastTouchTimeRef.current < 300) {
+                        // Çift tıklama - zoom reset
+                        setBoardZoom(1);
+                        setBoardPosition({ x: 0, y: 0 });
+                        showNotification('Masaya mərkəzləşdirildi', 'info');
+                    }
+                    lastTouchTimeRef.current = currentTime;
+                }
+            }, [boardPosition]);
+
+            const handleTouchMove = useCallback((e) => {
+                if (e.touches.length === 2 && pinchStart.distance > 0) {
+                    e.preventDefault();
                     const touch1 = e.touches[0];
                     const touch2 = e.touches[1];
                     const distance = Math.hypot(
@@ -1036,85 +1063,79 @@
                         touch2.clientY - touch1.clientY
                     );
                     
-                    // Orta noktayı hesapla (zoom merkezi için)
-                    const midX = (touch1.clientX + touch2.clientX) / 2;
-                    const midY = (touch1.clientY + touch2.clientY) / 2;
-                    
-                    setPinchStart({ 
-                        distance,
-                        midX,
-                        midY,
-                        startZoom: boardZoom,
-                        startX: boardPosition.x,
-                        startY: boardPosition.y
+                    const scaleChange = distance / pinchStart.distance;
+                    setBoardZoom(prev => {
+                        const newZoom = prev * scaleChange;
+                        return Math.min(Math.max(newZoom, 0.5), 3);
                     });
-                } else if (e.touches.length === 1) {
-                    // Tek parmakla kaydırma
-                    setIsDragging(true);
-                    setDragStart({
-                        x: e.touches[0].clientX - boardPosition.x,
-                        y: e.touches[0].clientY - boardPosition.y
-                    });
-                    
-                    // Çift dokunma kontrolü
-                    const currentTime = Date.now();
-                    if (currentTime - lastTouchTimeRef.current < 300) {
-                        // Çift dokunma - zoom reset ve merkezle
-                        setBoardZoom(1);
-                        setBoardPosition({ x: 0, y: 0 });
-                        showNotification('Masaya mərkəzləşdirildi', 'info');
-                    }
-
-                    lastTouchTimeRef.current = currentTime;
+                    setPinchStart({ distance });
+                } else if (e.touches.length === 1 && isDragging) {
+                    e.preventDefault();
+                    const newX = e.touches[0].clientX - dragStart.x;
+                    const newY = e.touches[0].clientY - dragStart.y;
+                    setBoardPosition({ x: newX, y: newY });
                 }
-            };
+            }, [isDragging, dragStart, pinchStart]);
 
-            const handleTouchMove = (e) => {
-                e.preventDefault();
-                if (e.touches.length === 2) {
-                    const touch1 = e.touches[0];
-                    const touch2 = e.touches[1];
-                    const currentDistance = Math.hypot(
-                        touch2.clientX - touch1.clientX,
-                        touch2.clientY - touch1.clientY
-                    );
-                    
-                    if (pinchStart.distance > 0) {
-                        const scale = currentDistance / pinchStart.distance;
-                        const newZoom = Math.min(Math.max(0.5, pinchStart.startZoom * scale), 3);
-                        setBoardZoom(newZoom);
-                    }
-                } else if (isDragging && e.touches.length === 1) {
-                    const x = e.touches[0].clientX - dragStart.x;
-                    const y = e.touches[0].clientY - dragStart.y;
-                    setBoardPosition({ x, y });
-                }
-            };
-
-            const handleTouchEnd = () => {
+            const handleTouchEnd = useCallback((e) => {
                 setIsDragging(false);
-                setPinchStart(prev => ({ ...prev, distance: 0 }));
-            };
+                setPinchStart({ distance: 0 });
+            }, []);
 
-            // Add event listeners
+            const handleMouseDown = useCallback((e) => {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                setIsDragging(true);
+                setDragStart({
+                    x: e.clientX - boardPosition.x,
+                    y: e.clientY - boardPosition.y
+                });
+            }, [boardPosition]);
+
+            const handleMouseMove = useCallback((e) => {
+                if (isDragging) {
+                    e.preventDefault();
+                    const newX = e.clientX - dragStart.x;
+                    const newY = e.clientY - dragStart.y;
+                    setBoardPosition({ x: newX, y: newY });
+                }
+            }, [isDragging, dragStart]);
+
+            const handleMouseUp = useCallback(() => {
+                setIsDragging(false);
+            }, []);
+
+            const handleWheel = useCallback((e) => {
+                e.preventDefault();
+                const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+                setBoardZoom(prev => {
+                    const newZoom = prev * zoomFactor;
+                    return Math.min(Math.max(newZoom, 0.5), 3);
+                });
+            }, []);
+
             useEffect(() => {
-                const board = boardContainerRef.current;
-                if (!board) return;
-
-                const options = { passive: false };
-                
-                board.addEventListener('touchstart', handleTouchStart, options);
-                board.addEventListener('touchmove', handleTouchMove, options);
-                board.addEventListener('touchend', handleTouchEnd);
-                board.addEventListener('touchcancel', handleTouchEnd);
-
-                return () => {
-                    board.removeEventListener('touchstart', handleTouchStart);
-                    board.removeEventListener('touchmove', handleTouchMove);
-                    board.removeEventListener('touchend', handleTouchEnd);
-                    board.removeEventListener('touchcancel', handleTouchEnd);
-                };
-            }, [handleTouchStart, handleTouchMove, handleTouchEnd]);
+                const boardContainer = boardContainerRef.current;
+                if (boardContainer) {
+                    boardContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
+                    boardContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
+                    boardContainer.addEventListener('touchend', handleTouchEnd);
+                    boardContainer.addEventListener('mousedown', handleMouseDown);
+                    boardContainer.addEventListener('mousemove', handleMouseMove);
+                    document.addEventListener('mouseup', handleMouseUp);
+                    boardContainer.addEventListener('wheel', handleWheel, { passive: false });
+                    
+                    return () => {
+                        boardContainer.removeEventListener('touchstart', handleTouchStart);
+                        boardContainer.removeEventListener('touchmove', handleTouchMove);
+                        boardContainer.removeEventListener('touchend', handleTouchEnd);
+                        boardContainer.removeEventListener('mousedown', handleMouseDown);
+                        boardContainer.removeEventListener('mousemove', handleMouseMove);
+                        document.removeEventListener('mouseup', handleMouseUp);
+                        boardContainer.removeEventListener('wheel', handleWheel);
+                    };
+                }
+            }, [handleTouchStart, handleTouchMove, handleTouchEnd, handleMouseDown, handleMouseMove, handleMouseUp, handleWheel]);
 
             // --- TAM EKRAN MOBİL UYUMU ---
             useEffect(() => {
@@ -1174,20 +1195,20 @@
                         // Önceki taşa göre pozisyon
                         const prevTile = tiles[index - 1];
                         if (prevTile.direction === 'right') {
-                            x = prevTile.position.x + 40; // Reduced from 65 to 40 for horizontal spacing
+                            x = prevTile.position.x + 65;
                             y = prevTile.position.y;
                             direction = 'right';
                         } else if (prevTile.direction === 'left') {
-                            x = prevTile.position.x - 40; // Reduced from 65 to 40 for horizontal spacing
+                            x = prevTile.position.x - 65;
                             y = prevTile.position.y;
                             direction = 'left';
                         } else if (prevTile.direction === 'up') {
                             x = prevTile.position.x;
-                            y = prevTile.position.y - 25; // Reduced from 40 to 25 for vertical spacing
+                            y = prevTile.position.y - 40;
                             direction = 'up';
                         } else if (prevTile.direction === 'down') {
                             x = prevTile.position.x;
-                            y = prevTile.position.y + 25; // Reduced from 40 to 25 for vertical spacing
+                            y = prevTile.position.y + 40;
                             direction = 'down';
                         }
                     }
@@ -1212,8 +1233,8 @@
                 const height = maxY - minY;
                 
                 // Eğer board çok büyükse, otomatik zoom ayarla
-                if (width > 500 || height > 200) {  // Reduced height threshold from 300 to 200
-                    const scale = Math.min(500 / (width + 80), 200 / (height + 80));  // Reduced padding from 100 to 80
+                if (width > 500 || height > 300) {
+                    const scale = Math.min(500 / (width + 100), 300 / (height + 100));
                     setBoardZoom(scale);
                 }
                 
@@ -1681,13 +1702,9 @@
                             <div className="flex items-center gap-2 md:gap-3">
                                 {opponent?.photoUrl ? (
                                     <img
-                                        src={opponent.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(opponent.username) + '&background=FFC107&color=000'}
+                                        src={opponent.photoUrl}
                                         alt="Rəqib"
                                         className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-yellow-400 shadow-lg object-cover"
-                                        onError={(e) => {
-                                            e.target.onerror = null;
-                                            e.target.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(opponent.username) + '&background=FFC107&color=000';
-                                        }}
                                     />
                                 ) : (
                                     <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center shadow-lg">
@@ -1857,13 +1874,9 @@
                                     <div className="flex items-center gap-2">
                                         {playerData?.photoUrl ? (
                                             <img
-                                                src={playerData.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(playerData.username) + '&background=4CAF50&color=fff'}
+                                                src={playerData.photoUrl}
                                                 alt="Siz"
                                                 className="w-8 h-8 rounded-full border-2 border-green-400 shadow-lg object-cover"
-                                                onError={(e) => {
-                                                    e.target.onerror = null;
-                                                    e.target.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(playerData.username) + '&background=4CAF50&color=fff';
-                                                }}
                                             />
                                         ) : (
                                             <div className="w-8 h-8 rounded-full bg-green-700 border-2 border-green-600 flex items-center justify-center shadow-lg">
