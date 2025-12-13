@@ -68,14 +68,14 @@
         /* DOMINO BOARD STYLES */
         .domino-board-container {
             width: 100%;
-            height: 70vh;
+            height: 60vh;
             position: relative;
             overflow: hidden;
             touch-action: none;
-            background: linear-gradient(135deg, rgba(27, 77, 62, 0.98) 0%, rgba(15, 43, 35, 0.98) 100%);
-            border: 3px solid rgba(255, 255, 255, 0.2);
+            background: linear-gradient(135deg, rgba(27, 77, 62, 0.95) 0%, rgba(15, 43, 35, 0.95) 100%);
+            border: 3px solid rgba(255, 255, 255, 0.15);
             margin: 0;
-            box-shadow: inset 0 0 40px rgba(0,0,0,0.6), 0 15px 40px rgba(0,0,0,0.4);
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.3);
         }
         
         .domino-board-inner {
@@ -149,7 +149,7 @@
         .tile-size-hand {
             width: 70px;
             height: 35px;
-            margin: 4px;
+            margin: 5px;
         }
         
         .tile-size-board {
@@ -159,8 +159,8 @@
         
         /* Seçili taş efekti */
         .selected-tile {
-            transform: translateY(-8px) scale(1.15) !important;
-            box-shadow: 0 0 20px rgba(251, 191, 36, 0.9), 0 5px 0 #aaa, 0 8px 8px rgba(0,0,0,0.4);
+            transform: translateY(-5px) scale(1.1) !important;
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.8), 0 3px 0 #aaa, 0 6px 6px rgba(0,0,0,0.4);
             z-index: 100;
             border-color: #f59e0b;
         }
@@ -203,26 +203,23 @@
             pointer-events: none;
         }
         
-        /* El taşları container - PROFESYONEL DİZİLİM */
+        /* El taşları container - YATAY DİZİLİM */
         .hand-tiles-container {
             display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            align-items: center;
-            padding: 10px;
-            gap: 5px;
-            min-height: 85px;
-            background: rgba(0, 0, 0, 0.4);
-            border-top: 2px solid rgba(255, 255, 255, 0.1);
+            flex-wrap: nowrap;
             overflow-x: auto;
-            overflow-y: hidden;
-            max-width: 100vw;
+            padding: 10px;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
+            min-height: 70px;
+            background: rgba(0, 0, 0, 0.3);
+            scroll-snap-type: x mandatory;
         }
         
         .hand-tile-wrapper {
-            display: inline-block;
-            margin: 0 2px;
-            transition: all 0.2s ease;
+            scroll-snap-align: center;
+            flex-shrink: 0;
         }
         
         /* Zoom hint */
@@ -238,6 +235,7 @@
             z-index: 100;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
+            display: none;
         }
         
         /* Game controls */
@@ -288,41 +286,6 @@
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
         
-        /* Disconnect timer */
-        .disconnect-timer {
-            animation: pulse-red 1s infinite;
-            position: fixed;
-            top: 70px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(239, 68, 68, 0.9);
-            color: white;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            z-index: 1000;
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-        }
-        
-        @keyframes pulse-red {
-            0%, 100% { background-color: rgba(239, 68, 68, 0.9); }
-            50% { background-color: rgba(239, 68, 68, 0.6); }
-        }
-        
-        /* Market info */
-        .market-info {
-            background: linear-gradient(135deg, rgba(234, 179, 8, 0.9), rgba(245, 158, 11, 0.9));
-            color: #000;
-            font-weight: bold;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 12px;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-        
         /* Animation for new tiles */
         @keyframes tileSlideIn {
             from {
@@ -352,30 +315,27 @@
         /* Mobile optimizations */
         @media (max-width: 640px) {
             .tile-size-hand {
-                width: 50px;
-                height: 25px;
-                margin: 2px;
+                width: 60px;
+                height: 30px;
+                margin: 3px;
             }
             
             .tile-size-board {
-                width: 45px;
-                height: 22px;
+                width: 50px;
+                height: 25px;
             }
             
             .domino-board-container {
-                height: 65vh;
+                height: 55vh;
             }
             
             .hand-tiles-container {
-                min-height: 80px;
+                min-height: 65px;
                 padding: 8px;
-                gap: 3px;
             }
             
             .zoom-hint {
                 display: block;
-                font-size: 10px;
-                padding: 4px 8px;
             }
         }
         
@@ -383,7 +343,6 @@
             .tile-size-hand {
                 width: 65px;
                 height: 32px;
-                margin: 3px;
             }
             
             .tile-size-board {
@@ -392,13 +351,7 @@
             }
             
             .domino-board-container {
-                height: 68vh;
-            }
-            
-            .hand-tiles-container {
-                min-height: 85px;
-                padding: 10px;
-                gap: 4px;
+                height: 60vh;
             }
         }
         
@@ -410,13 +363,17 @@
             }
             
             .domino-board-container {
-                height: 70vh;
+                height: 65vh;
             }
             
-            .hand-tiles-container {
-                min-height: 90px;
-                padding: 12px;
-                gap: 5px;
+            .tile-size-hand {
+                width: 75px;
+                height: 37px;
+            }
+            
+            .tile-size-board {
+                width: 65px;
+                height: 32px;
             }
         }
         
@@ -584,18 +541,15 @@
             const [endInfo, setEndInfo] = useState(null);
             const [opponent, setOpponent] = useState(null);
             const [reconnectAttemptCount, setReconnectAttemptCount] = useState(0);
+            const [appReady, setAppReady] = useState(false); // Yeni state
             const MAX_RECONNECT_ATTEMPTS = 5;
-            
-            // Bağlantı kesilme durumu
-            const [opponentDisconnected, setOpponentDisconnected] = useState(false);
-            const [disconnectTimer, setDisconnectTimer] = useState(30);
             
             // Board Zoom ve Position State
             const [boardZoom, setBoardZoom] = useState(1);
             const [boardPosition, setBoardPosition] = useState({ x: 0, y: 0 });
             const [isDragging, setIsDragging] = useState(false);
             const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-            const [pinchStart, setPinchStart] = useState({ distance: 0, centerX: 0, centerY: 0 });
+            const [pinchStart, setPinchStart] = useState({ distance: 0 });
             const [showZoomHint, setShowZoomHint] = useState(true);
             
             const wsRef = useRef(null);
@@ -606,7 +560,6 @@
             const lastTouchTimeRef = useRef(0);
             const zoomHintTimeoutRef = useRef(null);
             const connectionCheckRef = useRef(null);
-            const disconnectTimerRef = useRef(null);
 
             // Reset Game State
             const resetGameClientState = () => {
@@ -620,8 +573,6 @@
                 setJoinCode('');
                 setBoardZoom(1);
                 setBoardPosition({ x: 0, y: 0 });
-                setOpponentDisconnected(false);
-                setDisconnectTimer(30);
                 localStorage.removeItem(LOCAL_STORAGE_ROOM);
                 localStorage.removeItem(LOCAL_STORAGE_PLAYER);
             };
@@ -653,6 +604,7 @@
                     wsUrl = `ws://${window.location.hostname}:10000`;
                 }
 
+                // PC Telegram için WebSocket bağlantısını güçlendir
                 const ws = new WebSocket(wsUrl);
                 wsRef.current = ws;
 
@@ -665,15 +617,17 @@
                     const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
                     const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
                     
-                    if (storedRoomCode && storedPlayerId) {
-                        console.log('♻️ Kayıtlı oyun bulundu, yeniden bağlanılıyor...');
+                    if (storedRoomCode && storedPlayerId && playerData) {
+                        console.log('♻️ Yarımçıq oyun tapıldı, yenidən qoşulur...');
                         sendMessage({
                             type: 'reconnect',
                             playerId: storedPlayerId,
-                            roomCode: storedRoomCode
+                            roomCode: storedRoomCode,
+                            telegramId: playerData.telegramId
                         });
                     } else {
-                        setScreen('lobby');
+                        console.log('Yeni sessiya, serverə qoşuldu.');
+                        // Player data var, oyun yoxdur, lobi artıq göstərilir
                     }
                 };
                 
@@ -727,17 +681,23 @@
                         
                     case 'reconnectSuccess':
                     case 'gameStart':
-                        console.log('🎮 Oyun başladı/tekrar bağlandı!', data.gameState);
+                        if (!data.gameState || !data.gameState.players) {
+                            showNotification('Oyun məlumatları yüklənərkən xəta baş verdi. Lobbiyə qayıdılır.', 'error');
+                            resetGameClientState();
+                            setScreen('lobby');
+                            break;
+                        }
+                        console.log('🎮 Oyun başladı/yenidən qoşuldu!', data.gameState);
                         setGameState(data.gameState);
-                        setScreen('game');
-                        setSelectedTileIndex(null);
+                        
+                        // Rəqib məlumatlarını yenilə
+                        const opponentId = Object.keys(data.gameState.players).find(id => id !== data.gameState.playerId);
+                        if (opponentId) {
+                            setOpponent(data.gameState.players[opponentId]);
+                        }
+
                         setValidMoves([]);
                         setSearching(false);
-                        setOpponentDisconnected(false);
-                        setDisconnectTimer(30);
-                        if (disconnectTimerRef.current) {
-                            clearInterval(disconnectTimerRef.current);
-                        }
                         if (data.gameState.roomCode && data.gameState.playerId) {
                             localStorage.setItem(LOCAL_STORAGE_ROOM, data.gameState.roomCode);
                             localStorage.setItem(LOCAL_STORAGE_PLAYER, data.gameState.playerId);
@@ -748,7 +708,9 @@
                             searchTimerRef.current = null;
                         }
                         setSearchTime(0);
-                        showNotification(data.type === 'reconnectSuccess' ? 'Oyuna Davam Edildi!' : 'Oyun Başladı!', 'success');
+                        showNotification(data.type === 'reconnectSuccess' ? 'Oyuna Yenidən Qoşuldunuz!' : 'Oyun Başladı!', 'success');
+                        setScreen('game');
+                        setSelectedTileIndex(null); // Bunu setScreen-dən sonra etmək daha təhlükəsizdir
                         break;
                         
                     case 'gameUpdate':
@@ -766,18 +728,6 @@
                         
                     case 'error':
                         showNotification(data.message, 'error');
-                        if (data.message.includes('Zaten bir oyundasınız')) {
-                            // Kullanıcı zaten bir oyundaysa, oyunu yükle
-                            const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
-                            const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
-                            if (storedRoomCode && storedPlayerId) {
-                                sendMessage({
-                                    type: 'reconnect',
-                                    playerId: storedPlayerId,
-                                    roomCode: storedRoomCode
-                                });
-                            }
-                        }
                         setSearching(false);
                         if (screen === 'game' && data.fatal) {
                             resetGameClientState();
@@ -787,6 +737,7 @@
                         
                     case 'gameEnd':
                         const isWinner = data.isWinner === true;
+                        const isStalemate = data.reason === 'stalemate';
                         const isLoser = data.isLoser === true;
                         
                         setEndInfo({
@@ -799,12 +750,18 @@
                             eloChange: data.eloChanges ? (isWinner ? data.eloChanges.winner : data.eloChanges.loser) : 0,
                             message: data.message
                         });
-                        setScreen('end');
-                        
-                        setTimeout(() => {
-                            resetGameClientState(); 
-                            setScreen('lobby');
-                        }, 5000); 
+
+                        if (isStalemate) {
+                            // Dalana dirənmə vəziyyətində əvvəlcə hesablama ekranını göstər
+                            setScreen('calculating');
+                            setTimeout(() => {
+                                setScreen('end');
+                                resetGameClientState();
+                            }, 2500); // 2.5 saniyə sonra nəticə ekranına keç
+                        } else {
+                            setScreen('end');
+                            resetGameClientState();
+                        }
                         break;
                         
                     case 'searchCancelled':
@@ -831,30 +788,10 @@
                         
                     case 'opponentDisconnected':
                         showNotification('Rəqib bağlantısı kəsildi. 30 saniyə gözlənilir...', 'warning');
-                        setOpponentDisconnected(true);
-                        setDisconnectTimer(30);
-                        
-                        // 30 saniye geri sayım
-                        if (disconnectTimerRef.current) clearInterval(disconnectTimerRef.current);
-                        disconnectTimerRef.current = setInterval(() => {
-                            setDisconnectTimer(prev => {
-                                if (prev <= 1) {
-                                    clearInterval(disconnectTimerRef.current);
-                                    setOpponentDisconnected(false);
-                                    showNotification('Rəqib bağlantısı tamamilə kəsildi. Oyuna davam edilir.', 'error');
-                                    return 0;
-                                }
-                                return prev - 1;
-                            });
-                        }, 1000);
                         break;
                         
                     case 'opponentReconnected':
                         showNotification('Rəqib yenidən qoşuldu!', 'info');
-                        setOpponentDisconnected(false);
-                        if (disconnectTimerRef.current) {
-                            clearInterval(disconnectTimerRef.current);
-                        }
                         break;
                         
                     case 'connected':
@@ -870,28 +807,27 @@
                     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                         sendMessage({ type: 'ping' });
                     }
-                }, 30000); // 30 saniyede bir ping
+                }, 15000);
 
-                connectToServer();
-                
-                // Kısa bir timeout ile auth başlat
-                setTimeout(() => {
-                    initializeTelegramAuth();
-                }, 500);
+                initializeTelegramAuth();
                 
                 return () => { 
                     if (wsRef.current) wsRef.current.close(); 
                     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
                     if (zoomHintTimeoutRef.current) clearTimeout(zoomHintTimeoutRef.current);
                     if (connectionCheckRef.current) clearInterval(connectionCheckRef.current);
-                    if (disconnectTimerRef.current) clearInterval(disconnectTimerRef.current);
                 };
             }, []);
 
+            // PlayerData hazır olduqda serverə qoşul
+            useEffect(() => {
+                if (playerData) {
+                    connectToServer();
+                }
+            }, [playerData]);
+
             const initializeTelegramAuth = async () => {
                 try {
-                    let authSuccess = false;
-                    
                     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
                         const user = tg.initDataUnsafe.user;
                         const telegramData = {
@@ -901,30 +837,24 @@
                             photoUrl: user.photo_url || null
                         };
 
-                        try {
-                            const response = await fetch(`${API_URL}/api/auth/telegram`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(telegramData)
-                            });
+                        const response = await fetch(`${API_URL}/api/auth/telegram`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(telegramData)
+                        });
 
-                            const data = await response.json();
-                            if (data.success) {
-                                setPlayerData({
-                                    ...data.player,
-                                    isGuest: false,
-                                    photoUrl: telegramData.photoUrl || data.player.photoUrl
-                                });
-                                console.log('✅ Telegram auth başarılı:', data.player.username);
-                                authSuccess = true;
-                            }
-                        } catch (authError) {
-                            console.warn('Telegram auth hatası, guest moda geçiliyor:', authError);
+                        const data = await response.json();
+                        if (data.success) {
+                            setPlayerData({
+                                ...data.player,
+                                isGuest: false,
+                                photoUrl: telegramData.photoUrl || data.player.photoUrl
+                            });
+                            console.log('✅ Telegram auth başarılı:', data.player.username);
+                        } else {
+                            throw new Error('Auth uğursuz oldu');
                         }
-                    }
-                    
-                    if (!authSuccess) {
-                        // Guest hesap oluştur
+                    } else {
                         const guestData = { 
                             isGuest: true, 
                             username: 'Qonaq' + Math.floor(Math.random() * 9999),
@@ -948,16 +878,8 @@
                     };
                     setPlayerData(guestData);
                 } finally {
-                    const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
-                    const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
-                    
-                    if (storedRoomCode && storedPlayerId) {
-                        console.log('📂 Kayıtlı oyun bulundu, yeniden bağlanılıyor...');
-                        setScreen('loading');
-                    } else {
-                        console.log('🎮 Lobiye yönlendiriliyor...');
-                        setScreen('lobby');
-                    }
+                    setAppReady(true);
+                    setScreen('lobby');
                 }
             };
 
@@ -977,28 +899,20 @@
             const handleTouchStart = useCallback((e) => {
                 if (e.touches.length === 2) {
                     e.preventDefault();
-                    e.stopPropagation();
                     const touch1 = e.touches[0];
                     const touch2 = e.touches[1];
                     const distance = Math.hypot(
                         touch2.clientX - touch1.clientX,
                         touch2.clientY - touch1.clientY
                     );
-                    setPinchStart({ 
-                        distance,
-                        centerX: (touch1.clientX + touch2.clientX) / 2,
-                        centerY: (touch1.clientY + touch2.clientY) / 2
-                    });
-                    setIsDragging(false);
+                    setPinchStart({ distance });
                 } else if (e.touches.length === 1) {
                     e.preventDefault();
-                    e.stopPropagation();
                     setIsDragging(true);
                     setDragStart({
                         x: e.touches[0].clientX - boardPosition.x,
                         y: e.touches[0].clientY - boardPosition.y
                     });
-                    setPinchStart({ distance: 0 });
                     
                     // Çift tıklama kontrolü
                     const currentTime = Date.now();
@@ -1015,8 +929,6 @@
             const handleTouchMove = useCallback((e) => {
                 if (e.touches.length === 2 && pinchStart.distance > 0) {
                     e.preventDefault();
-                    e.stopPropagation();
-                    
                     const touch1 = e.touches[0];
                     const touch2 = e.touches[1];
                     const distance = Math.hypot(
@@ -1025,42 +937,22 @@
                     );
                     
                     const scaleChange = distance / pinchStart.distance;
-                    const newZoom = boardZoom * scaleChange;
-                    const clampedZoom = Math.min(Math.max(newZoom, 0.3), 5);
-                    
-                    // Zoom merkezini koru
-                    const deltaX = (pinchStart.centerX - window.innerWidth / 2) * (clampedZoom - boardZoom) / boardZoom;
-                    const deltaY = (pinchStart.centerY - window.innerHeight / 2) * (clampedZoom - boardZoom) / boardZoom;
-                    
-                    setBoardZoom(clampedZoom);
-                    setBoardPosition(prev => ({
-                        x: prev.x - deltaX,
-                        y: prev.y - deltaY
-                    }));
-                    
-                    setPinchStart({ 
-                        distance,
-                        centerX: (touch1.clientX + touch2.clientX) / 2,
-                        centerY: (touch1.clientY + touch2.clientY) / 2
+                    setBoardZoom(prev => {
+                        const newZoom = prev * scaleChange;
+                        return Math.min(Math.max(newZoom, 0.5), 3);
                     });
+                    setPinchStart({ distance });
                     
                     if (showZoomHint) {
                         setShowZoomHint(false);
                     }
                 } else if (e.touches.length === 1 && isDragging) {
                     e.preventDefault();
-                    e.stopPropagation();
                     const newX = e.touches[0].clientX - dragStart.x;
                     const newY = e.touches[0].clientY - dragStart.y;
-                    
-                    // Sınırları kontrol et
-                    const maxDrag = 200;
-                    const constrainedX = Math.min(Math.max(newX, -maxDrag), maxDrag);
-                    const constrainedY = Math.min(Math.max(newY, -maxDrag), maxDrag);
-                    
-                    setBoardPosition({ x: constrainedX, y: constrainedY });
+                    setBoardPosition({ x: newX, y: newY });
                 }
-            }, [isDragging, dragStart, pinchStart, boardZoom, showZoomHint]);
+            }, [isDragging, dragStart, pinchStart, showZoomHint]);
 
             const handleTouchEnd = useCallback((e) => {
                 setIsDragging(false);
@@ -1089,13 +981,7 @@
                     e.preventDefault();
                     const newX = e.clientX - dragStart.x;
                     const newY = e.clientY - dragStart.y;
-                    
-                    // Sınırları kontrol et
-                    const maxDrag = 200;
-                    const constrainedX = Math.min(Math.max(newX, -maxDrag), maxDrag);
-                    const constrainedY = Math.min(Math.max(newY, -maxDrag), maxDrag);
-                    
-                    setBoardPosition({ x: constrainedX, y: constrainedY });
+                    setBoardPosition({ x: newX, y: newY });
                 }
             }, [isDragging, dragStart]);
 
@@ -1108,7 +994,7 @@
                 const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
                 setBoardZoom(prev => {
                     const newZoom = prev * zoomFactor;
-                    return Math.min(Math.max(newZoom, 0.3), 5);
+                    return Math.min(Math.max(newZoom, 0.5), 3);
                 });
                 
                 if (showZoomHint) {
@@ -1143,12 +1029,12 @@
             const myPlayerId = gameState?.playerId;
             const isMyTurn = gameState?.currentPlayer === myPlayerId;
             const myHand = gameState?.players?.[myPlayerId]?.hand || []; 
-            const marketSize = gameState?.market?.length || 0;
+            const marketSize = gameState?.marketSize || 0;
             
             const opponentHandCount = useMemo(() => {
                 if (!gameState || !gameState.players) return 0;
                 const opponentId = Object.keys(gameState.players).find(id => id !== myPlayerId);
-                if (!opponentId) return 0;
+                if (!opponentId || !gameState.players[opponentId]) return 0;
                 return gameState.players[opponentId]?.hand?.length || 0;
             }, [gameState, myPlayerId]);
 
@@ -1156,64 +1042,63 @@
             const renderBoardTiles = useMemo(() => {
                 if (!gameState?.board || gameState.board.length === 0) return [];
                 
-                const tiles = [];
-                
-                // Board'u ortala ve simetrik yap
-                gameState.board.forEach((tile, index) => {
-                    // İlk taşı tam ortaya koy
-                    if (index === 0) {
-                        tiles.push({
-                            tile,
-                            index,
-                            direction: 'right',
-                            position: { x: 0, y: 0 }
-                        });
-                        return;
-                    }
-                    
-                    // Sağa doğru devam et, her taş için 65px boşluk
-                    const x = index * 65;
-                    tiles.push({
-                        tile,
-                        index,
-                        direction: 'right',
-                        position: { x, y: 0 }
+                const TILE_WIDTH = 60;
+                const TILE_HEIGHT = 30;
+
+                let renderedTiles = [];
+                let leftX = 0;
+                let rightX = 0;
+
+                // İlk taşı yerleştir
+                if (gameState.board.length > 0) {
+                    const firstTile = gameState.board[0];
+                    renderedTiles.push({
+                        tile: firstTile.values,
+                        position: { x: 0, y: 0 },
+                        orientation: 'horizontal'
                     });
-                });
-                
-                // Board'u merkeze çek
-                if (tiles.length > 0) {
-                    const lastTileX = tiles[tiles.length - 1].position.x;
-                    const offsetX = -lastTileX / 2;
-                    
-                    return tiles.map(tile => ({
-                        ...tile,
-                        position: {
-                            x: tile.position.x + offsetX,
-                            y: tile.position.y
-                        }
-                    }));
+                    leftX = -TILE_WIDTH / 2;
+                    rightX = TILE_WIDTH / 2;
                 }
-                
-                return tiles;
+
+                // Qalan daşları yerləşdir
+                for (let i = 1; i < gameState.board.length; i++) {
+                    const { values, position } = gameState.board[i];
+                    if (position === 'left') {
+                        leftX -= TILE_WIDTH;
+                        renderedTiles.unshift({
+                            tile: values,
+                            position: { x: leftX + TILE_WIDTH / 2, y: 0 },
+                            orientation: 'horizontal'
+                        });
+                    } else { // right
+                        rightX += TILE_WIDTH;
+                        renderedTiles.push({
+                            tile: values,
+                            position: { x: rightX - TILE_WIDTH / 2, y: 0 },
+                            orientation: 'horizontal'
+                        });
+                    }
+                }
+
+                return renderedTiles.map((item, index) => ({ ...item, index }));
             }, [gameState?.board]);
 
             const calculateValidMoves = (tile) => {
                 if (!gameState || gameState.board.length === 0) return ['start'];
                 
-                const board = gameState.board;
-                const leftEnd = board[0][0]; 
-                const rightEnd = board[board.length - 1][1]; 
+                const leftEnd = gameState.ends.left;
+                const rightEnd = gameState.ends.right;
 
                 const moves = [];
                 
-                if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
-                if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
+                if (tile.includes(leftEnd)) moves.push('left');
+                if (tile.includes(rightEnd)) moves.push('right');
                 
                 return moves;
             };
             
-            const handleTileClick = (index) => {
+            const handleTileClick = useCallback((index) => {
                 if (!isMyTurn) {
                     showNotification('Növbəniz deyil!', 'warning');
                     return;
@@ -1222,35 +1107,26 @@
                 const tile = myHand[index];
                 if (!tile) return;
                 
-                // PROFESYONEL KURAL: Elinde oynanabilir taş var mı kontrol et
-                const moves = calculateValidMoves(tile);
-                
-                if (moves.length === 0) {
-                    // Oynanabilecek taş yoksa
-                    const canPlayAnyTile = myHand.some(t => calculateValidMoves(t).length > 0);
-                    if (!canPlayAnyTile) {
-                        showNotification('Oynayacaq taşınız yoxdur. Bazardan çəkmək üçün 🎲 düyməsinə basın.', 'info');
-                        return;
-                    } else {
-                        showNotification('Bu taşı oynaya bilməzsiniz, lakin başqa oynayabileceğiniz taş var.', 'warning');
-                        return;
-                    }
-                }
-                
                 if (selectedTileIndex === index) {
                     setSelectedTileIndex(null);
                     setValidMoves([]);
                     return;
                 }
                 
-                setSelectedTileIndex(index);
-                setValidMoves(moves);
-                showNotification('Taş seçildi. Mövqe seçin', 'info');
-            };
+                const moves = calculateValidMoves(tile);
 
-            const playTile = (position) => {
+                if (moves.length > 0) {
+                    setSelectedTileIndex(index);
+                    setValidMoves(moves);
+                    showNotification('Daş seçildi. Mövqe seçin', 'info');
+                } else {
+                    showNotification('Bu daşla oynaya bilməzsiniz', 'warning');
+                }
+            }, [isMyTurn, myHand, selectedTileIndex, calculateValidMoves]);
+
+            const playTile = useCallback((position) => {
                 if (selectedTileIndex === null) {
-                    showNotification('Əvvəlcə taş seçin', 'warning');
+                    showNotification('Əvvəlcə daş seçin', 'warning');
                     return;
                 }
                 
@@ -1259,14 +1135,14 @@
                 sendMessage({
                     type: 'playTile',
                     tileIndex: selectedTileIndex,
-                    position: position === 'start' ? 'left' : position
+                    position: position
                 });
                 
                 setSelectedTileIndex(null);
                 setValidMoves([]);
-            };
+            }, [selectedTileIndex, sendMessage]);
 
-            const drawFromMarket = () => {
+            const drawFromMarket = useCallback(() => {
                 if (!isMyTurn) {
                     showNotification('Növbəniz deyil!', 'warning');
                     return;
@@ -1277,20 +1153,31 @@
                     return;
                 }
                 
-                // PROFESYONEL KURAL: Elinde oynanabilir taş varsa pazara gitme
-                const canPlayFromHand = myHand.some(tile => {
-                    const moves = calculateValidMoves(tile);
-                    return moves.length > 0;
-                });
-                
+                // Elinde oynanabilir taş var mı kontrol et
+                const canPlayFromHand = gameState.board.length > 0 && myHand.some(tile => calculateValidMoves(tile).length > 0);
                 if (canPlayFromHand) {
-                    showNotification('PROFESYONEL KURAL: Əlində oynaya biləcəyiniz taş var! Əvvəlcə onu oynayın.', 'error');
+                    showNotification('Elində oynaya biləcəyiniz daş var! Əvvəlcə onu oynayın.', 'error');
                     return;
                 }
                 
                 sendMessage({ type: 'drawFromMarket' });
-                showNotification('Bazardan taş çəkilir...', 'info');
-            };
+                showNotification('Bazardan daş çəkilir...', 'info');
+            }, [isMyTurn, marketSize, myHand, gameState?.board?.length, calculateValidMoves, sendMessage]);
+
+            const passTurn = useCallback(() => {
+                if (!isMyTurn) return;
+                const canPlayFromHand = myHand.some(tile => calculateValidMoves(tile).length > 0);
+                if (canPlayFromHand) {
+                    showNotification('Oynanacaq daşınız var. Pas keçə bilməzsiniz.', 'error');
+                    return;
+                }
+                if (marketSize > 0) {
+                    showNotification('Bazar boş deyil. Əvvəlcə daş çəkin.', 'error');
+                    return;
+                }
+                sendMessage({ type: 'passTurn' });
+                showNotification('Növbə rəqibə ötürülür...', 'info');
+            }, [isMyTurn, myHand, marketSize, calculateValidMoves, sendMessage]);
 
             const leaveGameClient = () => {
                 const confirmed = window.confirm(
@@ -1313,7 +1200,7 @@
 
             // --- RENDER BÖLÜMLERİ ---
             
-            if (screen === 'loading') {
+            if (screen === 'loading' || !appReady) {
                 return (
                     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center p-4">
                         <div className="loading-spinner mb-4"></div>
@@ -1405,10 +1292,38 @@
                                 </div>
                             )}
 
-                            {/* SADECE ODA KURMA BUTONU - DERECELİ OYUN KALDIRILDI */}
+                            <button 
+                                onClick={() => {
+                                    if(!playerData) return showNotification('Adınızı daxil edin', 'error');
+                                    if(searching) return;
+                                    
+                                    setScreen('searching');
+                                    setSearching(true);
+                                    setSearchTime(0);
+                                    
+                                    searchTimerRef.current = setInterval(() => {
+                                        setSearchTime(prev => prev + 1);
+                                    }, 1000);
+                                    
+                                    sendMessage({ 
+                                        type: 'findMatch',
+                                        telegramId: playerData.telegramId,
+                                        username: playerData.username,
+                                        playerName: playerData.username,
+                                        isGuest: playerData.isGuest,
+                                        level: playerData.level,
+                                        elo: playerData.elo
+                                    });
+                                }}
+                                disabled={!connected || searching}
+                                className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4 flex items-center justify-center gap-2"
+                            >
+                                <span>🏆</span> {!playerData?.isGuest ? '⚔️ RÜTBƏLİ OYUN AXTAR' : '🎮 OYUN AXTAR'}
+                            </button>
+
                             <div className="flex items-center gap-2 my-4">
                                 <div className="h-px bg-white/10 flex-1"></div>
-                                <span className="text-xs text-gray-500 uppercase">SADECE ODA OYUNU</span>
+                                <span className="text-xs text-gray-500 uppercase">və ya</span>
                                 <div className="h-px bg-white/10 flex-1"></div>
                             </div>
 
@@ -1425,7 +1340,7 @@
                                         });
                                     }}
                                     disabled={roomCode !== ''}
-                                    className="bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                                    className="bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
                                 >
                                     <span>🏠</span> OTAQ YARAT
                                 </button>
@@ -1545,6 +1460,21 @@
                 );
             }
 
+            if (screen === 'calculating') {
+                return (
+                    <div className="min-h-screen bg-black/90 flex flex-col items-center justify-center p-4 text-center">
+                        <div className="loading-spinner mb-6 border-yellow-400"></div>
+                        <h1 className="text-3xl font-bold text-white mb-2">Oyun Dalana Dirəndi!</h1>
+                        <p className="text-xl font-semibold text-yellow-400 animate-pulse">
+                            Xallar Hesablanır...
+                        </p>
+                        <p className="text-gray-400 mt-4 max-w-sm">
+                            Bazar boşdur və heç bir oyunçunun oynanacaq daşı yoxdur. Əlində ən az xalı olan oyunçu qalib gələcək.
+                        </p>
+                    </div>
+                );
+            }
+
             if (screen === 'end' && endInfo) {
                 const title = endInfo.isWinner ? '🎉 QAZANDINIZ!' : 
                               endInfo.isLoser ? '😔 UDUZDUNUZ' : 
@@ -1573,26 +1503,39 @@
                                 </div>
                             )}
 
-                            <div className="p-4 bg-black/30 rounded-lg text-gray-400 text-sm">
-                                ⏳ Avtomatik olaraq lobbiyə qayıdılır...
+                            <div className="mt-8 flex flex-col gap-3">
+                                <button 
+                                    onClick={() => {
+                                        setScreen('lobby');
+                                        // Yeni oyun axtarışını dərhal başlatmaq üçün
+                                        // findMatch(); // findMatch funksiyası yaradıb çağıra bilərsiniz
+                                    }}
+                                    className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-white font-bold py-3 rounded-xl shadow-lg transform active:scale-95 transition-all"
+                                >
+                                    Yeni Oyun Axtar
+                                </button>
+                                <button 
+                                    onClick={() => setScreen('lobby')}
+                                    className="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition-colors"
+                                >
+                                    Lobbiyə Qayıt
+                                </button>
                             </div>
                         </div>
                     </div>
                 );
             }
 
+            const canPlayFromHand = useMemo(() => 
+                myHand.some(tile => calculateValidMoves(tile).length > 0),
+                [myHand, gameState?.board]
+            );
+
             // OYUN EKRANI
             if (screen === 'game' && gameState) {
                 return (
                     <div className="fixed inset-0 flex flex-col h-full w-full bg-table-base">
                         {notification && <Toast message={notification.message} type={notification.type} />}
-                        
-                        {/* Bağlantı kesilme uyarısı */}
-                        {opponentDisconnected && (
-                            <div className="disconnect-timer">
-                                ⏳ Rəqib bağlantısı kəsildi: {disconnectTimer}s
-                            </div>
-                        )}
                         
                         {/* ÜST PANEL: Rakip */}
                         <div className="h-14 md:h-16 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between px-3 md:px-4 z-20">
@@ -1612,9 +1555,8 @@
                                     <div className="text-white text-xs md:text-sm font-bold">
                                         {opponent?.name || opponent?.username || 'Rəqib'}
                                     </div>
-                                    <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                        <span>🎲</span>
-                                        <span>{opponentHandCount}</span>
+                                    <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full">
+                                        🎲 {opponentHandCount}
                                     </div>
                                 </div>
                             </div>
@@ -1658,16 +1600,16 @@
                                     {/* DOMINO BOARD TAŞLARI - SİMETRİK */}
                                     {renderBoardTiles.length === 0 ? (
                                         <div className="text-white/30 text-lg md:text-xl font-bold border-4 border-dashed border-white/10 rounded-3xl p-4 md:p-6 text-center">
-                                            {selectedTileIndex !== null ? '👇 Taşı Buraya Qoy' : 'İlk taşı ortaya qoyun'}
+                                            {selectedTileIndex !== null ? '👇 Daşı Buraya Qoy' : 'İlk daşı ortaya qoyun'}
                                         </div>
                                     ) : (
-                                        renderBoardTiles.map(({ tile, index, direction, position }) => (
+                                        renderBoardTiles.map(({ tile, index, position, orientation }) => (
                                             <div 
                                                 key={index}
-                                                className="board-tile"
+                                                className={`board-tile domino-tile ${orientation}`}
                                                 style={{
                                                     left: `${position.x}px`,
-                                                    top: `${position.y}px`,
+                                                    top: '0px',
                                                     transform: 'translate(-50%, -50%)'
                                                 }}
                                             >
@@ -1681,15 +1623,18 @@
                                     )}
 
                                     {/* VALID MOVE INDICATORS - TIKLANABILIR */}
-                                    {validMoves.includes('left') && selectedTileIndex !== null && renderBoardTiles.length > 0 && (
-                                        <div 
+                                    {validMoves.includes('left') && selectedTileIndex !== null && renderBoardTiles.length > 0 && (() => {
+                                        const leftMostTile = renderBoardTiles[0];
+                                        const leftPosition = leftMostTile.position.x - 30; // TILE_WIDTH / 2
+                                        return (
+                                            <div 
                                             className="valid-move-indicator"
                                             style={{
                                                 position: 'absolute',
-                                                left: `${renderBoardTiles[0].position.x - 30}px`,
+                                                left: `${leftPosition}px`,
                                                 top: `${renderBoardTiles[0].position.y}px`,
-                                                width: '65px',
-                                                height: '35px',
+                                                width: '60px',
+                                                height: '32px',
                                                 transform: 'translate(-50%, -50%)'
                                             }}
                                             onClick={() => {
@@ -1699,17 +1644,21 @@
                                         >
                                             <div className="text-yellow-400 font-bold text-xs">SOL</div>
                                         </div>
-                                    )}
+                                        );
+                                    })()}
                                     
-                                    {validMoves.includes('right') && selectedTileIndex !== null && renderBoardTiles.length > 0 && (
-                                        <div 
+                                    {validMoves.includes('right') && selectedTileIndex !== null && renderBoardTiles.length > 0 && (() => {
+                                        const rightMostTile = renderBoardTiles[renderBoardTiles.length - 1];
+                                        const rightPosition = rightMostTile.position.x + 30; // TILE_WIDTH / 2
+                                        return (
+                                            <div 
                                             className="valid-move-indicator"
                                             style={{
                                                 position: 'absolute',
-                                                left: `${renderBoardTiles[renderBoardTiles.length - 1].position.x + 30}px`,
-                                                top: `${renderBoardTiles[renderBoardTiles.length - 1].position.y}px`,
-                                                width: '65px',
-                                                height: '35px',
+                                                left: `${rightPosition}px`,
+                                                top: `${rightMostTile.position.y}px`,
+                                                width: '60px',
+                                                height: '32px',
                                                 transform: 'translate(-50%, -50%)'
                                             }}
                                             onClick={() => {
@@ -1719,7 +1668,8 @@
                                         >
                                             <div className="text-yellow-400 font-bold text-xs">SAĞ</div>
                                         </div>
-                                    )}
+                                        );
+                                    })()}
 
                                     {validMoves.includes('start') && selectedTileIndex !== null && (
                                         <div 
@@ -1728,8 +1678,8 @@
                                                 position: 'absolute',
                                                 left: '50%',
                                                 top: '50%',
-                                                width: '70px',
-                                                height: '40px',
+                                                width: '65px',
+                                                height: '35px',
                                                 transform: 'translate(-50%, -50%)'
                                             }}
                                             onClick={() => {
@@ -1757,6 +1707,17 @@
                                 >
                                     🎲
                                 </button>
+                                {isMyTurn && !canPlayFromHand && marketSize === 0 && (
+                                    <button 
+                                        className="control-button bg-orange-600 border-orange-500 animate-pulse" 
+                                        onClick={passTurn}
+                                        title="Pas Keç"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                                        </svg>
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -1764,15 +1725,13 @@
                         <div className="bg-gradient-to-t from-black/90 via-table-dark to-transparent pb-3 pt-2 z-20">
                             <div className="flex justify-between items-center px-3 md:px-4 mb-2">
                                 <div className="flex items-center gap-2 md:gap-3">
-                                    <div className="text-white text-xs font-bold opacity-70 flex items-center gap-1">
-                                        <span>🎴</span>
-                                        <span>ƏLİNİZ ({myHand.length})</span>
-                                    </div>
+                                    <span className="text-white text-xs font-bold opacity-70">
+                                        🎴 ƏLİNİZ ({myHand.length})
+                                    </span>
                                     {marketSize > 0 && (
-                                        <div className="market-info flex items-center gap-1">
-                                            <span>🎲</span>
-                                            <span>BAZAR: {marketSize}</span>
-                                        </div>
+                                        <span className="text-yellow-400 text-xs font-bold bg-black/40 px-2 py-1 rounded-full">
+                                            🎲 BAZAR: {marketSize}
+                                        </span>
                                     )}
                                 </div>
                                 <button
@@ -1783,7 +1742,7 @@
                                 </button>
                             </div>
 
-                            {/* PROFESYONEL Taş Dizilimi */}
+                            {/* YATAY Taş Dizilimi */}
                             <div className="hand-tiles-container hide-scrollbar">
                                 {myHand.map((tile, index) => (
                                     <div key={`${tile[0]}-${tile[1]}-${index}`} className="hand-tile-wrapper">
