@@ -73,6 +73,7 @@ const rooms = new Map();
 const matchQueue = [];
 const playerConnections = new Map();
 const playerSessions = new Map(); // telegramId -> player data
+const activeDisconnects = new Map(); // roomCode -> timeout
 
 // ELO Calculation - Win-based system
 function calculateElo(winnerElo, loserElo, winnerLevel) {
@@ -639,6 +640,14 @@ function handleCancelSearch(ws) {
 }
 
 function reconnectPlayer(ws, roomCode, playerId, room) {
+    // Timeout varsa iptal et
+    const timeoutId = activeDisconnects.get(roomCode);
+    if (timeoutId) {
+        clearTimeout(timeoutId);
+        activeDisconnects.delete(roomCode);
+        console.log(`✅ Timeout iptal edildi: ${roomCode}`);
+    }
+
     // Eski bağlantıyı temizle
     if (playerConnections.has(playerId)) {
         const oldWs = playerConnections.get(playerId);
@@ -745,6 +754,7 @@ function handlePlayTile(ws, data) {
         handleGameEnd(ws.roomCode, winner, gs);
     } else {
         gs.turn++;
+        gs.consecutivePasses = 0; // Başarılı hamlede pas sayacı sıfırlanır
         gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
         Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
     }
@@ -899,19 +909,47 @@ function handlePass(ws) {
     }
 
     gs.turn++;
-    gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
 
-    const winner = checkWinner(gs);
-    if (winner) {
-        broadcastToRoom(ws.roomCode, {
-            type: 'gameEnd',
-            winner,
-            winnerName: winner === 'DRAW' ? 'Beraberlik' : gs.players[winner].name
-        });
-        rooms.delete(ws.roomCode);
-    } else {
-        Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+    // Pas sayacını artır
+    gs.consecutivePasses = (gs.consecutivePasses || 0) + 1;
+
+    // Eğer art arda 2 pas yapıldıysa (her iki oyuncu da oynayamıyor) oyun biter
+    if (gs.consecutivePasses >= 2) {
+        console.log(`🔒 Oyun kilitlendi (2 Pas) - Puanlar hesaplanıyor...`);
+        finishGameByScore(ws.roomCode, gs);
+        return;
     }
+
+    gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
+    Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+}
+
+function finishGameByScore(roomCode, gs) {
+    const playerIds = Object.keys(gs.players);
+    const p1Id = playerIds[0];
+    const p2Id = playerIds[1];
+
+    const p1Score = gs.players[p1Id].hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
+    const p2Score = gs.players[p2Id].hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
+
+    let winnerId;
+    if (p1Score < p2Score) winnerId = p1Id;
+    else if (p2Score < p1Score) winnerId = p2Id;
+    else winnerId = 'DRAW';
+
+    broadcastToRoom(roomCode, {
+        type: 'gameLocked',
+        message: 'Oyun kilitlendi! Puanlar hesaplanıyor...',
+        scoreDetails: {
+            [p1Id]: p1Score,
+            [p2Id]: p2Score
+        }
+    });
+
+    // Biraz bekleyip bitir
+    setTimeout(() => {
+        handleGameEnd(roomCode, winnerId, gs);
+    }, 3000);
 }
 
 function handleDrawFromMarket(ws) {
@@ -923,13 +961,17 @@ function handleDrawFromMarket(ws) {
 
     const player = gs.players[ws.playerId];
 
+    // Pazardan taş çekme kuralları
+    // 1. Kural: Elinde oynanabilir taş varsa çekemezsin
+    const hasPlayable = player.hand.some(tile => canPlayTile(tile, gs.board));
+    if (hasPlayable) {
+        return sendMessage(ws, { type: 'error', message: 'Elinizde oynanabilir taş var, pazardan çekemezsiniz!' });
+    }
+
     // Pazarda taş var mı?
     if (!gs.market || gs.market.length === 0) {
-        // Pazar boş, otomatik sıra geç
-        console.log(`🎲 ${player.name} pazardan çekemedi (boş) - Sıra geçiyor`);
-        gs.turn++;
-        gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
-        Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+        // Pazar boş, otomatik sıra geç (Pas)
+        handlePass(ws);
         return;
     }
 
@@ -937,28 +979,27 @@ function handleDrawFromMarket(ws) {
     const drawnTile = gs.market.shift();
     player.hand.push(drawnTile);
 
-    console.log(`🎲 ${player.name} pazardan taş çekti: [${drawnTile}] - Kalan: ${gs.market.length}`);
+    // İstatistik için move sayma, çekme hamlesi olarak
+    // gs.moves++; // İsteğe bağlı
 
-    // Çekilen taş oynanabilir mi kontrol et
+    // Çekilen taş ile oynanabilir mi?
     const canPlayDrawn = canPlayTile(drawnTile, gs.board);
 
-    if (!canPlayDrawn) {
-        // Oynanamıyor, tekrar çekmeli mi yoksa sıra geçmeli mi?
-        // Domino kurallarına göre: Oynanabilir taş bulana kadar çeker
-        const hasPlayable = player.hand.some(tile => canPlayTile(tile, gs.board));
+    // Durumu güncelle
+    Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
 
-        if (!hasPlayable && gs.market.length > 0) {
-            // Hala oynanabilir taş yok ve pazar doluysa, oyuncu tekrar çekebilir
-            sendMessage(ws, { type: 'info', message: 'Taş oynanamıyor, tekrar çekin veya bekleyin' });
-        } else if (!hasPlayable && gs.market.length === 0) {
-            // Pazar bitti ve hala oynanabilir taş yok - sıra geç
-            console.log(`❌ ${player.name} oynanabilir taş bulamadı - Sıra geçiyor`);
-            gs.turn++;
-            gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
+    if (canPlayDrawn) {
+        sendMessage(ws, { type: 'info', message: 'Çekilen taş oynanabilir!' });
+    } else {
+        // Otomatik tekrar çekme? Genelde oyuncu manuel çeker.
+        // Kullanıcı isteği: "oynamalık taş yoksa pas diger usere gecsin ondada yoksa taslar hesaplansin"
+        // Ancak burada oyuncu TEK BİR TAŞ çekti. Hala markette taş varsa ve oynayamıyorsa tekrar çekmeli.
+        // Eğer market bittiyse ve oynayamıyorsa o zaman PASS olur.
+        if (gs.market.length === 0) {
+            sendMessage(ws, { type: 'info', message: 'Pazar bitti ve oynanacak taş yok. Pas geçiliyor.' });
+            handlePass(ws);
         }
     }
-
-    Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
 }
 
 function handleLeaveGame(ws) {
@@ -990,15 +1031,32 @@ function handleDisconnect(ws) {
 
     if (ws.playerId) playerConnections.delete(ws.playerId);
 
-    const qIdx = matchQueue.findIndex(p => p.ws === ws);
+    // Kuyruktan temizleme: Hem WS referansına hem de TelegramID'ye göre detaylı temizlik
+    const qIdx = matchQueue.findIndex(p => p.ws === ws || (ws.telegramId && p.telegramId === ws.telegramId));
     if (qIdx !== -1) {
         matchQueue.splice(qIdx, 1);
-        console.log(`❌ Kuyruktan çıkarıldı - Kalan: ${matchQueue.length}`);
+        console.log(`❌ Kuyruktan çıkarıldı (Disconnect) - Kalan: ${matchQueue.length}`);
     }
 
     if (ws.roomCode) {
         console.log(`🏠 Odadan ayrıldı (Kopma): ${ws.roomCode}`);
-        broadcastToRoom(ws.roomCode, { type: 'playerDisconnected', message: 'Rakip bağlantısı koptu, bekleniyor...' });
+        broadcastToRoom(ws.roomCode, { type: 'playerDisconnected', message: 'Rakip bağlantısı koptu, bekleniyor...', timeoutSeconds: 20 });
+
+        // Timeout başlat: 20 saniye içinde gelmezse oyunu bitir
+        const timeoutId = setTimeout(() => {
+            const room = rooms.get(ws.roomCode);
+            if (room) {
+                const winnerId = Object.keys(room.gameState.players).find(pid => pid !== ws.playerId); // Corrected to room.gameState.players
+                if (winnerId) {
+                    console.log(`⏱️ Timeout doldu, kazanan: ${winnerId}`);
+                    broadcastToRoom(ws.roomCode, { type: 'opponentTimeout', message: 'Rakip süre dolduğu için oyunu kaybetti.' });
+                    handleGameEnd(ws.roomCode, winnerId, room.gameState);
+                }
+            }
+            activeDisconnects.delete(ws.roomCode);
+        }, 20000);
+
+        activeDisconnects.set(ws.roomCode, timeoutId);
 
         // Odayı silme! Oyuncu geri gelebilir.
         // rooms.delete(ws.roomCode); 
