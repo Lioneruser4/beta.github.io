@@ -825,7 +825,7 @@
                     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
                     if (connectionCheckRef.current) clearInterval(connectionCheckRef.current);
                 };
-            }, []);
+            }, []);     
 
             const initializeTelegramAuth = async () => {
                 try {
@@ -878,10 +878,8 @@
                         telegramId: null
                     };
                     setPlayerData(guestData);
-                } finally {
-                    // Başlatma mantığı artık `useEffect` ve `ws.onopen` içinde merkezileştirildi.
-                    // Burada ekran değiştirme işlemi yapılmamalıdır.
                 }
+                // finally bloğu TAMAMEN KALDIRILDI - ekran değişimi yapılmamalı
             };
 
             const loadLeaderboard = async () => {
@@ -1745,4 +1743,5 @@
         root.render(<DominoGame />);
     </script>
 </body>
-</html>  
+</html>
+                       
