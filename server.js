@@ -586,13 +586,15 @@ async function handleFindMatch(ws, data) {
     ws.elo = data.elo || 0; // 0 = guest
     ws.isGuest = !data.telegramId; // Telegram yoksa guest
 
-    // Aynı Telegram hesabının ikinci kez kuyruğa girmesini engelle
+    // Aynı Telegram hesabının ikinci kez kuyruğa girmesini engelle (TEST İÇİN DEVRE DIŞI)
+    /*
     if (!ws.isGuest && ws.telegramId) {
         const sameTelegramInQueue = matchQueue.find(p => p.telegramId === ws.telegramId);
         if (sameTelegramInQueue) {
             return sendMessage(ws, { type: 'error', message: 'Bu Telegram hesabı zaten eşleşme kuyruğunda' });
         }
     }
+    */
 
     playerConnections.set(playerId, ws);
 
@@ -603,26 +605,16 @@ async function handleFindMatch(ws, data) {
         }
     }
 
-    const isSelf = (p) => {
-        if (p.telegramId && ws.telegramId && p.telegramId === ws.telegramId) return true;
-        if (p.playerId === ws.playerId) return true;
-        return false;
-    };
+    // Eşleşme Mantığı (BASİTLEŞTİRİLMİŞ - HERKES HERKESLE)
 
-    let opponentIndex = -1;
+    // Kendisi dışındaki İLK kişiyi bul
+    // Test için: Aynı Telegram ID olsa bile eşleşmesine izin veriyoruz (farklı sekmeler için)
+    let opponentIndex = matchQueue.findIndex(p => p.ws !== ws);
 
-    if (!ws.isGuest) {
-        // Ranked Oyuncu
-        // 1. Ranked Rakip Ara (Öncelikli)
-        opponentIndex = matchQueue.findIndex(p => !p.isGuest && !isSelf(p));
-
-        // 2. Bulamazsa Guest Ara (Casual Maç)
-        if (opponentIndex === -1) {
-            opponentIndex = matchQueue.findIndex(p => p.isGuest && !isSelf(p));
-        }
+    if (opponentIndex !== -1) {
+        console.log(`✅ RAKİP BULUNDU! (Basit Mod)`);
     } else {
-        // Guest Oyuncu - Herkesle oynayabilir (Ranked oyuncu gelirse Casual olur)
-        opponentIndex = matchQueue.findIndex(p => !isSelf(p));
+        console.log(`❌ RAKİP YOK, Kuyruğa ekleniyor...`);
     }
 
     if (opponentIndex !== -1) {
