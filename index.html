@@ -431,22 +431,9 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-        // Telegram WebApp Initialization
-        const tg = window.Telegram?.WebApp;
-        if (tg) {
-            tg.ready();
-            tg.expand();
-            // Telegram PC uygulaması için özel ayarlar
-            if (window.innerWidth > 1024) {
-                document.body.style.minHeight = '600px';
-                document.body.style.minWidth = '350px';
-            }
-        }
-
-        // --- SABİT DEĞİŞKENLER (CONSTANTS) ---
-        const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const API_URL = IS_LOCAL ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
-        const WS_URL = IS_LOCAL ? 'ws://localhost:10000' : 'wss://beta-github-io.onrender.com';
+        // --- SABİT SUNUCU ADRESLERİ ---
+        const API_URL = 'https://beta-github-io.onrender.com';
+        const WS_URL = 'wss://beta-github-io.onrender.com';
 
         // --- BİLEŞENLER ---
         const RenderPips = ({ number }) => {
@@ -626,10 +613,11 @@
                             roomCode: storedRoomCode
                         });
                     } else {
-                        if (screen === 'loading') setScreen('lobby'); // Only transition if we are on the loading screen.
+                        // Auth işlemi de bittiyse lobiye geç
+                        if (playerData) setScreen('lobby');
                     }
                 };
-                
+
                 ws.onclose = (event) => { 
                     console.log('❌ WebSocket bağlantısı kapandı:', event.code, event.reason);
                     setConnected(false); 
@@ -801,33 +789,38 @@
             };
             
             // --- İLK YÜKLEME VE AUTH ---
+            const authCompletedRef = useRef(false);
+            const connectionCompletedRef = useRef(false);
+
             useEffect(() => {
-                const startApp = async () => {
-                    console.log('🚀 Tətbiq başladılır...');
-                    await initializeTelegramAuth(); // 1. Auth prosesini gözlə
-                    connectToServer();              // 2. Sonra serverə qoşul
-                };
+                const tg = window.Telegram?.WebApp;
+                tg?.ready();
+                tg?.expand();
+
+                console.log('🚀 Tətbiq başladılır... Bağlantı və Auth paralel olaraq başlayır.');
+                
+                // 1. WebSocket bağlantısını dərhal başlat
+                connectToServer();
+                
+                // 2. Auth prosesini arxa planda başlat
+                initializeTelegramAuth();
 
                 // Yükleme ekranında takılmayı önlemek için zaman aşımı
                 initialLoadTimeoutRef.current = setTimeout(() => {
                     if (screen === 'loading' && !connected) {
                         showNotification('Serverə qoşulmaq mümkün olmadı. Zəhmət olmasa sonra yenidən cəhd edin.', 'error');
                         setScreen('lobby');
+                        // Eğer auth da bitmediyse, misafir olarak devam et
+                        if (!playerData) {
+                             setPlayerData({ isGuest: true, username: 'Qonaq' + Math.floor(Math.random() * 9999), photoUrl: null, level: 0, elo: 0, telegramId: null });
+                        }
                     }
                 }, 10000); // 10 saniye bekle
 
+                // Keep-alive pings
                 connectionCheckRef.current = setInterval(() => {
-                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                        sendMessage({ type: 'ping' });
-                    }
+                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) sendMessage({ type: 'ping' });
                 }, 15000);
-                
-                // Telegram mühitinin hazır olmasını gözlə, əks halda dərhal başla.
-                if (tg) {
-                    tg.ready(startApp);
-                } else {
-                    startApp();
-                }
                 
                 return () => { 
                     if (wsRef.current) wsRef.current.close(); 
@@ -837,6 +830,7 @@
                 };
             }, []);     
 
+            // Lobiye geçişi kontrol eden useEffect
             const initializeTelegramAuth = async () => {
                 try {
                     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
@@ -889,8 +883,11 @@
                     };
                     setPlayerData(guestData);
                 }
-                // finally bloğu TAMAMEN KALDIRILDI - ekran değişimi yapılmamalı
+                // Auth bitti, eğer bağlantı da varsa lobiye geç
+                if (connected) setScreen('lobby');
             };
+
+
 
             const loadLeaderboard = async () => {
                 try {
@@ -1738,17 +1735,11 @@
             );
         };
 
-        // Telegram WebApp için özel yükleme
-        document.addEventListener('DOMContentLoaded', function() {
-            // Telegram PC uygulaması için viewport ayarı
-            if (window.innerWidth > 1024) {
-                const viewport = document.querySelector('meta[name="viewport"]');
-                if (viewport) {
-                    viewport.setAttribute('content', 'width=350, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes');
-                }
-            }
-        });
-
+        // Mobil cihazlarda 100vh sorununu çözmek için
+        const setAppHeight = () => document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+        window.addEventListener('resize', setAppHeight);
+        setAppHeight();
+        
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<DominoGame />);
     </script>
