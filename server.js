@@ -1,1256 +1,1142 @@
-<!DOCTYPE html>
-<html lang="tr">
+const WebSocket = require('ws');
+const http = require('http');
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#1b4d3e">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Domino 101 Pro - Telegram Game</title>
+const app = express();
 
-    <!-- Telegram WebApp SDK -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+// MongoDB Bağlantısı
+const MONGODB_URI = 'mongodb+srv://xaliqmustafayev7313_db_user:R4Cno5z1Enhtr09u@sayt.1oqunne.mongodb.net/domino_game?retryWrites=true&w=majority';
 
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+mongoose.connect(MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+})
+    .then(() => console.log('✅ MongoDB bağlantısı başarılı - Domino Game Database'))
+    .catch(err => console.error('❌ MongoDB bağlantı hatası:', err));
 
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+// Mongoose Schemas
+const playerSchema = new mongoose.Schema({
+    telegramId: { type: String, required: true, unique: true },
+    username: { type: String, required: true },
+    firstName: { type: String },
+    lastName: { type: String },
+    photoUrl: { type: String },
+    elo: { type: Number, default: 0 },
+    level: { type: Number, default: 1 },
+    wins: { type: Number, default: 0 },
+    losses: { type: Number, default: 0 },
+    draws: { type: Number, default: 0 },
+    totalGames: { type: Number, default: 0 },
+    winStreak: { type: Number, default: 0 },
+    bestWinStreak: { type: Number, default: 0 },
+    createdAt: { type: Date, default: Date.now },
+    lastPlayed: { type: Date, default: Date.now }
+});
 
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Roboto', 'sans-serif'] },
-                    colors: {
-                        table: {
-                            base: '#1b4d3e', // Klasik Yeşil Masa
-                            dark: '#0f2b23',
-                            light: '#2c6b58'
-                        },
-                        bone: {
-                            face: '#fdfdfd',
-                            side: '#e2e2e2',
-                            shadow: '#00000040'
-                        }
-                    },
-                    boxShadow: {
-                        '3d': '0px 4px 0px #c7c7c7, 0px 6px 6px rgba(0,0,0,0.4)', // Taşın 3D kalınlığı
-                        '3d-active': '0px 2px 0px #c7c7c7, 0px 3px 3px rgba(0,0,0,0.4)',
-                        'inner-pip': 'inset 0 1px 2px rgba(0,0,0,0.6)',
-                        'glow': '0 0 15px #fbbf24, 0 0 5px #fbbf24' // İpucu parlaması
-                    },
-                    animation: {
-                        'slide-up': 'slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                        'float': 'float 3s ease-in-out infinite',
-                        'slide-in': 'slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
-                        'celebrate': 'celebrate 1s ease-out',
-                        'glow-pulse': 'glowPulse 2s ease-in-out infinite',
-                        'shake': 'shake 0.5s ease-in-out'
-                    },
-                    keyframes: {
-                        slideUp: { '0%': { transform: 'translateY(100%)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
-                        float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-5px)' } },
-                        slideIn: { '0%': { transform: 'scale(0) rotate(180deg)', opacity: '0' }, '100%': { transform: 'scale(1) rotate(0)', opacity: '1' } },
-                        celebrate: {
-                            '0%': { transform: 'scale(1) rotate(0deg)' },
-                            '25%': { transform: 'scale(1.2) rotate(-10deg)' },
-                            '50%': { transform: 'scale(1.3) rotate(10deg)' },
-                            '75%': { transform: 'scale(1.2) rotate(-5deg)' },
-                            '100%': { transform: 'scale(1) rotate(0deg)' }
-                        },
-                        glowPulse: {
-                            '0%, 100%': { boxShadow: '0 0 20px rgba(251, 191, 36, 0.8), 0 0 40px rgba(251, 191, 36, 0.4)' },
-                            '50%': { boxShadow: '0 0 30px rgba(251, 191, 36, 1), 0 0 60px rgba(251, 191, 36, 0.6)' }
-                        },
-                        shake: {
-                            '0%, 100%': { transform: 'translateX(0)' },
-                            '25%': { transform: 'translateX(-10px)' },
-                            '75%': { transform: 'translateX(10px)' }
-                        }
-                    }
-                }
+const matchSchema = new mongoose.Schema({
+    player1: { type: mongoose.Schema.Types.ObjectId, ref: 'DominoPlayer' },
+    player2: { type: mongoose.Schema.Types.ObjectId, ref: 'DominoPlayer' },
+    winner: { type: mongoose.Schema.Types.ObjectId, ref: 'DominoPlayer' },
+    player1Elo: { type: Number },
+    player2Elo: { type: Number },
+    player1EloChange: { type: Number },
+    player2EloChange: { type: Number },
+    moves: { type: Number, default: 0 },
+    duration: { type: Number },
+    isDraw: { type: Boolean, default: false },
+    gameType: { type: String, enum: ['ranked', 'private'], default: 'ranked' },
+    createdAt: { type: Date, default: Date.now }
+});
+
+const activeGameSchema = new mongoose.Schema({
+    roomCode: { type: String, required: true, unique: true },
+    gameState: Object,
+    players: Object,
+    telegramIds: [String], // Kolay arama için
+    type: String,
+    host: String,
+    startTime: Number,
+    lastUpdated: { type: Date, default: Date.now }
+});
+
+const Player = mongoose.model('DominoPlayer', playerSchema);
+const Match = mongoose.model('DominoMatch', matchSchema);
+const ActiveGame = mongoose.model('DominoActiveGame', activeGameSchema);
+
+app.use(cors());
+app.use(express.json());
+
+const rooms = new Map();
+// Eşleştirme havuzlarını ayırıyoruz: ranked ve casual
+const rankedQueue = [];
+const casualQueue = [];
+
+const playerConnections = new Map();
+const playerSessions = new Map(); // telegramId -> player data
+const activeDisconnects = new Map(); // roomCode -> timeout
+
+// ELO Calculation - Win-based system
+function calculateElo(winnerElo, loserElo, winnerLevel) {
+    // Random points between 13-20 for levels 1-5
+    // Random points between 10-15 for levels 6+
+    let winnerChange;
+    if (winnerLevel <= 5) {
+        winnerChange = Math.floor(Math.random() * 8) + 13; // 13-20
+    } else {
+        winnerChange = Math.floor(Math.random() * 6) + 10; // 10-15
+    }
+
+    const loserChange = -Math.floor(winnerChange * 0.7); // Loser loses 70% of winner's gain
+
+    return {
+        winnerElo: winnerElo + winnerChange,
+        loserElo: Math.max(0, loserElo + loserChange),
+        winnerChange,
+        loserChange
+    };
+}
+
+// Level Calculation - Every 100 points = 1 level
+function calculateLevel(elo) {
+    return Math.floor(elo / 100) + 1; // Start at level 1 (0 ELO)
+}
+
+// API Endpoints
+app.post('/api/auth/telegram', async (req, res) => {
+    try {
+        const { telegramId, username, firstName, lastName, photoUrl } = req.body;
+
+        if (!telegramId || !username) {
+            return res.status(400).json({ error: 'Telegram ID ve kullanıcı adı gerekli' });
+        }
+
+        let player = await Player.findOne({ telegramId });
+
+        if (!player) {
+            player = new Player({
+                telegramId,
+                username,
+                firstName,
+                lastName,
+                photoUrl
+            });
+            await player.save();
+            console.log(`🆕 Yeni oyuncu kaydedildi: ${username} (${telegramId})`);
+        } else {
+            // Profil bilgilerini güncelle
+            player.username = username;
+            player.firstName = firstName;
+            player.lastName = lastName;
+            player.photoUrl = photoUrl;
+            player.lastPlayed = new Date();
+            await player.save();
+        }
+
+        playerSessions.set(telegramId, player);
+
+        res.json({
+            success: true,
+            player: {
+                id: player._id,
+                telegramId: player.telegramId,
+                username: player.username,
+                firstName: player.firstName,
+                lastName: player.lastName,
+                photoUrl: player.photoUrl,
+                elo: player.elo,
+                level: player.level,
+                wins: player.wins,
+                losses: player.losses,
+                draws: player.draws,
+                totalGames: player.totalGames,
+                winStreak: player.winStreak,
+                bestWinStreak: player.bestWinStreak
+            }
+        });
+    } catch (error) {
+        console.error('Auth error:', error);
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+app.get('/api/leaderboard', async (req, res) => {
+    try {
+        const players = await Player.find()
+            .sort({ elo: -1 })
+            .limit(10) // Top 10
+            .select('telegramId username firstName lastName photoUrl elo level wins losses draws totalGames winStreak');
+
+        res.json({ success: true, leaderboard: players });
+    } catch (error) {
+        console.error('Leaderboard error:', error);
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+app.get('/api/player/:telegramId/stats', async (req, res) => {
+    try {
+        const player = await Player.findOne({ telegramId: req.params.telegramId });
+        if (!player) {
+            return res.status(404).json({ error: 'Oyuncu bulunamadı' });
+        }
+
+        const recentMatches = await Match.find({
+            $or: [{ player1: player._id }, { player2: player._id }]
+        })
+            .sort({ createdAt: -1 })
+            .limit(10)
+            .populate('player1 player2 winner');
+
+        res.json({ success: true, player, recentMatches });
+    } catch (error) {
+        console.error('Stats error:', error);
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+app.get('/api/player/:telegramId/matches', async (req, res) => {
+    try {
+        const player = await Player.findOne({ telegramId: req.params.telegramId });
+        if (!player) {
+            return res.status(404).json({ error: 'Oyuncu bulunamadı' });
+        }
+
+        const matches = await Match.find({
+            $or: [{ player1: player._id }, { player2: player._id }]
+        })
+            .sort({ createdAt: -1 })
+            .limit(50)
+            .populate('player1 player2 winner');
+
+        res.json({ success: true, matches });
+    } catch (error) {
+        console.error('Matches error:', error);
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+app.get('/', (req, res) => {
+    res.json({
+        status: 'online',
+        message: 'Domino WebSocket Server',
+        players: playerConnections.size,
+        rooms: rooms.size
+    });
+});
+
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok' });
+});
+
+const server = http.createServer(app);
+const wss = new WebSocket.Server({
+    server,
+    perMessageDeflate: false,
+    clientTracking: true
+});
+
+// --- YARDIMCI FONKSİYONLAR ---
+
+function generateRoomCode() {
+    return Math.random().toString(36).substr(2, 4).toUpperCase();
+}
+
+function createDominoSet() {
+    const tiles = [];
+    for (let i = 0; i <= 6; i++) {
+        for (let j = i; j <= 6; j++) {
+            tiles.push([i, j]);
+        }
+    }
+    return shuffleArray(tiles);
+}
+
+function shuffleArray(array) {
+    const arr = [...array];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+function initializeGame(roomCode, player1Id, player2Id) {
+    const tiles = createDominoSet();
+    const player1Hand = tiles.slice(0, 7);
+    const player2Hand = tiles.slice(7, 14);
+    const market = tiles.slice(14); // Kalan taşlar pazar
+
+    const room = rooms.get(roomCode);
+
+    // En yüksek çifti bul (6|6, 5|5, 4|4, ...)
+    let startingPlayer = player1Id;
+    let highestDouble = -1;
+
+    for (let player of [player1Id, player2Id]) {
+        const hand = player === player1Id ? player1Hand : player2Hand;
+        for (let tile of hand) {
+            if (tile[0] === tile[1] && tile[0] > highestDouble) {
+                highestDouble = tile[0];
+                startingPlayer = player;
             }
         }
-    </script>
+    }
 
-    <style>
-        /* Yeşil Çuha Masa Dokusu */
-        body {
-            background-color: #1b4d3e;
-            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23153d31' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z'/%3E%3C/g%3E%3C/svg%3E");
-            overflow: hidden;
-            touch-action: pan-y pinch-zoom;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-            -webkit-user-select: none;
+    room.gameState = {
+        board: [],
+        players: {
+            [player1Id]: { hand: player1Hand, name: room.players[player1Id].name },
+            [player2Id]: { hand: player2Hand, name: room.players[player2Id].name }
+        },
+        market: market,
+        currentPlayer: startingPlayer,
+        turn: 1,
+        lastMove: null,
+        startingDouble: highestDouble
+    };
+
+    rooms.set(roomCode, room);
+    console.log(`🎮 Oyun başlatıldı - Başlayan: ${startingPlayer === player1Id ? room.players[player1Id].name : room.players[player2Id].name} (${highestDouble}|${highestDouble})`);
+    return room.gameState;
+}
+
+function canPlayTile(tile, board) {
+    if (board.length === 0) return true;
+    const leftEnd = board[0][0];
+    const rightEnd = board[board.length - 1][1];
+    return tile[0] === leftEnd || tile[1] === leftEnd ||
+        tile[0] === rightEnd || tile[1] === rightEnd;
+}
+
+// Bu fonksiyonu TRUE/FALSE dönecek şekilde güncelledim
+function playTileOnBoard(tile, board, position) {
+    if (board.length === 0) {
+        board.push(tile);
+        return true;
+    }
+
+    const leftEnd = board[0][0];
+    const rightEnd = board[board.length - 1][1];
+    let played = false;
+
+    if (position === 'left' || position === 'both') {
+        if (tile[1] === leftEnd) {
+            board.unshift(tile);
+            played = true;
+        } else if (tile[0] === leftEnd) {
+            board.unshift([tile[1], tile[0]]); // Yön değiştir
+            played = true;
         }
+    }
 
-        .pip-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: repeat(3, 1fr);
-            width: 100%;
-            height: 100%;
-            padding: 2px;
+    // Eğer 'both' seçildiyse ve sol tarafa uymadıysa sağa bakmaya devam etmeli
+    // Ancak oyuncu spesifik olarak 'left' dediyse ve uymadıysa buraya girmemeli
+    if (!played && (position === 'right' || position === 'both')) {
+        if (tile[0] === rightEnd) {
+            board.push(tile);
+            played = true;
+        } else if (tile[1] === rightEnd) {
+            board.push([tile[1], tile[0]]); // Yön değiştir
+            played = true;
         }
+    }
 
-        .pip {
-            background-color: #111;
-            border-radius: 50%;
-            width: 5px;
-            height: 5px;
-            margin: auto;
-            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
+    return played;
+}
+
+function checkWinner(gameState) {
+    for (const playerId in gameState.players) {
+        if (gameState.players[playerId].hand.length === 0) {
+            return playerId;
         }
+    }
 
-        /* Kırmızı noktalar (bazı setlerde olur ama burada siyah klasik yaptık) */
+    const player1Id = Object.keys(gameState.players)[0];
+    const player2Id = Object.keys(gameState.players)[1];
+    const player1Hand = gameState.players[player1Id].hand;
+    const player2Hand = gameState.players[player2Id].hand;
 
-        .hide-scrollbar::-webkit-scrollbar {
-            display: none;
+    const player1CanPlay = player1Hand.some(tile => canPlayTile(tile, gameState.board));
+    const player2CanPlay = player2Hand.some(tile => canPlayTile(tile, gameState.board));
+
+    if (!player1CanPlay && !player2CanPlay) {
+        const player1Sum = player1Hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
+        const player2Sum = player2Hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
+
+        // Eşitlik durumunda beraberlik mantığı eklenebilir, şimdilik az puanlı kazanır
+        if (player1Sum === player2Sum) return 'DRAW';
+        return player1Sum < player2Sum ? player1Id : player2Id;
+    }
+
+    return null;
+}
+
+function broadcastToRoom(roomCode, message, excludePlayer = null) {
+    const room = rooms.get(roomCode);
+    if (!room) return;
+
+    for (const playerId in room.players) {
+        if (playerId === excludePlayer) continue;
+        const ws = playerConnections.get(playerId);
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            try { ws.send(JSON.stringify(message)); } catch (e) { }
         }
+    }
+}
 
-        .hide-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
+function sendGameState(roomCode, playerId) {
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState) return;
 
-        /* Parlaklık Efekti */
-        .valid-zone {
-            position: relative;
-            animation: pulse-glow 1.5s infinite;
-        }
+    // Her state gönderiminde veritabanına kaydet
+    saveActiveGame(roomCode, room).catch(err => console.error('DB Save Error:', err));
 
-        .valid-zone::before {
-            content: '';
-            position: absolute;
-            inset: -8px;
-            background: linear-gradient(45deg, transparent, rgba(251, 191, 36, 0.3), transparent);
-            border-radius: 12px;
-            animation: rotate 3s linear infinite;
-        }
+    const ws = playerConnections.get(playerId);
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-        .valid-zone::after {
-            content: '';
-            position: absolute;
-            inset: -4px;
-            background: rgba(251, 191, 36, 0.2);
-            border-radius: 10px;
-            filter: blur(10px);
-        }
+    try {
+        ws.send(JSON.stringify({
+            type: 'gameUpdate',
+            gameState: { ...room.gameState, playerId: playerId }
+        }));
+    } catch (error) { console.error(error); }
+}
 
-        @keyframes pulse-glow {
+async function saveActiveGame(roomCode, room) {
+    if (!room || !room.players) return;
 
-            0%,
-            100% {
-                box-shadow: 0 0 20px rgba(251, 191, 36, 0.6), 0 0 40px rgba(251, 191, 36, 0.3);
-            }
+    // Telegram ID'lerini topla
+    const telegramIds = [];
+    Object.values(room.players).forEach(p => {
+        if (p.telegramId) telegramIds.push(p.telegramId);
+    });
 
-            50% {
-                box-shadow: 0 0 30px rgba(251, 191, 36, 0.9), 0 0 60px rgba(251, 191, 36, 0.5);
-            }
-        }
-
-        @keyframes rotate {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-    </style>
-</head>
-
-<body>
-    <div id="root"></div>
-
-    <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo } = React;
-
-        // Telegram WebApp Initialization
-        const tg = window.Telegram?.WebApp;
-        if (tg) {
-            tg.ready();
-            tg.expand();
-        }
-
-        // API Base URL
-        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
-
-        // --- BİLEŞENLER ---
-
-        // 0. Overlay Modal (Disconnect vb. için)
-        const Overlay = ({ title, message, timer, type }) => (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-slide-in">
-                <div className={`w-full max-w-md mx-4 p-6 rounded-2xl shadow-2xl border-2 text-center relative overflow-hidden ${type === 'error' ? 'bg-red-900/90 border-red-500' :
-                    type === 'success' ? 'bg-green-900/90 border-green-500' :
-                        'bg-gray-900/90 border-white/20'
-                    }`}>
-                    <div className="text-5xl mb-4 animate-bounce">
-                        {type === 'error' ? '⚠️' : type === 'success' ? '🏆' : '⏳'}
-                    </div>
-                    <h3 className="text-2xl font-bold text-white mb-2">{title}</h3>
-                    <p className="text-gray-200 mb-6">{message}</p>
-                    {timer !== undefined && (
-                        <div className="w-20 h-20 mx-auto rounded-full border-4 border-white/20 flex items-center justify-center relative">
-                            <span className="text-3xl font-mono font-bold text-white">{timer}</span>
-                            <div className="absolute inset-0 border-4 border-t-yellow-400 rounded-full animate-spin"></div>
-                        </div>
-                    )}
-                </div>
-            </div>
+    try {
+        await ActiveGame.findOneAndUpdate(
+            { roomCode: roomCode },
+            {
+                roomCode,
+                gameState: room.gameState,
+                players: room.players,
+                telegramIds,
+                type: room.type,
+                host: room.host,
+                startTime: room.startTime,
+                lastUpdated: new Date()
+            },
+            { upsert: true, new: true }
         );
+    } catch (error) {
+        console.error('Oyun kaydetme hatası:', error);
+    }
+}
 
-        // 0.1 Match Intro Screen (4 saniye)
-        const MatchIntroScreen = ({ opponent, myPlayer }) => (
-            <div className="min-h-screen bg-black flex flex-col items-center justify-center relative overflow-hidden">
-                <div className="absolute inset-0 bg-[url('https://c.wallhere.com/photos/22/8e/3840x2160_px_abstract_Poly_polygons_simple_background-1262319.jpg!d')] bg-cover opacity-20"></div>
+function sendMessage(ws, message) {
+    if (ws.readyState === WebSocket.OPEN) {
+        try { ws.send(JSON.stringify(message)); } catch (e) { }
+    }
+}
 
-                <h1 className="text-6xl font-black text-white italic tracking-tighter mb-12 animate-slide-in relative z-10">
-                    <span className="text-yellow-500">VS</span>
-                </h1>
+function getPlayerId(ws) {
+    // Oyuncunun benzersiz kimliğini döndürür.
+    // Client'tan gelen playerId (guest için) veya telegramId (kayıtlı kullanıcı için) önceliklidir.
+    if (ws.playerId) return ws.playerId;
+    if (ws.telegramId) return ws.telegramId;
+    return null;
+}
 
-                <div className="flex items-center gap-8 sm:gap-16 relative z-10 w-full max-w-4xl justify-center px-4">
-                    {/* ME */}
-                    <div className="text-center animate-slide-in" style={{ animationDelay: '0.2s' }}>
-                        <div className="relative mb-4">
-                            <img src={myPlayer?.photoUrl || 'https://via.placeholder.com/150'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.5)]" />
-                            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-blue-600 px-3 py-1 rounded-full text-xs font-bold text-white">SİZ / YOU</div>
-                        </div>
-                        <h2 className="text-2xl font-bold text-white mb-1">{myPlayer?.username}</h2>
-                        <div className="text-blue-400 font-mono font-bold">{myPlayer?.elo} ELO</div>
-                    </div>
+function removePlayerFromQueues(ws) {
+    const playerId = getPlayerId(ws);
+    if (!playerId) return;
+    [rankedQueue, casualQueue].forEach(queue => {
+        const index = queue.findIndex(p => p.playerId === playerId);
+        if (index > -1) queue.splice(index, 1);
+    });
+}
 
-                    {/* SWORD ICON */}
-                    <div className="text-5xl animate-pulse">⚔️</div>
+// --- WEBSOCKET EVENTLERİ ---
 
-                    {/* OPPONENT */}
-                    <div className="text-center animate-slide-in" style={{ animationDelay: '0.4s' }}>
-                        <div className="relative mb-4">
-                            <img src={opponent?.photoUrl || 'https://via.placeholder.com/150'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.5)]" />
-                            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-red-600 px-3 py-1 rounded-full text-xs font-bold text-white">RƏQİB / ENEMY</div>
-                        </div>
-                        <h2 className="text-2xl font-bold text-white mb-1">{opponent?.name || opponent?.username || 'Bilinmeyen'}</h2>
-                        <div className="text-red-400 font-mono font-bold">{opponent?.elo || '???'} ELO</div>
-                    </div>
-                </div>
+wss.on('connection', (ws, req) => {
+    ws.isAlive = true;
+    ws.on('pong', () => ws.isAlive = true);
 
-                <div className="absolute bottom-10 text-white/50 animate-pulse text-sm">
-                    Oyun Başlayır / Match Starting...
-                </div>
-            </div>
-        );
+    ws.on('message', (message) => {
+        try {
+            const data = JSON.parse(message);
+            switch (data.type) {
+                case 'findMatch': handleFindMatch(ws, data); break;
+                case 'cancelSearch': handleCancelSearch(ws); break;
+                case 'createRoom': handleCreateRoom(ws, data); break;
+                case 'joinRoom': handleJoinRoom(ws, data); break;
+                case 'playTile': handlePlayTile(ws, data); break;
+                case 'drawFromMarket': handleDrawFromMarket(ws); break;
+                case 'pass': handlePass(ws); break;
+                case 'leaveGame': handleLeaveGame(ws); break;
+            }
+        } catch (error) {
+            console.error('Hata:', error);
+        }
+    });
 
-        // 0.2 Game End Screen (Win/Loss Lobby)
-        // 0.2 Game End Screen (Win/Loss Lobby)
-        const EndScreen = ({ info, myPlayer, onExit }) => {
-            const isDraw = info.winnerName === 'Beraberlik' || info.winner === 'DRAW';
-            const isWin = info.isWinner;
+    ws.on('close', () => handleDisconnect(ws));
+    sendMessage(ws, { type: 'connected', message: 'Sunucuya bağlandınız' });
+});
 
-            let title = 'MƏĞLUB OLDUN / DEFEAT';
-            let titleColor = 'text-red-500';
-            let icon = '💀';
+const pingInterval = setInterval(() => {
+    wss.clients.forEach((ws) => {
+        if (ws.isAlive === false) return ws.terminate();
+        ws.isAlive = false;
+        ws.ping();
+    });
+}, 30000);
 
-            if (isDraw) {
-                title = 'BƏRABƏRLİK / DRAW';
-                titleColor = 'text-gray-400';
-                icon = '🤝';
-            } else if (isWin) {
-                title = 'QALİB OLDUN / VICTORY';
-                titleColor = 'text-green-400';
-                icon = '🏆';
+wss.on('close', () => clearInterval(pingInterval));
+
+// --- OYUN MANTIKLARI ---
+
+async function handleFindMatch(ws, data) {
+    const telegramId = data.telegramId;
+    const clientPlayerId = data.playerId; // Client'tan gelen ID (guest veya telegram)
+    const isGuest = data.isGuest || !data.telegramId;
+
+    // 1. Önce aktif bir oyunu var mı kontrol et (Memory & DB)
+    if (telegramId || clientPlayerId) {
+        // Memory check
+        for (const [code, room] of rooms.entries()) {
+            let playerEntry = null;
+            if (telegramId) {
+                playerEntry = Object.entries(room.players).find(([pid, p]) => p.telegramId === telegramId);
+            } else if (clientPlayerId && room.players[clientPlayerId]) { // Misafir oyuncu (guest) tekrar bağlanma kontrolü
+                playerEntry = [clientPlayerId, room.players[clientPlayerId]];
+            }
+            if (playerEntry) {
+                console.log(`♻️ Oyuncu ${data.username || 'Guest'} tekrar bağlanıyor (Memory): ${code}`);
+                reconnectPlayer(ws, code, playerEntry[0], room);
+                return;
+            }
+        }
+
+        // DB check (Server restart sonrası için)
+        try {
+            let activeGame = null;
+            if (telegramId) {
+                activeGame = await ActiveGame.findOne({ telegramIds: telegramId });
+            } else if (clientPlayerId) {
+                const query = { [`players.${clientPlayerId}`]: { $exists: true } };
+                activeGame = await ActiveGame.findOne(query);
             }
 
-            return (
-                <div className="min-h-screen bg-black flex flex-col items-center justify-center relative overflow-hidden z-50">
-                    <div className={`absolute inset-0 opacity-30 ${isWin ? 'bg-green-900' : isDraw ? 'bg-gray-800' : 'bg-red-900'}`}></div>
+            if (activeGame) {
+                console.log(`♻️ Oyuncu ${data.username} tekrar bağlanıyor (DB): ${activeGame.roomCode}`);
 
-                    <div className="relative z-10 text-center animate-celebrate">
-                        <div className="text-8xl mb-4">{icon}</div>
-                        <h1 className={`text-5xl sm:text-6xl font-black mb-2 ${titleColor}`}>
-                            {title}
-                        </h1>
-                        <p className="text-white/80 text-xl font-light mb-8 italic">
-                            {isDraw ? 'Dostluq Qazandı / Friendship Wins' : isWin ? 'Əla Oyun! / Great Game!' : 'Gələn səfər... / Next time...'}
-                        </p>
-
-                        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20 max-w-md mx-auto mb-8">
-                            <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-4">
-                                <span className="text-gray-300">Qalib / Winner</span>
-                                <span className="text-white font-bold text-xl">{isDraw ? '-' : info.winnerName}</span>
-                            </div>
-                            {info.isRanked && (
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-300">ELO</span>
-                                    <span className={`font-black text-2xl ${isWin ? 'text-green-400' : isDraw ? 'text-gray-400' : 'text-red-400'}`}>
-                                        {info.eloChange > 0 ? '+' : ''}{info.eloChange}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="text-sm text-gray-500 animate-pulse">Lobiyə qayıdılır... / Returning to lobby...</div>
-                    </div>
-                </div>
-            );
-        };
-
-        const RenderPips = ({ number }) => {
-            const layouts = {
-                0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8],
-                4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8]
-            };
-            const activePips = layouts[number] || [];
-            return (
-                <div className="pip-grid">
-                    {[...Array(9)].map((_, i) => (
-                        <div key={i} className="pip" style={{ opacity: activePips.includes(i) ? 1 : 0 }}></div>
-                    ))}
-                </div>
-            );
-        };
-
-        // 2. Domino Taşı (3D Tasarım)
-        const DominoTile = ({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false }) => {
-            const baseClasses = `
-                relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
-                transition-all duration-300 select-none
-                ${vertical ? 'flex-col w-9 h-[4.5rem] sm:w-10 sm:h-20' : 'flex-row w-[4.5rem] h-9 sm:w-20 sm:h-10'}
-                ${isGhost ? 'opacity-0 pointer-events-none' : 'shadow-3d'}
-                ${isSelected ? '-translate-y-4 shadow-3d-active ring-2 ring-yellow-500 z-10 animate-celebrate' : ''}
-                ${animateIn ? 'animate-slide-in' : ''}
-                ${!disabled && !isGhost ? 'cursor-pointer active:translate-y-1 active:shadow-3d-active hover:brightness-110' : ''}
-                ${disabled ? 'brightness-90 cursor-default' : ''}
-            `;
-
-            return (
-                <div
-                    onClick={onClick}
-                    className={baseClasses}
-                    style={{ transform: isSelected ? 'translateY(-15px) scale(1.1)' : `scale(${scale})` }}
-                >
-                    <div className={`flex-1 flex items-center justify-center ${vertical ? 'border-b' : 'border-r'} border-gray-300`}>
-                        <RenderPips number={values[0]} />
-                    </div>
-                    <div className="flex-1 flex items-center justify-center">
-                        <RenderPips number={values[1]} />
-                    </div>
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-400 border border-gray-500 shadow-inner z-10"></div>
-                </div>
-            );
-        };
-
-        // 3. Bildirim Toast
-        const Toast = ({ message, type }) => {
-            const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600', warning: 'bg-yellow-600' };
-            return (
-                <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-2 rounded-full shadow-lg text-white font-medium text-sm animate-slide-up flex items-center gap-2 ${colors[type] || colors.info}`}>
-                    <span>{type === 'success' ? '✓' : type === 'error' ? '!' : 'i'}</span>
-                    {message}
-                </div>
-            );
-        };
-
-        // --- ANA OYUN ---
-
-        const DominoGame = () => {
-            const [screen, setScreen] = useState('loading'); // loading, lobby, searching, game, leaderboard, end
-            const [connected, setConnected] = useState(false);
-            const [playerData, setPlayerData] = useState(null); // Telegram user data
-            const [leaderboard, setLeaderboard] = useState([]);
-            const [roomCode, setRoomCode] = useState('');
-            const [joinCode, setJoinCode] = useState('');
-            const [gameState, setGameState] = useState(null);
-            const [searchTime, setSearchTime] = useState(0);
-
-            // Oyun İçi State
-            const [selectedTileIndex, setSelectedTileIndex] = useState(null);
-            const [validMoves, setValidMoves] = useState([]); // ['left', 'right', 'both']
-            const [notification, setNotification] = useState(null);
-            const [searching, setSearching] = useState(false);
-            const [endInfo, setEndInfo] = useState(null);
-            const [opponent, setOpponent] = useState(null);
-
-            const wsRef = useRef(null);
-            const boardScrollRef = useRef(null);
-            const searchTimerRef = useRef(null);
-
-            const [overlayState, setOverlayState] = useState(null); // { type: 'disconnect', timer: 20, message: '' }
-
-            // Oyun state'ini temizlemek için merkezi bir fonksiyon
-            const resetGameClientState = () => {
-                setGameState(null);
-                setRoomCode('');
-                setSearching(false);
-                setSelectedTileIndex(null);
-                setValidMoves([]);
-                setEndInfo(null);
-                setOpponent(null);
-                setJoinCode('');
-                setOverlayState(null);
-            };
-
-            // Ses Efektleri (Opsiyonel - Tarayıcı izin verirse çalışır)
-            const playSound = (type) => {
-                // Basit bip sesleri veya mp3 eklenebilir. Şimdilik boş bırakıyorum hata vermesin diye.
-            };
-
-            useEffect(() => {
-                initializeTelegramAuth();
-                connectToServer();
-                return () => { if (wsRef.current) wsRef.current.close(); };
-            }, []);
-
-            // Telegram Auth
-            const initializeTelegramAuth = async () => {
-                try {
-                    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                        // Telegram WebApp - Otomatik giriş
-                        const user = tg.initDataUnsafe.user;
-                        const telegramData = {
-                            telegramId: user.id.toString(),
-                            username: user.username || user.first_name || 'User',
-                            firstName: user.first_name || '',
-                            lastName: user.last_name || '',
-                            photoUrl: user.photo_url || null
-                        };
-
-                        console.log('📡 Telegram kullanıcısı:', telegramData);
-
-                        // MongoDB'ye kaydet/güncelle
-                        const response = await fetch(`${API_URL}/api/auth/telegram`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(telegramData)
-                        });
-
-                        const data = await response.json();
-                        if (data.success) {
-                            setPlayerData({
-                                ...data.player,
-                                isGuest: false,
-                                photoUrl: telegramData.photoUrl || data.player.photoUrl
-                            });
-                            console.log('✅ Telegram Auth başarılı:', data.player);
-                        } else {
-                            throw new Error('Auth failed');
-                        }
-                    } else {
-                        // Normal tarayıcı ve Guest testleri için HER SEFERİNDE YENİ ID
-                        // Bu, aynı tarayıcıda iki sekme açıp kendi kendinize oynamanızı sağlar.
-                        const forcedId = 'guest_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
-                        // localStorage.removeItem('domino_guest_user'); // Eskiyi temizle
-                        console.log('👥 Guest session created with playerId:', forcedId);
-                        const guestData = {
-                            isGuest: true,
-                            username: 'Misafir ' + Math.floor(Math.random() * 999),
-                            photoUrl: null,
-                            level: 1,
-                            elo: 0,
-                            telegramId: null,
-                            playerId: forcedId
-                        };
-                        // localStorage.removeItem('domino_guest_user'); // Eskiyi temizle
-                        console.log('👥 Guest session created:', guestData);
-
-                        setPlayerData(guestData);
-                    }
-                } catch (error) {
-                    console.error('Auth error:', error);
-                    // Hata durumunda da misafir oturumu oluşturulabilir.
-                    const forcedId = 'guest_error_' + Date.now();
-                    setPlayerData({
-                        isGuest: true,
-                        username: 'Guest' + Math.floor(Math.random() * 9999),
-                        photoUrl: null,
-                        level: 1,
-                        elo: 0,
-                        telegramId: null,
-                        playerId: forcedId
+                // Odayı memory'e geri yükle
+                if (!rooms.has(activeGame.roomCode)) {
+                    rooms.set(activeGame.roomCode, {
+                        code: activeGame.roomCode,
+                        players: activeGame.players,
+                        gameState: activeGame.gameState,
+                        type: activeGame.type,
+                        host: activeGame.host,
+                        startTime: activeGame.startTime
                     });
-                } finally {
-                    setScreen('lobby');
-                }
-            };
 
-            // Leaderboard yükle
-            const loadLeaderboard = async () => {
-                try {
-                    const response = await fetch(`${API_URL}/api/leaderboard`);
-                    const data = await response.json();
-                    if (data.success) {
-                        setLeaderboard(data.leaderboard);
+                    // Odayı geri yüklerken, diğer oyuncunun bağlı olup olmadığını kontrol et.
+                    // Eğer sunucu yeni başladıysa kimse bağlı değildir.
+                    // İlk bağlanan kişi odayı kurdu. Diğeri yok.
+                    // Diğer oyuncu için bir timeout başlatmalıyız, yoksa oyun sonsuza kadar bekler.
+                    const room = rooms.get(activeGame.roomCode);
+                    const otherPlayerId = Object.keys(room.players).find(pid => room.players[pid].telegramId !== telegramId);
+
+                    if (otherPlayerId) {
+                        // Diğer oyuncu henüz memory'de yok (çünkü server yeni başladı veya o da düştü)
+                        // Onun için disconnect sürecini başlat
+                        console.log(`⏳ Rakip (${otherPlayerId}) bekleniyor, 30sn timeout başlatıldı.`);
+                        const timeoutId = setTimeout(() => {
+                            const r = rooms.get(activeGame.roomCode);
+                            if (r && !playerConnections.has(otherPlayerId)) { // Hala bağlanmadıysa
+                                const myPid = Object.keys(r.players).find(pid => (r.players[pid].telegramId === telegramId) || (pid === clientPlayerId));
+                                console.log(`⏱️ Timeout doldu (Server Restart Sonrası), kazanan: ${myPid}`);
+                                // Mevcut bağlantıya bildir
+                                const ws = playerConnections.get(myPid);
+                                if (ws) sendMessage(ws, { type: 'opponentTimeout', message: 'Rakip süre dolduğu için oyunu kaybetti.' });
+
+                                handleGameEnd(activeGame.roomCode, myPid, r.gameState);
+                            }
+                            activeDisconnects.delete(activeGame.roomCode);
+                        }, 30000); // 30 saniye bekle
+                        activeDisconnects.set(activeGame.roomCode, timeoutId);
                     }
-                } catch (error) {
-                    console.error('Leaderboard error:', error);
-                }
-            };
-
-            // Otomatik Kaydırma: Oyun güncellendiğinde tahtayı ortala veya sona git
-            useEffect(() => {
-                if (gameState && boardScrollRef.current) {
-                    const scrollWidth = boardScrollRef.current.scrollWidth;
-                    const clientWidth = boardScrollRef.current.clientWidth;
-                    boardScrollRef.current.scrollLeft = (scrollWidth - clientWidth) / 2;
-                }
-            }, [gameState?.board]);
-
-            const connectToServer = () => {
-                let wsUrl = 'wss://beta-github-io.onrender.com';
-                // Test için Localhost kontrolü
-                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                    wsUrl = `ws://${window.location.hostname}:10000`;
                 }
 
-                const ws = new WebSocket(wsUrl);
+                const room = rooms.get(activeGame.roomCode);
+                const foundPlayerId = Object.keys(room.players).find(pid =>
+                    (telegramId && room.players[pid].telegramId === telegramId) ||
+                    (clientPlayerId && pid === clientPlayerId)
+                );
 
-                ws.onopen = () => { setConnected(true); showNotification('Sunucuya Bağlandı', 'success'); };
-                ws.onclose = () => { setConnected(false); setTimeout(connectToServer, 3000); };
-                ws.onmessage = (e) => {
-                    try {
-                        const data = JSON.parse(e.data);
-                        handleServerMessage(data);
-                    } catch (err) { console.error(err); }
-                };
-                const handleServerMessage = (data) => {
-                    console.log('📨 Server mesajı:', data.type, data);
-
-                    switch (data.type) {
-                        case 'roomCreated':
-                            setRoomCode(data.roomCode);
-                            break;
-                        case 'gameStart':
-                            console.log('🎮 Oyun başlıyor...', data.gameState);
-                            setGameState(data.gameState);
-                            // Server 6sn bekleyip gönderiyor, o yüzden direkt geçiş yapıyoruz.
-                            setScreen('game');
-
-                            setSelectedTileIndex(null);
-                            setValidMoves([]);
-                            setSearching(false);
-                            setOverlayState(null);
-
-                            // Timer temizle
-                            if (searchTimerRef.current) {
-                                clearInterval(searchTimerRef.current);
-                                searchTimerRef.current = null;
-                            }
-                            setSearchTime(0);
-                            break;
-                        case 'gameUpdate':
-                            console.log('🔄 Oyun güncelleniyor...', data.gameState);
-                            if (data.gameState && data.gameState.board) {
-                                setGameState(prevState => ({
-                                    ...prevState,
-                                    ...data.gameState,
-                                    playerId: prevState?.playerId || data.gameState.playerId
-                                }));
-                                setSelectedTileIndex(null);
-                                setValidMoves([]);
-                            }
-                            break;
-                        case 'playerDisconnected':
-                            setOverlayState({
-                                type: 'disconnect',
-                                title: 'Oyuncu Koptu / Disconnected',
-                                message: data.message || 'Rakip bekleniyor... / Waiting for opponent...',
-                                timer: data.timeoutSeconds || 20
-                            });
-
-                            const endTime = Date.now() + (data.timeoutSeconds || 20) * 1000;
-                            const intervalId = setInterval(() => {
-                                const remaining = Math.ceil((endTime - Date.now()) / 1000);
-                                if (remaining <= 0) {
-                                    clearInterval(intervalId);
-                                } else {
-                                    setOverlayState(prev => prev ? { ...prev, timer: remaining } : null);
-                                }
-                            }, 1000);
-                            break;
-                        case 'opponentReconnected':
-                            setOverlayState(null);
-                            showNotification('✅ Rakip tekrar bağlandı! / Opponent reconnected!', 'success');
-                            break;
-                        case 'opponentTimeout':
-                            setOverlayState({
-                                type: 'error',
-                                title: 'Oyun Bitti / Game Over',
-                                message: data.message,
-                                timer: undefined
-                            });
-                            setTimeout(() => setOverlayState(null), 3000);
-                            break;
-                        case 'error':
-                            showNotification(data.message, 'error');
-                            setSearching(false);
-                            if (searchTimerRef.current) {
-                                clearInterval(searchTimerRef.current);
-                                searchTimerRef.current = null;
-                            }
-                            setSearchTime(0);
-                            break;
-                        case 'gameEnd':
-                            const isRanked = data.isRanked;
-                            const isWinnerClient = data.winner === gameState?.playerId;
-                            const eloChange = data.eloChanges
-                                ? (isWinnerClient ? data.eloChanges.winner : data.eloChanges.loser)
-                                : 0;
-
-                            // Winner 'DRAW' gelirse isWinnerClient false olur, EndScreen'de bunu ele aliyoruz.
-
-                            setEndInfo({
-                                winnerName: data.winnerName,
-                                winner: data.winner, // Draw kontrolü için gerekli
-                                isRanked,
-                                isWinner: isWinnerClient,
-                                eloChange,
-                            });
-
-                            setScreen('end');
-
-                            if (searchTimerRef.current) clearInterval(searchTimerRef.current);
-                            setSearchTime(0);
-
-                            setTimeout(() => {
-                                resetGameClientState();
-                                setScreen('lobby');
-                                if (isRanked && playerData && !playerData.isGuest) {
-                                    initializeTelegramAuth();
-                                }
-                            }, 5000);
-                            break;
-                        case 'searchCancelled':
-                            showNotification('Arama iptal edildi / Cancelled', 'info');
-                            setSearching(false);
-                            setScreen('lobby');
-                            if (searchTimerRef.current) clearInterval(searchTimerRef.current);
-                            setSearchTime(0);
-                            break;
-                        case 'searchStatus':
-                            break;
-                        case 'matchFound':
-                            showNotification(`Rakip Bulundu! / Match Found!`, 'success');
-                            setOpponent(data.opponent || null);
-                            if (searchTimerRef.current) clearInterval(searchTimerRef.current);
-                            setSearchTime(0);
-
-                            setScreen('match_intro');
-                            // Timeout YOK. Server gameStart gönderene kadar bekler.
-                            break;
-                        case 'gameLocked':
-                            // Bu mesaj tipi için bir işlem tanımlanmamış.
-                            // 'msg' değişkeni tanımlı olmadığı için önceki kod hata veriyordu.
-                            console.warn('Unhandled message type: gameLocked');
-                            break;
-                    }
-                };
-            };
-
-            const showNotification = (msg, type = 'info') => {
-                setNotification({ message: msg, type });
-                setTimeout(() => setNotification(null), 3000);
-            };
-
-            // --- OYUN MANTIĞI ---
-
-            const myPlayerId = gameState?.playerId;
-            const isMyTurn = gameState?.currentPlayer === myPlayerId;
-            const myHand = gameState?.players[myPlayerId]?.hand || [];
-            const marketSize = gameState?.market?.length || 0;
-            const canDrawFromMarket = marketSize > 0;
-
-            // calculateValidMoves fonksiyonu
-            const calculateValidMoves = (tile) => {
-                if (!gameState || gameState.board.length === 0) return ['start'];
-
-                const leftEnd = gameState.board[0][0];
-                const rightEnd = gameState.board[gameState.board.length - 1][1];
-                const moves = [];
-
-                if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
-                if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
-
-                return moves;
-            };
-
-            // Seçim Yapma
-            const handleTileClick = (index, tile) => {
-                if (!isMyTurn) return;
-
-                if (selectedTileIndex === index) {
-                    setSelectedTileIndex(null);
-                    setValidMoves([]);
+                if (foundPlayerId) {
+                    reconnectPlayer(ws, activeGame.roomCode, foundPlayerId, room);
                     return;
                 }
+            }
+        } catch (err) {
+            console.error('DB Reconnect check error:', err);
+        }
+    }
 
-                if (gameState.board.length === 0) {
-                    setSelectedTileIndex(index);
-                    setValidMoves(['start']);
-                } else {
-                    const moves = calculateValidMoves(tile);
-                    if (moves.length > 0) {
-                        setSelectedTileIndex(index);
-                        setValidMoves(moves);
-                        playSound('click');
-                    } else {
-                        showNotification('Bu taş uygun değil', 'warning');
-                    }
+    // Oyuncu bilgilerini WebSocket objesine ata
+    const playerId = clientPlayerId || telegramId || generateRoomCode(); // Benzersiz ID
+    ws.playerId = playerId;
+    ws.playerName = data.playerName || data.username || 'Guest';
+    ws.telegramId = data.telegramId || null; // null ise guest
+    ws.photoUrl = data.photoUrl || null;
+    ws.level = data.level || 0; // 0 = guest
+    ws.elo = data.elo || 0; // 0 = guest
+    ws.isGuest = isGuest;
+
+    playerConnections.set(playerId, ws);
+    removePlayerFromQueues(ws); // Önceki aramalardan kalmış olabilecek kayıtları temizle
+
+    // Doğru kuyruğu seç
+    const queue = isGuest ? casualQueue : rankedQueue;
+    const queueName = isGuest ? 'Casual' : 'Ranked';
+
+    // Ölü bağlantıları kuyruktan temizle
+    for (let i = queue.length - 1; i >= 0; i--) {
+        const playerInQueue = queue[i];
+        if (!playerInQueue.ws || playerInQueue.ws.readyState !== WebSocket.OPEN) {
+            queue.splice(i, 1);
+            console.log(`🧹 Kuyruktan ölü bağlantı temizlendi: ${playerInQueue.playerName}`);
+        }
+    }
+
+    // Eşleşme Mantığı
+    // Kendisiyle eşleşmemesi için playerId kontrolü yapıyoruz.
+    let opponentIndex = queue.findIndex(p => p.playerId !== playerId);
+
+    if (opponentIndex !== -1) {
+        const opponent = queue.splice(opponentIndex, 1)[0];
+        console.log(`✅ ${queueName} RAKİP BULUNDU: ${ws.playerName} vs ${opponent.playerName}`);
+
+        const roomCode = generateRoomCode();
+        const gameType = (ws.isGuest || opponent.isGuest) ? 'casual' : 'ranked';
+
+        console.log(`🎮 Maç oluşturuluyor (${gameType.toUpperCase()}): ${ws.playerName} vs ${opponent.playerName}`);
+
+        const room = {
+            code: roomCode,
+            players: {
+                [ws.playerId]: {
+                    name: ws.playerName,
+                    telegramId: ws.telegramId,
+                    photoUrl: ws.photoUrl,
+                    level: ws.level,
+                    elo: ws.elo,
+                    isGuest: ws.isGuest
+                },
+                [opponent.playerId]: {
+                    name: opponent.playerName,
+                    telegramId: opponent.telegramId,
+                    photoUrl: opponent.photoUrl,
+                    level: opponent.level,
+                    elo: opponent.elo,
+                    isGuest: opponent.isGuest
                 }
-            };
-
-            // Taşı Oynama
-            const playTile = (position) => {
-                if (selectedTileIndex === null) return;
-                const posToSend = position === 'start' ? 'left' : position;
-                sendMessage({ type: 'playTile', tileIndex: selectedTileIndex, position: posToSend });
-                setSelectedTileIndex(null);
-                setValidMoves([]);
-            };
-
-            const passTurn = () => {
-                sendMessage({ type: 'pass' });
-            };
-
-            const drawFromMarket = () => {
-                if (!isMyTurn || !canDrawFromMarket) return;
-                const canPlayFromHand = myHand.some(tile => calculateValidMoves(tile).length > 0);
-                if (gameState.board.length > 0 && canPlayFromHand) {
-                    showNotification('Elinde oynanabilir taş varken pazardan çekemezsin!', 'warning');
-                    return;
-                }
-                sendMessage({ type: 'drawFromMarket' });
-                showNotification('🎲 Pazardan taş çekiliyor...', 'info');
-            };
-
-            const leaveGameClient = () => {
-                const confirmed = window.confirm(
-                    'Oyundan çıkmak istediğine emin misin?\n\n' +
-                    'Bu eli terk edersen ELO puanı kaybedebilirsin ve el otomatik olarak rakibine yazılacaktır.'
-                );
-                if (!confirmed) return;
-                sendMessage({ type: 'leaveGame' });
-                resetGameClientState();
-                setScreen('lobby');
-            };
-
-            const sendMessage = (message) => {
-                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                    wsRef.current.send(JSON.stringify(message));
-                } else {
-                    console.error("WebSocket is not connected.");
-                }
-            };
-
-            // --- SEARCHING LOBBY ---
-            if (screen === 'searching') {
-                const minutes = Math.floor(searchTime / 60);
-                const seconds = searchTime % 60;
-                const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6 relative overflow-hidden">
-                        {/* Animated Background */}
-                        <div className="absolute inset-0 overflow-hidden">
-                            {[...Array(20)].map((_, i) =>
-                                <div
-                                    key={i}
-                                    className="absolute animate-pulse"
-                                    style={{
-                                        left: `${Math.random() * 100}%`,
-                                        top: `${Math.random() * 100}%`,
-                                        width: `${Math.random() * 4 + 2}px`,
-                                        height: `${Math.random() * 4 + 2}px`,
-                                        backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                                        borderRadius: '50%',
-                                        animationDelay: `${Math.random() * 2}s`,
-                                        animationDuration: `${Math.random() * 3 + 2}s`
-                                    }}
-                                />
-                            )}
-                        </div>
-
-                        {notification && <Toast message={notification.message} type={notification.type} />}
-
-                        <div className="relative z-10 max-w-md w-full">
-                            <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20">
-                                {/* Player Card */}
-                                <div className="text-center mb-8">
-                                    {playerData?.photoUrl && (
-                                        <img src={playerData.photoUrl} alt="Profile" className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 animate-pulse" />
-                                    )}
-                                    <h2 className="text-white text-2xl font-bold mb-2">{playerData?.username}</h2>
-                                    {!playerData?.isGuest && (
-                                        <div className="flex justify-center gap-3">
-                                            <span className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-4 py-1 rounded-full text-sm font-bold">
-                                                LVL {Math.min(playerData?.level || 0, 10)}
-                                            </span>
-                                            <span className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-4 py-1 rounded-full text-sm font-bold">
-                                                {playerData?.elo} ELO
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Searching Animation */}
-                                <div className="mb-8">
-                                    <div className="w-32 h-32 mx-auto relative">
-                                        <div className="absolute inset-0 border-8 border-yellow-400/30 rounded-full"></div>
-                                        <div className="absolute inset-0 border-8 border-t-yellow-400 rounded-full animate-spin"></div>
-                                        <div className="absolute inset-0 flex items-center justify-center">
-                                            <span className="text-5xl">🎯</span>
-                                        </div>
-                                    </div>
-                                    <h3 className="text-white text-2xl font-bold text-center mt-6 mb-2">🔍 RAIP ARANIYOR...</h3>
-                                    <p className="text-white/70 text-center text-sm mb-4">
-                                        {!playerData?.isGuest ? '⚔️ DERECELİ MAÇ' : '🎮 CASUAL MAÇ'}
-                                    </p>
-
-                                    {/* Timer */}
-                                    <div className="bg-black/30 rounded-xl p-4 text-center mb-6">
-                                        <div className="text-white text-4xl font-mono font-bold">⏱️ {timeString}</div>
-                                        <div className="text-white/60 text-sm mt-1">⏳ Geçen Süre</div>
-                                    </div>
-
-                                    {/* İpucu */}
-                                    <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-3 mb-4 text-center">
-                                        <p className="text-blue-300 text-xs">💡 İpucu: Dereceli maçlarda ELO puanınız değişir!</p>
-                                    </div>
-                                </div>
-
-                                {/* Cancel Button */}
-                                <button
-                                    onClick={() => {
-                                        setSearching(false);
-                                        setScreen('lobby');
-                                        if (searchTimerRef.current) {
-                                            clearInterval(searchTimerRef.current);
-                                            searchTimerRef.current = null;
-                                        }
-                                        setSearchTime(0);
-                                        sendMessage({ type: 'cancelSearch' });
-                                    }}
-                                    className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all"
-                                >
-                                    ❌ ARAMADI İPTAL ET
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
-
-            // --- LOBBY EKRANI ---
-            if (screen === 'loading') {
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-                        <div className="text-center">
-                            <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                            <p className="text-white text-xl font-bold">Yükleniyor...</p>
-                        </div>
-                    </div>
-                );
-            }
-
-            if (screen === 'lobby') {
-                return (
-                    <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10">
-                        {notification && <Toast message={notification.message} type={notification.type} />}
-
-                        <div className="text-center mb-10 animate-float">
-                            <h1 className="text-5xl font-black text-white drop-shadow-lg mb-2 tracking-tighter">
-                                🎯 DOMINO <span className="text-yellow-400">101</span> 🏆
-                            </h1>
-                            <p className="text-gray-300 text-sm tracking-widest uppercase">⚡ Profesyonel Online Oyun ⚡</p>
-                        </div>
-
-                        {/* NAVİGASYON */}
-                        <div className="flex justify-center gap-3 mb-6">
-                            <button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold">🏆 Skor Tablosu</button>
-                        </div>
-
-                        <div className="w-full max-w-sm bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
-                            {/* Player Info */}
-                            {playerData && (
-                                <div className="mb-6 text-center">
-                                    {playerData.photoUrl && (
-                                        <img src={playerData.photoUrl} alt="Profile" className="w-20 h-20 rounded-full mx-auto mb-3 border-4 border-yellow-400" />
-                                    )}
-                                    <h2 className="text-white text-2xl font-bold">{playerData.username || playerData.firstName}</h2>
-                                    {!playerData.isGuest && (
-                                        <div className="flex justify-center gap-4 mt-2">
-                                            <span className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-sm font-bold">
-                                                LVL {Math.min(playerData.level || 0, 10)}
-                                            </span>
-                                            <span className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-3 py-1 rounded-full text-sm font-bold">
-                                                {playerData.elo} ELO
-                                            </span>
-                                        </div>
-                                    )}
-                                    {playerData.isGuest && (
-                                        <p className="text-yellow-400 text-sm mt-2">👥 Guest Mode (ELO sistemi yok)</p>
-                                    )}
-                                </div>
-                            )}
-
-                            <button
-                                onClick={() => {
-                                    if (!playerData) return showNotification('İsim giriniz', 'error');
-                                    if (searching) return;
-
-                                    // Özel arama ekranına geç
-                                    setScreen('searching');
-                                    setSearching(true);
-                                    setSearchTime(0);
-
-                                    // Timer başlat
-                                    searchTimerRef.current = setInterval(() => {
-                                        setSearchTime(prev => prev + 1);
-                                    }, 1000);
-
-                                    // Server'a gönder
-                                    sendMessage({
-                                        type: 'findMatch',
-                                        ...playerData,
-                                        playerName: playerData.username
-                                    });
-                                }}
-                                disabled={!connected || searching}
-                                className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4 flex items-center justify-center gap-2"
-                            >
-                                <span>🏆</span> {!playerData?.isGuest ? '⚔️ DERECELİ MAÇ ARA' : '🎮 MAÇ ARA (CASUAL)'}
-                            </button>
-
-                            <div className="flex items-center gap-2 my-4">
-                                <div className="h-px bg-white/10 flex-1"></div>
-                                <span className="text-xs text-gray-500 uppercase">veya</span>
-                                <div className="h-px bg-white/10 flex-1"></div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <button
-                                    onClick={() => {
-                                        if (!playerData) return showNotification('İsim giriniz', 'error');
-                                        if (roomCode) return;
-                                        sendMessage({ type: 'createRoom', ...playerData, playerName: playerData.username });
-                                    }}
-                                    disabled={roomCode !== ''}
-                                    className="bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-semibold transition-colors"
-                                >
-                                    🏠 ODA KUR
-                                </button>
-                                <div className="relative">
-                                    <input
-                                        value={joinCode}
-                                        onChange={e => setJoinCode(e.target.value.toUpperCase())}
-                                        placeholder="KOD"
-                                        maxLength={4}
-                                        className="w-full h-full bg-black/30 border border-white/10 rounded-xl px-2 text-center text-white font-mono uppercase focus:ring-1 focus:ring-yellow-400"
-                                    />
-                                    <button
-                                        onClick={() => sendMessage({ type: 'joinRoom', roomCode: joinCode, ...playerData, playerName: playerData.username })}
-                                        className="absolute right-1 top-1 bottom-1 bg-yellow-500 text-white px-3 rounded-lg hover:bg-yellow-400"
-                                    >
-                                        ➔
-                                    </button>
-                                </div>
-                            </div>
-
-                            {roomCode && (
-                                <div className="mt-4 p-4 bg-green-500/20 border border-green-500/30 rounded-xl text-center animate-pulse">
-                                    <p className="text-green-400 text-xs mb-1">📱 ODA KODU</p>
-                                    <p className="text-3xl font-mono text-white font-bold tracking-widest cursor-pointer" onClick={() => { navigator.clipboard.writeText(roomCode); showNotification('📋 Kod kopyalandı!', 'success'); }}>{roomCode}</p>
-                                    <p className="text-xs text-gray-400 mt-2">⏳ Arkadaşın bekleniyor...</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                );
-            }
-
-            // --- LEADERBOARD EKRANI (YENİ) ---
-            if (screen === 'leaderboard') {
-                return (
-                    <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10">
-                        {notification && <Toast message={notification.message} type={notification.type} />}
-
-                        <div className="text-center mb-6">
-                            <h1 className="text-4xl font-black text-white drop-shadow-lg mb-2">🏆 LİDERLƏR / LEADERBOARD</h1>
-                        </div>
-
-                        <button onClick={() => setScreen('lobby')} className="mb-4 px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold">⬅️ Geri / Back</button>
-
-                        <div className="w-full max-w-2xl bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
-                            {leaderboard.length === 0 ? (
-                                <div className="text-center text-gray-400 py-8">
-                                    <p className="text-xl">📊 Yüklənir / Loading...</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {leaderboard.map((player, index) => (
-                                        <div key={player._id} className={`flex items-center gap-4 p-4 rounded-xl ${index === 0 ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-2 border-yellow-500' :
-                                            index === 1 ? 'bg-gradient-to-r from-gray-400/20 to-gray-500/20 border-2 border-gray-400' :
-                                                index === 2 ? 'bg-gradient-to-r from-orange-600/20 to-orange-700/20 border-2 border-orange-600' :
-                                                    'bg-white/5 border border-white/10'
-                                            }`}>
-                                            <div className="text-3xl font-black text-white w-10 text-center">
-                                                {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
-                                            </div>
-
-                                            {player.photoUrl && (
-                                                <img src={player.photoUrl} alt={player.username} className="w-12 h-12 rounded-full border-2 border-white/30" />
-                                            )}
-
-                                            <div className="flex-1">
-                                                <div className="text-white font-bold text-lg">{player.username || player.firstName}</div>
-                                                <div className="flex gap-2 text-sm">
-                                                    <span className="text-green-400">✓ {player.wins}</span>
-                                                    <span className="text-red-400">✗ {player.losses}</span>
-                                                    <span className="text-yellow-400">🔥 {player.winStreak}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="text-right">
-                                                <div className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-3 py-1 rounded-full text-sm font-bold mb-1">
-                                                    {player.elo} ELO
-                                                </div>
-                                                <div className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-xs font-bold">
-                                                    LVL {Math.min(player.level || 0, 10)}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                );
-            }
-
-            // --- OYUN EKRANI ---
-            if (screen === 'game' && gameState) {
-                // Tahtada görsel olarak taşları döndürmek gerekir mi?
-                // Sunucu genellikle [[1,6], [6,2]] diye sıralı atar.
-                // Biz sadece çiziyoruz.
-
-                // Elimizdeki taş sayısı 7'den fazla mı?
-                const isHandCrowded = myHand.length > 7;
-
-                return (
-                    <div className="fixed inset-0 flex flex-col h-full w-full">
-                        {overlayState && (
-                            <Overlay
-                                title={overlayState.title}
-                                message={overlayState.message}
-                                timer={overlayState.timer}
-                                type={overlayState.type}
-                            />
-                        )}
-                        {notification && <Toast message={notification.message} type={notification.type} />}
-
-                        {/* ÜST PANEL: Rakip */}
-                        <div className="h-16 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between px-4 z-20">
-                            <div className="flex items-center gap-3">
-                                {opponent?.photoUrl ? (
-                                    <img
-                                        src={opponent.photoUrl}
-                                        alt={opponent.name || opponent.username || 'Rakip'}
-                                        className="w-10 h-10 rounded-full border-2 border-yellow-400 shadow-lg object-cover"
-                                    />
-                                ) : (
-                                    <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center shadow-lg">
-                                        👤
-                                    </div>
-                                )}
-                                <div>
-                                    <div className="text-white text-sm font-bold shadow-black drop-shadow-md">
-                                        {opponent?.name || opponent?.username || 'Rakip'}
-                                    </div>
-                                    <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
-                                        🎲 {(() => {
-                                            const oppName = opponent?.name || opponent?.username;
-                                            const oppEntry = Object.values(gameState.players).find(p => p.name === oppName);
-                                            return (oppEntry && oppEntry.hand ? oppEntry.hand.length : 0);
-                                        })()} Taş
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="text-center">
-                                {isMyTurn ? (
-                                    <div className="bg-yellow-500 text-black text-xs font-bold px-4 py-1 rounded-full animate-pulse shadow-glow">⚡ SİZİN SIRANIZ / YOUR TURN ⚡</div>
-                                ) : (
-                                    <div className="text-gray-400 text-xs font-medium bg-black/40 px-3 py-1 rounded-full">⏳ Gözlənilir / Waiting...</div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* ORTA PANEL: Masa ve Board */}
-                        <div className="flex-1 relative overflow-hidden flex items-center justify-center w-full">
-                            {/* Yatay Kaydırma Alanı */}
-                            <div
-                                ref={boardScrollRef}
-                                className="w-full h-full overflow-x-auto overflow-y-hidden hide-scrollbar flex items-center px-8"
-                                style={{ scrollBehavior: 'smooth' }}
-                            >
-                                <div className="flex items-center gap-1 mx-auto min-w-max py-10">
-
-                                    {/* SOL IŞIKLI GÖSTERGE */}
-                                    {validMoves.includes('left') && selectedTileIndex !== null && gameState.board.length > 0 && (
-                                        <div className="mr-2 sm:mr-3 flex items-center" onClick={() => playTile('left')}>
-                                            <div className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer">
-                                                <div className="absolute inset-0 bg-yellow-400/20 rounded-lg valid-zone"></div>
-                                                <div className="absolute inset-0 flex items-center justify-center">
-                                                    <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-yellow-400/10 rounded-md border-2 border-yellow-400 border-dashed animate-glow-pulse"></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* TAHTADAKİ TAŞLAR */}
-                                    {gameState.board.length === 0 ? (
-                                        <div className="text-white/30 text-xl font-bold border-4 border-dashed border-white/10 rounded-3xl p-6">
-                                            {selectedTileIndex !== null ? '👇 Daşı Bura Qoy / Place Here' : 'Daş Seç və Başla / Select Tile'}
-                                        </div>
-                                    ) : (
-                                        gameState.board.map((tile, i) => (
-                                            <DominoTile
-                                                key={i}
-                                                values={tile}
-                                                vertical={tile[0] === tile[1]}
-                                                disabled={true}
-                                                scale={0.95}
-                                                animateIn={i === gameState.board.length - 1 || i === 0}
-                                            />
-                                        ))
-                                    )}
-
-                                    {/* SAĞ IŞIKLI GÖSTERGE */}
-                                    {validMoves.includes('right') && selectedTileIndex !== null && gameState.board.length > 0 && (
-                                        <div className="ml-2 sm:ml-3 flex items-center" onClick={() => playTile('right')}>
-                                            <div className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer">
-                                                <div className="absolute inset-0 bg-yellow-400/20 rounded-lg valid-zone"></div>
-                                                <div className="absolute inset-0 flex items-center justify-center">
-                                                    <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-yellow-400/10 rounded-md border-2 border-yellow-400 border-dashed animate-glow-pulse"></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* İLK HAMLE (ORTAYA) */}
-                                    {validMoves.includes('start') && selectedTileIndex !== null && (
-                                        <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-30 animate-slide-up" onClick={() => playTile('start')}>
-                                            <div className="bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold px-8 py-4 rounded-2xl animate-glow-pulse cursor-pointer shadow-glow transform scale-110">
-                                                ✨ OYUNA BAŞLA / START
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* ALT PANEL: Oyuncu Eli */}
-                        <div className="bg-gradient-to-t from-black/90 via-table-dark to-transparent pb-6 pt-2 px-2 z-20">
-
-                            {/* Kontrol Butonları */}
-                            <div className="flex justify-between items-center px-4 mb-2">
-                                <div className="flex items-center gap-3">
-                                    <span className="text-white text-xs font-bold tracking-widest opacity-70">
-                                        🎴 ƏLİNİZ / YOUR HAND ({myHand.length})
-                                    </span>
-                                    {marketSize > 0 && (
-                                        <span className="text-yellow-400 text-xs font-bold bg-black/40 px-2 py-1 rounded-full">
-                                            🎲 BAZAR / BAZAAR: {marketSize}
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="flex gap-2 items-center">
-                                    {isMyTurn && canDrawFromMarket && validMoves.length === 0 && selectedTileIndex === null && (
-                                        <button
-                                            onClick={drawFromMarket}
-                                            className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
-                                        >
-                                            🎲 ÇƏK / DRAW
-                                        </button>
-                                    )}
-                                    {isMyTurn && !canDrawFromMarket && validMoves.length === 0 && selectedTileIndex === null && (
-                                        <button
-                                            onClick={passTurn}
-                                            className="bg-gray-500/80 hover:bg-gray-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
-                                        >
-                                            ⏭️ PAS / PASS
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={leaveGameClient}
-                                        className="bg-red-600/80 hover:bg-red-600 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95"
-                                    >
-                                        🚪 ÇIX / EXIT
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Taş Dizilimi */}
-                            <div className="w-full max-w-4xl mx-auto overflow-y-auto max-h-[40vh] p-2">
-                                <div className="flex justify-center gap-2 flex-wrap">
-                                    {myHand.map((tile, index) => {
-                                        const canPlay = isMyTurn && (gameState.board.length === 0 || calculateValidMoves(tile).length > 0);
-
-                                        return (
-                                            <DominoTile
-                                                key={index}
-                                                values={tile}
-                                                onClick={() => handleTileClick(index, tile)}
-                                                disabled={!isMyTurn}
-                                                isSelected={selectedTileIndex === index}
-                                                vertical={true}
-                                                animateIn={true}
-                                            />
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
-
-            // --- MATCH INTRO EKRANI ---
-            if (screen === 'match_intro') {
-                return <MatchIntroScreen opponent={opponent} myPlayer={playerData} />;
-            }
-
-            // --- END SCREEN ---
-            if (screen === 'end' && endInfo) {
-                return <EndScreen info={endInfo} myPlayer={playerData} />;
-            }
-
-            // --- OYUN EKRANI (Üzerine Overlay eklendi) ---
-            if (screen === 'game' && gameState) {
-                // ... (Game render logic starts here)
-                // Overlay componentini return içinde en üstte çağıracağız
-            }
-
-            return (
-                <>
-                    {overlayState && (
-                        <Overlay
-                            title={overlayState.title}
-                            message={overlayState.message}
-                            timer={overlayState.timer}
-                            type={overlayState.type}
-                        />
-                    )}
-                </>
-            );
+            },
+            type: gameType,
+            startTime: Date.now()
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<DominoGame />);
-    </script>
-</body>
+        rooms.set(roomCode, room);
+        ws.roomCode = roomCode;
+        opponent.ws.roomCode = roomCode;
 
-</html>
+        const gameState = initializeGame(roomCode, ws.playerId, opponent.playerId);
+
+        // SYNC FIX: 
+        // 1. Send matchFound immediately.
+        // 2. Wait 6 seconds (server side delay).
+        // 3. Send gameStart to both.
+        // This ensures the intro screen is shown for exactly 6 sec on both client.
+
+        sendMessage(ws, { type: 'matchFound', roomCode, opponent: room.players[opponent.playerId], gameType });
+        sendMessage(opponent.ws, { type: 'matchFound', roomCode, opponent: room.players[ws.playerId], gameType });
+
+        setTimeout(() => {
+            const gameStartMsg1 = { type: 'gameStart', gameState: { ...gameState, playerId: ws.playerId } };
+            sendMessage(ws, gameStartMsg1);
+
+            const gameStartMsg2 = { type: 'gameStart', gameState: { ...gameState, playerId: opponent.playerId } };
+            sendMessage(opponent.ws, gameStartMsg2);
+
+            console.log(`✅ Oyun başlatıldı (6s gecikmeli): ${roomCode}`);
+        }, 6000);
+
+    } else {
+        queue.push({
+            ws,
+            playerId,
+            playerName: ws.playerName,
+            telegramId: ws.telegramId,
+            photoUrl: ws.photoUrl,
+            level: ws.level,
+            elo: ws.elo,
+            isGuest: ws.isGuest
+        });
+
+        const playerType = ws.isGuest ? 'GUEST' : `LVL ${ws.level}, ELO ${ws.elo}`;
+        console.log(`⏳ ${ws.playerName} (${playerType}) ${queueName} kuyruğuna eklendi. Kuyrukta: ${queue.length}`);
+        sendMessage(ws, { type: 'searchStatus', message: 'Rakip aranıyor...' });
+    }
+}
+
+function handleCancelSearch(ws) {
+    removePlayerFromQueues(ws);
+    console.log(`❌ ${ws.playerName || 'Biri'} aramayı iptal etti.`);
+    sendMessage(ws, { type: 'searchCancelled', message: 'Arama iptal edildi' });
+}
+
+function reconnectPlayer(ws, roomCode, playerId, room) {
+    // Timeout varsa iptal et
+    const timeoutId = activeDisconnects.get(roomCode);
+    if (timeoutId) {
+        clearTimeout(timeoutId);
+        activeDisconnects.delete(roomCode);
+        console.log(`✅ Timeout iptal edildi: ${roomCode}`);
+    }
+
+    // Eski bağlantıyı temizle
+    if (playerConnections.has(playerId)) {
+        const oldWs = playerConnections.get(playerId);
+        if (oldWs !== ws) {
+            try { oldWs.terminate(); } catch (e) { }
+        }
+    }
+
+    // Yeni bağlantıyı ayarla
+    ws.playerId = playerId;
+    ws.roomCode = roomCode;
+    ws.playerName = room.players[playerId].name;
+    ws.telegramId = room.players[playerId].telegramId;
+    ws.photoUrl = room.players[playerId].photoUrl;
+
+    playerConnections.set(playerId, ws);
+
+    // Oyunu başlat/devam ettir
+    sendMessage(ws, {
+        type: 'matchFound',
+        roomCode,
+        // Düzeltme: Rakibi playerId'ye göre bul.
+        // Önceki kod, her iki oyuncu da misafir (guest) olduğunda (telegramId'leri null olduğunda)
+        // yanlış rakibi bulabiliyordu.
+        opponent: room.players[Object.keys(room.players).find(id => id !== playerId)] || {},
+        gameType: room.type
+    });
+
+    // Reconnect case: No 6s delay needed for intro, usually jump straight in.
+    // Or maybe show it? Let's show it for consistency but faster. 1s?
+    // Actually, if reconnecting, usually user wants to play immediately.
+    // Let's keep it fast for reconnect.
+    setTimeout(() => {
+        const gameStartMsg = { type: 'gameStart', gameState: { ...room.gameState, playerId: playerId } };
+        sendMessage(ws, gameStartMsg);
+
+        broadcastToRoom(roomCode, { type: 'opponentReconnected', message: 'Rakip tekrar bağlandı' }, playerId);
+
+        const opponentId = Object.keys(room.players).find(id => id !== playerId);
+        if (!playerConnections.has(opponentId)) {
+            sendMessage(ws, {
+                type: 'playerDisconnected',
+                message: 'Rakip bekleniyor (Sunucu Yenilendi)...',
+                timeoutSeconds: 30
+            });
+        }
+
+    }, 500);
+}
+
+function handleCreateRoom(ws, data) {
+    const roomCode = generateRoomCode();
+    const playerId = generateRoomCode();
+    ws.playerId = playerId;
+    ws.playerName = data.playerName;
+    ws.roomCode = roomCode;
+    playerConnections.set(playerId, ws);
+
+    rooms.set(roomCode, {
+        code: roomCode,
+        players: { [playerId]: { name: data.playerName } },
+        type: 'private',
+        host: playerId
+    });
+
+    sendMessage(ws, { type: 'roomCreated', roomCode });
+}
+
+function handleJoinRoom(ws, data) {
+    const room = rooms.get(data.roomCode);
+    if (!room || Object.keys(room.players).length >= 2) {
+        return sendMessage(ws, { type: 'error', message: 'Oda bulunamadı veya dolu' });
+    }
+
+    const playerId = generateRoomCode();
+    ws.playerId = playerId;
+    ws.playerName = data.playerName;
+    ws.roomCode = data.roomCode;
+    playerConnections.set(playerId, ws);
+    room.players[playerId] = { name: data.playerName };
+
+    const hostId = room.host;
+    const gameState = initializeGame(data.roomCode, hostId, playerId);
+
+    setTimeout(() => {
+        sendGameState(data.roomCode, hostId);
+        sendGameState(data.roomCode, playerId);
+        // Herkese oyunun başladığını bildir
+        [hostId, playerId].forEach(pid => {
+            const socket = playerConnections.get(pid);
+            if (socket) socket.send(JSON.stringify({ type: 'gameStart', gameState: { ...gameState, playerId: pid } }));
+        });
+    }, 500);
+}
+
+function handlePlayTile(ws, data) {
+    const room = rooms.get(ws.roomCode);
+    if (!room || !room.gameState) return;
+
+    const gs = room.gameState;
+    if (gs.currentPlayer !== ws.playerId) return sendMessage(ws, { type: 'error', message: 'Sıra sizde değil' });
+
+    const player = gs.players[ws.playerId];
+    const tile = player.hand[data.tileIndex];
+
+    if (!tile) return;
+
+    const boardCopy = JSON.parse(JSON.stringify(gs.board));
+    const success = playTileOnBoard(tile, gs.board, data.position);
+
+    if (!success) {
+        return sendMessage(ws, { type: 'error', message: 'Bu hamle geçersiz (Pozisyon uyuşmuyor)' });
+    }
+
+    player.hand.splice(data.tileIndex, 1);
+    gs.moves = (gs.moves || 0) + 1;
+
+    const winner = checkWinner(gs);
+    if (winner) {
+        handleGameEnd(ws.roomCode, winner, gs);
+    } else {
+        gs.turn++;
+        gs.consecutivePasses = 0; // Başarılı hamlede pas sayacı sıfırlanır
+        gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
+        Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+    }
+}
+
+async function handleGameEnd(roomCode, winnerId, gameState) {
+    const room = rooms.get(roomCode);
+    if (!room) return;
+
+    try {
+        const playerIds = Object.keys(gameState.players);
+        const player1Id = playerIds[0];
+        const player2Id = playerIds[1];
+
+        const isDraw = winnerId === 'DRAW';
+        let eloChanges = null;
+
+        // Guest kontrolu - Guest varsa ELO guncellemesi yapma
+        const player1IsGuest = room.players[player1Id].isGuest;
+        const player2IsGuest = room.players[player2Id].isGuest;
+        const isRankedMatch = room.type === 'ranked' && !player1IsGuest && !player2IsGuest;
+
+        if (isRankedMatch) {
+            // Her iki oyuncu da Telegram ile girdi - ELO guncelle
+            const player1 = await Player.findOne({ telegramId: room.players[player1Id].telegramId });
+            const player2 = await Player.findOne({ telegramId: room.players[player2Id].telegramId });
+
+            if (!player1 || !player2) {
+                console.error('❌ Oyuncular MongoDB\'de bulunamadı');
+                broadcastToRoom(roomCode, {
+                    type: 'gameEnd',
+                    winner: winnerId,
+                    winnerName: isDraw ? 'Beraberlik' : gameState.players[winnerId].name,
+                    isRanked: false
+                });
+                rooms.delete(roomCode);
+                return;
+            }
+
+            if (!isDraw) {
+                const winner = winnerId === player1Id ? player1 : player2;
+                const loser = winnerId === player1Id ? player2 : player1;
+
+                eloChanges = calculateElo(winner.elo, loser.elo, winner.level);
+
+                winner.elo = eloChanges.winnerElo;
+                winner.level = calculateLevel(winner.elo);
+                winner.wins += 1;
+                winner.winStreak += 1;
+                winner.bestWinStreak = Math.max(winner.bestWinStreak, winner.winStreak);
+                winner.totalGames += 1;
+                winner.lastPlayed = new Date();
+
+                loser.elo = eloChanges.loserElo;
+                loser.level = calculateLevel(loser.elo);
+                loser.losses += 1;
+                loser.winStreak = 0;
+                loser.totalGames += 1;
+                loser.lastPlayed = new Date();
+
+                await winner.save();
+                await loser.save();
+
+                const match = new Match({
+                    player1: player1._id,
+                    player2: player2._id,
+                    winner: winner._id,
+                    player1Elo: winnerId === player1Id ? eloChanges.winnerElo : eloChanges.loserElo,
+                    player2Elo: winnerId === player2Id ? eloChanges.winnerElo : eloChanges.loserElo,
+                    player1EloChange: winnerId === player1Id ? eloChanges.winnerChange : eloChanges.loserChange,
+                    player2EloChange: winnerId === player2Id ? eloChanges.winnerChange : eloChanges.loserChange,
+                    moves: gameState.moves || 0,
+                    duration: Math.floor((Date.now() - room.startTime) / 1000),
+                    gameType: 'ranked',
+                    isDraw: false
+                });
+                await match.save();
+
+                console.log(`🏆 RANKED Maç bitti: ${winner.username} kazandı! ELO: ${eloChanges.winnerChange > 0 ? '+' : ''}${eloChanges.winnerChange}`);
+            } else {
+                player1.draws += 1;
+                player1.totalGames += 1;
+                player1.winStreak = 0;
+                player1.lastPlayed = new Date();
+
+                player2.draws += 1;
+                player2.totalGames += 1;
+                player2.winStreak = 0;
+                player2.lastPlayed = new Date();
+
+                await player1.save();
+                await player2.save();
+
+                const match = new Match({
+                    player1: player1._id,
+                    player2: player2._id,
+                    player1Elo: player1.elo,
+                    player2Elo: player2.elo,
+                    player1EloChange: 0,
+                    player2EloChange: 0,
+                    moves: gameState.moves || 0,
+                    duration: Math.floor((Date.now() - room.startTime) / 1000),
+                    gameType: 'ranked',
+                    isDraw: true
+                });
+                await match.save();
+            }
+        } else {
+            // Casual (Guest) maç - ELO guncellenmez
+            console.log(`🎮 CASUAL Maç bitti: ${isDraw ? 'Beraberlik' : gameState.players[winnerId].name + ' kazandı'}`);
+        }
+
+        broadcastToRoom(roomCode, {
+            type: 'gameEnd',
+            winner: winnerId,
+            winnerName: isDraw ? 'Beraberlik' : gameState.players[winnerId].name,
+            isRanked: isRankedMatch,
+            eloChanges: eloChanges ? {
+                winner: eloChanges.winnerChange,
+                loser: eloChanges.loserChange
+            } : null
+        });
+
+
+        rooms.delete(roomCode);
+        await ActiveGame.deleteOne({ roomCode: roomCode });
+    } catch (error) {
+        console.error('❌ Game end error:', error);
+        broadcastToRoom(roomCode, {
+            type: 'gameEnd',
+            winner: winnerId,
+            winnerName: winnerId === 'DRAW' ? 'Beraberlik' : gameState.players[winnerId].name,
+            isRanked: false
+        });
+        rooms.delete(roomCode);
+        ActiveGame.deleteOne({ roomCode: roomCode }).catch(e => { });
+    }
+}
+
+function handlePass(ws) {
+    const room = rooms.get(ws.roomCode);
+    if (!room || !room.gameState) return;
+
+    const gs = room.gameState;
+    if (gs.currentPlayer !== ws.playerId) return;
+
+    const playerHand = gs.players[ws.playerId].hand;
+    const canPlay = playerHand.some(tile => canPlayTile(tile, gs.board));
+
+    if (canPlay) {
+        return sendMessage(ws, { type: 'error', message: 'Elinizde oynanabilir taş var, pas geçemezsiniz!' });
+    }
+
+    gs.turn++;
+
+    // Pas sayacını artır
+    gs.consecutivePasses = (gs.consecutivePasses || 0) + 1;
+
+    // Eğer art arda 2 pas yapıldıysa (her iki oyuncu da oynayamıyor) oyun biter
+    if (gs.consecutivePasses >= 2) {
+        console.log(`🔒 Oyun kilitlendi (2 Pas) - Puanlar hesaplanıyor...`);
+        finishGameByScore(ws.roomCode, gs);
+        return;
+    }
+
+    gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
+    Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+}
+
+function finishGameByScore(roomCode, gs) {
+    const playerIds = Object.keys(gs.players);
+    const p1Id = playerIds[0];
+    const p2Id = playerIds[1];
+
+    const p1Score = gs.players[p1Id].hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
+    const p2Score = gs.players[p2Id].hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
+
+    let winnerId;
+    if (p1Score < p2Score) winnerId = p1Id;
+    else if (p2Score < p1Score) winnerId = p2Id;
+    else winnerId = 'DRAW';
+
+    broadcastToRoom(roomCode, {
+        type: 'gameLocked',
+        message: 'Oyun kilitlendi! Puanlar hesaplanıyor...',
+        scoreDetails: {
+            [p1Id]: p1Score,
+            [p2Id]: p2Score
+        }
+    });
+
+    // Biraz bekleyip bitir
+    setTimeout(() => {
+        handleGameEnd(roomCode, winnerId, gs);
+    }, 3000);
+}
+
+function handleDrawFromMarket(ws) {
+    const room = rooms.get(ws.roomCode);
+    if (!room || !room.gameState) return;
+
+    const gs = room.gameState;
+    if (gs.currentPlayer !== ws.playerId) return sendMessage(ws, { type: 'error', message: 'Sıra sizde değil' });
+
+    const player = gs.players[ws.playerId];
+
+    // Pazardan taş çekme kuralları
+    // 1. Kural: Elinde oynanabilir taş varsa çekemezsin
+    const hasPlayable = player.hand.some(tile => canPlayTile(tile, gs.board));
+    if (hasPlayable) {
+        return sendMessage(ws, { type: 'error', message: 'Elinizde oynanabilir taş var, pazardan çekemezsiniz!' });
+    }
+
+    // Pazarda taş var mı?
+    if (!gs.market || gs.market.length === 0) {
+        // Pazar boş, otomatik sıra geç (Pas)
+        handlePass(ws);
+        return;
+    }
+
+    // Pazardan taş çek
+    const drawnTile = gs.market.shift();
+    player.hand.push(drawnTile);
+
+    // İstatistik için move sayma, çekme hamlesi olarak
+    // gs.moves++; // İsteğe bağlı
+
+    // Çekilen taş ile oynanabilir mi?
+    const canPlayDrawn = canPlayTile(drawnTile, gs.board);
+
+    // Durumu güncelle
+    Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+
+    if (canPlayDrawn) {
+        sendMessage(ws, { type: 'info', message: 'Çekilen taş oynanabilir!' });
+    } else {
+        // Otomatik tekrar çekme? Genelde oyuncu manuel çeker.
+        // Kullanıcı isteği: "oynamalık taş yoksa pas diger usere gecsin ondada yoksa taslar hesaplansin"
+        // Ancak burada oyuncu TEK BİR TAŞ çekti. Hala markette taş varsa ve oynayamıyorsa tekrar çekmeli.
+        // Eğer market bittiyse ve oynayamıyorsa o zaman PASS olur.
+        if (gs.market.length === 0) {
+            sendMessage(ws, { type: 'info', message: 'Pazar bitti ve oynanacak taş yok. Pas geçiliyor.' });
+            handlePass(ws);
+        }
+    }
+}
+
+function handleLeaveGame(ws) {
+    const room = rooms.get(ws.roomCode);
+    if (!room || !room.gameState || !ws.playerId) {
+        return;
+    }
+
+    const gs = room.gameState;
+    const playerIds = Object.keys(gs.players);
+    if (playerIds.length !== 2) {
+        rooms.delete(ws.roomCode);
+        ws.roomCode = null;
+        return;
+    }
+
+    const leaverId = ws.playerId;
+    const winnerId = playerIds.find(id => id !== leaverId);
+
+    handleGameEnd(ws.roomCode, winnerId, gs);
+
+    // Oyun bitti, bu soketin oda bilgisini temizle ki tekrar eşleşme arayabilsin
+    ws.roomCode = null;
+    // playerId bağlantı için dursun ama aktif oda ilişkisi kalmasın
+}
+
+function handleDisconnect(ws) {
+    console.log(`🔌 Oyuncu ayrıldı: ${ws.playerName || 'Bilinmeyen'}`);
+
+    const playerId = getPlayerId(ws);
+    if (playerId) {
+        playerConnections.delete(playerId);
+    }
+
+    // Eşleşme kuyruklarından temizle
+    removePlayerFromQueues(ws);
+
+    // Eğer bir odadaysa, terk etme (forfeit) sürecini başlat
+    const roomCode = ws.roomCode;
+    const room = rooms.get(roomCode);
+
+    if (roomCode && room) {
+        // Eğer bu oyuncu için zaten bir timeout varsa, onu temizle (gereksiz)
+        if (activeDisconnects.has(roomCode)) {
+            clearTimeout(activeDisconnects.get(roomCode));
+            activeDisconnects.delete(roomCode);
+        }
+
+        console.log(`🏠 Oyuncu ${ws.playerName} odadan koptu: ${roomCode}. 30 saniye içinde dönmezse kaybeder.`);
+        broadcastToRoom(roomCode, { type: 'playerDisconnected', message: 'Rakip bağlantısı koptu. Tekrar bağlanması bekleniyor...', timeoutSeconds: 30 });
+
+        const timeoutId = setTimeout(() => {
+            console.log(`⏱️ ${ws.playerName} için timeout doldu. Oyun bitiriliyor.`);
+            const winnerId = Object.keys(room.players).find(id => id !== playerId);
+            handleGameEnd(roomCode, winnerId, room.gameState);
+            activeDisconnects.delete(roomCode);
+        }, 30000); // 30 saniye
+        activeDisconnects.set(roomCode, timeoutId);
+    }
+}
+
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Domino Sunucusu çalışıyor: Port ${PORT}`);
+});
