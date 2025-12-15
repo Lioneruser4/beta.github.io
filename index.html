@@ -3,120 +3,52 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Domino 101 Pro - Realistic</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="theme-color" content="#1b4d3e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Domino 101 Pro - Telegram Oyunu</title>
 
-    <!-- Telegram SDK -->
+    <!-- Favicon - Tarayıcı sekmesi için ikon -->
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎲</text></svg>">
+
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-    <!-- React & Tailwind -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 
     <style>
-        body {
-            background: #0f2027;
-            background: linear-gradient(to right, #203a43, #2c5364);
-            font-family: 'Roboto', sans-serif;
-            overflow: hidden;
-            user-select: none;
+        * {
             -webkit-tap-highlight-color: transparent;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
-        /* --- REALISTIC DOMINO TILE STYLES --- */
-        .domino-tile-3d {
-            position: relative;
-            background: #fdfbf7;
-            /* Bone white */
-            border-radius: 4px;
-            box-shadow:
-                inset 0 0 5px rgba(255, 255, 255, 0.8),
-                /* Inner highlight */
-                inset -2px -2px 4px rgba(0, 0, 0, 0.1),
-                /* Inner shadow */
-                1px 1px 0px #bbb,
-                /* Fake 3D depth sides */
-                2px 2px 0px #999,
-                2px 4px 6px rgba(0, 0, 0, 0.4);
-            /* Drop shadow */
-            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-            cursor: pointer;
-            z-index: 10;
+        body {
+            background-color: #1b4d3e;
+            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23153d31' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z'/%3E%3C/g%3E%3C/svg%3E");
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            overscroll-behavior: none;
+            font-family: 'Roboto', sans-serif;
+            height: 100vh;
+            width: 100vw;
+            position: fixed;
         }
 
-        .domino-tile-3d:active {
-            transform: translateY(2px) scale(0.98);
-            box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4);
+        #root {
+            height: 100vh;
+            width: 100vw;
         }
-
-        .domino-tile-3d.selected {
-            transform: translateY(-8px) scale(1.05);
-            box-shadow: 0 0 15px #fbbf24, 4px 8px 12px rgba(0, 0, 0, 0.3);
-            border: 1px solid #fbbf24;
-            z-index: 50;
-        }
-
-        /* Different Sizes */
-        .tile-hand {
-            width: 44px;
-            height: 88px;
-            flex-direction: column;
-        }
-
-        .tile-board-h {
-            width: 70px;
-            height: 35px;
-            flex-direction: row;
-        }
-
-        .tile-board-v {
-            width: 35px;
-            height: 70px;
-            flex-direction: column;
-        }
-
-        /* Divider Line */
-        .tile-divider-h {
-            width: 2px;
-            height: 80%;
-            background: #d1d5db;
-            position: absolute;
-            left: 50%;
-            top: 10%;
-            transform: translateX(-50%);
-            box-shadow: inset 1px 0 1px rgba(0, 0, 0, 0.1);
-        }
-
-        .tile-divider-v {
-            width: 80%;
-            height: 2px;
-            background: #d1d5db;
-            position: absolute;
-            top: 50%;
-            left: 10%;
-            transform: translateY(-50%);
-            box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.1);
-        }
-
-        /* PIPS (Dots) - Deep Inset Look */
-        .pip {
-            width: 7px;
-            height: 7px;
-            background: #111;
-            border-radius: 50%;
-            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8), 0 1px 0 rgba(255, 255, 255, 0.5);
-            /* Inset effect */
-        }
-
-        .pip-red {
-            background: #d93025;
-        }
-
-        /* Optional: Color pips? Standard is black usually */
 
         .pip-grid {
             display: grid;
@@ -124,439 +56,1829 @@
             grid-template-rows: repeat(3, 1fr);
             width: 100%;
             height: 100%;
-            padding: 4px;
-            place-items: center;
+            padding: 2px;
         }
 
-        /* --- BOARD TEXTURE --- */
-        .wood-table {
-            background-color: #2e7d32;
-            background-image: url("https://www.transparenttextures.com/patterns/felt.png"), radial-gradient(circle, #388e3c, #1b5e20);
-            box-shadow: inset 0 0 50px #000;
-        }
-
-        /* --- INDICATORS --- */
-        .valid-zone {
-            position: absolute;
-            width: 60px;
-            height: 60px;
+        .pip {
+            background-color: #111;
             border-radius: 50%;
-            background: rgba(251, 191, 36, 0.3);
-            border: 3px dashed #fbbf24;
-            animation: spin-slow 8s linear infinite, pulse 2s infinite;
-            z-index: 40;
+            width: 6px;
+            height: 6px;
+            margin: auto;
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* DOMINO BOARD STYLES */
+        .domino-board-container {
+            width: 100%;
+            height: 60vh;
+            position: relative;
+            overflow: hidden;
+            touch-action: none;
+            background: linear-gradient(135deg, rgba(27, 77, 62, 0.95) 0%, rgba(15, 43, 35, 0.95) 100%);
+            border: 3px solid rgba(255, 255, 255, 0.15);
+            margin: 0;
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5), 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .domino-board-inner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform-origin: center center;
+            transition: transform 0.1s ease-out;
+            will-change: transform;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: 900;
-            color: #fff;
-            text-shadow: 0 1px 3px #000;
+        }
+
+        .domino-tile {
+            display: inline-flex;
+            background: linear-gradient(145deg, #ffffff, #f0f0f0);
+            border: 2px solid #222;
+            border-radius: 6px;
+            box-shadow: 0 3px 0 #aaa, 0 4px 4px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            flex-shrink: 0;
+        }
+
+        .domino-tile.horizontal {
+            flex-direction: row;
+        }
+
+        .domino-tile.vertical {
+            flex-direction: column;
+        }
+
+        .domino-tile:active {
+            transform: scale(0.95) !important;
+        }
+
+
+        .domino-tile-face {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .domino-divider {
+            background: #222;
+            position: absolute;
+            z-index: 1;
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .domino-tile.horizontal .domino-divider {
+            width: 2px;
+            height: 85%;
+            top: 7.5%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .domino-tile.vertical .domino-divider {
+            height: 2px;
+            width: 85%;
+            left: 7.5%;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        /* Taş boyutları */
+        .tile-size-hand {
+            width: 38px;
+            /* Dik durması için */
+            height: 76px;
+            margin: 5px;
+        }
+
+        .tile-size-board {
+            width: 60px;
+            height: 30px;
+        }
+
+        /* Seçili taş efekti */
+        .selected-tile {
+            transform: translateY(-5px) scale(1.1) !important;
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.8), 0 3px 0 #aaa, 0 6px 6px rgba(0, 0, 0, 0.4);
+            z-index: 100;
+            border-color: #f59e0b;
+        }
+
+        /* Valid Move Indicators */
+        .valid-move-indicator {
+            position: absolute;
+            z-index: 50;
+            border: 3px dashed rgba(251, 191, 36, 0.9);
+            border-radius: 8px;
+            background: rgba(251, 191, 36, 0.15);
+            animation: pulse-glow 1.5s infinite;
+            pointer-events: auto;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
         }
 
-        @keyframes spin-slow {
-            to {
-                transform: translate(-50%, -50%) rotate(360deg);
+        .valid-move-indicator:active {
+            transform: scale(0.95);
+            background: rgba(251, 191, 36, 0.3);
+        }
+
+        @keyframes pulse-glow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 10px rgba(251, 191, 36, 0.6), 0 0 20px rgba(251, 191, 36, 0.3);
+                border-color: rgba(251, 191, 36, 0.9);
             }
-        }
 
-        @keyframes pulse {
             50% {
-                opacity: 0.6;
-                transform: translate(-50%, -50%) scale(1.1);
+                box-shadow: 0 0 20px rgba(251, 191, 36, 0.9), 0 0 40px rgba(251, 191, 36, 0.5);
+                border-color: rgba(251, 191, 36, 1);
             }
         }
 
-        /* Loading */
-        .loader {
-            border: 4px solid rgba(255, 255, 255, 0.1);
-            border-left-color: #fbbf24;
+        /* Board taş pozisyonları */
+        .board-tile {
+            position: absolute;
+            pointer-events: none;
+        }
+
+        /* El taşları container - YATAY DİZİLİM */
+        .hand-tiles-container {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            padding: 10px;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
+            min-height: 70px;
+            background: rgba(0, 0, 0, 0.3);
+            scroll-snap-type: x mandatory;
+        }
+
+        .hand-tile-wrapper {
+            scroll-snap-align: center;
+            flex-shrink: 0;
+        }
+
+        /* Zoom hint */
+        .zoom-hint {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: none;
+        }
+
+        /* Game controls */
+        .game-controls {
+            position: absolute;
+            bottom: 15px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .control-button {
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-button:active {
+            transform: scale(0.9);
+            background: rgba(0, 0, 0, 0.9);
+        }
+
+        /* Board zoom info */
+        .board-zoom-info {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Animation for new tiles */
+        @keyframes tileSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .tile-slide-in {
+            animation: tileSlideIn 0.2s ease-out;
+        }
+
+        /* Turn indicator */
+        .turn-indicator {
+            animation: pulse-turn 2s infinite;
+        }
+
+        @keyframes pulse-turn {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        /* Mobile optimizations */
+        @media (max-width: 640px) {
+            .tile-size-hand {
+                width: 32px;
+                height: 64px;
+                margin: 3px;
+            }
+
+            .tile-size-board {
+                width: 50px;
+                height: 25px;
+            }
+
+            .domino-board-container {
+                height: 55vh;
+            }
+
+            .hand-tiles-container {
+                min-height: 65px;
+                padding: 8px;
+            }
+
+            .zoom-hint {
+                display: block;
+            }
+        }
+
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .tile-size-hand {
+                width: 35px;
+                height: 70px;
+            }
+
+            .tile-size-board {
+                width: 55px;
+                height: 27px;
+            }
+
+            .domino-board-container {
+                height: 60vh;
+            }
+        }
+
+        /* PC için Telegram uyumu */
+        @media (min-width: 1025px) {
+            body {
+                min-height: 600px;
+                min-width: 350px;
+            }
+
+            .domino-board-container {
+                height: 65vh;
+            }
+
+            .tile-size-hand {
+                width: 40px;
+                height: 80px;
+            }
+
+            .tile-size-board {
+                width: 65px;
+                height: 32px;
+            }
+        }
+
+        /* Telegram WebApp için özel stiller */
+        .tg-webapp {
+            background: transparent !important;
+        }
+
+        /* Oda kodu gösterimi */
+        .room-code-display {
+            animation: room-code-pulse 2s infinite;
+        }
+
+        @keyframes room-code-pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        /* Loading spinner */
+        .loading-spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid #ffffff;
             width: 40px;
             height: 40px;
             animation: spin 1s linear infinite;
         }
 
         @keyframes spin {
-            to {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
                 transform: rotate(360deg);
             }
         }
 
-        /* Toast */
-        .toast-enter {
-            transform: translateY(-20px);
-            opacity: 0;
+        /* Toast notification */
+        .toast-notification {
+            animation: toast-slide 0.3s ease-out, toast-fade 0.3s ease-out 2.7s;
         }
 
-        .toast-enter-active {
-            transform: translateY(0);
-            opacity: 1;
-            transition: all 0.3s ease-out;
+        @keyframes toast-slide {
+            from {
+                transform: translate(-50%, -100px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes toast-fade {
+            to {
+                opacity: 0;
+            }
         }
     </style>
 </head>
 
-<body>
+<body class="tg-webapp">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo } = React;
+        const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+        // Telegram WebApp Initialization
         const tg = window.Telegram?.WebApp;
-        if (tg) { tg.ready(); tg.expand(); }
 
-        const WS_URL = 'wss://beta-github-io.onrender.com';
+        // Telegram SDK-ni işə sal
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            tg.enableClosingConfirmation();
+            console.log('✅ Telegram WebApp SDK işə salındı');
+        }
+
+        // --- SABİT SUNUCU ADRESLERİ ---
         const API_URL = 'https://beta-github-io.onrender.com';
+        const WS_URL = 'wss://beta-github-io.onrender.com';
 
-        /* --- DOMINO TILE COMPONENT (REALISTIC) --- */
-        const Pips = ({ n }) => {
-            const map = { 0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
-            const active = map[n] || [];
+        // --- BİLEŞENLER ---
+        const RenderPips = ({ number }) => {
+            // Bu kısım eski kodunuzdan daha modern olduğu için korundu.
+            // Herhangi bir değişiklik yapılmadı.
+            const layouts = {
+                0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8],
+                4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8]
+            };
+            const activePips = layouts[number] || [];
             return (
                 <div className="pip-grid">
-                    {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-                        <div key={i} className="pip" style={{ opacity: active.includes(i) ? 1 : 0 }} />
+                    {[...Array(9)].map((_, i) => (
+                        <div key={i} className="pip" style={{
+                            opacity: activePips.includes(i) ? 1 : 0.2,
+                            transform: activePips.includes(i) ? 'scale(1)' : 'scale(0.5)',
+                            transition: 'all 0.2s ease'
+                        }}></div>
                     ))}
                 </div>
             );
         };
 
-        const Tile = ({ vals, onClick, selected, isBoard, dir = 'right' }) => {
-            // isBoard = true ise masa taşı, false ise el taşı
-            // dir = 'left'|'right'|'up'|'down'
+        const DominoTile = ({ values, onClick, disabled, isSelected, isBoardTile = false }) => {
+            const handleClick = (e) => {
+                e.stopPropagation();
+                if (!disabled && onClick) {
+                    onClick();
+                }
+            };
 
-            const isVert = isBoard ? (dir === 'up' || dir === 'down') : true; // El taşı her zaman dikey
-            const className = `domino-tile-3d flex items-center justify-center ${isBoard ? (isVert ? 'tile-board-v' : 'tile-board-h') : 'tile-hand'
-                } ${selected ? 'selected' : ''}`;
+            const orientationClass = isBoardTile ? 'horizontal' : 'vertical';
+            const baseClasses = `
+                domino-tile relative flex overflow-hidden
+                ${isSelected ? 'selected-tile' : ''}
+                ${!disabled && !isBoardTile ? 'cursor-pointer hover:brightness-110 active:scale-95' : ''}
+                ${disabled ? 'opacity-80 cursor-default' : ''}
+                tile-slide-in
+            `;
+
+            const sizeClass = isBoardTile ? 'tile-size-board' : 'tile-size-hand';
 
             return (
-                <div className={className} onClick={onClick}>
-                    <div className="flex-1 w-full h-full"><Pips n={vals[0]} /></div>
-                    <div className={isVert ? 'tile-divider-v' : 'tile-divider-h'}></div>
-                    <div className="flex-1 w-full h-full"><Pips n={vals[1]} /></div>
+                <div
+                    onClick={handleClick}
+                    className={`${baseClasses} ${sizeClass} ${orientationClass}`}
+                >
+                    <div className={`domino-tile-face ${orientationClass === 'horizontal' ? 'border-r-2' : 'border-b-2'} border-gray-800`}>
+                        <RenderPips number={values[0]} />
+                    </div>
+                    <div className="domino-tile-face">
+                        <RenderPips number={values[1]} />
+                    </div>
+                    <div className="domino-divider"></div>
                 </div>
             );
         };
 
-        const Toast = ({ msg, type }) => (
-            <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-full shadow-2xl font-bold text-white flex gap-3 items-center toast-enter-active
-                ${type === 'error' ? 'bg-red-600' : type === 'success' ? 'bg-green-600' : 'bg-blue-600'}`}>
-                <span>{type === 'error' ? '⚠️' : type === 'success' ? '✅' : 'ℹ️'}</span>
-                {msg}
-            </div>
-        );
+        const Toast = ({ message, type }) => {
+            const colors = {
+                success: 'bg-green-600',
+                error: 'bg-red-600',
+                info: 'bg-blue-600',
+                warning: 'bg-yellow-600'
+            };
+            const icons = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️',
+                info: 'ℹ️'
+            };
 
-        /* --- MAIN APP --- */
-        const App = () => {
-            const [page, setPage] = useState('lobby');
-            const [ws, setWs] = useState(null);
-            const [me, setMe] = useState(null);
-            const [game, setGame] = useState(null);
-            const [opp, setOpp] = useState(null);
-            const [lead, setLead] = useState([]);
-            const [notif, setNotif] = useState(null);
-            const [searching, setSearching] = useState(false);
+            return (
+                <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-full shadow-xl text-white font-medium text-sm toast-notification flex items-center gap-2 ${colors[type] || colors.info}`}>
+                    <span className="text-base">{icons[type] || icons.info}</span>
+                    <span>{message}</span>
+                </div>
+            );
+        };
 
-            // Game Interaction
-            const [selTile, setSelTile] = useState(null);
+        // --- ANA OYUN ---
+        const DominoGame = () => {
+            const LOCAL_STORAGE_ROOM = 'domino_roomCode';
+            const LOCAL_STORAGE_PLAYER = 'domino_playerId';
+
+            const [screen, setScreen] = useState('loading');
+            const [connected, setConnected] = useState(false);
+            const [playerData, setPlayerData] = useState(null);
+            const [leaderboard, setLeaderboard] = useState([]);
+            const [roomCode, setRoomCode] = useState('');
+            const [joinCode, setJoinCode] = useState('');
+            const [gameState, setGameState] = useState(null);
+            const [searchTime, setSearchTime] = useState(0);
+
+            // Oyun İçi State
+            const [selectedTileIndex, setSelectedTileIndex] = useState(null);
             const [validMoves, setValidMoves] = useState([]);
+            const [notification, setNotification] = useState(null);
+            const [searching, setSearching] = useState(false);
+            const [endInfo, setEndInfo] = useState(null);
+            const [opponent, setOpponent] = useState(null);
+            const [reconnectAttemptCount, setReconnectAttemptCount] = useState(0);
+            const MAX_RECONNECT_ATTEMPTS = 5;
 
-            // Pan/Zoom
-            const [view, setView] = useState({ x: 0, y: 0, s: 1 });
-            const touch = useRef({ x: 0, y: 0, d: 0 });
+            // Board Zoom ve Position State
+            const [boardZoom, setBoardZoom] = useState(1);
+            const [boardPosition, setBoardPosition] = useState({ x: 0, y: 0 });
+            const [isDragging, setIsDragging] = useState(false);
+            const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+            const [pinchStart, setPinchStart] = useState({ distance: 0 });
+            const [showZoomHint, setShowZoomHint] = useState(true);
 
-            const notify = (msg, type = 'info') => { setNotif({ msg, type }); setTimeout(() => setNotif(null), 3000); };
+            const wsRef = useRef(null);
+            const boardContainerRef = useRef(null);
+            const boardInnerRef = useRef(null);
+            const searchTimerRef = useRef(null);
+            const reconnectTimerRef = useRef(null);
+            const lastTouchTimeRef = useRef(0);
+            const zoomHintTimeoutRef = useRef(null);
+            const connectionCheckRef = useRef(null);
+            const initialLoadTimeoutRef = useRef(null);
 
-            useEffect(() => {
-                const init = async () => {
-                    let u = { username: 'Guest', telegramId: 'g' + Date.now() };
-                    if (tg?.initDataUnsafe?.user) {
-                        const t = tg.initDataUnsafe.user;
-                        u = { telegramId: String(t.id), username: t.first_name, photoUrl: t.photo_url };
+            // Reset Game State
+            // Reset Game State
+            const resetGameClientState = (clearStorage = true) => {
+                setGameState(null);
+                setRoomCode('');
+                setSearching(false);
+                setSelectedTileIndex(null);
+                setValidMoves([]);
+                setEndInfo(null);
+                setOpponent(null);
+                setJoinCode('');
+                setBoardZoom(1);
+                setBoardPosition({ x: 0, y: 0 });
+                if (clearStorage) {
+                    localStorage.removeItem(LOCAL_STORAGE_ROOM);
+                    localStorage.removeItem(LOCAL_STORAGE_PLAYER);
+                }
+            };
+
+            const showNotification = (msg, type = 'info') => {
+                setNotification({ message: msg, type });
+                setTimeout(() => setNotification(null), 3000);
+            };
+
+            // --- WebSocket Bağlantı ---
+            const attemptReconnect = () => {
+                if (reconnectAttemptCount >= MAX_RECONNECT_ATTEMPTS) {
+                    console.log('❌ Maksimum yenidən bağlanma cəhdinə çatıldı');
+                    showNotification('Server bağlantısı qurula bilmədi. Zəhmət olmasa səhifəni yeniləyin.', 'error');
+                    setScreen('lobby');
+                    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+                    return;
+                }
+
+                // Eksponensial backoff: 2s, 4s, 6s, 8s, 10s
+                const delay = Math.min(2000 * (reconnectAttemptCount + 1), 10000);
+                console.log(`⏳ ${delay}ms sonra yenidən bağlanılacaq...`);
+
+                setReconnectAttemptCount(prev => prev + 1);
+                reconnectTimerRef.current = setTimeout(() => {
+                    connectToServer();
+                }, delay);
+            };
+
+            const connectToServer = () => {
+                if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
+                    return;
+                }
+
+                if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+
+                let wsUrl = WS_URL;
+                // Localhost check override
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    wsUrl = 'ws://localhost:10000';
+                }
+
+                console.log('🔌 WebSocket bağlantısı qurulur:', wsUrl);
+
+                try {
+                    const ws = new WebSocket(wsUrl);
+                    wsRef.current = ws;
+
+                    ws.onopen = () => {
+                        console.log('✅ WebSocket AÇILDI');
+                        setConnected(true);
+                        setReconnectAttemptCount(0);
+                        // showNotification('Serverə qoşuldu 🟢', 'success'); // Too noisy on every reconnect
+
+                        // Heartbeat
+                        sendMessage({ type: 'ping' });
+
+                        const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
+                        const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
+
+                        if (storedRoomCode && storedPlayerId) {
+                            console.log('♻️ Köhnə oyun tapıldı, bərpa edilir...');
+                            sendMessage({
+                                type: 'reconnect',
+                                playerId: storedPlayerId,
+                                roomCode: storedRoomCode
+                            });
+                        } else {
+                            // Sadece loading ekranındaysak lobby'e geç. 
+                            // Eğer zaten başka ekrandaysak (örn: game) ve socket koptuysa, burası tetiklenince stay in game
+                            if (screen === 'loading') setScreen('lobby');
+                        }
+                    };
+
+                    ws.onclose = (event) => {
+                        console.log('❌ WebSocket bağlandı:', event.code);
+                        setConnected(false);
+                        wsRef.current = null;
+
+                        // Həmişə reconnect etməyə çalış (infinite retry strategy for robustness)
+                        const delay = Math.min(1000 * Math.pow(1.5, reconnectAttemptCount), 10000);
+
+                        console.log(`🔄 Yenidən bağlanılır ${delay}ms sonra...`);
+                        setReconnectAttemptCount(prev => prev + 1);
+
+                        if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+                        reconnectTimerRef.current = setTimeout(connectToServer, delay);
+                    };
+
+                    ws.onerror = (error) => {
+                        console.error('❌ WebSocket xətası:', error);
+                        ws.close(); // Close triggers onclose which handles reconnect
+                    };
+
+                    ws.onmessage = (e) => {
+                        try {
+                            const data = JSON.parse(e.data);
+                            handleServerMessage(data);
+                        } catch (err) {
+                            console.error('JSON Parse Error:', err);
+                        }
+                    };
+                } catch (e) {
+                    console.error("Socket Creation Error:", e);
+                    setTimeout(connectToServer, 2000);
+                }
+            };
+
+            const sendMessage = (msg) => {
+                const ws = wsRef.current;
+
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    console.warn('⚠️ WebSocket bağlı deyil. State:', ws?.readyState);
+
+                    // Əgər bağlantı yoxdursa, yenidən bağlanmağa cəhd et
+                    if (!ws || ws.readyState === WebSocket.CLOSED) {
+                        console.log('� Avtomatik yenidən bağlanma başladılır...');
+                        connectToServer();
                     }
 
-                    try {
-                        const r = await fetch(API_URL + '/api/auth/telegram', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(u) });
-                        const d = await r.json();
-                        if (d.success) setMe(d.player); else setMe(u);
-                    } catch (e) { setMe(u); }
+                    showNotification('Bağlantı gözlənilir...', 'warning');
+                    return false;
+                }
 
-                    connectWS(u.telegramId);
+                try {
+                    ws.send(JSON.stringify(msg));
+                    console.log('📤 Mesaj göndərildi:', msg.type);
+                    return true;
+                } catch (error) {
+                    console.error('❌ Mesaj göndərmə xətası:', error);
+                    showNotification('Mesaj göndərilə bilmədi', 'error');
+                    return false;
+                }
+            };
+
+            // --- Sunucu Mesaj İşleyici ---
+            const handleServerMessage = (data) => {
+                switch (data.type) {
+                    case 'roomCreated':
+                        setRoomCode(data.roomCode);
+                        showNotification('Otaq yaradıldı: ' + data.roomCode, 'success');
+                        break;
+
+                    case 'gameUpdate':
+                        console.log('🔄 Oyun yenilənir...', data.gameState);
+                        if (data.gameState && data.gameState.board) {
+                            // playerId ve roomCode'un üzerine yazılmasını önle
+                            setGameState(prevGameState => {
+                                const newGameState = { ...prevGameState, ...data.gameState };
+                                return newGameState;
+                            });
+                            setSelectedTileIndex(null);
+                            setValidMoves([]);
+                        }
+                        break;
+
+                    case 'error':
+                        console.log('❌ Server xətası:', data.message);
+                        showNotification(data.message || 'Xəta baş verdi', 'error');
+
+                        // Fatal error handling
+                        // Fatal error handling
+                        if (screen === 'game' && data.fatal) {
+                            // Only clear storage if explicitly told the game is gone
+                            if (data.code === 'GAME_NOT_FOUND' || data.code === 'PLAYER_NOT_FOUND') {
+                                // Don't reset state immediately if connection retry might fix it?
+                                // No, game not found means server HAS reset.
+                                resetGameClientState(true);
+                                setScreen('lobby');
+                                showNotification('Oyun tapılmadı (bitmiş ola bilər).', 'info');
+                            } else {
+                                // For connection issues, don't clear, just wait for reconnect
+                            }
+                        } else if (screen === 'loading' && data.code === 'GAME_NOT_FOUND') {
+                            // Trying to reconnect but game is gone
+                            resetGameClientState(true);
+                            setScreen('lobby');
+                        }
+                        break;
+
+                    case 'gameEnd':
+                        const isWinner = data.isWinner === true;
+                        const isLoser = data.isLoser === true;
+
+                        setEndInfo({
+                            winnerName: data.winnerName,
+                            loserName: data.loserName,
+                            isRanked: data.isRanked,
+                            isWinner: isWinner,
+                            isLoser: isLoser,
+                            isDraw: data.isDraw,
+                            eloChange: data.eloChanges ? (isWinner ? data.eloChanges.winner : data.eloChanges.loser) : 0,
+                            message: data.message
+                        });
+                        setScreen('end');
+
+                        setTimeout(() => {
+                            resetGameClientState();
+                            setScreen('lobby');
+                        }, 5000);
+                        break;
+
+                    case 'searchCancelled':
+                        showNotification('Axtarış ləğv edildi', 'info');
+                        setSearching(false);
+                        setScreen('lobby');
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
+                        break;
+
+                    case 'matchFound':
+                        console.log('🎯 Rəqib tapıldı!', data.opponent);
+                        showNotification(`Rəqib Tapıldı! ${data.gameType === 'ranked' ? '🏆 RÜTBƏLİ' : '🎮 ADİ'}`, 'success');
+
+                        // Axtarışı dayandır
+                        setSearching(false);
+                        setOpponent(data.opponent || null);
+
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
+
+                        // Oyun başlayana qədər gözləmə ekranına keç (opsional)
+                        // setScreen('loading'); // və ya searching-də qal amma "Rəqib tapıldı, oyun başlayır..." göstər
+                        break;
+
+                    case 'reconnectSuccess':
+                    case 'gameStart':
+                        console.log('🎮 Oyun başladı/yenidən bağlandı!', data);
+
+                        // Server-dən gələn playerId-ni istifadə et
+                        const gameStateWithPlayer = {
+                            ...data.gameState,
+                            playerId: data.playerId || data.gameState?.playerId
+                        };
+
+                        setGameState(gameStateWithPlayer);
+                        setScreen('game');
+                        setSelectedTileIndex(null);
+                        setValidMoves([]);
+                        setSearching(false); // Əmin olmaq üçün
+
+                        // LocalStorage-ə yaz
+                        if (gameStateWithPlayer.roomCode && gameStateWithPlayer.playerId) {
+                            localStorage.setItem(LOCAL_STORAGE_ROOM, gameStateWithPlayer.roomCode);
+                            localStorage.setItem(LOCAL_STORAGE_PLAYER, gameStateWithPlayer.playerId);
+                            console.log('💾 Oyun məlumatları saxlanıldı:', gameStateWithPlayer.roomCode, gameStateWithPlayer.playerId);
+                        }
+
+                        // Timer-i təmizlə
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
+
+                        showNotification(data.type === 'reconnectSuccess' ? 'Oyuna Davam Edildi! ♻️' : 'Oyun Başladı! 🎮', 'success');
+                        break;
+
+                    case 'opponentDisconnected':
+                        showNotification('Rəqib bağlantısı kəsildi. 30 saniyə gözlənilir...', 'warning');
+                        break;
+
+                    case 'opponentReconnected':
+                        showNotification('Rəqib yenidən qoşuldu!', 'info');
+                        break;
+
+                    case 'connected':
+                        setConnected(true);
+                        break;
+                }
+            };
+
+            // --- İLK YÜKLEME VE AUTH ---
+            useEffect(() => {
+                const startApp = async () => {
+                    console.log('🚀 Tətbiq başladılır...');
+                    await initializeTelegramAuth(); // 1. Auth prosesini gözlə
+                    connectToServer();              // 2. Sonra serverə qoşul
                 };
-                init();
+
+                // Yükleme ekranında takılmayı önlemek için zaman aşımı
+                // Yükleme ekranında takılmayı önlemek için zaman aşımı - Server wake-up for Render takes time
+                initialLoadTimeoutRef.current = setTimeout(() => {
+                    // Sadece loading ekranındaysak ve hala bağlanmadıysak uyar
+                    if (screen === 'loading' && !wsRef.current) {
+                        showNotification('Server oyanır... Zəhmət olmasa gözləyin.', 'info');
+                    }
+                    // 45 saniye sonra hala yoksa lobby
+                    setTimeout(() => {
+                        if (screen === 'loading' && !connected) {
+                            showNotification('Serverə qoşulmaq vaxt apardı. Yenidən cəhd edin.', 'warning');
+                            setScreen('lobby');
+                        }
+                    }, 30000);
+                }, 15000); // 15 saniye bekle ilk uyarı için
+
+                // Keep-alive pings - yalnız oyun zamanı
+                connectionCheckRef.current = setInterval(() => {
+                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && screen === 'game') {
+                        sendMessage({ type: 'ping' });
+                    }
+                }, 30000); // 30 saniyədə bir
+
+                // Telegram mühitinin hazır olmasını gözlə, əks halda dərhal başla.
+                startApp();
+
+                return () => {
+                    if (wsRef.current) wsRef.current.close();
+                    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+                    if (connectionCheckRef.current) clearInterval(connectionCheckRef.current);
+                    if (initialLoadTimeoutRef.current) clearTimeout(initialLoadTimeoutRef.current);
+                };
             }, []);
 
-            const connectWS = (tid) => {
-                const s = new WebSocket(WS_URL);
-                s.onopen = () => {
-                    setWs(s);
-                    s.send(JSON.stringify({ type: 'reconnect', telegramId: tid }));
-                };
-                s.onmessage = (e) => handleMsg(JSON.parse(e.data));
-                s.onclose = () => setTimeout(() => connectWS(tid), 3000);
-            };
+            const initializeTelegramAuth = async () => {
+                const initDataUnsafe = window.Telegram?.WebApp?.initDataUnsafe;
 
-            const send = (type, data = {}) => {
-                if (ws?.readyState === 1) ws.send(JSON.stringify({ type, telegramId: me.telegramId, ...data }));
-            };
+                // Retry loop for Telegram Auth
+                if (initDataUnsafe?.user) {
+                    const user = initDataUnsafe.user;
+                    const telegramData = {
+                        telegramId: user.id.toString(),
+                        username: user.username || user.first_name || 'İstifadəçi',
+                        firstName: user.first_name || '',
+                        photoUrl: user.photo_url
+                    };
 
-            const handleMsg = (d) => {
-                if (d.type === 'reconnectSuccess' || d.type === 'gameStart') {
-                    setGame(d.gameState);
-                    const op = Object.values(d.gameState.players).find(p => p.name !== me.username); // Simple Find
-                    // Better: find by ID key != me.telegramId
-                    const opId = Object.keys(d.gameState.players).find(k => k !== me.telegramId);
-                    if (opId) setOpp(d.gameState.players[opId]);
+                    let attempts = 0;
+                    let success = false;
+                    while (attempts < 3 && !success) {
+                        try {
+                            console.log(`🔑 Telegram Giriş Cəhdi ${attempts + 1}...`);
 
-                    setPage('game');
-                    setSearching(false);
-                }
-                if (d.type === 'gameUpdate') {
-                    setGame(p => ({ ...p, ...d.gameState }));
-                    setSelTile(null);
-                    setValidMoves([]);
-                }
-                if (d.type === 'matchFound') {
-                    setOpp(d.opponent);
-                    notify('Rakib Tapıldı!', 'success');
-                }
-                if (d.type === 'gameEnd') {
-                    setPage('result');
-                    setGame(cur => ({ ...cur, winnerInfo: d }));
-                }
-                if (d.type === 'error') notify(d.message, 'error');
-            };
+                            // Use the global API_URL
+                            const response = await fetch(`${API_URL}/api/auth/telegram`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(telegramData)
+                            });
 
-            // --- GAME RULES LOGIC ---
-            const getValidMoves = (tile) => {
-                if (!game?.board.length) return ['start']; // İlk hamle
-                // Basit mantık: Server array of arrays yolluyor [[1,2], [2,3]]
-                const L = game.board[0][0];
-                const R = game.board[game.board.length - 1][1];
-                const m = [];
-                // Tile [a,b]
-                if (tile[0] === L || tile[1] === L) m.push('left');
-                if (tile[0] === R || tile[1] === R) m.push('right');
-                return m;
-            };
+                            if (response.ok) {
+                                const data = await response.json();
+                                if (data.success) {
+                                    setPlayerData({
+                                        ...data.player,
+                                        isGuest: false,
+                                        photoUrl: telegramData.photoUrl || data.player.photoUrl
+                                    });
+                                    console.log('✅ Telegram girişi uğurlu!');
+                                    success = true;
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Auth attempt error:', e);
+                        }
 
-            const canPlayAny = (hand) => {
-                if (!game?.board.length) return true;
-                const L = game.board[0][0];
-                const R = game.board[game.board.length - 1][1];
-                return hand.some(t => t[0] === L || t[1] === L || t[0] === R || t[1] === R);
-            };
+                        if (!success) {
+                            attempts++;
+                            await new Promise(r => setTimeout(r, 1500));
+                        }
+                    }
 
-            const handleTileClick = (idx) => {
-                if (game.currentPlayer !== me.telegramId) return notify('Sıra sizde değil!', 'error');
-                const tile = game.players[me.telegramId].hand[idx];
-                const moves = getValidMoves(tile);
-                if (!moves.length) return notify('Bu taş uygun değil!', 'error');
-                setSelTile(idx);
-                setValidMoves(moves);
-            };
+                    if (success) {
+                        // Only go to lobby if auth succeeded
+                        setTimeout(() => setScreen('lobby'), 100);
+                        return;
+                    }
 
-            const play = (pos) => {
-                send('playTile', { tileIndex: selTile, position: pos });
-            };
-
-            const draw = () => {
-                if (game.currentPlayer !== me.telegramId) return notify('Sıra sizde değil!', 'error');
-
-                // GLOBAL RULE: Elinde oynayacak taş varsa pazara gidemezsin!
-                const myHand = game.players[me.telegramId].hand;
-                if (canPlayAny(myHand)) {
-                    return notify('Elinizde oynanabilir taş varken pazara gidemezsiniz! Kurallar böyle.', 'error');
+                    console.log('⚠️ Telegram girişi baş tutmadı, amma təkrar yoxlanacaq...');
+                    showNotification("Telegram girişi alınmadı, qonaq kimi daxil olunur...", "warning");
                 }
 
-                send('drawFromMarket');
-            };
+                // GUEST FALLBACK
+                let guestData = null;
+                try {
+                    const stored = localStorage.getItem('domino_guest_account');
+                    if (stored) guestData = JSON.parse(stored);
+                } catch (e) { }
 
-            // --- RENDER HELPERS ---
-            const renderBoard = () => {
-                if (!game?.board) return null;
-                // Simple straight line layout for robustness
-                // Center calculated dynamically
-                let items = [];
-                let x = 0; const W = 70;
-                game.board.forEach((t, i) => {
-                    items.push({ val: t, x, y: 0 });
-                    x += W;
-                });
-                // Center it
-                const offset = - (x - W) / 2;
-                return items.map(it => ({ ...it, x: it.x + offset }));
-            };
-
-            // --- PAN ZOOM HANDLERS ---
-            const onTouchStart = (e) => {
-                if (e.touches.length === 1) touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                if (e.touches.length === 2) touch.current.d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-            };
-            const onTouchMove = (e) => {
-                if (e.touches.length === 1) {
-                    const dx = e.touches[0].clientX - touch.current.x;
-                    const dy = e.touches[0].clientY - touch.current.y;
-                    touch.current.x = e.touches[0].clientX; touch.current.y = e.touches[0].clientY;
-                    setView(v => ({ ...v, x: v.x + dx, y: v.y + dy }));
+                if (!guestData) {
+                    guestData = {
+                        isGuest: true,
+                        username: 'Qonaq' + Math.floor(Math.random() * 9999),
+                        photoUrl: null,
+                        level: 0,
+                        elo: 0,
+                        telegramId: null
+                    };
+                    localStorage.setItem('domino_guest_account', JSON.stringify(guestData));
                 }
+                setPlayerData(guestData);
+                console.log('👤 Qonaq girişi:', guestData.username);
+                setTimeout(() => setScreen('lobby'), 100);
+            };
+
+
+
+            const loadLeaderboard = async () => {
+                try {
+                    const response = await fetch(`${API_URL}/api/leaderboard`);
+                    const data = await response.json();
+                    if (data.success) {
+                        setLeaderboard(data.leaderboard);
+                    }
+                } catch (error) {
+                    console.error('Leaderboard xətası:', error);
+                }
+            };
+
+            // --- TOUCH/PINCH ZOOM HANDLERS ---
+            const handleTouchStart = useCallback((e) => {
+                // Eğer tıklanan element oynanabilir bir alansa, sürüklemeyi başlatma.
+                if (e.target.closest('.valid-move-indicator')) {
+                    return;
+                }
+
                 if (e.touches.length === 2) {
-                    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-                    const s = d / touch.current.d;
-                    touch.current.d = d;
-                    setView(v => ({ ...v, s: Math.min(2, Math.max(0.5, v.s * s)) }));
+                    e.preventDefault();
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    const distance = Math.hypot(
+                        touch2.clientX - touch1.clientX,
+                        touch2.clientY - touch1.clientY
+                    );
+                    setPinchStart({ distance });
+                } else if (e.touches.length === 1) {
+                    e.preventDefault();
+                    setIsDragging(true);
+                    setDragStart({
+                        x: e.touches[0].clientX - boardPosition.x,
+                        y: e.touches[0].clientY - boardPosition.y
+                    });
+
+                    // Çift tıklama kontrolü
+                    const currentTime = Date.now();
+                    if (currentTime - lastTouchTimeRef.current < 300) {
+                        // Çift tıklama - zoom reset
+                        setBoardZoom(1);
+                        setBoardPosition({ x: 0, y: 0 });
+                        showNotification('Masaya mərkəzləşdirildi', 'info');
+                    }
+                    lastTouchTimeRef.current = currentTime;
+                }
+            }, [boardPosition]);
+
+            const handleTouchMove = useCallback((e) => {
+                if (e.touches.length === 2 && pinchStart.distance > 0) {
+                    e.preventDefault();
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    const distance = Math.hypot(
+                        touch2.clientX - touch1.clientX,
+                        touch2.clientY - touch1.clientY
+                    );
+
+                    const scaleChange = distance / pinchStart.distance;
+                    setBoardZoom(prev => {
+                        const newZoom = prev * scaleChange;
+                        return Math.min(Math.max(newZoom, 0.5), 3);
+                    });
+                    setPinchStart({ distance });
+
+                    if (showZoomHint) {
+                        setShowZoomHint(false);
+                    }
+                } else if (e.touches.length === 1 && isDragging) {
+                    e.preventDefault();
+                    const newX = e.touches[0].clientX - dragStart.x;
+                    const newY = e.touches[0].clientY - dragStart.y;
+                    setBoardPosition({ x: newX, y: newY });
+                }
+            }, [isDragging, dragStart, pinchStart, showZoomHint]);
+
+            const handleTouchEnd = useCallback((e) => {
+                setIsDragging(false);
+                setPinchStart({ distance: 0 });
+
+                if (zoomHintTimeoutRef.current) clearTimeout(zoomHintTimeoutRef.current);
+                zoomHintTimeoutRef.current = setTimeout(() => {
+                    if (screen === 'game' && boardZoom === 1) {
+                        setShowZoomHint(true);
+                    }
+                }, 5000);
+            }, [screen, boardZoom]);
+
+            const handleMouseDown = useCallback((e) => {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                setIsDragging(true);
+                setDragStart({
+                    x: e.clientX - boardPosition.x,
+                    y: e.clientY - boardPosition.y
+                });
+            }, [boardPosition]);
+
+            const handleMouseMove = useCallback((e) => {
+                if (isDragging) {
+                    e.preventDefault();
+                    const newX = e.clientX - dragStart.x;
+                    const newY = e.clientY - dragStart.y;
+                    setBoardPosition({ x: newX, y: newY });
+                }
+            }, [isDragging, dragStart]);
+
+            const handleMouseUp = useCallback(() => {
+                setIsDragging(false);
+            }, []);
+
+            const handleWheel = useCallback((e) => {
+                e.preventDefault();
+                const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+                setBoardZoom(prev => {
+                    const newZoom = prev * zoomFactor;
+                    return Math.min(Math.max(newZoom, 0.5), 3);
+                });
+
+                if (showZoomHint) {
+                    setShowZoomHint(false);
+                }
+            }, [showZoomHint]);
+
+            useEffect(() => {
+                const boardContainer = boardContainerRef.current;
+                if (boardContainer) {
+                    boardContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
+                    boardContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
+                    boardContainer.addEventListener('touchend', handleTouchEnd);
+                    boardContainer.addEventListener('mousedown', handleMouseDown);
+                    boardContainer.addEventListener('mousemove', handleMouseMove);
+                    document.addEventListener('mouseup', handleMouseUp);
+                    boardContainer.addEventListener('wheel', handleWheel, { passive: false });
+
+                    return () => {
+                        boardContainer.removeEventListener('touchstart', handleTouchStart);
+                        boardContainer.removeEventListener('touchmove', handleTouchMove);
+                        boardContainer.removeEventListener('touchend', handleTouchEnd);
+                        boardContainer.removeEventListener('mousedown', handleMouseDown);
+                        boardContainer.removeEventListener('mousemove', handleMouseMove);
+                        document.removeEventListener('mouseup', handleMouseUp);
+                        boardContainer.removeEventListener('wheel', handleWheel);
+                    };
+                }
+            }, [handleTouchStart, handleTouchMove, handleTouchEnd, handleMouseDown, handleMouseMove, handleMouseUp, handleWheel]);
+
+            // --- OYUN MANTIĞI ---
+            const myPlayerId = gameState?.playerId;
+            const isMyTurn = gameState?.currentPlayer === myPlayerId;
+            const myHand = gameState?.players?.[myPlayerId]?.hand || [];
+            const marketSize = gameState?.market?.length || 0;
+
+            const opponentHandCount = useMemo(() => {
+                if (!gameState || !gameState.players) return 0;
+                const opponentId = Object.keys(gameState.players).find(id => id !== myPlayerId);
+                if (!opponentId) return 0;
+                return gameState.players[opponentId]?.hand?.length || 0;
+            }, [gameState, myPlayerId]);
+
+            // DOMINO BOARD TAŞLARINI PROFESYONEL YERLEŞTİRME - SİMETRİK
+            const renderBoardTiles = useMemo(() => {
+                if (!gameState?.board || gameState.board.length === 0) return [];
+
+                const tiles = [];
+                const centerX = 0;
+                const centerY = 0;
+
+                const board = gameState.board;
+                const TILE_WIDTH = 60; // .tile-size-board CSS-dəki eni
+
+                // İlk taşı mərkəzə qoy
+                if (board.length > 0) {
+                    tiles.push({
+                        tile: board[0],
+                        position: { x: centerX, y: centerY },
+                        rotation: 0
+                    });
+                }
+
+                // Sağ və sol tərəfləri ayrı-ayrılıqda emal et
+                let leftX = centerX - TILE_WIDTH;
+                let rightX = centerX + TILE_WIDTH;
+
+                // Bu sadələşdirilmiş məntiq daşları sadəcə xətti olaraq düzür.
+                // Daha mürəkkəb (dönməli) məntiq üçün əlavə kod lazımdır.
+                // Daşları bir-birinə bitişik yerləşdir
+                for (let i = 1; i < board.length; i++) {
+                    tiles.push({ tile: board[i], position: { x: rightX, y: centerY }, rotation: 0 });
+                    rightX += TILE_WIDTH; // Növbəti daşın mərkəzi üçün mövqeni artır.
+                }
+
+                // Board'u merkeze çek
+                if (tiles.length > 0) {
+                    const lastTileX = tiles[tiles.length - 1].position.x;
+                    const offsetX = -lastTileX / 2;
+
+                    return tiles.map(tile => ({
+                        ...tile,
+                        position: {
+                            x: tile.position.x + offsetX,
+                            y: tile.position.y
+                        }
+                    }));
+                }
+
+                return tiles.map((t, i) => ({ ...t, index: i }));
+            }, [gameState?.board]);
+
+            const calculateValidMoves = (tile) => {
+                if (!gameState || gameState.board.length === 0) return ['start'];
+
+                const board = gameState.board;
+                // Soldakı daşın sol ucu və ya sağdakı daşın sol ucu (əgər tərsinədirsə)
+                const leftEndValue = board[0][0];
+                // Sağdakı daşın sağ ucu
+                const rightEndValue = board[board.length - 1][1];
+
+                const moves = [];
+
+                // Daşın hər iki ucunu yoxla
+                if (tile[0] === leftEndValue || tile[1] === leftEndValue) moves.push('left');
+                if (tile[0] === rightEndValue || tile[1] === rightEndValue) moves.push('right');
+
+                return moves;
+            };
+
+            const handleTileClick = (index) => {
+                if (!isMyTurn) {
+                    showNotification('Növbəniz deyil!', 'warning');
+                    return;
+                }
+
+                const tile = myHand[index];
+                if (!tile) return;
+
+                if (selectedTileIndex === index) {
+                    setSelectedTileIndex(null);
+                    setValidMoves([]);
+                    return;
+                }
+
+                const moves = calculateValidMoves(tile);
+
+                if (moves.length > 0) {
+                    setSelectedTileIndex(index);
+                    setValidMoves(moves);
+                    showNotification('Daş seçildi. Mövqe seçin', 'info');
+                } else {
+                    showNotification('Bu daşla oynaya bilməzsiniz', 'warning');
                 }
             };
 
-            // --- PAGES ---
+            const playTile = (position) => {
+                if (selectedTileIndex === null) {
+                    showNotification('Əvvəlcə daş seçin', 'warning');
+                    return;
+                }
 
-            if (page === 'lobby') return (
-                <div className="h-screen flex flex-col items-center justify-center text-white relative p-6">
-                    {/* Background Detail */}
-                    <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
+                console.log('🎮 Taş oynanıyor:', { tileIndex: selectedTileIndex, position });
 
-                    {me && <div className="z-10 text-center mb-8">
-                        <img src={me.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 rounded-full border-4 border-yellow-400 shadow-xl mx-auto mb-4" />
-                        <h1 className="text-3xl font-black">{me.username}</h1>
-                        <div className="text-yellow-400 font-bold">{me.elo} ELO</div>
-                    </div>}
+                sendMessage({
+                    type: 'playTile',
+                    tileIndex: selectedTileIndex,
+                    position: position,
+                    tile: myHand[selectedTileIndex] // Sunucu tarafında doğrulamayı kolaylaştırır
+                });
+                // Do not reset state here. Wait for 'gameUpdate' from the server.
+                // This prevents race conditions and ensures the UI reflects the true game state.
+            };
 
-                    <div className="z-10 w-full max-w-sm space-y-4">
-                        <button onClick={() => { setSearching(true); setPage('searching'); send('findMatch', me); }}
-                            className="w-full py-4 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-xl font-black text-xl shadow-lg border-b-4 border-yellow-700 active:border-b-0 active:translate-y-1 transition-all">
-                            ⚔️ OYUN BUL
-                        </button>
-                        <div className="flex gap-4">
-                            <input placeholder="Oda Kodu" className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 text-center placeholder-gray-400" id="codeIn" />
-                            <button onClick={() => {
-                                const c = document.getElementById('codeIn').value.toUpperCase();
-                                if (c) send('joinRoom', { roomCode: c });
-                            }} className="bg-blue-600 px-6 rounded-xl font-bold">GİR</button>
-                        </div>
-                        <button onClick={() => { send('createRoom', me); notify('Oda yaradıldı...', 'success'); }} className="block w-full text-sm text-gray-400 underline">Özel Oda Yarat</button>
+            const drawFromMarket = () => {
+                if (!isMyTurn) {
+                    showNotification('Növbəniz deyil!', 'warning');
+                    return;
+                }
+
+                if (marketSize === 0) {
+                    showNotification('Bazar boşdur!', 'warning');
+                    return;
+                }
+
+                // Elinde oynanabilir taş var mı kontrol et
+                // Masa boşsa, hər zaman oynaya bilərsən, bazara getməyə ehtiyac yoxdur.
+                if (gameState.board.length === 0) {
+                    showNotification('İlk siz başlayırsınız! Zəhmət olmasa bir daş seçin.', 'info');
+                    return;
+                }
+
+                if (myHand.some(tile => calculateValidMoves(tile).length > 0)) {
+                    showNotification('Elində oynaya biləcəyiniz daş var! Əvvəlcə onu oynayın.', 'error');
+                    return;
+                }
+
+                sendMessage({ type: 'drawFromMarket' });
+                showNotification('Bazardan daş çəkilir...', 'info');
+            };
+
+            const leaveGameClient = () => {
+                const confirmed = window.confirm(
+                    'Oyundan çıxmaq istədiyinizə əminsiniz?\n\n' +
+                    'Bu oyunu tərk etsəniz ELO balı itirə bilərsiniz.'
+                );
+                if (!confirmed) return;
+
+                sendMessage({ type: 'quit' });
+                resetGameClientState();
+                setScreen('lobby');
+                showNotification('Oyundan ayrıldınız', 'info');
+            };
+
+            // --- RENDER BÖLÜMLERİ ---
+
+            if (screen === 'loading') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center p-4">
+                        <div className="loading-spinner mb-4"></div>
+                        <p className="text-white text-xl font-bold text-center">Yüklənir...</p>
+                        {!connected && (
+                            <p className="text-yellow-400 text-sm mt-2 text-center">Serverə qoşulur...</p>
+                        )}
                     </div>
-                    {notif && <Toast msg={notif.msg} type={notif.type} />}
-                </div>
-            );
+                );
+            }
 
-            if (page === 'searching') return (
-                <div className="h-screen flex flex-col items-center justify-center text-white p-6">
-                    {opp ? (
-                        <div className="text-center animate-pulse">
-                            <div className="text-3xl font-bold text-green-400 mb-6">RAKİB TAPILDI!</div>
-                            <img src={opp.photoUrl} className="w-32 h-32 rounded-full border-4 border-green-500 shadow-2xl mx-auto" />
-                            <div className="text-2xl font-bold mt-4">{opp.username || opp.name}</div>
-                        </div>
-                    ) : (
-                        <div className="text-center">
-                            <div className="loader mx-auto mb-8"></div>
-                            <h2 className="text-2xl font-bold">Rakib Aranır...</h2>
-                            <button onClick={() => { setPage('lobby'); send('cancelSearch'); }} className="mt-8 text-red-400 font-bold border border-red-400 px-6 py-2 rounded-full">Ləğv Et</button>
-                        </div>
-                    )}
-                </div>
-            );
+            if (screen === 'searching') {
+                const minutes = Math.floor(searchTime / 60);
+                const seconds = searchTime % 60;
+                const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-            if (page === 'result') return (
-                <div className="h-screen bg-black/90 flex flex-col items-center justify-center text-white p-6 text-center z-50">
-                    <h1 className={`text-6xl font-black mb-4 ${game?.winnerInfo?.isWinner ? 'text-green-500' : 'text-red-500'}`}>
-                        {game?.winnerInfo?.isWinner ? 'QAZANDIN!' : 'MƏĞLUB'}
-                    </h1>
-                    <p className="text-xl text-gray-300 mb-8">{game?.winnerInfo?.message}</p>
-                    <div className="text-4xl font-mono font-bold mb-12">
-                        {game?.winnerInfo?.eloChange > 0 ? '+' : ''}{game?.winnerInfo?.eloChange} ELO
-                    </div>
-                    <button onClick={() => { setPage('lobby'); setGame(null); }} className="bg-white text-black px-10 py-4 rounded-full font-bold text-xl hover:scale-110 transition-transform">TAMAM</button>
-                </div>
-            );
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6">
+                        {notification && <Toast message={notification.message} type={notification.type} />}
 
-            if (page === 'game' && game) return (
-                <div className="fixed inset-0 wood-table flex flex-col overflow-hidden">
-                    {notif && <Toast msg={notif.msg} type={notif.type} />}
+                        <div className="relative z-10 max-w-md w-full">
+                            <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20">
+                                <div className="text-center mb-8">
+                                    <div className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 animate-pulse flex items-center justify-center">
+                                        <span className="text-4xl">🎯</span>
+                                    </div>
+                                    <h2 className="text-white text-2xl font-bold mb-2">{playerData?.username}</h2>
+                                </div>
 
-                    {/* Header */}
-                    <div className="bg-black/40 backdrop-blur p-2 flex justify-between items-center z-20 shadow-lg">
-                        <div className="flex items-center gap-3">
-                            <img src={opp?.photoUrl} className="w-10 h-10 rounded-full border-2 border-white/20" />
-                            <div>
-                                <div className="text-white font-bold text-sm leading-tight">{opp?.name || 'Rakib'}</div>
-                                <div className="text-xs text-yellow-400">🔥 {game.players[opp?.telegramId]?.handCount || 7} das</div>
+                                <div className="mb-8">
+                                    <h3 className="text-white text-2xl font-bold text-center mt-6 mb-2">🔍 RƏQİB AXTARILIR...</h3>
+                                    <p className="text-white/70 text-center text-sm mb-4">
+                                        {!playerData?.isGuest ? '⚔️ RÜTBƏLİ OYUN' : '🎮 ADİ OYUN'}
+                                    </p>
+
+                                    <div className="bg-black/30 rounded-xl p-4 text-center mb-6">
+                                        <div className="text-white text-4xl font-mono font-bold">⏱️ {timeString}</div>
+                                        <div className="text-white/60 text-sm mt-1">⏳ Keçən Vaxt</div>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={() => {
+                                        setSearching(false);
+                                        setScreen('lobby');
+                                        if (searchTimerRef.current) {
+                                            clearInterval(searchTimerRef.current);
+                                            searchTimerRef.current = null;
+                                        }
+                                        setSearchTime(0);
+                                        sendMessage({ type: 'cancelSearch' });
+                                    }}
+                                    className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all"
+                                >
+                                    ❌ AXTARIŞI DAYANDIR
+                                </button>
                             </div>
                         </div>
-                        <div className={`px-4 py-1 rounded-full text-xs font-black tracking-wider ${game.currentPlayer === me.telegramId ? 'bg-yellow-500 text-black animate-pulse' : 'bg-white/10 text-white/50'}`}>
-                            {game.currentPlayer === me.telegramId ? 'SİZİN SIRANIZ' : 'RAKİB DÜŞÜNÜR...'}
+                    </div>
+                );
+            }
+
+            if (screen === 'lobby') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-green-900 via-emerald-800 to-teal-900 flex flex-col items-center justify-center p-4">
+                        {notification && <Toast message={notification.message} type={notification.type} />}
+
+                        <div className="text-center mb-8">
+                            <h1 className="text-4xl md:text-5xl font-black text-white drop-shadow-lg mb-2">
+                                🎯 DOMINO <span className="text-yellow-400">101</span> 🏆
+                            </h1>
+                            <p className="text-gray-300 text-sm tracking-widest uppercase">⚡ Professional Online Oyun ⚡</p>
+                        </div>
+
+                        <div className="w-full max-w-md bg-black/40 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
+                            {playerData && (
+                                <div className="mb-6 text-center flex flex-col items-center">
+                                    {/* Profil Şəkli */}
+                                    {playerData.photoUrl && (
+                                        <img
+                                            src={playerData.photoUrl}
+                                            className="w-20 h-20 rounded-full border-4 border-yellow-400 mb-4 shadow-lg"
+                                            alt="Profil"
+                                        />
+                                    )}
+                                    {/* İstifadəçi Adı */}
+                                    <h2 className="text-white text-2xl font-bold mb-2">{playerData.username}</h2>
+
+                                    {/* Statistikalar (Səviyyə və ELO) */}
+                                    {!playerData.isGuest && (
+                                        <div className="flex justify-center items-center gap-3 mt-1">
+                                            <span className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-sm font-bold">
+                                                SƏV {Math.min(playerData.level || 0, 10)}
+                                            </span>
+                                            <span className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-3 py-1 rounded-full text-sm font-bold">
+                                                {playerData.elo || 0} ELO
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <button
+                                onClick={() => {
+                                    if (!playerData) return showNotification('Adınızı daxil edin', 'error');
+                                    if (searching) return;
+
+                                    setScreen('searching');
+                                    setSearching(true);
+                                    setSearchTime(0);
+
+                                    searchTimerRef.current = setInterval(() => {
+                                        setSearchTime(prev => prev + 1);
+                                    }, 1000);
+
+                                    sendMessage({
+                                        type: 'findMatch',
+                                        telegramId: playerData.telegramId,
+                                        username: playerData.username,
+                                        playerName: playerData.username,
+                                        isGuest: playerData.isGuest,
+                                        level: playerData.level,
+                                        elo: playerData.elo
+                                    });
+                                }}
+                                disabled={!connected || searching}
+                                className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all mb-4 flex items-center justify-center gap-2"
+                            >
+                                <span>🏆</span> {!playerData?.isGuest ? '⚔️ RÜTBƏLİ OYUN AXTAR' : '🎮 OYUN AXTAR'}
+                            </button>
+
+                            <div className="flex items-center gap-2 my-4">
+                                <div className="h-px bg-white/10 flex-1"></div>
+                                <span className="text-xs text-gray-500 uppercase">və ya</span>
+                                <div className="h-px bg-white/10 flex-1"></div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 mb-4">
+                                <button
+                                    onClick={() => {
+                                        if (!playerData) return showNotification('Adınızı daxil edin', 'error');
+                                        sendMessage({
+                                            type: 'createRoom',
+                                            telegramId: playerData.telegramId,
+                                            username: playerData.username,
+                                            playerName: playerData.username,
+                                            isGuest: playerData.isGuest
+                                        });
+                                    }}
+                                    disabled={roomCode !== ''}
+                                    className="bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <span>🏠</span> OTAQ YARAT
+                                </button>
+                                <div className="relative">
+                                    <input
+                                        value={joinCode}
+                                        onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                                        placeholder="KOD"
+                                        maxLength={4}
+                                        className="w-full h-full bg-black/30 border border-white/10 rounded-xl px-3 text-center text-white font-mono uppercase focus:ring-2 focus:ring-yellow-400 focus:outline-none"
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            if (!playerData) return showNotification('Adınızı daxil edin', 'error');
+                                            if (!joinCode) return showNotification('Otaq kodunu daxil edin', 'error');
+                                            sendMessage({
+                                                type: 'joinRoom',
+                                                roomCode: joinCode,
+                                                telegramId: playerData.telegramId,
+                                                username: playerData.username,
+                                                playerName: playerData.username,
+                                                isGuest: playerData.isGuest
+                                            });
+                                        }}
+                                        className="absolute right-1 top-1 bottom-1 bg-yellow-500 text-white px-3 rounded-lg hover:bg-yellow-400"
+                                    >
+                                        ➔
+                                    </button>
+                                </div>
+                            </div>
+
+                            {roomCode && (
+                                <div className="mt-4 p-4 bg-green-500/20 border border-green-500/30 rounded-xl text-center room-code-display">
+                                    <p className="text-green-400 text-xs mb-1">📱 OTAQ KODU</p>
+                                    <p className="text-3xl font-mono text-white font-bold tracking-widest cursor-pointer"
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(roomCode);
+                                            showNotification('📋 Kod kopyalandı!', 'success');
+                                        }}>
+                                        {roomCode}
+                                    </p>
+                                    <p className="text-xs text-gray-300 mt-2">⏳ Dostunuz gözlənilir...</p>
+                                    <button
+                                        onClick={() => {
+                                            sendMessage({
+                                                type: 'cancelRoom',
+                                                roomCode: roomCode
+                                            });
+                                            setRoomCode('');
+                                            showNotification('Otaq ləğv edildi', 'info');
+                                        }}
+                                        className="mt-2 text-xs text-red-400 hover:text-red-300"
+                                    >
+                                        Otağı ləğv et
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="flex justify-center gap-3 mt-4">
+                                <button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold text-sm">
+                                    🏆 Skor Tablosu
+                                </button>
+                            </div>
                         </div>
                     </div>
+                );
+            }
 
-                    {/* Board Area */}
-                    <div className="flex-1 relative overflow-hidden"
-                        onTouchStart={onTouchStart} onTouchMove={onTouchMove}>
+            if (screen === 'leaderboard') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center p-4">
+                        {notification && <Toast message={notification.message} type={notification.type} />}
 
-                        <div className="absolute top-1/2 left-1/2 transition-transform duration-75"
-                            style={{ transform: `translate(-50%, -50%) translate(${view.x}px, ${view.y}px) scale(${view.s})` }}>
+                        <div className="text-center mb-6">
+                            <h1 className="text-3xl md:text-4xl font-black text-white drop-shadow-lg mb-2">🏆 SKOR TABLOSU 🏆</h1>
+                        </div>
 
-                            <div className="relative">
-                                {renderBoard()?.map((b, i) => (
-                                    <div key={i} className="absolute" style={{ left: b.x, top: b.y, transform: 'translate(-50%,-50%)' }}>
-                                        <Tile vals={b.val} isBoard={true} dir={'right'} />
+                        <button onClick={() => setScreen('lobby')} className="mb-4 px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold">⬅️ Geri Dön</button>
+
+                        <div className="w-full max-w-2xl bg-black/40 backdrop-blur-md rounded-2xl p-4 md:p-6 shadow-2xl border border-white/10">
+                            {leaderboard.length === 0 ? (
+                                <div className="text-center text-gray-400 py-8">
+                                    <p className="text-xl">📊 Skor tablosu yüklənir...</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {leaderboard.map((player, index) => (
+                                        <div key={player._id} className={`flex items-center gap-3 p-3 md:p-4 rounded-xl ${index === 0 ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-2 border-yellow-500' :
+                                            index === 1 ? 'bg-gradient-to-r from-gray-400/20 to-gray-500/20 border-2 border-gray-400' :
+                                                index === 2 ? 'bg-gradient-to-r from-orange-600/20 to-orange-700/20 border-2 border-orange-600' :
+                                                    'bg-white/5 border border-white/10'
+                                            }`}>
+                                            <div className="text-2xl md:text-3xl font-black text-white w-8 md:w-10 text-center">
+                                                {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
+                                            </div>
+
+                                            {player.photoUrl ? (
+                                                <img src={player.photoUrl} alt={player.username} className="w-10 h-10 rounded-full object-cover border-2 border-white/20" />
+                                            ) : (
+                                                <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-lg">
+                                                    👤
+                                                </div>
+                                            )}
+                                            <div className="flex-1">
+                                                <div className="text-white font-bold text-base md:text-lg">{player.username || player.firstName}</div>
+                                                <div className="flex gap-2 text-xs md:text-sm">
+                                                    <span className="text-green-400">✓ {player.wins}</span>
+                                                    <span className="text-red-400">✗ {player.losses}</span>
+                                                    <span className="text-yellow-400">🔥 {player.winStreak}</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="text-right">
+                                                <div className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-bold mb-1">
+                                                    {player.elo} ELO
+                                                </div>
+                                                <div className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-2 md:px-3 py-1 rounded-full text-xs font-bold">
+                                                    SƏV {Math.min(player.level || 0, 10)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            if (screen === 'end' && endInfo) {
+                const title = endInfo.isWinner ? '🎉 QAZANDINIZ!' :
+                    endInfo.isLoser ? '😔 UDUZDUNUZ' :
+                        endInfo.isDraw ? '⚖️ BƏRABƏRƏ' : 'Oyun Sonu';
+                const titleColor = endInfo.isWinner ? 'text-green-400' :
+                    endInfo.isLoser ? 'text-red-400' :
+                        endInfo.isDraw ? 'text-blue-400' : 'text-gray-400';
+
+                return (
+                    <div className="min-h-screen bg-black/95 flex items-center justify-center p-6">
+                        <div className="w-full max-w-sm bg-white/10 backdrop-blur-md rounded-2xl p-8 shadow-2xl text-center border border-white/10">
+                            <h1 className={`text-3xl md:text-4xl font-black mb-4 ${titleColor}`}>
+                                {title}
+                            </h1>
+
+                            <p className="text-gray-300 text-lg mb-6">
+                                {endInfo.message}
+                            </p>
+
+                            {endInfo.isRanked && endInfo.eloChange !== undefined && (
+                                <div className="mb-8">
+                                    <h2 className="text-white text-xl font-bold mb-2">ELO DƏYİŞİKLİYİ</h2>
+                                    <p className={`text-4xl md:text-5xl font-extrabold ${endInfo.eloChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                        {endInfo.eloChange > 0 ? '+' : ''}{endInfo.eloChange}
+                                    </p>
+                                </div>
+                            )}
+
+                            <div className="p-4 bg-black/30 rounded-lg text-gray-400 text-sm">
+                                ⏳ Avtomatik olaraq lobbiyə qayıdılır...
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // OYUN EKRANI
+            if (screen === 'game' && gameState) {
+                return (
+                    <div className="fixed inset-0 flex flex-col h-full w-full bg-table-base">
+                        {notification && <Toast message={notification.message} type={notification.type} />}
+
+                        {/* ÜST PANEL: Rakip */}
+                        <div className="h-14 md:h-16 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between px-3 md:px-4 z-20">
+                            <div className="flex items-center gap-2 md:gap-3">
+                                {opponent?.photoUrl ? (
+                                    <img
+                                        src={opponent.photoUrl}
+                                        alt="Rəqib"
+                                        className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-yellow-400 shadow-lg object-cover"
+                                    />
+                                ) : (
+                                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center shadow-lg">
+                                        👤
                                     </div>
-                                ))}
-
-                                {/* Indicators */}
-                                {validMoves.length > 0 && renderBoard() && (
-                                    <>
-                                        {validMoves.includes('left') &&
-                                            <div className="valid-zone left-[-50px]"
-                                                style={{ left: (renderBoard()[0]?.x) - 50, top: 0, transform: 'translate(-50%,-50%)' }}
-                                                onClick={() => play('left')}>SOL</div>}
-
-                                        {validMoves.includes('right') &&
-                                            <div className="valid-zone"
-                                                style={{ left: (renderBoard()[renderBoard().length - 1]?.x) + 50, top: 0, transform: 'translate(-50%,-50%)' }}
-                                                onClick={() => play('right')}>SAĞ</div>}
-
-                                        {validMoves.includes('start') &&
-                                            <div className="valid-zone" style={{ left: 0, top: 0, transform: 'translate(-50%,-50%)' }} onClick={() => play('left')}>BAŞLA</div>}
-                                    </>
+                                )}
+                                <div>
+                                    <div className="text-white text-xs md:text-sm font-bold">
+                                        {opponent?.name || opponent?.username || 'Rəqib'}
+                                    </div>
+                                    <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full">
+                                        🎲 {opponentHandCount}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="text-center">
+                                {isMyTurn ? (
+                                    <div className="bg-yellow-500 text-black text-xs font-bold px-3 py-1 rounded-full animate-pulse turn-indicator">
+                                        ⚡ SİZİN NÖVBƏNİZ
+                                    </div>
+                                ) : (
+                                    <div className="text-gray-400 text-xs font-medium bg-black/40 px-3 py-1 rounded-full">
+                                        ⏳ Rəqib Oynayır...
+                                    </div>
                                 )}
                             </div>
                         </div>
-                    </div>
 
-                    {/* Hand Area */}
-                    <div className="bg-gradient-to-t from-black/90 to-transparent pb-6 pt-10 px-4 z-20 flex flex-col items-center">
-                        <div className="flex items-end justify-center gap-1 mb-4 h-[100px]">
-                            {game.players[me.telegramId].hand.map((t, i) => (
-                                <div key={i} className="transition-all hover:-translate-y-2">
-                                    <Tile vals={t} onClick={() => handleTileClick(i)} selected={selTile === i} />
+                        {/* ORTA PANEL: DOMINO BOARD */}
+                        <div className="flex-1 relative overflow-hidden w-full">
+                            <div
+                                ref={boardContainerRef}
+                                className="domino-board-container"
+                            >
+                                {showZoomHint && boardZoom === 1 && (
+                                    <div className="zoom-hint">
+                                        👆 İki barmaqla böyüt / kiçilt
+                                    </div>
+                                )}
+
+                                <div className="board-zoom-info">
+                                    Zoom: %{Math.round(boardZoom * 100)}
                                 </div>
-                            ))}
+
+                                <div
+                                    ref={boardInnerRef}
+                                    className="domino-board-inner"
+                                    style={{
+                                        transform: `translate(${boardPosition.x}px, ${boardPosition.y}px) scale(${boardZoom})`,
+                                        cursor: isDragging ? 'grabbing' : 'grab'
+                                    }}
+                                >
+                                    {/* DOMINO BOARD TAŞLARI - SİMETRİK */}
+                                    {renderBoardTiles.length === 0 ? (
+                                        <div className="text-white/30 text-lg md:text-xl font-bold border-4 border-dashed border-white/10 rounded-3xl p-4 md:p-6 text-center">
+                                            {selectedTileIndex !== null ? '👇 Daşı Buraya Qoy' : 'İlk daşı ortaya qoyun'}
+                                        </div>
+                                    ) : (
+                                        renderBoardTiles.map(({ tile, index, direction, position }) => (
+                                            <div
+                                                key={index}
+                                                className="board-tile"
+                                                style={{
+                                                    left: `${position.x}px`,
+                                                    top: `${position.y}px`,
+                                                    transform: 'translate(-50%, -50%)'
+                                                }}
+                                            >
+                                                <DominoTile
+                                                    values={tile}
+                                                    disabled={true}
+                                                    isBoardTile={true}
+                                                />
+                                            </div>
+                                        ))
+                                    )}
+
+                                    {/* VALID MOVE INDICATORS - TIKLANABILIR */}
+                                    {validMoves.includes('left') && selectedTileIndex !== null && renderBoardTiles.length > 0 && (
+                                        <div
+                                            className="valid-move-indicator"
+                                            style={{
+                                                position: 'absolute',
+                                                left: `${renderBoardTiles[0].position.x - 30}px`,
+                                                top: `${renderBoardTiles[0].position.y}px`,
+                                                width: '60px',
+                                                height: '32px',
+                                                transform: 'translate(-50%, -50%)'
+                                            }}
+                                            onClick={() => {
+                                                console.log('SOL tıklandı');
+                                                playTile('left');
+                                            }}
+                                        >
+                                            <div className="text-yellow-400 font-bold text-xs">SOL</div>
+                                        </div>
+                                    )}
+
+                                    {validMoves.includes('right') && selectedTileIndex !== null && renderBoardTiles.length > 0 && (
+                                        <div
+                                            className="valid-move-indicator"
+                                            style={{
+                                                position: 'absolute',
+                                                left: `${renderBoardTiles[renderBoardTiles.length - 1].position.x + 30}px`,
+                                                top: `${renderBoardTiles[renderBoardTiles.length - 1].position.y}px`,
+                                                width: '60px',
+                                                height: '32px',
+                                                transform: 'translate(-50%, -50%)'
+                                            }}
+                                            onClick={() => {
+                                                console.log('SAĞ tıklandı');
+                                                playTile('right');
+                                            }}
+                                        >
+                                            <div className="text-yellow-400 font-bold text-xs">SAĞ</div>
+                                        </div>
+                                    )}
+
+                                    {validMoves.includes('start') && selectedTileIndex !== null && (
+                                        <div
+                                            className="valid-move-indicator"
+                                            style={{
+                                                position: 'absolute',
+                                                left: '50%',
+                                                top: '50%',
+                                                width: '65px',
+                                                height: '35px',
+                                                transform: 'translate(-50%, -50%)'
+                                            }}
+                                            onClick={() => {
+                                                console.log('BAŞLA tıklandı');
+                                                playTile('start');
+                                            }}
+                                        >
+                                            <div className="text-yellow-400 font-bold text-sm">BAŞLA</div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Game Controls */}
+                            <div className="game-controls">
+                                <button
+                                    className="control-button"
+                                    onClick={drawFromMarket}
+                                    title="Bazardan çək"
+                                    disabled={!isMyTurn || marketSize === 0}
+                                    style={{ opacity: (!isMyTurn || marketSize === 0) ? 0.5 : 1 }}
+                                >
+                                    🎲
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="w-full flex justify-between items-center max-w-md">
-                            <button onClick={() => { if (confirm('Çıkmak istiyor musunuz? Kaybedeceksiniz.')) send('leaveGame'); }}
-                                className="text-red-400 font-bold text-xs bg-red-900/20 px-4 py-2 rounded-full border border-red-900/50">ÇIXIŞ</button>
+                        {/* ALT PANEL: Oyuncu Eli */}
+                        <div className="bg-gradient-to-t from-black/90 via-table-dark to-transparent pb-3 pt-2 z-20">
+                            <div className="flex justify-between items-center px-3 md:px-4 mb-2">
+                                <div className="flex items-center gap-2 md:gap-3">
+                                    <span className="text-white text-xs font-bold opacity-70">
+                                        🎴 ƏLİNİZ ({myHand.length})
+                                    </span>
+                                    {marketSize > 0 && (
+                                        <span className="text-yellow-400 text-xs font-bold bg-black/40 px-2 py-1 rounded-full">
+                                            🎲 BAZAR: {marketSize}
+                                        </span>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={leaveGameClient}
+                                    className="bg-red-600/80 hover:bg-red-600 text-white text-xs px-3 md:px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95"
+                                >
+                                    🚪 Çıx
+                                </button>
+                            </div>
 
-                            <button onClick={draw}
-                                disabled={game.currentPlayer !== me.telegramId || game.market === 0}
-                                className={`font-bold px-6 py-3 rounded-full shadow-lg transition-all flex items-center gap-2
-                                    ${(game.currentPlayer === me.telegramId && game.market > 0)
-                                        ? canPlayAny(game.players[me.telegramId].hand)
-                                            ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50' // Has moves -> Disabled visually
-                                            : 'bg-blue-600 text-white active:scale-95' // No moves -> Enabled
-                                        : 'bg-gray-700 text-gray-500 opacity-50'}`}>
-                                🎲 BAZAR ({game.market})
-                            </button>
+                            {/* YATAY Taş Dizilimi */}
+                            <div className="hand-tiles-container hide-scrollbar">
+                                {myHand.map((tile, index) => (
+                                    <div key={`${tile[0]}-${tile[1]}-${index}`} className="hand-tile-wrapper">
+                                        <DominoTile
+                                            values={tile}
+                                            onClick={() => handleTileClick(index)}
+                                            disabled={!isMyTurn}
+                                            isSelected={selectedTileIndex === index}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center p-4">
+                    <div className="loading-spinner mb-4"></div>
+                    <p className="text-white text-xl font-bold">Yüklənir...</p>
                 </div>
             );
-
-            return <div className="h-screen bg-slate-900 flex items-center justify-center text-white"><div className="loader"></div></div>;
         };
 
+        // Mobil cihazlarda 100vh sorununu çözmek için
+        const setAppHeight = () => document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+        window.addEventListener('resize', setAppHeight);
+        setAppHeight();
+
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        root.render(<DominoGame />);
     </script>
 </body>
 
