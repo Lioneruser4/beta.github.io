@@ -3,561 +3,1208 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Domino 101 Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="theme-color" content="#1b4d3e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Domino 101 Pro - Telegram Oyunu</title>
 
-    <!-- Telegram & React -->
+    <!-- Favicon - Tarayıcı sekmesi için ikon -->
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎲</text></svg>">
+
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Fonts & Icons -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Outfit', 'sans-serif'] },
-                    colors: {
-                        table: { dark: '#0f172a', surface: '#1e293b' },
-                        gold: { 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706' }
-                    },
-                    animation: {
-                        'float': 'float 6s ease-in-out infinite',
-                        'pulse-glow': 'pulse-glow 2s infinite',
-                        'spin-slow': 'spin 3s linear infinite',
-                    },
-                    keyframes: {
-                        float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-20px)' } },
-                        'pulse-glow': { '0%, 100%': { boxShadow: '0 0 10px rgba(251, 191, 36, 0.5)' }, '50%': { boxShadow: '0 0 25px rgba(251, 191, 36, 0.8)' } }
-                    }
-                }
-            }
-        }
-    </script>
     <style>
-        body {
-            background: #0f172a;
-            overflow: hidden;
-            user-select: none;
+        * {
             -webkit-tap-highlight-color: transparent;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
-        .pip {
-            background-color: #111;
-            border-radius: 50%;
-            width: 5px;
-            height: 5px;
-            margin: auto;
+        body {
+            background-color: #1b4d3e;
+            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23153d31' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z'/%3E%3C/g%3E%3C/svg%3E");
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            overscroll-behavior: none;
+            font-family: 'Roboto', sans-serif;
+            height: 100vh;
+            width: 100vw;
+            position: fixed;
+        }
+
+        #root {
+            height: 100vh;
+            width: 100vw;
         }
 
         .pip-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            padding: 2px;
+            grid-template-rows: repeat(3, 1fr);
             width: 100%;
             height: 100%;
-            gap: 1px;
+            padding: 2px;
+        }
+
+        .pip {
+            background-color: #111;
+            border-radius: 50%;
+            width: 6px;
+            height: 6px;
+            margin: auto;
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* DOMINO BOARD STYLES */
+        .domino-board-container {
+            width: 100%;
+            height: 60vh;
+            position: relative;
+            overflow: hidden;
+            touch-action: none;
+            background: linear-gradient(135deg, rgba(27, 77, 62, 0.95) 0%, rgba(15, 43, 35, 0.95) 100%);
+            border: 3px solid rgba(255, 255, 255, 0.15);
+            margin: 0;
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5), 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .domino-board-inner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform-origin: center center;
+            transition: transform 0.1s ease-out;
+            will-change: transform;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .domino-tile {
-            background: #fff;
-            border: 1px solid #94a3b8;
+            display: inline-flex;
+            background: linear-gradient(145deg, #ffffff, #f0f0f0);
+            border: 2px solid #222;
             border-radius: 6px;
-            box-shadow: 2px 3px 0px #cbd5e1, 4px 5px 5px rgba(0, 0, 0, 0.3);
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 3px 0 #aaa, 0 4px 4px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            flex-shrink: 0;
+        }
+
+        .domino-tile.horizontal {
+            flex-direction: row;
+        }
+
+        .domino-tile.vertical {
+            flex-direction: column;
         }
 
         .domino-tile:active {
-            transform: translateY(2px);
-            box-shadow: 0px 1px 0px #cbd5e1;
+            transform: scale(0.95) !important;
         }
 
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-        }
 
-        .snake-board {
+        .domino-tile-face {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             position: relative;
-            width: 2000px;
-            height: 2000px;
         }
 
-        /* Large container for panning */
-
-        /* Valid Move Indicator */
-        .valid-ring {
+        .domino-divider {
+            background: #222;
             position: absolute;
+            z-index: 1;
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .domino-tile.horizontal .domino-divider {
+            width: 2px;
+            height: 85%;
+            top: 7.5%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .domino-tile.vertical .domino-divider {
+            height: 2px;
+            width: 85%;
+            left: 7.5%;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        /* Taş boyutları */
+        .tile-size-hand {
+            width: 38px;
+            /* Dik durması için */
+            height: 76px;
+            margin: 5px;
+        }
+
+        .tile-size-board {
+            width: 60px;
+            height: 30px;
+        }
+
+        /* Seçili taş efekti */
+        .selected-tile {
+            transform: translateY(-5px) scale(1.1) !important;
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.8), 0 3px 0 #aaa, 0 6px 6px rgba(0, 0, 0, 0.4);
+            z-index: 100;
+            border-color: #f59e0b;
+        }
+
+        /* Valid Move Indicators */
+        .valid-move-indicator {
+            position: absolute;
+            z-index: 50;
+            border: 3px dashed rgba(251, 191, 36, 0.9);
+            border-radius: 8px;
+            background: rgba(251, 191, 36, 0.15);
+            animation: pulse-glow 1.5s infinite;
+            pointer-events: auto;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .valid-move-indicator:active {
+            transform: scale(0.95);
+            background: rgba(251, 191, 36, 0.3);
+        }
+
+        @keyframes pulse-glow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 10px rgba(251, 191, 36, 0.6), 0 0 20px rgba(251, 191, 36, 0.3);
+                border-color: rgba(251, 191, 36, 0.9);
+            }
+
+            50% {
+                box-shadow: 0 0 20px rgba(251, 191, 36, 0.9), 0 0 40px rgba(251, 191, 36, 0.5);
+                border-color: rgba(251, 191, 36, 1);
+            }
+        }
+
+        /* Board taş pozisyonları */
+        .board-tile {
+            position: absolute;
+            pointer-events: none;
+        }
+
+        /* El taşları container - YATAY DİZİLİM */
+        .hand-tiles-container {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            padding: 10px;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
+            min-height: 70px;
+            background: rgba(0, 0, 0, 0.3);
+            scroll-snap-type: x mandatory;
+        }
+
+        .hand-tile-wrapper {
+            scroll-snap-align: center;
+            flex-shrink: 0;
+        }
+
+        /* Zoom hint */
+        .zoom-hint {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: none;
+        }
+
+        /* Game controls */
+        .game-controls {
+            position: absolute;
+            bottom: 15px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .control-button {
             width: 40px;
             height: 40px;
-            border: 3px solid #fbbf24;
             border-radius: 50%;
-            background: rgba(251, 191, 36, 0.2);
-            animation: pulse-glow 1.5s infinite;
-            z-index: 50;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
-            transform: translate(-50%, -50%);
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-button:active {
+            transform: scale(0.9);
+            background: rgba(0, 0, 0, 0.9);
+        }
+
+        /* Board zoom info */
+        .board-zoom-info {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Animation for new tiles */
+        @keyframes tileSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .tile-slide-in {
+            animation: tileSlideIn 0.2s ease-out;
+        }
+
+        /* Turn indicator */
+        .turn-indicator {
+            animation: pulse-turn 2s infinite;
+        }
+
+        @keyframes pulse-turn {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        /* Mobile optimizations */
+        @media (max-width: 640px) {
+            .tile-size-hand {
+                width: 32px;
+                height: 64px;
+                margin: 3px;
+            }
+
+            .tile-size-board {
+                width: 50px;
+                height: 25px;
+            }
+
+            .domino-board-container {
+                height: 55vh;
+            }
+
+            .hand-tiles-container {
+                min-height: 65px;
+                padding: 8px;
+            }
+
+            .zoom-hint {
+                display: block;
+            }
+        }
+
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .tile-size-hand {
+                width: 35px;
+                height: 70px;
+            }
+
+            .tile-size-board {
+                width: 55px;
+                height: 27px;
+            }
+
+            .domino-board-container {
+                height: 60vh;
+            }
+        }
+
+        /* PC için Telegram uyumu */
+        @media (min-width: 1025px) {
+            body {
+                min-height: 600px;
+                min-width: 350px;
+            }
+
+            .domino-board-container {
+                height: 65vh;
+            }
+
+            .tile-size-hand {
+                width: 40px;
+                height: 80px;
+            }
+
+            .tile-size-board {
+                width: 65px;
+                height: 32px;
+            }
+        }
+
+        /* Telegram WebApp için özel stiller */
+        .tg-webapp {
+            background: transparent !important;
+        }
+
+        /* Oda kodu gösterimi */
+        .room-code-display {
+            animation: room-code-pulse 2s infinite;
+        }
+
+        @keyframes room-code-pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        /* Loading spinner */
+        .loading-spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid #ffffff;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Toast notification */
+        .toast-notification {
+            animation: toast-slide 0.3s ease-out, toast-fade 0.3s ease-out 2.7s;
+        }
+
+        @keyframes toast-slide {
+            from {
+                transform: translate(-50%, -100px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes toast-fade {
+            to {
+                opacity: 0;
+            }
         }
     </style>
 </head>
 
-<body>
+<body class="tg-webapp">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+        // Telegram WebApp Initialization
         const tg = window.Telegram?.WebApp;
-        if (tg) { tg.ready(); tg.expand(); tg.enableClosingConfirmation(); }
 
-        const WS_URL = 'wss://beta-github-io.onrender.com';
+        // Telegram SDK-ni işə sal
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            tg.enableClosingConfirmation();
+            console.log('✅ Telegram WebApp SDK işə salındı');
+        }
+
+        // --- SABİT SUNUCU ADRESLERİ ---
         const API_URL = 'https://beta-github-io.onrender.com';
+        const WS_URL = 'wss://beta-github-io.onrender.com';
 
-        // --- COMPONENTS ---
-        const RenderPips = ({ n }) => {
-            const m = { 0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
-            return <div className="pip-grid">{[...Array(9)].map((_, i) => <div key={i} className={`pip ${m[n].includes(i) ? 'bg-black' : 'bg-transparent'}`} />)}</div>
-        };
-
-        const DominoTile = ({ val, onClick, selected, isBoard, dir = 'right', scale = 1 }) => {
-            // Logic regarding rotation and size
-            const isVert = isBoard ? (dir === 'up' || dir === 'down') : true; // Board: dynamic, Hand: always vertical
-
-            // Sizes
-            const W = 40 * scale;
-            const H = 80 * scale;
-
-            // If Board Horizontal: W=80, H=40. If Vertical: W=40, H=80.
-            // Hand: W=40, H=80.
-
-            const styles = isBoard
-                ? (isVert ? { w: W, h: H, flex: 'col' } : { w: H, h: W, flex: 'row' })
-                : { w: W, h: H, flex: 'col' };
-
+        // --- BİLEŞENLER ---
+        const RenderPips = ({ number }) => {
+            const layouts = {
+                0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8],
+                4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8]
+            };
+            const activePips = layouts[number] || [];
             return (
-                <div onClick={onClick} className={`domino-tile flex relative overflow-hidden ${selected ? 'ring-4 ring-yellow-400 transform -translate-y-4' : ''}`}
-                    style={{ width: styles.w, height: styles.h, flexDirection: styles.flex === 'col' ? 'column' : 'row' }}>
-                    <div className={`flex-1 flex items-center justify-center relative ${styles.flex === 'col' ? 'border-b' : 'border-r'} border-slate-300`}>
-                        <RenderPips n={val[0]} />
-                    </div>
-                    <div className="flex-1 flex items-center justify-center relative">
-                        <RenderPips n={val[1]} />
-                    </div>
+                <div className="pip-grid">
+                    {[...Array(9)].map((_, i) => (
+                        <div key={i} className="pip" style={{
+                            opacity: activePips.includes(i) ? 1 : 0.2,
+                            transform: activePips.includes(i) ? 'scale(1)' : 'scale(0.5)',
+                            transition: 'all 0.2s ease'
+                        }}></div>
+                    ))}
                 </div>
             );
         };
 
-        const Notif = ({ msg, type }) => (
-            <div className={`fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-white font-bold shadow-2xl z-50 animate-bounce 
-                ${type === 'error' ? 'bg-red-600' : type === 'success' ? 'bg-green-600' : 'bg-blue-600'}`}>
-                {msg}
-            </div>
-        );
+        const DominoTile = ({ values, onClick, disabled, isSelected, isBoardTile = false }) => {
+            const handleClick = (e) => {
+                e.stopPropagation();
+                if (!disabled && onClick) {
+                    onClick();
+                }
+            };
 
-        // --- MAIN GAME COMPONENT ---
-        const App = () => {
-            // States
-            const [screen, setScreen] = useState('lobby'); // lobby, searching, game, result, leaderboard
-            const [ws, setWs] = useState(null);
-            const [me, setMe] = useState(null);
-            const [opp, setOpp] = useState(null);
-            const [game, setGame] = useState(null);
+            const orientationClass = isBoardTile ? 'horizontal' : 'vertical';
+            const baseClasses = `
+                domino-tile relative flex overflow-hidden
+                ${isSelected ? 'selected-tile' : ''}
+                ${!disabled && !isBoardTile ? 'cursor-pointer hover:brightness-110 active:scale-95' : ''}
+                ${disabled ? 'opacity-80 cursor-default' : ''}
+                tile-slide-in
+            `;
+
+            const sizeClass = isBoardTile ? 'tile-size-board' : 'tile-size-hand';
+
+            return (
+                <div
+                    onClick={handleClick}
+                    className={`${baseClasses} ${sizeClass} ${orientationClass}`}
+                >
+                    <div className={`domino-tile-face ${orientationClass === 'horizontal' ? 'border-r-2' : 'border-b-2'} border-gray-800`}>
+                        <RenderPips number={values[0]} />
+                    </div>
+                    <div className="domino-tile-face">
+                        <RenderPips number={values[1]} />
+                    </div>
+                    <div className="domino-divider"></div>
+                </div>
+            );
+        };
+
+        const Toast = ({ message, type }) => {
+            const colors = {
+                success: 'bg-green-600',
+                error: 'bg-red-600',
+                info: 'bg-blue-600',
+                warning: 'bg-yellow-600'
+            };
+            const icons = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️',
+                info: 'ℹ️'
+            };
+
+            return (
+                <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-full shadow-xl text-white font-medium text-sm toast-notification flex items-center gap-2 ${colors[type] || colors.info}`}>
+                    <span className="text-base">{icons[type] || icons.info}</span>
+                    <span>{message}</span>
+                </div>
+            );
+        };
+
+        // --- ANA OYUN ---
+        const DominoGame = () => {
+            const LOCAL_STORAGE_ROOM = 'domino_roomCode';
+            const LOCAL_STORAGE_PLAYER = 'domino_playerId';
+
+            const [screen, setScreen] = useState('loading');
+            const [connected, setConnected] = useState(false);
+            const [playerData, setPlayerData] = useState(null);
             const [leaderboard, setLeaderboard] = useState([]);
             const [roomCode, setRoomCode] = useState('');
             const [joinCode, setJoinCode] = useState('');
-            const [notif, setNotif] = useState(null);
+            const [gameState, setGameState] = useState(null);
+            const [searchTime, setSearchTime] = useState(0);
 
-            // Game Interaction
-            const [selTile, setSelTile] = useState(null);
+            // Oyun İçi State
+            const [selectedTileIndex, setSelectedTileIndex] = useState(null);
             const [validMoves, setValidMoves] = useState([]);
-            const [endData, setEndData] = useState(null);
+            const [notification, setNotification] = useState(null);
+            const [searching, setSearching] = useState(false);
+            const [endInfo, setEndInfo] = useState(null);
+            const [opponent, setOpponent] = useState(null);
+            const [reconnectAttemptCount, setReconnectAttemptCount] = useState(0);
+            const MAX_RECONNECT_ATTEMPTS = 5;
 
-            // Viewport (Pan/Zoom)
-            const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
-            const touchRef = useRef({ x: 0, y: 0, d: 0 });
+            // Board Zoom ve Position State
+            const [boardZoom, setBoardZoom] = useState(1);
+            const [boardPosition, setBoardPosition] = useState({ x: 0, y: 0 });
+            const [isDragging, setIsDragging] = useState(false);
+            const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+            const [pinchStart, setPinchStart] = useState({ distance: 0 });
+            const [showZoomHint, setShowZoomHint] = useState(true);
 
-            // Notify
-            const notify = (msg, type = 'info') => { setNotif({ msg, type }); setTimeout(() => setNotif(null), 3000); };
+            const wsRef = useRef(null);
+            const boardContainerRef = useRef(null);
+            const boardInnerRef = useRef(null);
+            const searchTimerRef = useRef(null);
+            const reconnectTimerRef = useRef(null);
+            const lastTouchTimeRef = useRef(0);
+            const zoomHintTimeoutRef = useRef(null);
+            const connectionCheckRef = useRef(null);
+            const initialLoadTimeoutRef = useRef(null);
 
-            // --- INIT ---
-            useEffect(() => {
-                const initUser = async () => {
-                    let u = { username: 'Guest', telegramId: 'guest_' + Date.now(), isGuest: true };
-                    if (tg?.initDataUnsafe?.user) {
-                        const t = tg.initDataUnsafe.user;
-                        u = { username: t.first_name, telegramId: String(t.id), photoUrl: t.photo_url, isGuest: false };
+            // Reset Game State
+            const resetGameClientState = () => {
+                setGameState(null);
+                setRoomCode('');
+                setSearching(false);
+                setSelectedTileIndex(null);
+                setValidMoves([]);
+                setEndInfo(null);
+                setOpponent(null);
+                setJoinCode('');
+                setBoardZoom(1);
+                setBoardPosition({ x: 0, y: 0 });
+                localStorage.removeItem(LOCAL_STORAGE_ROOM);
+                localStorage.removeItem(LOCAL_STORAGE_PLAYER);
+            };
+
+            const showNotification = (msg, type = 'info') => {
+                setNotification({ message: msg, type });
+                setTimeout(() => setNotification(null), 3000);
+            };
+
+            // --- WebSocket Bağlantı ---
+            const attemptReconnect = () => {
+                if (reconnectAttemptCount >= MAX_RECONNECT_ATTEMPTS) {
+                    showNotification('Server bağlantısı qurula bilmədi. Zəhmət olmasa səhifəni yeniləyin.', 'error');
+                    setScreen('lobby');
+                    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+                    return;
+                }
+
+                const delay = Math.min(2000 * (reconnectAttemptCount + 1), 10000);
+                setReconnectAttemptCount(prev => prev + 1);
+                reconnectTimerRef.current = setTimeout(() => {
+                    connectToServer();
+                }, delay);
+            };
+
+            const connectToServer = () => {
+                if (wsRef.current) {
+                    const state = wsRef.current.readyState;
+                    if (state === WebSocket.OPEN || state === WebSocket.CONNECTING) return;
+                }
+
+                if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+
+                const ws = new WebSocket(WS_URL);
+                wsRef.current = ws;
+
+                ws.onopen = () => {
+                    setConnected(true);
+                    setReconnectAttemptCount(0);
+                    showNotification('Serverə qoşuldu ✅', 'success');
+
+                    const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
+                    const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
+
+                    if (storedRoomCode && storedPlayerId && screen !== 'lobby') {
+                        setTimeout(() => {
+                            sendMessage({
+                                type: 'reconnect',
+                                pokemonId: storedPlayerId, // Using correct ID field name
+                                telegramId: storedPlayerId,
+                                roomCode: storedRoomCode
+                            });
+                        }, 500);
+                    } else {
+                        localStorage.removeItem(LOCAL_STORAGE_ROOM);
+                        localStorage.removeItem(LOCAL_STORAGE_PLAYER);
                     }
-
-                    // Auth/Save to DB
-                    try {
-                        const r = await fetch(API_URL + '/api/auth/telegram', {
-                            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(u)
-                        });
-                        const d = await r.json();
-                        if (d.success) setMe(d.player); else setMe(u);
-                    } catch (e) { setMe(u); }
-
-                    connect(u.telegramId);
                 };
-                initUser();
+
+                ws.onclose = (event) => {
+                    setConnected(false);
+                    if (wsRef.current === ws) wsRef.current = null;
+
+                    const normalCloseCodes = [1000, 1001];
+                    const shouldReconnect = !normalCloseCodes.includes(event.code) && reconnectAttemptCount < MAX_RECONNECT_ATTEMPTS;
+
+                    if (shouldReconnect) {
+                        const delay = 3000 + (reconnectAttemptCount * 2000);
+                        showNotification(`Yenidən bağlanılır... (${reconnectAttemptCount + 1}/${MAX_RECONNECT_ATTEMPTS})`, 'warning');
+                        setReconnectAttemptCount(prev => prev + 1);
+                        if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+                        reconnectTimerRef.current = setTimeout(() => {
+                            connectToServer();
+                        }, delay);
+                    } else if (reconnectAttemptCount >= MAX_RECONNECT_ATTEMPTS) {
+                        showNotification('Bağlantı uğursuz. Səhifəni yeniləyin.', 'error');
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    console.error('WebSocket Error:', error);
+                };
+
+                ws.onmessage = (e) => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        handleServerMessage(data);
+                    } catch (err) { }
+                };
+            };
+
+            const sendMessage = (msg) => {
+                const ws = wsRef.current;
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    if (!ws || ws.readyState === WebSocket.CLOSED) connectToServer();
+                    showNotification('Bağlantı gözlənilir...', 'warning');
+                    return false;
+                }
+                try {
+                    ws.send(JSON.stringify(msg));
+                    return true;
+                } catch (error) {
+                    showNotification('Mesaj göndərilə bilmədi', 'error');
+                    return false;
+                }
+            };
+
+            const handleServerMessage = (data) => {
+                switch (data.type) {
+                    case 'roomCreated':
+                        setRoomCode(data.roomCode);
+                        showNotification('Otaq yaradıldı: ' + data.roomCode, 'success');
+                        break;
+
+                    case 'gameUpdate':
+                        if (data.gameState && data.gameState.board) {
+                            setGameState(prev => ({ ...prev, ...data.gameState }));
+                            setSelectedTileIndex(null);
+                            setValidMoves([]);
+                        }
+                        break;
+
+                    case 'error':
+                        showNotification(data.message || 'Xəta baş verdi', 'error');
+                        if (data.message && (data.message.includes('not found') || data.message.includes('tapılmadı'))) {
+                            localStorage.removeItem(LOCAL_STORAGE_ROOM);
+                            localStorage.removeItem(LOCAL_STORAGE_PLAYER);
+                            if (screen === 'loading') setTimeout(() => setScreen('lobby'), 500);
+                        }
+                        setSearching(false);
+                        if (screen === 'game' && data.fatal) {
+                            resetGameClientState();
+                            setScreen('lobby');
+                        }
+                        break;
+
+                    case 'gameEnd':
+                        setEndInfo({
+                            winnerName: data.winnerName,
+                            isWinner: data.isWinner,
+                            eloChange: data.eloChange,
+                            message: data.message
+                        });
+                        setScreen('end');
+                        setTimeout(() => {
+                            resetGameClientState();
+                            setScreen('lobby');
+                        }, 5000);
+                        break;
+
+                    case 'matchFound':
+                        showNotification(`Rəqib Tapıldı!`, 'success');
+                        setSearching(false);
+                        setOpponent(data.opponent || null);
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
+                        break;
+
+                    case 'reconnectSuccess':
+                    case 'gameStart':
+                        setGameState(data.gameState);
+                        setScreen('game');
+
+                        // Opponent info extracted from game state if needed
+                        const oppId = Object.keys(data.gameState.players).find(id => id !== data.gameState.playerId);
+                        if (oppId) setOpponent(data.gameState.players[oppId]);
+
+                        setSelectedTileIndex(null);
+                        setValidMoves([]);
+                        setSearching(false);
+
+                        if (data.gameState.roomCode && data.gameState.playerId) {
+                            localStorage.setItem(LOCAL_STORAGE_ROOM, data.gameState.roomCode);
+                            localStorage.setItem(LOCAL_STORAGE_PLAYER, data.gameState.playerId);
+                        }
+
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
+                        showNotification(data.type === 'reconnectSuccess' ? 'Oyuna Davam Edildi!' : 'Oyun Başladı!', 'success');
+                        break;
+
+                    case 'opponentDisconnected':
+                        showNotification('Rəqib bağlantısı kəsildi...', 'warning');
+                        break;
+
+                    case 'opponentReconnected':
+                        showNotification('Rəqib yenidən qoşuldu!', 'info');
+                        break;
+                }
+            };
+
+            useEffect(() => {
+                const startApp = async () => {
+                    await initializeTelegramAuth();
+                    connectToServer();
+                };
+                initialLoadTimeoutRef.current = setTimeout(() => {
+                    if (screen === 'loading') {
+                        setScreen('lobby');
+                    }
+                }, 10000);
+
+                connectionCheckRef.current = setInterval(() => {
+                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && screen === 'game') {
+                        sendMessage({ type: 'ping' });
+                    }
+                }, 30000);
+
+                startApp();
+
+                return () => {
+                    if (wsRef.current) wsRef.current.close();
+                    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+                    if (connectionCheckRef.current) clearInterval(connectionCheckRef.current);
+                    if (initialLoadTimeoutRef.current) clearTimeout(initialLoadTimeoutRef.current);
+                };
             }, []);
 
-            const connect = (tid) => {
-                const s = new WebSocket(WS_URL);
-                s.onopen = () => {
-                    setWs(s);
-                    s.send(JSON.stringify({ type: 'reconnect', telegramId: tid }));
-                    notify('Serverə qoşuldu 🟢', 'success');
-                };
-                s.onmessage = (e) => handleMsg(JSON.parse(e.data));
-                s.onclose = () => setTimeout(() => connect(tid), 3000);
-            };
-
-            const send = (type, data = {}) => {
-                if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type, telegramId: me.telegramId, ...data }));
-            };
-
-            const handleMsg = (d) => {
-                console.log('MSG:', d.type);
-                if (d.type === 'reconnectSuccess' || d.type === 'gameStart') {
-                    setGame(d.gameState);
-                    const opId = Object.keys(d.gameState.players).find(k => k !== me.telegramId);
-                    setOpp(d.gameState.players[opId]);
-                    setScreen('game');
-                    notify('Oyun Başladı! 🎮', 'success');
-                }
-                else if (d.type === 'matchFound') {
-                    setOpp(d.opponent);
-                    // Don't switch screen immediately, let the searching UI show the "Opponent Found" state
-                    // Use a timeout or a specific state wrapper? 
-                    // Let's us the 'searching' screen's logic to show opponent
-                }
-                else if (d.type === 'gameUpdate') {
-                    setGame(prev => ({ ...prev, ...d.gameState }));
-                    setSelTile(null);
-                }
-                else if (d.type === 'gameEnd') {
-                    setEndData(d);
-                    setScreen('result');
-                }
-                else if (d.type === 'roomCreated') setRoomCode(d.roomCode);
-                else if (d.type === 'opponentDisconnected') notify('Rəqib çıxdı! ⚠️', 'error');
-                else if (d.type === 'error') notify(d.message, 'error');
-            };
-
-            // --- GAME LOGIC ---
-            const getValid = (tile) => {
-                if (!game || !game.board.length) return ['start'];
-                const board = game.board;
-                const L = board[0].tile?.[0] ?? board[0][0]; // Handle object or array tile
-                const R = board[board.length - 1].tile?.[1] ?? board[board.length - 1][1];
-
-                // My server sends [[1,2], [2,3]]. But wait, I added logic to client before about directions.
-                // If server sends raw tiles: [[1,2], [2,3]]
-                // Left end of board is board[0][0]. Right is board[last][1].
-
-                // HOWEVER, snake logic needs to know the layout.
-                // The server should be source of truth for "ends".
-                // Simple version:
-                const realL = game.board[0][0];
-                const realR = game.board[game.board.length - 1][1];
-
-                const m = [];
-                if (tile[0] === realL || tile[1] === realL) m.push('left');
-                if (tile[0] === realR || tile[1] === realR) m.push('right');
-                return m;
-            };
-
-            const snakeLayout = useMemo(() => {
-                if (!game?.board) return [];
-                const b = game.board;
-                let x = 0, y = 0, dir = 'right';
-                const res = [];
-
-                // Tile dims
-                const W = 80, H = 40;
-
-                b.forEach((t, i) => {
-                    // Start at center
-                    res.push({ tile: t, x, y, dir });
-
-                    // Move cursor for next tile
-                    // Simple snake: 6 right, then down, then 6 left, ...
-                    // Check index to decide turn
-                    const rowLen = 6;
-
-                    // Logic from previous code (Step 34)
-                    // If we are moving right and hit limit -> turn down
-
-                    // Simplified: Just horizontal for now to ensure stability as per "hatasiz" request
-                    // If user REALLY wants snake, I can add it, but it often causes visual bugs if not perfect.
-                    // User said "Eski index arayuz olsun" which HAD snake.
-
-                    // Let's do a smart adaptive snake
-                    if (dir === 'right') {
-                        x += 60; // Overlap slightly
-                        if (i % 8 === 7) { dir = 'down'; }
-                    } else if (dir === 'down') {
-                        y += 60;
-                        dir = (Math.floor(i / 8) % 2 === 0) ? 'right' : 'left';
-                    } else if (dir === 'left') {
-                        x -= 60;
-                        if (i % 8 === 7) { dir = 'down'; }
+            const initializeTelegramAuth = async () => {
+                try {
+                    let user = { username: 'Guest', telegramId: 'guest_' + Date.now(), isGuest: true };
+                    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                        const tgu = tg.initDataUnsafe.user;
+                        user = {
+                            telegramId: tgu.id.toString(),
+                            username: tgu.username || tgu.first_name,
+                            firstName: tgu.first_name,
+                            photoUrl: tgu.photo_url,
+                            isGuest: false
+                        };
                     }
+
+                    const response = await fetch(`${API_URL}/api/auth/telegram`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(user)
+                    });
+                    const data = await response.json();
+
+                    if (data.success) {
+                        setPlayerData({ ...data.player, isGuest: user.isGuest, photoUrl: user.photoUrl });
+                    } else {
+                        setPlayerData(user);
+                    }
+                } catch (error) {
+                    setPlayerData({ isGuest: true, username: 'Qonaq' });
+                }
+                finally {
+                    setTimeout(() => setScreen('lobby'), 100);
+                }
+            };
+
+            const loadLeaderboard = async () => {
+                try {
+                    const response = await fetch(`${API_URL}/api/leaderboard`);
+                    const data = await response.json();
+                    if (data.success) {
+                        setLeaderboard(data.leaderboard);
+                    }
+                } catch (error) { }
+            };
+
+            // --- TOUCH/PINCH ZOOM HANDLERS ---
+            const handleTouchStart = useCallback((e) => {
+                if (e.target.closest('.valid-move-indicator')) return;
+
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                    setPinchStart({ distance: d });
+                } else if (e.touches.length === 1) {
+                    e.preventDefault();
+                    setIsDragging(true);
+                    setDragStart({ x: e.touches[0].clientX - boardPosition.x, y: e.touches[0].clientY - boardPosition.y });
+
+                    const currentTime = Date.now();
+                    if (currentTime - lastTouchTimeRef.current < 300) {
+                        setBoardZoom(1);
+                        setBoardPosition({ x: 0, y: 0 });
+                    }
+                    lastTouchTimeRef.current = currentTime;
+                }
+            }, [boardPosition]);
+
+            const handleTouchMove = useCallback((e) => {
+                if (e.touches.length === 2 && pinchStart.distance > 0) {
+                    e.preventDefault();
+                    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                    const scaleChange = d / pinchStart.distance;
+                    setBoardZoom(prev => Math.min(Math.max(prev * scaleChange, 0.5), 3));
+                    setPinchStart({ distance: d });
+                    if (showZoomHint) setShowZoomHint(false);
+                } else if (e.touches.length === 1 && isDragging) {
+                    e.preventDefault();
+                    setBoardPosition({ x: e.touches[0].clientX - dragStart.x, y: e.touches[0].clientY - dragStart.y });
+                }
+            }, [isDragging, dragStart, pinchStart, showZoomHint]);
+
+            const handleTouchEnd = useCallback((e) => {
+                setIsDragging(false);
+                setPinchStart({ distance: 0 });
+                if (zoomHintTimeoutRef.current) clearTimeout(zoomHintTimeoutRef.current);
+                zoomHintTimeoutRef.current = setTimeout(() => {
+                    if (screen === 'game' && boardZoom === 1) setShowZoomHint(true);
+                }, 5000);
+            }, [screen, boardZoom]);
+
+            const handleMouseDown = useCallback((e) => {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                setIsDragging(true);
+                setDragStart({ x: e.clientX - boardPosition.x, y: e.clientY - boardPosition.y });
+            }, [boardPosition]);
+
+            const handleMouseMove = useCallback((e) => {
+                if (isDragging) {
+                    e.preventDefault();
+                    setBoardPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+                }
+            }, [isDragging, dragStart]);
+
+            const handleMouseUp = useCallback(() => setIsDragging(false), []);
+
+            const handleWheel = useCallback((e) => {
+                e.preventDefault();
+                const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+                setBoardZoom(prev => Math.min(Math.max(prev * zoomFactor, 0.5), 3));
+                if (showZoomHint) setShowZoomHint(false);
+            }, [showZoomHint]);
+
+            useEffect(() => {
+                const el = boardContainerRef.current;
+                if (el) {
+                    el.addEventListener('touchstart', handleTouchStart, { passive: false });
+                    el.addEventListener('touchmove', handleTouchMove, { passive: false });
+                    el.addEventListener('touchend', handleTouchEnd);
+                    el.addEventListener('mousedown', handleMouseDown);
+                    el.addEventListener('mousemove', handleMouseMove);
+                    document.addEventListener('mouseup', handleMouseUp);
+                    el.addEventListener('wheel', handleWheel, { passive: false });
+                    return () => {
+                        el.removeEventListener('touchstart', handleTouchStart);
+                        el.removeEventListener('touchmove', handleTouchMove);
+                        el.removeEventListener('touchend', handleTouchEnd);
+                        el.removeEventListener('mousedown', handleMouseDown);
+                        el.removeEventListener('mousemove', handleMouseMove);
+                        document.removeEventListener('mouseup', handleMouseUp);
+                        el.removeEventListener('wheel', handleWheel);
+                    };
+                }
+            }, [handleTouchStart, handleTouchMove, handleTouchEnd, handleMouseDown, handleMouseMove, handleMouseUp, handleWheel]);
+
+            const myPlayerId = gameState?.playerId;
+            const isMyTurn = gameState?.currentPlayer === myPlayerId;
+            const myHand = gameState?.players?.[myPlayerId]?.hand || [];
+            const marketSize = gameState?.market?.length || 0;
+
+            const opponentHandCount = useMemo(() => {
+                if (!gameState || !gameState.players) return 0;
+                const opponentId = Object.keys(gameState.players).find(id => id !== myPlayerId);
+                return gameState.players[opponentId]?.handCount || gameState.players[opponentId]?.hand?.length || 0;
+            }, [gameState, myPlayerId]);
+
+            const renderBoardTiles = useMemo(() => {
+                if (!gameState?.board || gameState.board.length === 0) return [];
+                const tiles = [];
+                const TILE_WIDTH = 60;
+                let rightX = 0;
+
+                // Straight line rendering for simplicity and robustness
+                gameState.board.forEach((tile, i) => {
+                    tiles.push({ tile, position: { x: rightX, y: 0 }, rotation: 0 });
+                    rightX += TILE_WIDTH;
                 });
 
-                // Centering
-                const mid = res[Math.floor(res.length / 2)];
-                if (mid) {
-                    const ox = mid.x; const oy = mid.y;
-                    return res.map(r => ({ ...r, x: r.x - ox, y: r.y - oy }));
-                }
-                return res;
-            }, [game?.board]);
+                // Center
+                const offsetX = -(rightX - TILE_WIDTH) / 2;
+                return tiles.map(t => ({ ...t, position: { x: t.position.x + offsetX, y: t.position.y } }));
+            }, [gameState?.board]);
 
-            // --- TOUCH LOGIC ---
-            const handleTouch = (e) => {
-                const t = e.touches;
-                if (t.length === 1) {
-                    const cx = t[0].clientX, cy = t[0].clientY;
-                    if (touchRef.current.x) {
-                        const dx = cx - touchRef.current.x;
-                        const dy = cy - touchRef.current.y;
-                        setView(v => ({ ...v, x: v.x + dx, y: v.y + dy }));
-                    }
-                    touchRef.current.x = cx; touchRef.current.y = cy;
+            const calculateValidMoves = (tile) => {
+                if (!gameState || gameState.board.length === 0) return ['start'];
+                const board = gameState.board;
+                // Simple assumption: board is array of arrays [[1,2], [2,3]]
+                const leftEnd = board[0].tile?.[0] ?? board[0][0];
+                const rightEnd = board[board.length - 1].tile?.[1] ?? board[board.length - 1][1];
+
+                const moves = [];
+                if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
+                if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
+                return moves;
+            };
+
+            const handleTileClick = (index) => {
+                if (!isMyTurn) return showNotification('Növbəniz deyil!', 'warning');
+                const tile = myHand[index];
+                if (selectedTileIndex === index) {
+                    setSelectedTileIndex(null);
+                    setValidMoves([]);
+                    return;
                 }
-                if (t.length === 2) {
-                    const d = Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-                    if (touchRef.current.d) {
-                        const ratio = d / touchRef.current.d;
-                        setView(v => ({ ...v, scale: Math.max(0.4, Math.min(2.5, v.scale * ratio)) }));
-                    }
-                    touchRef.current.d = d;
+                const moves = calculateValidMoves(tile);
+                if (moves.length > 0) {
+                    setSelectedTileIndex(index);
+                    setValidMoves(moves);
+                    showNotification('Daş seçildi. Mövqe seçin', 'info');
+                } else {
+                    showNotification('Bu daşla oynaya bilməzsiniz', 'warning');
                 }
             };
-            const resetTouch = () => { touchRef.current = { x: 0, y: 0, d: 0 }; };
 
-            // --- SCREENS ---
+            const playTile = (position) => {
+                if (selectedTileIndex === null) return;
+                sendMessage({ type: 'playTile', tileIndex: selectedTileIndex, position });
+            };
 
-            // LOBBY (Old UI Style: Gradient + Floating)
-            if (screen === 'lobby') return (
-                <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center p-6 relative overflow-hidden text-white">
-                    {/* Particles */}
-                    <div className="absolute inset-0 z-0 opacity-30">
-                        {[...Array(15)].map((_, i) => <div key={i} className="absolute bg-white rounded-full animate-float" style={{
-                            top: Math.random() * 100 + '%', left: Math.random() * 100 + '%', width: Math.random() * 5 + 'px', height: Math.random() * 5 + 'px', animationDelay: Math.random() * 2 + 's'
-                        }} />)}
-                    </div>
+            const drawFromMarket = () => {
+                if (!isMyTurn) return showNotification('Növbəniz deyil!', 'warning');
+                if (marketSize === 0) return showNotification('Bazar boşdur!', 'warning');
+                if (gameState.board.length > 0 && myHand.some(tile => calculateValidMoves(tile).length > 0)) {
+                    showNotification('Elində oynaya biləcəyiniz daş var!', 'error');
+                    return;
+                }
+                sendMessage({ type: 'drawFromMarket' });
+            };
 
-                    <div className="z-10 w-full max-w-md bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 shadow-2xl">
-                        {/* Profile Section */}
-                        {me && (
-                            <div className="flex flex-col items-center mb-8">
-                                <div className="relative">
-                                    <img src={me.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 rounded-full border-4 border-yellow-400 shadow-lg" />
-                                    <div className="absolute bottom-0 right-0 bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-full">LVL {me.level}</div>
-                                </div>
-                                <h2 className="text-2xl font-bold mt-3">{me.username}</h2>
-                                <div className="text-blue-300 font-mono font-bold text-lg">{me.elo} ELO</div>
-                            </div>
-                        )}
+            const leaveGameClient = () => {
+                if (confirm('Oyundan çıxmaq istədiyinizə əminsiniz? ELO itirəcəksiniz.')) {
+                    sendMessage({ type: 'leaveGame' });
+                    resetGameClientState();
+                    setScreen('lobby');
+                }
+            };
 
-                        <button onClick={() => { send('findMatch', me); setScreen('searching'); }}
-                            className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:scale-105 transition-all py-4 rounded-xl font-black text-xl shadow-lg mb-4 flex items-center justify-center gap-2">
-                            <span>⚔️</span> OYUN AXTAR
-                        </button>
+            if (screen === 'loading') return <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center"><div className="loading-spinner"></div></div>;
 
-                        <div className="flex gap-3">
-                            <button onClick={async () => {
-                                const r = await fetch(API_URL + '/api/leaderboard');
-                                const d = await r.json();
-                                if (d.success) { setLeaderboard(d.leaderboard); setScreen('leaderboard'); }
-                            }} className="flex-1 bg-white/10 py-3 rounded-xl font-bold hover:bg-white/20">🏆 Liderlər</button>
-
-                            <button onClick={() => send('createRoom', me)} className="flex-1 bg-white/10 py-3 rounded-xl font-bold hover:bg-white/20">🏠 Otaq</button>
-                        </div>
-
-                        {roomCode && (
-                            <div className="mt-4 bg-green-500/20 p-4 rounded-xl text-center border border-green-500/40">
-                                <div className="text-sm text-green-300">OTAQ KODU</div>
-                                <div className="text-3xl font-mono font-bold">{roomCode}</div>
-                            </div>
-                        )}
-
-                        <div className="mt-4 relative">
-                            <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="KOD DAXİL ET" className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-center font-mono placeholder:text-gray-500 outline-none focus:border-yellow-400" />
-                            {joinCode.length === 4 && <button onClick={() => send('joinRoom', { roomCode: joinCode, ...me })} className="absolute right-2 top-2 bottom-2 bg-yellow-500 px-4 rounded-lg font-bold text-black">Gir</button>}
-                        </div>
-                    </div>
-                </div>
-            );
-
-            // SEARCHING
-            if (screen === 'searching') return (
-                <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white relative p-6">
-                    {opp ? (
-                        <div className="text-center z-10 animate-pulse">
-                            <div className="relative inline-block mb-6">
-                                <img src={opp.photoUrl} className="w-32 h-32 rounded-full border-4 border-green-500 object-cover shadow-[0_0_30px_rgba(34,197,94,0.6)]" />
-                                <div className="absolute -bottom-2 -right-2 text-4xl">⚔️</div>
-                            </div>
-                            <h2 className="text-3xl font-bold text-green-400 mb-2">RƏQİB TAPILDI!</h2>
-                            <p className="text-xl font-bold text-white mb-8">{opp.username}</p>
-                            <div className="text-gray-400">Oyun yüklənir...</div>
-                        </div>
-                    ) : (
-                        <div className="text-center z-10">
-                            <div className="w-24 h-24 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin mx-auto mb-8"></div>
-                            <h2 className="text-2xl font-bold mb-4">Rəqib Axtarılır...</h2>
-                            <div className="text-amber-400 font-mono mb-8 text-xl">ELO {me?.elo}</div>
-                            <button onClick={() => { send('cancelSearch'); setScreen('lobby'); }} className="px-8 py-3 bg-red-600/20 text-red-400 rounded-full font-bold border border-red-600/50 hover:bg-red-600 hover:text-white transition-all">Ləğv Et</button>
-                        </div>
-                    )}
-                </div>
-            );
-
-            // GAME
-            if (screen === 'game' && game) {
-                const isMyTurn = game.currentPlayer === me.telegramId;
-                const myHand = game.players[me.telegramId].hand;
-
+            if (screen === 'searching') {
                 return (
-                    <div className="fixed inset-0 bg-[#0f172a] overflow-hidden flex flex-col">
-                        {notif && <Notif msg={notif.msg} type={notif.type} />}
-
-                        {/* Top Bar */}
-                        <div className="h-16 bg-slate-800/80 backdrop-blur flex items-center justify-between px-4 z-20 border-b border-white/5 shadow-lg">
-                            <div className="flex items-center gap-3">
-                                <img src={opp?.photoUrl} className="w-10 h-10 rounded-full border-2 border-red-400" />
+                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6">
+                        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20 text-center w-full max-w-md">
+                            {opponent ? (
+                                <div className="animate-pulse">
+                                    <h2 className="text-3xl font-bold text-green-400 mb-2">RƏQİB TAPILDI!</h2>
+                                    <img src={opponent.photoUrl} className="w-24 h-24 rounded-full mx-auto my-4 border-4 border-green-500" />
+                                    <div className="text-white text-xl font-bold">{opponent.username}</div>
+                                </div>
+                            ) : (
                                 <div>
-                                    <div className="text-white font-bold text-sm">{opp?.username || 'Rəqib'}</div>
-                                    <div className="text-xs text-slate-400">🔥 {opp?.score || 0} xal</div>
+                                    <div className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 animate-spin flex items-center justify-center"><span className="text-4xl">🎯</span></div>
+                                    <h3 className="text-white text-2xl font-bold mb-4">Axtarılır...</h3>
+                                    <button onClick={() => { setSearching(false); setScreen('lobby'); sendMessage({ type: 'cancelSearch' }); }} className="bg-red-600 text-white font-bold py-3 px-8 rounded-xl">Ləğv Et</button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            if (screen === 'lobby') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-green-900 via-emerald-800 to-teal-900 flex flex-col items-center justify-center p-4">
+                        {notification && <Toast message={notification.message} type={notification.type} />}
+                        <div className="text-center mb-8">
+                            <h1 className="text-4xl font-black text-white drop-shadow-lg mb-2">🎯 DOMINO <span className="text-yellow-400">101</span> 🏆</h1>
+                        </div>
+                        <div className="w-full max-w-md bg-black/40 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
+                            {playerData && (
+                                <div className="mb-6 text-center flex flex-col items-center">
+                                    {playerData.photoUrl && <img src={playerData.photoUrl} className="w-20 h-20 rounded-full border-4 border-yellow-400 mb-4 shadow-lg" />}
+                                    <h2 className="text-white text-2xl font-bold mb-2">{playerData.username}</h2>
+                                    {!playerData.isGuest && <div className="text-blue-300 font-bold">{playerData.elo} ELO</div>}
+                                </div>
+                            )}
+                            <button onClick={() => {
+                                setScreen('searching'); setSearching(true);
+                                sendMessage({ type: 'findMatch', telegramId: playerData.telegramId, username: playerData.username });
+                            }} className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 text-white font-bold py-4 rounded-xl shadow-lg mb-4 flex items-center justify-center gap-2">
+                                ⚔️ OYUN AXTAR
+                            </button>
+                            <div className="grid grid-cols-2 gap-3 mb-4">
+                                <button onClick={() => sendMessage({ type: 'createRoom', telegramId: playerData.telegramId, username: playerData.username })} className="bg-white/10 text-white py-3 rounded-xl font-bold">🏠 OTAQ YARAT</button>
+                                <div className="relative">
+                                    <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="KOD" className="w-full h-full bg-black/30 border border-white/10 rounded-xl px-2 text-center text-white" />
+                                    <button onClick={() => sendMessage({ type: 'joinRoom', roomCode: joinCode, telegramId: playerData.telegramId, username: playerData.username })} className="absolute right-1 top-1 bottom-1 bg-yellow-500 text-white px-3 rounded-lg">➔</button>
                                 </div>
                             </div>
-                            <div className={`px-4 py-1.5 rounded-full text-xs font-bold tracking-wider ${isMyTurn ? 'bg-yellow-500 text-black animate-pulse' : 'bg-slate-700 text-slate-300'}`}>
-                                {isMyTurn ? 'SƏNİN SIRAN' : 'RƏQİBİ GÖZLƏ'}
+                            {roomCode && <div className="mt-4 p-4 bg-green-500/20 rounded-xl text-center"><div className="text-3xl font-mono text-white font-bold">{roomCode}</div><div className="text-xs text-gray-300">Dostunuz gözlənilir...</div></div>}
+                            <div className="flex justify-center"><button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold">🏆 Skor Tablosu</button></div>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (screen === 'leaderboard') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center p-4">
+                        <h1 className="text-3xl text-white font-bold mb-6">🏆 Liderlər</h1>
+                        <button onClick={() => setScreen('lobby')} className="mb-4 text-white bg-slate-700 px-4 py-2 rounded">Geri</button>
+                        <div className="w-full max-w-lg space-y-2">
+                            {leaderboard.map((p, i) => (
+                                <div key={i} className="bg-black/40 p-3 rounded flex items-center gap-4 text-white">
+                                    <div className="font-bold text-yellow-400">#{i + 1}</div>
+                                    <img src={p.photoUrl} className="w-8 h-8 rounded-full" />
+                                    <div className="flex-1">{p.username}</div>
+                                    <div className="font-mono text-blue-300">{p.elo}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            }
+
+            if (screen === 'game' && gameState) {
+                return (
+                    <div className="fixed inset-0 flex flex-col h-full w-full bg-table-base">
+                        {notification && <Toast message={notification.message} type={notification.type} />}
+                        <div className="h-16 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between px-4 z-20">
+                            <div className="flex items-center gap-3">
+                                {opponent && <img src={opponent.photoUrl} className="w-10 h-10 rounded-full border-2 border-yellow-400" />}
+                                <div><div className="text-white text-sm font-bold">{opponent?.username || 'Rəqib'}</div></div>
+                            </div>
+                            <div className={`px-4 py-1.5 rounded-full text-xs font-bold ${isMyTurn ? 'bg-yellow-500 text-black animate-pulse' : 'bg-black/40 text-gray-400'}`}>
+                                {isMyTurn ? 'SİZİN NÖVBƏNİZ' : 'Rəqib Oynayır...'}
                             </div>
                         </div>
 
-                        {/* Board */}
-                        <div className="flex-1 relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/dark-leather.png')]"
-                            onTouchStart={handleTouch} onTouchMove={handleTouch} onTouchEnd={resetTouch}>
-
-                            <div className="absolute top-1/2 left-1/2 transition-transform duration-75 ease-out origin-center"
-                                style={{ transform: `translate(-50%, -50%) translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}>
-
-                                <div className="relative">
-                                    {snakeLayout.map((t, i) => (
-                                        <div key={i} style={{ position: 'absolute', left: t.x, top: t.y, transform: 'translate(-50%, -50%)' }}>
-                                            <DominoTile val={t.tile} isBoard={true} dir={t.dir} scale={0.8} />
+                        <div className="flex-1 relative overflow-hidden w-full">
+                            <div ref={boardContainerRef} className="domino-board-container">
+                                {showZoomHint && boardZoom === 1 && <div className="zoom-hint">👆 İki barmaqla böyüt / kiçilt</div>}
+                                <div ref={boardInnerRef} className="domino-board-inner" style={{ transform: `translate(${boardPosition.x}px, ${boardPosition.y}px) scale(${boardZoom})` }}>
+                                    {renderBoardTiles.map(({ tile, position }, i) => (
+                                        <div key={i} className="board-tile" style={{ left: position.x, top: position.y, transform: 'translate(-50%, -50%)' }}>
+                                            <DominoTile values={tile} disabled={true} isBoardTile={true} />
                                         </div>
                                     ))}
-
-                                    {/* Valid Move Indicators for Snake Endpoints */}
-                                    {selTile !== null && getValid(myHand[selTile]).map((pos) => {
-                                        // Find exact coordinates for indicators based on snakeLayout
-                                        // We know 'left' connects to board[0] and 'right' to board[last]
-
-                                        // Simplified visual placement logic for stability
-                                        // If snake layout is empty, place center.
-                                        // If not, place near ends.
-
-                                        if (snakeLayout.length === 0) return <div key={pos} className="valid-ring" style={{ left: 0, top: 0 }} onClick={() => send('playTile', { tileIndex: selTile, position: pos })} />;
-
-                                        const target = pos === 'left' ? snakeLayout[0] : snakeLayout[snakeLayout.length - 1];
-                                        // Offset calculation based on direction could be added here
-                                        // For now place directly ON the last tile for user to click
-                                        return (
-                                            <div key={pos} className="valid-ring" style={{ left: target.x, top: target.y }}
-                                                onClick={() => send('playTile', { tileIndex: selTile, position: pos })} />
-                                        );
-                                    })}
+                                    {validMoves.includes('left') && <div className="valid-move-indicator" style={{ position: 'absolute', left: renderBoardTiles[0]?.position.x - 30, top: renderBoardTiles[0]?.position.y, width: 60, height: 32, transform: 'translate(-50%, -50%)' }} onClick={() => playTile('left')}><div className="text-yellow-400 text-xs font-bold">SOL</div></div>}
+                                    {validMoves.includes('right') && <div className="valid-move-indicator" style={{ position: 'absolute', left: renderBoardTiles[renderBoardTiles.length - 1]?.position.x + 30, top: renderBoardTiles[renderBoardTiles.length - 1]?.position.y, width: 60, height: 32, transform: 'translate(-50%, -50%)' }} onClick={() => playTile('right')}><div className="text-yellow-400 text-xs font-bold">SAĞ</div></div>}
+                                    {validMoves.includes('start') && <div className="valid-move-indicator" style={{ position: 'absolute', left: '50%', top: '50%', width: 65, height: 35, transform: 'translate(-50%, -50%)' }} onClick={() => playTile('start')}><div className="text-yellow-400 font-bold text-sm">BAŞLA</div></div>}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Hand & Controls */}
-                        <div className="bg-slate-900/95 backdrop-blur-xl pb-8 pt-4 z-30 rounded-t-3xl border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-                            <div className="flex justify-center gap-2 mb-4 px-4 overflow-x-auto hide-scrollbar min-h-[90px] items-end">
-                                {myHand.map((tile, i) => (
-                                    <DominoTile key={i} val={tile} selected={selTile === i}
-                                        onClick={() => { if (isMyTurn) setSelTile(sep => sep === i ? null : i) }}
-                                    />
-                                ))}
+                        <div className="bg-gradient-to-t from-black/90 via-table-dark to-transparent pb-3 pt-2 z-20">
+                            <div className="flex justify-between items-center px-4 mb-2">
+                                <span className="text-white text-xs font-bold opacity-70">🎴 ƏLİNİZ ({myHand.length})</span>
+                                <button onClick={leaveGameClient} className="bg-red-600/80 hover:bg-red-600 text-white text-xs px-4 py-2 rounded-full font-bold">🚪 Çıx</button>
                             </div>
-
-                            <div className="flex justify-between items-center px-6">
-                                <button onClick={() => send('leaveGame')} className="text-red-400 text-xs font-bold bg-red-900/20 px-4 py-2 rounded-lg hover:bg-red-900/40">
-                                    ❌ ÇIXIŞ
-                                </button>
-
-                                {game.market.length > 0 && (
-                                    <button onClick={() => send('drawFromMarket')}
-                                        disabled={!isMyTurn}
-                                        className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-2 rounded-full shadow-lg shadow-blue-600/30 disabled:opacity-50 disabled:shadow-none transition-all active:scale-95">
-                                        BAZAR ({game.market.length})
-                                    </button>
-                                )}
+                            <div className="hand-tiles-container hide-scrollbar">
+                                {myHand.map((tile, index) => (
+                                    <div key={index} className="hand-tile-wrapper">
+                                        <DominoTile values={tile} onClick={() => handleTileClick(index)} disabled={!isMyTurn} isSelected={selectedTileIndex === index} />
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
                 );
             }
 
-            // RESULT
-            if (screen === 'result' && endData) return (
-                <div className="min-h-screen bg-black/95 flex flex-col items-center justify-center text-white p-6 text-center">
-                    <div className="mb-6 transform scale-150">{endData.isWinner ? '🏆' : '💀'}</div>
-                    <h1 className={`text-5xl font-black mb-4 ${endData.isWinner ? 'text-yellow-400' : 'text-gray-400'}`}>
-                        {endData.isWinner ? 'QAZANDIN!' : 'MƏĞLUB OLDUN'}
-                    </h1>
-                    <p className="text-xl text-gray-300 mb-8">{endData.message}</p>
-
-                    <div className="bg-white/10 p-6 rounded-2xl mb-8 min-w-[200px]">
-                        <div className="text-sm text-gray-400 mb-1">Yeni ELO</div>
-                        <div className="text-4xl font-mono font-bold">{me.elo + endData.eloChange}</div>
-                        <div className={`text-sm font-bold ${endData.eloChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {endData.eloChange > 0 ? '+' : ''}{endData.eloChange}
+            if (screen === 'end' && endInfo) {
+                return (
+                    <div className="min-h-screen bg-black/95 flex items-center justify-center p-6 text-center">
+                        <div>
+                            <h1 className={`text-4xl font-bold mb-4 ${endInfo.isWinner ? 'text-green-400' : 'text-red-400'}`}>{endInfo.isWinner ? 'QAZANDINIZ!' : 'UDUZDUNUZ'}</h1>
+                            <p className="text-white mb-6">{endInfo.message}</p>
+                            <div className="text-3xl font-bold text-white mb-8">{endInfo.eloChange > 0 ? '+' : ''}{endInfo.eloChange} ELO</div>
+                            <button onClick={() => { resetGameClientState(); setScreen('lobby'); }} className="bg-white text-black px-8 py-3 rounded-full font-bold">Ana Menyu</button>
                         </div>
                     </div>
-
-                    <button onClick={() => { setScreen('lobby'); setGame(null); }} className="bg-white text-black px-10 py-4 rounded-full font-bold text-lg hover:scale-105 transition-transform">
-                        ANA MENYU
-                    </button>
-                </div>
-            );
-
-            // LEADERBOARD
-            if (screen === 'leaderboard') return (
-                <div className="min-h-screen bg-slate-900 text-white p-6">
-                    <div className="flex items-center gap-4 mb-6">
-                        <button onClick={() => setScreen('lobby')} className="p-2 bg-white/10 rounded-lg">⬅️</button>
-                        <h1 className="text-2xl font-bold">Liderlər</h1>
-                    </div>
-                    <div className="space-y-3">
-                        {leaderboard.map((u, i) => (
-                            <div key={i} className={`flex items-center gap-4 p-4 rounded-xl border border-white/5 ${i === 0 ? 'bg-yellow-500/20 border-yellow-500/50' : 'bg-white/5'}`}>
-                                <div className={`font-black w-8 text-center ${i === 0 ? 'text-yellow-400' : 'text-gray-500'}`}>#{i + 1}</div>
-                                <img src={u.photoUrl || 'https://via.placeholder.com/40'} className="w-10 h-10 rounded-full" />
-                                <div className="flex-1 font-bold">{u.username}</div>
-                                <div className="font-mono text-yellow-500">{u.elo}</div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )
-
+                );
+            }
             return null;
         };
 
+        const setAppHeight = () => document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+        window.addEventListener('resize', setAppHeight);
+        setAppHeight();
+
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        root.render(<DominoGame />);
     </script>
 </body>
 
