@@ -35,7 +35,8 @@ const playerSchema = new mongoose.Schema({
     winStreak: { type: Number, default: 0 },
     bestWinStreak: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now },
-    lastPlayed: { type: Date, default: Date.now }
+    lastPlayed: { type: Date, default: Date.now },
+    isHidden: { type: Boolean, default: false } // Admin hide flag
 });
 
 const matchSchema = new mongoose.Schema({
@@ -158,7 +159,7 @@ app.post('/api/auth/telegram', async (req, res) => {
 
 app.get('/api/leaderboard', async (req, res) => {
     try {
-        const players = await Player.find()
+        const players = await Player.find({ isHidden: { $ne: true } }) // Gizli olmayanları getir
             .sort({ elo: -1 })
             .limit(10) // Top 10
             .select('telegramId username firstName lastName photoUrl elo level wins losses draws totalGames winStreak');
@@ -166,6 +167,76 @@ app.get('/api/leaderboard', async (req, res) => {
         res.json({ success: true, leaderboard: players });
     } catch (error) {
         console.error('Leaderboard error:', error);
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+// --- ADMIN API ---
+// Middleware to check admin Telegram ID
+const ADMIN_ID = '1840079939';
+
+const checkAdmin = async (req, res, next) => {
+    const { adminId } = req.body;
+    if (adminId !== ADMIN_ID) {
+        return res.status(403).json({ error: 'Yetkisiz işlem' });
+    }
+    next();
+};
+
+app.post('/api/admin/reset-elo', checkAdmin, async (req, res) => {
+    try {
+        const { targetUserId } = req.body;
+        // targetUserId could be mongo ID or telegram ID
+        let player = await Player.findOne({ _id: targetUserId });
+        if (!player) player = await Player.findOne({ telegramId: targetUserId });
+
+        if (!player) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+
+        player.elo = 0;
+        player.level = 1;
+        player.wins = 0;
+        player.losses = 0;
+        player.draws = 0;
+        player.totalGames = 0;
+        await player.save();
+
+        res.json({ success: true, message: `${player.username} ELO sıfırlandı.` });
+        console.log(`🔧 Admin: ${player.username} ELO sıfırlandı.`);
+    } catch (error) {
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+app.post('/api/admin/reset-all-elo', checkAdmin, async (req, res) => {
+    try {
+        await Player.updateMany({}, {
+            elo: 0,
+            level: 1,
+            wins: 0,
+            losses: 0,
+            draws: 0,
+            totalGames: 0
+        });
+        res.json({ success: true, message: 'Tüm oyuncuların ELO puanları sıfırlandı.' });
+        console.log('🔧 Admin: Tüm ELOlar sıfırlandı.');
+    } catch (error) {
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+app.post('/api/admin/hide-user', checkAdmin, async (req, res) => {
+    try {
+        const { targetUserId, hide } = req.body;
+        let player = await Player.findOne({ _id: targetUserId });
+        if (!player) player = await Player.findOne({ telegramId: targetUserId });
+
+        if (!player) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+
+        player.isHidden = hide; // Schema update needed
+        await player.save();
+
+        res.json({ success: true, message: `${player.username} ${hide ? 'gizlendi' : 'gösteriliyor'}.` });
+    } catch (error) {
         res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
