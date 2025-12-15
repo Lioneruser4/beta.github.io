@@ -478,14 +478,21 @@ wss.on('close', () => clearInterval(pingInterval));
 
 async function handleFindMatch(ws, data) {
     const telegramId = data.telegramId;
+    const storedPlayerId = data.playerId; // Client provided stored ID
 
     // 1. Önce aktif bir oyunu var mı kontrol et (Memory & DB)
-    if (telegramId) {
+    if (telegramId || storedPlayerId) {
         // Memory check
         for (const [code, room] of rooms.entries()) {
-            const playerEntry = Object.entries(room.players).find(([pid, p]) => p.telegramId === telegramId);
+            let playerEntry = null;
+            if (telegramId) {
+                playerEntry = Object.entries(room.players).find(([pid, p]) => p.telegramId === telegramId);
+            } else if (storedPlayerId && room.players[storedPlayerId]) {
+                playerEntry = [storedPlayerId, room.players[storedPlayerId]];
+            }
+
             if (playerEntry) {
-                console.log(`♻️ Oyuncu ${data.username} tekrar bağlanıyor (Memory): ${code}`);
+                console.log(`♻️ Oyuncu ${data.username || 'Guest'} tekrar bağlanıyor (Memory): ${code}`);
                 reconnectPlayer(ws, code, playerEntry[0], room);
                 return;
             }
@@ -493,7 +500,15 @@ async function handleFindMatch(ws, data) {
 
         // DB check (Server restart sonrası için)
         try {
-            const activeGame = await ActiveGame.findOne({ telegramIds: telegramId });
+            let activeGame = null;
+            if (telegramId) {
+                activeGame = await ActiveGame.findOne({ telegramIds: telegramId });
+            } else if (storedPlayerId) {
+                const query = {};
+                query[`players.${storedPlayerId}`] = { $exists: true };
+                activeGame = await ActiveGame.findOne(query);
+            }
+
             if (activeGame) {
                 console.log(`♻️ Oyuncu ${data.username} tekrar bağlanıyor (DB): ${activeGame.roomCode}`);
 
@@ -537,10 +552,13 @@ async function handleFindMatch(ws, data) {
                 }
 
                 const room = rooms.get(activeGame.roomCode);
-                const playerId = Object.keys(room.players).find(pid => room.players[pid].telegramId === telegramId);
+                const foundPlayerId = Object.keys(room.players).find(pid =>
+                    (telegramId && room.players[pid].telegramId === telegramId) ||
+                    (storedPlayerId && pid === storedPlayerId)
+                );
 
-                if (playerId) {
-                    reconnectPlayer(ws, activeGame.roomCode, playerId, room);
+                if (foundPlayerId) {
+                    reconnectPlayer(ws, activeGame.roomCode, foundPlayerId, room);
                     return;
                 }
             }
@@ -559,7 +577,7 @@ async function handleFindMatch(ws, data) {
         }
     }
 
-    const playerId = ws.playerId || generateRoomCode();
+    const playerId = ws.playerId || storedPlayerId || generateRoomCode();
     ws.playerId = playerId;
     ws.playerName = data.playerName || data.username || 'Guest';
     ws.telegramId = data.telegramId || null; // null ise guest
@@ -1087,23 +1105,17 @@ function handleDisconnect(ws) {
 
     if (ws.roomCode) {
         console.log(`🏠 Odadan ayrıldı (Kopma): ${ws.roomCode}`);
-        broadcastToRoom(ws.roomCode, { type: 'playerDisconnected', message: 'Rakip bağlantısı koptu, bekleniyor...', timeoutSeconds: 20 });
+        broadcastToRoom(ws.roomCode, { type: 'playerDisconnected', message: 'Rakip bağlantısı koptu. Tekrar bağlanması bekleniyor...' });
 
-        // Timeout başlat: 20 saniye içinde gelmezse oyunu bitir
-        const timeoutId = setTimeout(() => {
-            const room = rooms.get(ws.roomCode);
-            if (room) {
-                const winnerId = Object.keys(room.gameState.players).find(pid => pid !== ws.playerId); // Corrected to room.gameState.players
-                if (winnerId) {
-                    console.log(`⏱️ Timeout doldu, kazanan: ${winnerId}`);
-                    broadcastToRoom(ws.roomCode, { type: 'opponentTimeout', message: 'Rakip süre dolduğu için oyunu kaybetti.' });
-                    handleGameEnd(ws.roomCode, winnerId, room.gameState);
-                }
-            }
-            activeDisconnects.delete(ws.roomCode);
-        }, 20000);
+        // Timeout kaldırıldı - Oyun DB'de kayıtlı kalmalı.
+        // Bağlantı kopsa bile ActiveGame silinmiyor.
+        // Oyuncu geri geldiğinde ActiveGame'den geri yüklenecek.
 
-        activeDisconnects.set(ws.roomCode, timeoutId);
+        // Sadece server memory'den temizlemeyelim, çünkü oyun "duraklatıldı" modunda memory'de kalabilir 
+        // veya memory'den silip DB'den restore edebiliriz.
+        // Memory'den silersek, diğer oyuncu ne yapacak?
+        // Diğer oyuncu hala bağlı. O zaman odayı silmemeliyiz.
+        // Sadece ws bağlantısını kopuk işaretleyelim.
     }
 }
 
