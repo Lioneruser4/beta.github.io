@@ -220,7 +220,7 @@
                     <div className="text-center animate-slide-in" style={{ animationDelay: '0.2s' }}>
                         <div className="relative mb-4">
                             <img src={myPlayer?.photoUrl || 'https://via.placeholder.com/150'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.5)]" />
-                            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-blue-600 px-3 py-1 rounded-full text-xs font-bold text-white">SIZ</div>
+                            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-blue-600 px-3 py-1 rounded-full text-xs font-bold text-white">SİZ / YOU</div>
                         </div>
                         <h2 className="text-2xl font-bold text-white mb-1">{myPlayer?.username}</h2>
                         <div className="text-blue-400 font-mono font-bold">{myPlayer?.elo} ELO</div>
@@ -233,7 +233,7 @@
                     <div className="text-center animate-slide-in" style={{ animationDelay: '0.4s' }}>
                         <div className="relative mb-4">
                             <img src={opponent?.photoUrl || 'https://via.placeholder.com/150'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.5)]" />
-                            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-red-600 px-3 py-1 rounded-full text-xs font-bold text-white">RAKİP</div>
+                            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-red-600 px-3 py-1 rounded-full text-xs font-bold text-white">RƏQİB / ENEMY</div>
                         </div>
                         <h2 className="text-2xl font-bold text-white mb-1">{opponent?.name || opponent?.username || 'Bilinmeyen'}</h2>
                         <div className="text-red-400 font-mono font-bold">{opponent?.elo || '???'} ELO</div>
@@ -241,26 +241,27 @@
                 </div>
 
                 <div className="absolute bottom-10 text-white/50 animate-pulse text-sm">
-                    Maç Başlıyor...
+                    Oyun Başlayır / Match Starting...
                 </div>
             </div>
         );
 
         // 0.2 Game End Screen (Win/Loss Lobby)
+        // 0.2 Game End Screen (Win/Loss Lobby)
         const EndScreen = ({ info, myPlayer, onExit }) => {
             const isDraw = info.winnerName === 'Beraberlik' || info.winner === 'DRAW';
             const isWin = info.isWinner;
 
-            let title = 'KAYBETTİN / DEFEAT';
+            let title = 'MƏĞLUB OLDUN / DEFEAT';
             let titleColor = 'text-red-500';
             let icon = '💀';
 
             if (isDraw) {
-                title = 'BERABERLİK / DRAW';
+                title = 'BƏRABƏRLİK / DRAW';
                 titleColor = 'text-gray-400';
                 icon = '🤝';
             } else if (isWin) {
-                title = 'KAZANDIN / VICTORY';
+                title = 'QALİB OLDUN / VICTORY';
                 titleColor = 'text-green-400';
                 icon = '🏆';
             }
@@ -275,7 +276,7 @@
                             {title}
                         </h1>
                         <p className="text-white/80 text-xl font-light mb-8 italic">
-                            {isDraw ? 'Dostluk Kazandı / Friendship Wins' : isWin ? 'Əla Oyun! / Great Game!' : 'Gələn səfər... / Next time...'}
+                            {isDraw ? 'Dostluq Qazandı / Friendship Wins' : isWin ? 'Əla Oyun! / Great Game!' : 'Gələn səfər... / Next time...'}
                         </p>
 
                         <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20 max-w-md mx-auto mb-8">
@@ -293,7 +294,7 @@
                             )}
                         </div>
 
-                        <div className="text-sm text-gray-500 animate-pulse">Lobiye dönülüyor... / Returning to lobby...</div>
+                        <div className="text-sm text-gray-500 animate-pulse">Lobiyə qayıdılır... / Returning to lobby...</div>
                     </div>
                 </div>
             );
@@ -1177,11 +1178,11 @@
                                 <div className="flex justify-between items-center px-4 mb-2">
                                     <div className="flex items-center gap-3">
                                         <span className="text-white text-xs font-bold tracking-widest opacity-70">
-                                            🎴 ELİNİZ ({myHand.length})
+                                            🎴 ƏLİNİZ / YOUR HAND ({myHand.length})
                                         </span>
                                         {marketSize > 0 && (
                                             <span className="text-yellow-400 text-xs font-bold bg-black/40 px-2 py-1 rounded-full">
-                                                🎲 PAZAR: {marketSize}
+                                                🎲 BAZAR / BAZAAR: {marketSize}
                                             </span>
                                         )}
                                     </div>
@@ -1191,7 +1192,7 @@
                                                 onClick={drawFromMarket}
                                                 className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
                                             >
-                                                🎲 ÇEK
+                                                🎲 ÇƏK / DRAW
                                             </button>
                                         )}
                                         {isMyTurn && !canDrawFromMarket && validMoves.length === 0 && selectedTileIndex === null && (
@@ -1199,14 +1200,14 @@
                                                 onClick={passTurn}
                                                 className="bg-gray-500/80 hover:bg-gray-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
                                             >
-                                                ⏭️ PAS
+                                                ⏭️ PAS / PASS
                                             </button>
                                         )}
                                         <button
                                             onClick={leaveGameClient}
                                             className="bg-red-600/80 hover:bg-red-600 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95"
                                         >
-                                            🚪 Çık
+                                            🚪 ÇIX / EXIT
                                         </button>
                                     </div>
                                 </div>
