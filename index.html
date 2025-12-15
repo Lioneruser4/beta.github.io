@@ -444,13 +444,13 @@
                         // Normal tarayıcı ve Guest testleri için HER SEFERİNDE YENİ ID
                         // Bu, aynı tarayıcıda iki sekme açıp kendi kendinize oynamanızı sağlar.
                         const forcedId = 'guest_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+                        // localStorage.removeItem('domino_guest_user'); // Eskiyi temizle
+                        console.log('👥 Guest session created with playerId:', forcedId);
                         const guestData = {
                             isGuest: true,
                             username: 'Misafir ' + Math.floor(Math.random() * 999),
-                            firstName: '',
-                            lastName: '',
                             photoUrl: null,
-                            level: 0,
+                            level: 1,
                             elo: 0,
                             telegramId: null,
                             playerId: forcedId
@@ -459,19 +459,19 @@
                         console.log('👥 Guest session created:', guestData);
 
                         setPlayerData(guestData);
-                        console.log('👥 Guest mode:', guestData);
                     }
                 } catch (error) {
                     console.error('Auth error:', error);
+                    // Hata durumunda da misafir oturumu oluşturulabilir.
+                    const forcedId = 'guest_error_' + Date.now();
                     setPlayerData({
                         isGuest: true,
                         username: 'Guest' + Math.floor(Math.random() * 9999),
-                        firstName: '',
-                        lastName: '',
                         photoUrl: null,
-                        level: 0,
+                        level: 1,
                         elo: 0,
-                        telegramId: null
+                        telegramId: null,
+                        playerId: forcedId
                     });
                 } finally {
                     setScreen('lobby');
