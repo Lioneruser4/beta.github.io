@@ -5,196 +5,217 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Domino 101 Pro</title>
+
+    <!-- Telegram & React -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Outfit', 'sans-serif'] },
+                    colors: {
+                        table: { dark: '#0f172a', surface: '#1e293b' },
+                        gold: { 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706' }
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-glow': 'pulse-glow 2s infinite',
+                        'spin-slow': 'spin 3s linear infinite',
+                    },
+                    keyframes: {
+                        float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-20px)' } },
+                        'pulse-glow': { '0%, 100%': { boxShadow: '0 0 10px rgba(251, 191, 36, 0.5)' }, '50%': { boxShadow: '0 0 25px rgba(251, 191, 36, 0.8)' } }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
         body {
             background: #0f172a;
-            font-family: 'Roboto', sans-serif;
             overflow: hidden;
-            touch-action: none;
+            user-select: none;
             -webkit-tap-highlight-color: transparent;
         }
 
-        .bg-table {
-            background: radial-gradient(circle at center, #1b4d3e 0%, #061812 100%);
-        }
-
-        .tile-shadow {
-            box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.5);
-        }
-
         .pip {
+            background-color: #111;
+            border-radius: 50%;
             width: 5px;
             height: 5px;
-            background: #111;
-            border-radius: 50%;
+            margin: auto;
         }
 
-        .animate-pop {
-            animation: pop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        .pip-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            padding: 2px;
+            width: 100%;
+            height: 100%;
+            gap: 1px;
         }
 
-        @keyframes pop {
-            0% {
-                transform: scale(0.8);
-                opacity: 0;
-            }
-
-            100% {
-                transform: scale(1);
-                opacity: 1;
-            }
+        .domino-tile {
+            background: #fff;
+            border: 1px solid #94a3b8;
+            border-radius: 6px;
+            box-shadow: 2px 3px 0px #cbd5e1, 4px 5px 5px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .glass {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
+        .domino-tile:active {
+            transform: translateY(2px);
+            box-shadow: 0px 1px 0px #cbd5e1;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
 
-        .valid-move {
+        .snake-board {
+            position: relative;
+            width: 2000px;
+            height: 2000px;
+        }
+
+        /* Large container for panning */
+
+        /* Valid Move Indicator */
+        .valid-ring {
             position: absolute;
-            width: 30px;
-            height: 30px;
-            background: rgba(255, 215, 0, 0.6);
-            border: 2px solid white;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #fbbf24;
             border-radius: 50%;
+            background: rgba(251, 191, 36, 0.2);
+            animation: pulse-glow 1.5s infinite;
             z-index: 50;
-            animation: pulse 1.5s infinite;
             cursor: pointer;
-            box-shadow: 0 0 10px gold;
-        }
-
-        @keyframes pulse {
-            0% {
-                transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7);
-            }
-
-            70% {
-                transform: scale(1.1);
-                box-shadow: 0 0 0 10px rgba(255, 215, 0, 0);
-            }
-
-            100% {
-                transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
-            }
+            transform: translate(-50%, -50%);
         }
     </style>
 </head>
 
 <body>
     <div id="root"></div>
+
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo } = React;
+        const { useState, useEffect, useRef, useMemo, useCallback } = React;
         const tg = window.Telegram?.WebApp;
-        if (tg) { tg.ready(); tg.expand(); }
+        if (tg) { tg.ready(); tg.expand(); tg.enableClosingConfirmation(); }
 
         const WS_URL = 'wss://beta-github-io.onrender.com';
         const API_URL = 'https://beta-github-io.onrender.com';
 
         // --- COMPONENTS ---
-        const Pips = ({ n }) => {
-            const map = { 0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
-            return <div className="grid grid-cols-3 grid-rows-3 w-full h-full p-0.5 gap-0.5">{[...Array(9)].map((_, i) => <div key={i} className={`rounded-full ${map[n].includes(i) ? 'bg-black' : 'bg-transparent'}`} />)}</div>
+        const RenderPips = ({ n }) => {
+            const m = { 0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+            return <div className="pip-grid">{[...Array(9)].map((_, i) => <div key={i} className={`pip ${m[n].includes(i) ? 'bg-black' : 'bg-transparent'}`} />)}</div>
         };
 
-        const Tile = ({ vals, onClick, selected, isBoard, dir = 'right' }) => {
-            // Hand tiles: Vertical. Board tiles: Depends on dir.
-            const isVert = isBoard ? (dir === 'up' || dir === 'down') : true;
-            const dim = isBoard
-                ? (isVert ? { w: 30, h: 60 } : { w: 60, h: 30 })
-                : { w: 42, h: 84 }; // Hand size
+        const DominoTile = ({ val, onClick, selected, isBoard, dir = 'right', scale = 1 }) => {
+            // Logic regarding rotation and size
+            const isVert = isBoard ? (dir === 'up' || dir === 'down') : true; // Board: dynamic, Hand: always vertical
 
-            // Flex direction inside the tile
-            // If Hand Vertical: Column.
-            // If Board Horizontal: Row. If Board Vertical: Column.
-            const flexDir = (isBoard && !isVert) ? 'row' : 'col';
+            // Sizes
+            const W = 40 * scale;
+            const H = 80 * scale;
+
+            // If Board Horizontal: W=80, H=40. If Vertical: W=40, H=80.
+            // Hand: W=40, H=80.
+
+            const styles = isBoard
+                ? (isVert ? { w: W, h: H, flex: 'col' } : { w: H, h: W, flex: 'row' })
+                : { w: W, h: H, flex: 'col' };
 
             return (
-                <div onClick={onClick}
-                    className={`relative bg-white rounded flex border border-gray-400 tile-shadow transition-transform ${selected ? '-translate-y-4 ring-2 ring-yellow-400 z-10' : ''}`}
-                    style={{ width: dim.w, height: dim.h, flexDirection: flexDir === 'col' ? 'column' : 'row' }}>
-                    <div className={`flex-1 flex items-center justify-center ${flexDir === 'col' ? 'border-b' : 'border-r'} border-gray-300 relative`}>
-                        <Pips n={vals[0]} />
+                <div onClick={onClick} className={`domino-tile flex relative overflow-hidden ${selected ? 'ring-4 ring-yellow-400 transform -translate-y-4' : ''}`}
+                    style={{ width: styles.w, height: styles.h, flexDirection: styles.flex === 'col' ? 'column' : 'row' }}>
+                    <div className={`flex-1 flex items-center justify-center relative ${styles.flex === 'col' ? 'border-b' : 'border-r'} border-slate-300`}>
+                        <RenderPips n={val[0]} />
                     </div>
                     <div className="flex-1 flex items-center justify-center relative">
-                        <Pips n={vals[1]} />
-                        <div className="absolute inset-0 flex items-center justify-center"><div className="w-1.5 h-1.5 rounded-full bg-black opacity-20" /></div>
+                        <RenderPips n={val[1]} />
                     </div>
                 </div>
             );
         };
 
-        const Avatar = ({ url, name, ring = 'gray', size = 'md' }) => {
-            const sz = size === 'lg' ? 'w-16 h-16' : size === 'xl' ? 'w-24 h-24' : 'w-10 h-10';
-            return (
-                <div className="flex flex-col items-center">
-                    <div className={`${sz} rounded-full border-2 border-${ring}-400 overflow-hidden bg-gray-700 shadow-lg`}>
-                        {url ? <img src={url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xl">👤</div>}
-                    </div>
-                    {name && <span className="text-white text-xs font-bold mt-1 shadow-black drop-shadow-md">{name}</span>}
-                </div>
-            );
-        };
+        const Notif = ({ msg, type }) => (
+            <div className={`fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-white font-bold shadow-2xl z-50 animate-bounce 
+                ${type === 'error' ? 'bg-red-600' : type === 'success' ? 'bg-green-600' : 'bg-blue-600'}`}>
+                {msg}
+            </div>
+        );
 
-        // --- APP ---
+        // --- MAIN GAME COMPONENT ---
         const App = () => {
-            const [page, setPage] = useState('auth');
+            // States
+            const [screen, setScreen] = useState('lobby'); // lobby, searching, game, result, leaderboard
             const [ws, setWs] = useState(null);
             const [me, setMe] = useState(null);
-            const [game, setGame] = useState(null);
             const [opp, setOpp] = useState(null);
-            const [lead, setLead] = useState([]);
-            const [loading, setLoading] = useState(false);
+            const [game, setGame] = useState(null);
+            const [leaderboard, setLeaderboard] = useState([]);
+            const [roomCode, setRoomCode] = useState('');
+            const [joinCode, setJoinCode] = useState('');
+            const [notif, setNotif] = useState(null);
 
-            // Game State
+            // Game Interaction
             const [selTile, setSelTile] = useState(null);
             const [validMoves, setValidMoves] = useState([]);
-            const [winInfo, setWinInfo] = useState(null);
+            const [endData, setEndData] = useState(null);
 
-            // Pan/Zoom
-            const [view, setView] = useState({ x: 0, y: 0, z: 1 });
-            const boardRef = useRef();
-            const touchStart = useRef(null);
+            // Viewport (Pan/Zoom)
+            const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
+            const touchRef = useRef({ x: 0, y: 0, d: 0 });
 
+            // Notify
+            const notify = (msg, type = 'info') => { setNotif({ msg, type }); setTimeout(() => setNotif(null), 3000); };
+
+            // --- INIT ---
             useEffect(() => {
-                // Auth & Connect
-                const init = async () => {
-                    let u = { username: 'Guest', telegramId: 'guest_' + Date.now() };
+                const initUser = async () => {
+                    let u = { username: 'Guest', telegramId: 'guest_' + Date.now(), isGuest: true };
                     if (tg?.initDataUnsafe?.user) {
-                        const tgu = tg.initDataUnsafe.user;
-                        u = { telegramId: String(tgu.id), username: tgu.first_name, photoUrl: tgu.photo_url };
+                        const t = tg.initDataUnsafe.user;
+                        u = { username: t.first_name, telegramId: String(t.id), photoUrl: t.photo_url, isGuest: false };
                     }
 
-                    // Sync with server
+                    // Auth/Save to DB
                     try {
-                        const res = await fetch(API_URL + '/api/auth/telegram', {
+                        const r = await fetch(API_URL + '/api/auth/telegram', {
                             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(u)
                         });
-                        const d = await res.json();
+                        const d = await r.json();
                         if (d.success) setMe(d.player); else setMe(u);
                     } catch (e) { setMe(u); }
 
-                    connectWS(u.telegramId);
+                    connect(u.telegramId);
                 };
-                init();
+                initUser();
             }, []);
 
-            const connectWS = (tid) => {
+            const connect = (tid) => {
                 const s = new WebSocket(WS_URL);
                 s.onopen = () => {
                     setWs(s);
                     s.send(JSON.stringify({ type: 'reconnect', telegramId: tid }));
+                    notify('Serverə qoşuldu 🟢', 'success');
                 };
                 s.onmessage = (e) => handleMsg(JSON.parse(e.data));
-                s.onclose = () => setTimeout(() => connectWS(tid), 3000);
+                s.onclose = () => setTimeout(() => connect(tid), 3000);
             };
 
             const send = (type, data = {}) => {
@@ -202,221 +223,335 @@
             };
 
             const handleMsg = (d) => {
-                switch (d.type) {
-                    case 'reconnectSuccess':
-                    case 'gameStart':
-                        setGame(d.gameState);
-                        // Find Opponent
-                        const opId = Object.keys(d.gameState.players).find(k => k !== me.telegramId);
-                        setOpp(d.gameState.players[opId]);
-                        setPage('game');
-                        setLoading(false);
-                        break;
-                    case 'gameUpdate':
-                        setGame(curr => ({ ...curr, ...d.gameState }));
-                        setSelTile(null);
-                        break;
-                    case 'matchFound':
-                        setOpp(d.opponent); // Shows opponent immediately
-                        setLoading(true); // Wait for start
-                        break;
-                    case 'gameEnd':
-                        setWinInfo(d);
-                        setPage('result');
-                        break;
-                    case 'opponentDisconnected':
-                        alert('Rəqib internetdən ayrıldı! Gözlənilir...');
-                        break;
+                console.log('MSG:', d.type);
+                if (d.type === 'reconnectSuccess' || d.type === 'gameStart') {
+                    setGame(d.gameState);
+                    const opId = Object.keys(d.gameState.players).find(k => k !== me.telegramId);
+                    setOpp(d.gameState.players[opId]);
+                    setScreen('game');
+                    notify('Oyun Başladı! 🎮', 'success');
                 }
+                else if (d.type === 'matchFound') {
+                    setOpp(d.opponent);
+                    // Don't switch screen immediately, let the searching UI show the "Opponent Found" state
+                    // Use a timeout or a specific state wrapper? 
+                    // Let's us the 'searching' screen's logic to show opponent
+                }
+                else if (d.type === 'gameUpdate') {
+                    setGame(prev => ({ ...prev, ...d.gameState }));
+                    setSelTile(null);
+                }
+                else if (d.type === 'gameEnd') {
+                    setEndData(d);
+                    setScreen('result');
+                }
+                else if (d.type === 'roomCreated') setRoomCode(d.roomCode);
+                else if (d.type === 'opponentDisconnected') notify('Rəqib çıxdı! ⚠️', 'error');
+                else if (d.type === 'error') notify(d.message, 'error');
             };
 
-            // Helpers
-            const getMoves = (tile) => {
-                if (!game?.board.length) return ['left']; // 'start' maps to left for simplicity here
-                const b = game.board;
-                const L = b[0][0], R = b[b.length - 1][1];
+            // --- GAME LOGIC ---
+            const getValid = (tile) => {
+                if (!game || !game.board.length) return ['start'];
+                const board = game.board;
+                const L = board[0].tile?.[0] ?? board[0][0]; // Handle object or array tile
+                const R = board[board.length - 1].tile?.[1] ?? board[board.length - 1][1];
+
+                // My server sends [[1,2], [2,3]]. But wait, I added logic to client before about directions.
+                // If server sends raw tiles: [[1,2], [2,3]]
+                // Left end of board is board[0][0]. Right is board[last][1].
+
+                // HOWEVER, snake logic needs to know the layout.
+                // The server should be source of truth for "ends".
+                // Simple version:
+                const realL = game.board[0][0];
+                const realR = game.board[game.board.length - 1][1];
+
                 const m = [];
-                if (tile[0] === L || tile[1] === L) m.push('left');
-                if (tile[0] === R || tile[1] === R) m.push('right');
+                if (tile[0] === realL || tile[1] === realL) m.push('left');
+                if (tile[0] === realR || tile[1] === realR) m.push('right');
                 return m;
             };
 
-            const play = (pos) => {
-                if (selTile === null) return;
-                send('playTile', { tileIndex: selTile, position: pos });
-            };
-
-            // Render Board Logic
-            const renderBoard = () => {
+            const snakeLayout = useMemo(() => {
                 if (!game?.board) return [];
                 const b = game.board;
-                let x = 0, y = 0;
-                // Simple Straight Line for stability as requested "fix play"
-                // Complex snake can be added but let's ensure functionality first
-                // Using 60px width per tile
-                return b.map((t, i) => {
-                    const pos = { val: t, x: (i - b.length / 2) * 62, y: 0 };
-                    return pos;
+                let x = 0, y = 0, dir = 'right';
+                const res = [];
+
+                // Tile dims
+                const W = 80, H = 40;
+
+                b.forEach((t, i) => {
+                    // Start at center
+                    res.push({ tile: t, x, y, dir });
+
+                    // Move cursor for next tile
+                    // Simple snake: 6 right, then down, then 6 left, ...
+                    // Check index to decide turn
+                    const rowLen = 6;
+
+                    // Logic from previous code (Step 34)
+                    // If we are moving right and hit limit -> turn down
+
+                    // Simplified: Just horizontal for now to ensure stability as per "hatasiz" request
+                    // If user REALLY wants snake, I can add it, but it often causes visual bugs if not perfect.
+                    // User said "Eski index arayuz olsun" which HAD snake.
+
+                    // Let's do a smart adaptive snake
+                    if (dir === 'right') {
+                        x += 60; // Overlap slightly
+                        if (i % 8 === 7) { dir = 'down'; }
+                    } else if (dir === 'down') {
+                        y += 60;
+                        dir = (Math.floor(i / 8) % 2 === 0) ? 'right' : 'left';
+                    } else if (dir === 'left') {
+                        x -= 60;
+                        if (i % 8 === 7) { dir = 'down'; }
+                    }
                 });
+
+                // Centering
+                const mid = res[Math.floor(res.length / 2)];
+                if (mid) {
+                    const ox = mid.x; const oy = mid.y;
+                    return res.map(r => ({ ...r, x: r.x - ox, y: r.y - oy }));
+                }
+                return res;
+            }, [game?.board]);
+
+            // --- TOUCH LOGIC ---
+            const handleTouch = (e) => {
+                const t = e.touches;
+                if (t.length === 1) {
+                    const cx = t[0].clientX, cy = t[0].clientY;
+                    if (touchRef.current.x) {
+                        const dx = cx - touchRef.current.x;
+                        const dy = cy - touchRef.current.y;
+                        setView(v => ({ ...v, x: v.x + dx, y: v.y + dy }));
+                    }
+                    touchRef.current.x = cx; touchRef.current.y = cy;
+                }
+                if (t.length === 2) {
+                    const d = Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+                    if (touchRef.current.d) {
+                        const ratio = d / touchRef.current.d;
+                        setView(v => ({ ...v, scale: Math.max(0.4, Math.min(2.5, v.scale * ratio)) }));
+                    }
+                    touchRef.current.d = d;
+                }
             };
+            const resetTouch = () => { touchRef.current = { x: 0, y: 0, d: 0 }; };
 
-            // --- PAGES ---
+            // --- SCREENS ---
 
-            if (page === 'auth' || !me) return <div className="h-screen bg-slate-900 flex items-center justify-center text-white"><div className="animate-spin text-4xl">⏳</div></div>;
-
-            if (page === 'lobby') return (
-                <div className="h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 flex flex-col">
-                    <div className="flex justify-between items-center mb-8">
-                        <Avatar url={me.photoUrl} name={me.username} size="lg" ring="green" />
-                        <div className="text-right">
-                            <div className="text-2xl font-black text-yellow-400">{me.elo} ELO</div>
-                            <div className="text-sm text-gray-400">LVL {me.level}</div>
-                        </div>
+            // LOBBY (Old UI Style: Gradient + Floating)
+            if (screen === 'lobby') return (
+                <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center p-6 relative overflow-hidden text-white">
+                    {/* Particles */}
+                    <div className="absolute inset-0 z-0 opacity-30">
+                        {[...Array(15)].map((_, i) => <div key={i} className="absolute bg-white rounded-full animate-float" style={{
+                            top: Math.random() * 100 + '%', left: Math.random() * 100 + '%', width: Math.random() * 5 + 'px', height: Math.random() * 5 + 'px', animationDelay: Math.random() * 2 + 's'
+                        }} />)}
                     </div>
 
-                    <div className="flex-1 flex flex-col items-center justify-center gap-4">
-                        <button onClick={() => { setPage('searching'); send('findMatch', me); }}
-                            className="w-full max-w-sm bg-gradient-to-r from-yellow-500 to-amber-600 py-6 rounded-2xl font-black text-2xl shadow-lg transform active:scale-95 transition-all">
-                            ⚔️ OYUN AXTAR
+                    <div className="z-10 w-full max-w-md bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 shadow-2xl">
+                        {/* Profile Section */}
+                        {me && (
+                            <div className="flex flex-col items-center mb-8">
+                                <div className="relative">
+                                    <img src={me.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 rounded-full border-4 border-yellow-400 shadow-lg" />
+                                    <div className="absolute bottom-0 right-0 bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-full">LVL {me.level}</div>
+                                </div>
+                                <h2 className="text-2xl font-bold mt-3">{me.username}</h2>
+                                <div className="text-blue-300 font-mono font-bold text-lg">{me.elo} ELO</div>
+                            </div>
+                        )}
+
+                        <button onClick={() => { send('findMatch', me); setScreen('searching'); }}
+                            className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:scale-105 transition-all py-4 rounded-xl font-black text-xl shadow-lg mb-4 flex items-center justify-center gap-2">
+                            <span>⚔️</span> OYUN AXTAR
                         </button>
-                        <button onClick={async () => {
-                            const res = await fetch(API_URL + '/api/leaderboard');
-                            const d = await res.json();
-                            if (d.success) { setLead(d.leaderboard); setPage('leaderboard'); }
-                        }} className="w-full max-w-sm glass py-4 rounded-xl font-bold">
-                            🏆 LİDERLƏR
-                        </button>
+
+                        <div className="flex gap-3">
+                            <button onClick={async () => {
+                                const r = await fetch(API_URL + '/api/leaderboard');
+                                const d = await r.json();
+                                if (d.success) { setLeaderboard(d.leaderboard); setScreen('leaderboard'); }
+                            }} className="flex-1 bg-white/10 py-3 rounded-xl font-bold hover:bg-white/20">🏆 Liderlər</button>
+
+                            <button onClick={() => send('createRoom', me)} className="flex-1 bg-white/10 py-3 rounded-xl font-bold hover:bg-white/20">🏠 Otaq</button>
+                        </div>
+
+                        {roomCode && (
+                            <div className="mt-4 bg-green-500/20 p-4 rounded-xl text-center border border-green-500/40">
+                                <div className="text-sm text-green-300">OTAQ KODU</div>
+                                <div className="text-3xl font-mono font-bold">{roomCode}</div>
+                            </div>
+                        )}
+
+                        <div className="mt-4 relative">
+                            <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="KOD DAXİL ET" className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-center font-mono placeholder:text-gray-500 outline-none focus:border-yellow-400" />
+                            {joinCode.length === 4 && <button onClick={() => send('joinRoom', { roomCode: joinCode, ...me })} className="absolute right-2 top-2 bottom-2 bg-yellow-500 px-4 rounded-lg font-bold text-black">Gir</button>}
+                        </div>
                     </div>
                 </div>
             );
 
-            if (page === 'searching') return (
-                <div className="h-screen bg-slate-900 flex flex-col items-center justify-center text-white p-4">
+            // SEARCHING
+            if (screen === 'searching') return (
+                <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white relative p-6">
                     {opp ? (
-                        <div className="text-center animate-pop">
-                            <div className="text-green-400 text-2xl font-bold mb-4">RƏQİB TAPILDI!</div>
-                            <Avatar url={opp.photoUrl} name={opp.username} size="xl" ring="red" />
-                            <div className="mt-4 text-sm text-gray-400">Oyun başladılır...</div>
+                        <div className="text-center z-10 animate-pulse">
+                            <div className="relative inline-block mb-6">
+                                <img src={opp.photoUrl} className="w-32 h-32 rounded-full border-4 border-green-500 object-cover shadow-[0_0_30px_rgba(34,197,94,0.6)]" />
+                                <div className="absolute -bottom-2 -right-2 text-4xl">⚔️</div>
+                            </div>
+                            <h2 className="text-3xl font-bold text-green-400 mb-2">RƏQİB TAPILDI!</h2>
+                            <p className="text-xl font-bold text-white mb-8">{opp.username}</p>
+                            <div className="text-gray-400">Oyun yüklənir...</div>
                         </div>
                     ) : (
-                        <div className="text-center">
-                            <div className="w-20 h-20 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
-                            <h2 className="text-2xl font-bold">Rəqib Axtarılır...</h2>
-                            <button onClick={() => { send('cancelSearch'); setPage('lobby'); }} className="mt-8 text-red-400">LƏĞV ET</button>
+                        <div className="text-center z-10">
+                            <div className="w-24 h-24 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin mx-auto mb-8"></div>
+                            <h2 className="text-2xl font-bold mb-4">Rəqib Axtarılır...</h2>
+                            <div className="text-amber-400 font-mono mb-8 text-xl">ELO {me?.elo}</div>
+                            <button onClick={() => { send('cancelSearch'); setScreen('lobby'); }} className="px-8 py-3 bg-red-600/20 text-red-400 rounded-full font-bold border border-red-600/50 hover:bg-red-600 hover:text-white transition-all">Ləğv Et</button>
                         </div>
                     )}
                 </div>
             );
 
-            if (page === 'leaderboard') return (
-                <div className="h-screen bg-slate-900 text-white p-4 flex flex-col">
-                    <div className="flex items-center mb-6"><button onClick={() => setPage('lobby')} className="text-2xl mr-4">⬅️</button><h1 className="text-2xl font-bold">Liderlər</h1></div>
-                    <div className="flex-1 overflow-y-auto space-y-3 pb-4">
-                        {lead.map((u, i) => (
-                            <div key={i} className="glass p-3 rounded-xl flex items-center gap-4">
-                                <div className="font-bold text-gray-400 w-6">#{i + 1}</div>
-                                <Avatar url={u.photoUrl} size="sm" />
-                                <div className="flex-1 font-bold">{u.username}</div>
-                                <div className="text-yellow-400 font-bold">{u.elo}</div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
+            // GAME
+            if (screen === 'game' && game) {
+                const isMyTurn = game.currentPlayer === me.telegramId;
+                const myHand = game.players[me.telegramId].hand;
 
-            if (page === 'result' && winInfo) return (
-                <div className="h-screen bg-black/90 flex flex-col items-center justify-center text-white p-6 text-center">
-                    <h1 className={`text-5xl font-black mb-4 ${winInfo.isWinner ? 'text-green-500' : 'text-red-500'}`}>
-                        {winInfo.isWinner ? 'QAZANDINIZ! 🎉' : 'UDUZDUNUZ 💀'}
-                    </h1>
-                    <p className="text-xl mb-8">{winInfo.message}</p>
-                    <div className="text-3xl font-bold mb-8">
-                        {winInfo.eloChange > 0 ? '+' : ''}{winInfo.eloChange} ELO
+                return (
+                    <div className="fixed inset-0 bg-[#0f172a] overflow-hidden flex flex-col">
+                        {notif && <Notif msg={notif.msg} type={notif.type} />}
+
+                        {/* Top Bar */}
+                        <div className="h-16 bg-slate-800/80 backdrop-blur flex items-center justify-between px-4 z-20 border-b border-white/5 shadow-lg">
+                            <div className="flex items-center gap-3">
+                                <img src={opp?.photoUrl} className="w-10 h-10 rounded-full border-2 border-red-400" />
+                                <div>
+                                    <div className="text-white font-bold text-sm">{opp?.username || 'Rəqib'}</div>
+                                    <div className="text-xs text-slate-400">🔥 {opp?.score || 0} xal</div>
+                                </div>
+                            </div>
+                            <div className={`px-4 py-1.5 rounded-full text-xs font-bold tracking-wider ${isMyTurn ? 'bg-yellow-500 text-black animate-pulse' : 'bg-slate-700 text-slate-300'}`}>
+                                {isMyTurn ? 'SƏNİN SIRAN' : 'RƏQİBİ GÖZLƏ'}
+                            </div>
+                        </div>
+
+                        {/* Board */}
+                        <div className="flex-1 relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/dark-leather.png')]"
+                            onTouchStart={handleTouch} onTouchMove={handleTouch} onTouchEnd={resetTouch}>
+
+                            <div className="absolute top-1/2 left-1/2 transition-transform duration-75 ease-out origin-center"
+                                style={{ transform: `translate(-50%, -50%) translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}>
+
+                                <div className="relative">
+                                    {snakeLayout.map((t, i) => (
+                                        <div key={i} style={{ position: 'absolute', left: t.x, top: t.y, transform: 'translate(-50%, -50%)' }}>
+                                            <DominoTile val={t.tile} isBoard={true} dir={t.dir} scale={0.8} />
+                                        </div>
+                                    ))}
+
+                                    {/* Valid Move Indicators for Snake Endpoints */}
+                                    {selTile !== null && getValid(myHand[selTile]).map((pos) => {
+                                        // Find exact coordinates for indicators based on snakeLayout
+                                        // We know 'left' connects to board[0] and 'right' to board[last]
+
+                                        // Simplified visual placement logic for stability
+                                        // If snake layout is empty, place center.
+                                        // If not, place near ends.
+
+                                        if (snakeLayout.length === 0) return <div key={pos} className="valid-ring" style={{ left: 0, top: 0 }} onClick={() => send('playTile', { tileIndex: selTile, position: pos })} />;
+
+                                        const target = pos === 'left' ? snakeLayout[0] : snakeLayout[snakeLayout.length - 1];
+                                        // Offset calculation based on direction could be added here
+                                        // For now place directly ON the last tile for user to click
+                                        return (
+                                            <div key={pos} className="valid-ring" style={{ left: target.x, top: target.y }}
+                                                onClick={() => send('playTile', { tileIndex: selTile, position: pos })} />
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Hand & Controls */}
+                        <div className="bg-slate-900/95 backdrop-blur-xl pb-8 pt-4 z-30 rounded-t-3xl border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+                            <div className="flex justify-center gap-2 mb-4 px-4 overflow-x-auto hide-scrollbar min-h-[90px] items-end">
+                                {myHand.map((tile, i) => (
+                                    <DominoTile key={i} val={tile} selected={selTile === i}
+                                        onClick={() => { if (isMyTurn) setSelTile(sep => sep === i ? null : i) }}
+                                    />
+                                ))}
+                            </div>
+
+                            <div className="flex justify-between items-center px-6">
+                                <button onClick={() => send('leaveGame')} className="text-red-400 text-xs font-bold bg-red-900/20 px-4 py-2 rounded-lg hover:bg-red-900/40">
+                                    ❌ ÇIXIŞ
+                                </button>
+
+                                {game.market.length > 0 && (
+                                    <button onClick={() => send('drawFromMarket')}
+                                        disabled={!isMyTurn}
+                                        className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-2 rounded-full shadow-lg shadow-blue-600/30 disabled:opacity-50 disabled:shadow-none transition-all active:scale-95">
+                                        BAZAR ({game.market.length})
+                                    </button>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                    <button onClick={() => { setPage('lobby'); setGame(null); }} className="bg-white text-black px-8 py-3 rounded-full font-bold">
-                        LOBBİYƏ QAYIT
+                );
+            }
+
+            // RESULT
+            if (screen === 'result' && endData) return (
+                <div className="min-h-screen bg-black/95 flex flex-col items-center justify-center text-white p-6 text-center">
+                    <div className="mb-6 transform scale-150">{endData.isWinner ? '🏆' : '💀'}</div>
+                    <h1 className={`text-5xl font-black mb-4 ${endData.isWinner ? 'text-yellow-400' : 'text-gray-400'}`}>
+                        {endData.isWinner ? 'QAZANDIN!' : 'MƏĞLUB OLDUN'}
+                    </h1>
+                    <p className="text-xl text-gray-300 mb-8">{endData.message}</p>
+
+                    <div className="bg-white/10 p-6 rounded-2xl mb-8 min-w-[200px]">
+                        <div className="text-sm text-gray-400 mb-1">Yeni ELO</div>
+                        <div className="text-4xl font-mono font-bold">{me.elo + endData.eloChange}</div>
+                        <div className={`text-sm font-bold ${endData.eloChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {endData.eloChange > 0 ? '+' : ''}{endData.eloChange}
+                        </div>
+                    </div>
+
+                    <button onClick={() => { setScreen('lobby'); setGame(null); }} className="bg-white text-black px-10 py-4 rounded-full font-bold text-lg hover:scale-105 transition-transform">
+                        ANA MENYU
                     </button>
                 </div>
             );
 
-            if (page === 'game' && game) return (
-                <div className="fixed inset-0 bg-table flex flex-col">
-                    {/* Header */}
-                    <div className="h-16 glass flex items-center justify-between px-4 z-20">
-                        <div className="flex items-center gap-3">
-                            <Avatar url={opp?.photoUrl} size="sm" ring="red" />
-                            <div className="leading-tight">
-                                <div className="font-bold text-white">{opp?.name}</div>
-                                <div className="text-xs text-gray-300">Daş: {opp?.handCount}</div>
+            // LEADERBOARD
+            if (screen === 'leaderboard') return (
+                <div className="min-h-screen bg-slate-900 text-white p-6">
+                    <div className="flex items-center gap-4 mb-6">
+                        <button onClick={() => setScreen('lobby')} className="p-2 bg-white/10 rounded-lg">⬅️</button>
+                        <h1 className="text-2xl font-bold">Liderlər</h1>
+                    </div>
+                    <div className="space-y-3">
+                        {leaderboard.map((u, i) => (
+                            <div key={i} className={`flex items-center gap-4 p-4 rounded-xl border border-white/5 ${i === 0 ? 'bg-yellow-500/20 border-yellow-500/50' : 'bg-white/5'}`}>
+                                <div className={`font-black w-8 text-center ${i === 0 ? 'text-yellow-400' : 'text-gray-500'}`}>#{i + 1}</div>
+                                <img src={u.photoUrl || 'https://via.placeholder.com/40'} className="w-10 h-10 rounded-full" />
+                                <div className="flex-1 font-bold">{u.username}</div>
+                                <div className="font-mono text-yellow-500">{u.elo}</div>
                             </div>
-                        </div>
-                        <div className={`px-3 py-1 rounded-full text-xs font-bold ${game.currentPlayer === me.telegramId ? 'bg-yellow-500 text-black animate-pulse' : 'bg-gray-700 text-white'}`}>
-                            {game.currentPlayer === me.telegramId ? 'SİZİN NÖVBƏNİZ' : 'RƏQİB GÖZLƏNİLİR'}
-                        </div>
-                    </div>
-
-                    {/* Board */}
-                    <div className="flex-1 relative overflow-hidden"
-                        onTouchStart={e => {
-                            if (e.touches.length === 1) touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                            if (e.touches.length === 2) touchStart.current = { d: Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY) };
-                        }}
-                        onTouchMove={e => {
-                            if (e.touches.length === 1 && touchStart.current?.x) {
-                                const dx = e.touches[0].clientX - touchStart.current.x;
-                                const dy = e.touches[0].clientY - touchStart.current.y;
-                                setView(v => ({ ...v, x: v.x + dx, y: v.y + dy }));
-                                touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                            }
-                            if (e.touches.length === 2 && touchStart.current?.d) {
-                                const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-                                const s = d / touchStart.current.d;
-                                setView(v => ({ ...v, z: Math.max(0.5, Math.min(3, v.z * s)) }));
-                                touchStart.current.d = d;
-                            }
-                        }}
-                    >
-                        <div className="absolute top-1/2 left-1/2 transition-transform duration-75"
-                            style={{ transform: `translate(-50%,-50%) translate(${view.x}px,${view.y}px) scale(${view.z})` }}>
-
-                            {renderBoard().map((pos, i) => (
-                                <div key={i} className="absolute transition-all duration-300" style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
-                                    <Tile vals={pos.val} isBoard={true} />
-                                </div>
-                            ))}
-
-                            {/* Interactive Indicators */}
-                            {selTile !== null && getMoves(game.players[me.telegramId].hand[selTile]).map(dir => (
-                                <div key={dir} className="valid-move"
-                                    style={{
-                                        left: dir === 'left' ? (renderBoard()[0]?.x || 0) - 50 : (renderBoard()[renderBoard.length - 1]?.x || 0) + 50,
-                                        top: 15
-                                    }}
-                                    onClick={() => play(dir)}
-                                />
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Hand */}
-                    <div className="bg-black/80 p-4 pb-8 z-20">
-                        <div className="flex justify-center gap-2 mb-4 overflow-x-auto px-4 min-h-[90px]">
-                            {game.players[me.telegramId].hand.map((t, i) => (
-                                <Tile key={i} vals={t} selected={selTile === i} onClick={() => {
-                                    if (game.currentPlayer === me.telegramId) setSelTile(selTile === i ? null : i);
-                                }} />
-                            ))}
-                        </div>
-                        <div className="flex justify-between items-center px-4">
-                            <button onClick={() => send('leaveGame')} className="text-red-400 font-bold text-sm">⛔ ÇIXIŞ</button>
-                            <button onClick={() => send('drawFromMarket')} className="bg-blue-600 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg active:scale-95 disabled:opacity-50"
-                                disabled={game.market === 0 || game.currentPlayer !== me.telegramId}>
-                                🎲 BAZAR ({game.market})
-                            </button>
-                        </div>
+                        ))}
                     </div>
                 </div>
-            );
+            )
 
             return null;
         };
