@@ -443,8 +443,10 @@
             }
         }
 
-        // API Base URL
-        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
+        // --- SABİT DEĞİŞKENLER (CONSTANTS) ---
+        const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const API_URL = IS_LOCAL ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
+        const WS_URL = IS_LOCAL ? 'ws://localhost:10000' : 'wss://beta-github-io.onrender.com';
 
         // --- BİLEŞENLER ---
         const RenderPips = ({ number }) => {
@@ -603,13 +605,8 @@
                 if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return;
                 if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
 
-                let wsUrl = 'wss://beta-github-io.onrender.com';
-                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                    wsUrl = `ws://${window.location.hostname}:10000`;
-                }
-
                 // PC Telegram için WebSocket bağlantısını güçlendir
-                const ws = new WebSocket(wsUrl);
+                const ws = new WebSocket(WS_URL);
                 wsRef.current = ws;
 
                 ws.onopen = () => {
