@@ -779,27 +779,6 @@
                         showNotification('Otaq yaradıldı: ' + data.roomCode, 'success');
                         break;
 
-                    case 'reconnectSuccess':
-                    case 'gameStart':
-                        console.log('🎮 Oyun başladı/tekrar bağlandı!', data.gameState);
-                        setGameState(data.gameState);
-                        setScreen('game');
-                        setSelectedTileIndex(null);
-                        setValidMoves([]);
-                        setSearching(false);
-                        if (data.gameState.roomCode && data.gameState.playerId) {
-                            localStorage.setItem(LOCAL_STORAGE_ROOM, data.gameState.roomCode);
-                            localStorage.setItem(LOCAL_STORAGE_PLAYER, data.gameState.playerId);
-                        }
-
-                        if (searchTimerRef.current) {
-                            clearInterval(searchTimerRef.current);
-                            searchTimerRef.current = null;
-                        }
-                        setSearchTime(0);
-                        showNotification(data.type === 'reconnectSuccess' ? 'Oyuna Davam Edildi!' : 'Oyun Başladı!', 'success');
-                        break;
-
                     case 'gameUpdate':
                         console.log('🔄 Oyun yenilənir...', data.gameState);
                         if (data.gameState && data.gameState.board) {
@@ -870,14 +849,54 @@
                         break;
 
                     case 'matchFound':
+                        console.log('🎯 Rəqib tapıldı!', data.opponent);
                         showNotification(`Rəqib Tapıldı! ${data.gameType === 'ranked' ? '🏆 RÜTBƏLİ' : '🎮 ADİ'}`, 'success');
+
+                        // Axtarışı dayandır
                         setSearching(false);
                         setOpponent(data.opponent || null);
+
                         if (searchTimerRef.current) {
                             clearInterval(searchTimerRef.current);
                             searchTimerRef.current = null;
                         }
                         setSearchTime(0);
+
+                        // Oyun başlayana qədər gözləmə ekranına keç (opsional)
+                        // setScreen('loading'); // və ya searching-də qal amma "Rəqib tapıldı, oyun başlayır..." göstər
+                        break;
+
+                    case 'reconnectSuccess':
+                    case 'gameStart':
+                        console.log('🎮 Oyun başladı/yenidən bağlandı!', data);
+
+                        // Server-dən gələn playerId-ni istifadə et
+                        const gameStateWithPlayer = {
+                            ...data.gameState,
+                            playerId: data.playerId || data.gameState?.playerId
+                        };
+
+                        setGameState(gameStateWithPlayer);
+                        setScreen('game');
+                        setSelectedTileIndex(null);
+                        setValidMoves([]);
+                        setSearching(false); // Əmin olmaq üçün
+
+                        // LocalStorage-ə yaz
+                        if (gameStateWithPlayer.roomCode && gameStateWithPlayer.playerId) {
+                            localStorage.setItem(LOCAL_STORAGE_ROOM, gameStateWithPlayer.roomCode);
+                            localStorage.setItem(LOCAL_STORAGE_PLAYER, gameStateWithPlayer.playerId);
+                            console.log('💾 Oyun məlumatları saxlanıldı:', gameStateWithPlayer.roomCode, gameStateWithPlayer.playerId);
+                        }
+
+                        // Timer-i təmizlə
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
+
+                        showNotification(data.type === 'reconnectSuccess' ? 'Oyuna Davam Edildi! ♻️' : 'Oyun Başladı! 🎮', 'success');
                         break;
 
                     case 'opponentDisconnected':
@@ -1294,7 +1313,7 @@
                 );
                 if (!confirmed) return;
 
-                sendMessage({ type: 'leaveGame' });
+                sendMessage({ type: 'quit' });
                 resetGameClientState();
                 setScreen('lobby');
                 showNotification('Oyundan ayrıldınız', 'info');
