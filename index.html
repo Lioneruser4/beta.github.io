@@ -667,38 +667,65 @@
                 wsRef.current = ws;
 
                 ws.onopen = () => {
-                    console.log('✅ WebSocket bağlantısı açıldı');
+                    console.log('✅ WebSocket AÇILDI');
                     setConnected(true);
                     setReconnectAttemptCount(0);
-                    showNotification('Serverə qoşuldu', 'success');
+                    showNotification('Serverə qoşuldu ✅', 'success');
 
+                    // Yalnız oyun ekranındaysa və ya yadda saxlanılmış oyun varsa reconnect et
                     const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
                     const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
 
-                    if (storedRoomCode && storedPlayerId) {
-                        console.log('♻️ Yadda saxlanılmış oyun tapıldı, yenidən qoşulur...');
-                        sendMessage({
-                            type: 'reconnect',
-                            playerId: storedPlayerId,
-                            roomCode: storedRoomCode
-                        });
+                    if (storedRoomCode && storedPlayerId && screen !== 'lobby') {
+                        console.log('♻️ Oyun bərpa edilir:', storedRoomCode);
+                        setTimeout(() => {
+                            sendMessage({
+                                type: 'reconnect',
+                                playerId: storedPlayerId,
+                                roomCode: storedRoomCode
+                            });
+                        }, 500);
+                    } else {
+                        // Köhnə məlumatları təmizlə
+                        if (storedRoomCode || storedPlayerId) {
+                            console.log('🗑️ Köhnə oyun məlumatları təmizlənir');
+                            localStorage.removeItem(LOCAL_STORAGE_ROOM);
+                            localStorage.removeItem(LOCAL_STORAGE_PLAYER);
+                        }
                     }
-                    // Əks halda, auth prosesi lobiyə keçidi idarə edəcək
                 };
 
                 ws.onclose = (event) => {
-                    console.log('❌ WebSocket bağlantısı kapandı:', event.code, event.reason);
+                    console.log('❌ WebSocket bağlandı. Code:', event.code, 'Reason:', event.reason, 'Clean:', event.wasClean);
                     setConnected(false);
-                    wsRef.current = null;
 
-                    // Yalnız təmiz olmayan bağlantı kəsilməsində yenidən bağlan
-                    if (!event.wasClean && reconnectAttemptCount < MAX_RECONNECT_ATTEMPTS) {
-                        console.log(`🔄 Yenidən bağlanma cəhdi ${reconnectAttemptCount + 1}/${MAX_RECONNECT_ATTEMPTS}`);
-                        showNotification('Bağlantı kəsildi. Yenidən cəhd olunur...', 'warning');
-                        attemptReconnect();
+                    // WebSocket referansını təmizlə
+                    if (wsRef.current === ws) {
+                        wsRef.current = null;
+                    }
+
+                    // Normal bağlanma kodları (1000, 1001) - yenidən bağlanma
+                    const normalCloseCodes = [1000, 1001];
+                    const shouldReconnect = !normalCloseCodes.includes(event.code) && reconnectAttemptCount < MAX_RECONNECT_ATTEMPTS;
+
+                    if (shouldReconnect) {
+                        const delay = 3000 + (reconnectAttemptCount * 2000); // 3s, 5s, 7s, 9s, 11s
+                        console.log(`🔄 ${delay}ms sonra yenidən bağlanılacaq (cəhd ${reconnectAttemptCount + 1}/${MAX_RECONNECT_ATTEMPTS})`);
+
+                        showNotification(`Yenidən bağlanılır... (${reconnectAttemptCount + 1}/${MAX_RECONNECT_ATTEMPTS})`, 'warning');
+
+                        setReconnectAttemptCount(prev => prev + 1);
+
+                        if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+                        reconnectTimerRef.current = setTimeout(() => {
+                            console.log('⏰ Yenidən bağlanma vaxtı gəldi');
+                            connectToServer();
+                        }, delay);
                     } else if (reconnectAttemptCount >= MAX_RECONNECT_ATTEMPTS) {
-                        showNotification('Serverə qoşulmaq mümkün olmadı. Səhifəni yeniləyin.', 'error');
-                        setScreen('lobby');
+                        console.log('❌ Maksimum cəhd sayına çatıldı');
+                        showNotification('Bağlantı uğursuz. Səhifəni yeniləyin.', 'error');
+                    } else {
+                        console.log('ℹ️ Normal bağlanma, yenidən bağlanma lazım deyil');
                     }
                 };
 
@@ -719,17 +746,28 @@
 
             const sendMessage = (msg) => {
                 const ws = wsRef.current;
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    try {
-                        ws.send(JSON.stringify(msg));
-                        console.log('📤 Gönderilen mesaj:', msg.type);
-                    } catch (error) {
-                        console.error('Mesaj gönderme hatası:', error);
+
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    console.warn('⚠️ WebSocket bağlı deyil. State:', ws?.readyState);
+
+                    // Əgər bağlantı yoxdursa, yenidən bağlanmağa cəhd et
+                    if (!ws || ws.readyState === WebSocket.CLOSED) {
+                        console.log('� Avtomatik yenidən bağlanma başladılır...');
+                        connectToServer();
                     }
-                } else {
-                    console.warn('WebSocket bağlantısı yok');
-                    showNotification('Server bağlantısı yoxdur. Yenidən bağlanılır...', 'warning');
-                    attemptReconnect();
+
+                    showNotification('Bağlantı gözlənilir...', 'warning');
+                    return false;
+                }
+
+                try {
+                    ws.send(JSON.stringify(msg));
+                    console.log('📤 Mesaj göndərildi:', msg.type);
+                    return true;
+                } catch (error) {
+                    console.error('❌ Mesaj göndərmə xətası:', error);
+                    showNotification('Mesaj göndərilə bilmədi', 'error');
+                    return false;
                 }
             };
 
@@ -776,19 +814,21 @@
                         break;
 
                     case 'error':
-                        showNotification(data.message, 'error');
-                        if (data.message.includes('Zaten bir oyundasınız')) {
-                            // Kullanıcı zaten bir oyundaysa, oyunu yükle
-                            const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
-                            const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
-                            if (storedRoomCode && storedPlayerId) {
-                                sendMessage({
-                                    type: 'reconnect',
-                                    playerId: storedPlayerId,
-                                    roomCode: storedRoomCode
-                                });
+                        console.log('❌ Server xətası:', data.message);
+                        showNotification(data.message || 'Xəta baş verdi', 'error');
+
+                        // Əgər reconnect xətasıdırsa, localStorage-i təmizlə
+                        if (data.message && (data.message.includes('not found') || data.message.includes('tapılmadı') || data.message.includes('invalid'))) {
+                            console.log('🗑️ Köhnə oyun məlumatları təmizlənir...');
+                            localStorage.removeItem(LOCAL_STORAGE_ROOM);
+                            localStorage.removeItem(LOCAL_STORAGE_PLAYER);
+
+                            // Lobiyə keç
+                            if (screen === 'loading') {
+                                setTimeout(() => setScreen('lobby'), 500);
                             }
                         }
+
                         setSearching(false);
                         if (screen === 'game' && data.fatal) {
                             resetGameClientState();
@@ -870,10 +910,12 @@
                     }
                 }, 10000); // 10 saniye bekle
 
-                // Keep-alive pings
+                // Keep-alive pings - yalnız oyun zamanı
                 connectionCheckRef.current = setInterval(() => {
-                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) sendMessage({ type: 'ping' });
-                }, 15000);
+                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && screen === 'game') {
+                        sendMessage({ type: 'ping' });
+                    }
+                }, 30000); // 30 saniyədə bir
 
                 // Telegram mühitinin hazır olmasını gözlə, əks halda dərhal başla.
                 startApp();
@@ -939,18 +981,9 @@
                     setPlayerData(guestData);
                 }
                 finally {
-                    // Bu blok, auth işlemi başarılı da olsa başarısız da olsa çalışır.
-                    const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
-                    const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
-
-                    if (storedRoomCode && storedPlayerId) {
-                        console.log('📂 Yadda saxlanılmış oyun tapıldı, yenidən bağlanılacaq...');
-                        // Ekran 'loading' olaraq qalacaq, connectToServer yenidən bağlanmağı sınayacaq.
-                    } else {
-                        console.log('🎮 Lobbiyə yönləndirilir...');
-                        // Race condition-u önləmək üçün setTimeout istifadə et
-                        setTimeout(() => setScreen('lobby'), 100);
-                    }
+                    // Auth tamamlandı, lobiyə keç
+                    console.log('🎮 Auth tamamlandı, lobbiyə keçilir...');
+                    setTimeout(() => setScreen('lobby'), 100);
                 }
             };
 
