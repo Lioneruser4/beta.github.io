@@ -509,7 +509,7 @@
                         setGameState(data.gameState);
                         // Eğer match intro ekranındaysak hemen geçme, timeout bitince geçecek.
                         // Ancak reconnect durumunda direkt geç.
-                        if (screen !== 'match_intro') {
+                        if (screenRef.current !== 'match_intro') {
                             setScreen('game');
                         }
                         setSelectedTileIndex(null);
@@ -609,7 +609,7 @@
                     case 'searchStatus':
                         break;
                     case 'matchFound':
-                        // 4 Saniye Intro Göster
+                        // 5 Saniye Intro Göster
                         setOpponent(data.opponent || null);
                         if (searchTimerRef.current) clearInterval(searchTimerRef.current);
                         setSearchTime(0);
@@ -617,7 +617,7 @@
                         setScreen('match_intro');
                         setTimeout(() => {
                             setScreen('game');
-                        }, 4000);
+                        }, 5000);
                         break;
                     case 'gameLocked':
                         setOverlayState({
