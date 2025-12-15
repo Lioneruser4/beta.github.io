@@ -858,18 +858,45 @@ function handleLeaveGame(ws) {
 function handleDisconnect(ws) {
     console.log(`🔌 Oyuncu ayrıldı: ${ws.playerName || 'Bilinmeyen'}`);
     
-    if (ws.playerId) playerConnections.delete(ws.playerId);
+    if (ws.playerId) {
+        playerConnections.delete(ws.playerId);
+        
+        // Eğer oyuncu bir odadaysa, oyunu sonlandır
+        if (ws.roomCode) {
+            const room = rooms.get(ws.roomCode);
+            if (room && room.gameState) {
+                console.log(`🏠 Oyuncu oyundan ayrıldı: ${ws.roomCode}`);
+                // Oyunu sonlandır ve diğer oyuncuya haber ver
+                const gameState = room.gameState;
+                const playerIds = Object.keys(gameState.players);
+                const otherPlayerId = playerIds.find(id => id !== ws.playerId);
+                
+                if (otherPlayerId) {
+                    // Diğer oyuncuya bağlı mı kontrol et
+                    const otherPlayerWs = playerConnections.get(otherPlayerId);
+                    if (otherPlayerWs) {
+                        // Oyunu sonlandır ve kazananı ilan et
+                        handleGameEnd(ws.roomCode, otherPlayerId, gameState);
+                    } else {
+                        // Her iki oyuncu da ayrıldıysa odayı temizle
+                        rooms.delete(ws.roomCode);
+                    }
+                } else {
+                    // Oda boşsa sil
+                    rooms.delete(ws.roomCode);
+                }
+            } else {
+                // Oyun başlamadıysa sadece odayı sil
+                rooms.delete(ws.roomCode);
+            }
+        }
+    }
     
+    // Kuyruktan çıkar
     const qIdx = matchQueue.findIndex(p => p.ws === ws);
     if (qIdx !== -1) {
         matchQueue.splice(qIdx, 1);
         console.log(`❌ Kuyruktan çıkarıldı - Kalan: ${matchQueue.length}`);
-    }
-
-    if (ws.roomCode) {
-        console.log(`🏠 Odadan ayrıldı: ${ws.roomCode}`);
-        broadcastToRoom(ws.roomCode, { type: 'playerDisconnected' });
-        rooms.delete(ws.roomCode);
     }
 }
 
