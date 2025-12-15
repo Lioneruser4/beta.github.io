@@ -596,15 +596,33 @@ async function handleFindMatch(ws, data) {
 
     playerConnections.set(playerId, ws);
 
-    // Eşleşme Mantığı:
-    // 1. Guest sadece Guest ile eşleşebilir.
-    // 2. Telegram kayıtlı kullanıcı sadece Telegram kullanıcısı ile eşleşebilir (Ranked).
+    // Ölü bağlantıları temizle ve Eşleşme Mantığı
+    for (let i = matchQueue.length - 1; i >= 0; i--) {
+        if (matchQueue[i].ws.readyState !== WebSocket.OPEN) {
+            matchQueue.splice(i, 1);
+        }
+    }
+
+    const isSelf = (p) => {
+        if (p.telegramId && ws.telegramId && p.telegramId === ws.telegramId) return true;
+        if (p.playerId === ws.playerId) return true;
+        return false;
+    };
+
     let opponentIndex = -1;
 
-    if (ws.isGuest) {
-        opponentIndex = matchQueue.findIndex(p => p.isGuest === true);
+    if (!ws.isGuest) {
+        // Ranked Oyuncu
+        // 1. Ranked Rakip Ara (Öncelikli)
+        opponentIndex = matchQueue.findIndex(p => !p.isGuest && !isSelf(p));
+
+        // 2. Bulamazsa Guest Ara (Casual Maç)
+        if (opponentIndex === -1) {
+            opponentIndex = matchQueue.findIndex(p => p.isGuest && !isSelf(p));
+        }
     } else {
-        opponentIndex = matchQueue.findIndex(p => p.isGuest === false && p.telegramId !== ws.telegramId);
+        // Guest Oyuncu - Herkesle oynayabilir (Ranked oyuncu gelirse Casual olur)
+        opponentIndex = matchQueue.findIndex(p => !isSelf(p));
     }
 
     if (opponentIndex !== -1) {
