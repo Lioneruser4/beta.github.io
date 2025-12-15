@@ -648,122 +648,108 @@
                             // Timeout YOK. Server gameStart gönderene kadar bekler.
                             break;
                         case 'gameLocked':
-                            wsRef.current.send(JSON.stringify(msg));
+                            // Bu mesaj tipi için bir işlem tanımlanmamış.
+                            // 'msg' değişkeni tanımlı olmadığı için önceki kod hata veriyordu.
+                            console.warn('Unhandled message type: gameLocked');
+                            break;
                     }
                 };
+            };
 
-                const showNotification = (msg, type = 'info') => {
-                    setNotification({ message: msg, type });
-                    setTimeout(() => setNotification(null), 3000);
-                };
+            const showNotification = (msg, type = 'info') => {
+                setNotification({ message: msg, type });
+                setTimeout(() => setNotification(null), 3000);
+            };
 
-                // --- OYUN MANTIĞI ---
+            // --- OYUN MANTIĞI ---
 
-                const myPlayerId = gameState?.playerId;
-                const isMyTurn = gameState?.currentPlayer === myPlayerId;
-                const myHand = gameState?.players[myPlayerId]?.hand || [];
-                const marketSize = gameState?.market?.length || 0;
-                const canDrawFromMarket = marketSize > 0;
+            const myPlayerId = gameState?.playerId;
+            const isMyTurn = gameState?.currentPlayer === myPlayerId;
+            const myHand = gameState?.players[myPlayerId]?.hand || [];
+            const marketSize = gameState?.market?.length || 0;
+            const canDrawFromMarket = marketSize > 0;
 
-                // calculateValidMoves fonksiyonu - EKSİKTİ!
-                const calculateValidMoves = (tile) => {
-                    if (!gameState || gameState.board.length === 0) return ['start'];
+            // calculateValidMoves fonksiyonu
+            const calculateValidMoves = (tile) => {
+                if (!gameState || gameState.board.length === 0) return ['start'];
 
-                    const leftEnd = gameState.board[0][0];
-                    const rightEnd = gameState.board[gameState.board.length - 1][1];
-                    const moves = [];
+                const leftEnd = gameState.board[0][0];
+                const rightEnd = gameState.board[gameState.board.length - 1][1];
+                const moves = [];
 
-                    if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
-                    if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
+                if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
+                if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
 
-                    return moves;
-                };
+                return moves;
+            };
 
-                // Seçim Yapma
-                const handleTileClick = (index, tile) => {
-                    if (!isMyTurn) return;
+            // Seçim Yapma
+            const handleTileClick = (index, tile) => {
+                if (!isMyTurn) return;
 
-                    // Zaten seçiliyse seçimi kaldır
-                    if (selectedTileIndex === index) {
-                        setSelectedTileIndex(null);
-                        setValidMoves([]);
-                        return;
-                    }
-
-                    // Geçerli hamleleri hesapla
-                    if (gameState.board.length === 0) {
-                        // İlk hamle her yere yapılabilir
-                        setSelectedTileIndex(index);
-                        setValidMoves(['start']);
-                    } else {
-                        const leftEnd = gameState.board[0][0];
-                        const rightEnd = gameState.board[gameState.board.length - 1][1];
-                        const moves = [];
-
-                        // Basit mantık: Eşleşiyor mu?
-                        if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
-                        if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
-
-                        if (moves.length > 0) {
-                            setSelectedTileIndex(index);
-                            setValidMoves(moves);
-                            playSound('click');
-                        } else {
-                            showNotification('Bu taş uygun değil', 'warning');
-                        }
-                    }
-                };
-
-                // Taşı Oynama
-                const playTile = (position) => {
-                    if (selectedTileIndex === null) return;
-
-                    // Server 'left' veya 'right' bekliyor.
-                    // Eğer tahta boşsa server genelde fark etmez ama 'left' gönderelim.
-                    const posToSend = position === 'start' ? 'left' : position;
-
-                    sendMessage({
-                        type: 'playTile',
-                        tileIndex: selectedTileIndex,
-                        position: posToSend
-                    });
-
-                    // Seçimi temizle (Optimistik UI)
+                if (selectedTileIndex === index) {
                     setSelectedTileIndex(null);
                     setValidMoves([]);
-                };
+                    return;
+                }
 
-                const passTurn = () => {
-                    sendMessage({ type: 'pass' });
-                };
-
-                const drawFromMarket = () => {
-                    if (!isMyTurn || !canDrawFromMarket) return;
-                    // Elinde oynanabilir taş varsa pazardan çekmeyi engelle
-                    const canPlayFromHand = myHand.some(tile => calculateValidMoves(tile).length > 0);
-                    if (gameState.board.length > 0 && canPlayFromHand) {
-                        showNotification('Elinde oynanabilir taş varken pazardan çekemezsin!', 'warning');
-                        return; // Fonksiyondan tamamen çık
+                if (gameState.board.length === 0) {
+                    setSelectedTileIndex(index);
+                    setValidMoves(['start']);
+                } else {
+                    const moves = calculateValidMoves(tile);
+                    if (moves.length > 0) {
+                        setSelectedTileIndex(index);
+                        setValidMoves(moves);
+                        playSound('click');
+                    } else {
+                        showNotification('Bu taş uygun değil', 'warning');
                     }
-                    sendMessage({ type: 'drawFromMarket' });
-                    showNotification('🎲 Pazardan taş çekiliyor...', 'info');
-                };
+                }
+            };
 
-                const leaveGameClient = () => {
-                    // Kullanıcıdan onay iste
-                    const confirmed = window.confirm(
-                        'Oyundan çıkmak istediğine emin misin?\n\n' +
-                        'Bu eli terk edersen ELO puanı kaybedebilirsin ve el otomatik olarak rakibine yazılacaktır.'
-                    );
-                    if (!confirmed) return;
+            // Taşı Oynama
+            const playTile = (position) => {
+                if (selectedTileIndex === null) return;
+                const posToSend = position === 'start' ? 'left' : position;
+                sendMessage({ type: 'playTile', tileIndex: selectedTileIndex, position: posToSend });
+                setSelectedTileIndex(null);
+                setValidMoves([]);
+            };
 
-                    // Sunucuya haber ver
-                    sendMessage({ type: 'leaveGame' });
+            const passTurn = () => {
+                sendMessage({ type: 'pass' });
+            };
 
-                    // Lokal state temizle ve lobiye dön
-                    resetGameClientState();
-                    setScreen('lobby');
-                };
+            const drawFromMarket = () => {
+                if (!isMyTurn || !canDrawFromMarket) return;
+                const canPlayFromHand = myHand.some(tile => calculateValidMoves(tile).length > 0);
+                if (gameState.board.length > 0 && canPlayFromHand) {
+                    showNotification('Elinde oynanabilir taş varken pazardan çekemezsin!', 'warning');
+                    return;
+                }
+                sendMessage({ type: 'drawFromMarket' });
+                showNotification('🎲 Pazardan taş çekiliyor...', 'info');
+            };
+
+            const leaveGameClient = () => {
+                const confirmed = window.confirm(
+                    'Oyundan çıkmak istediğine emin misin?\n\n' +
+                    'Bu eli terk edersen ELO puanı kaybedebilirsin ve el otomatik olarak rakibine yazılacaktır.'
+                );
+                if (!confirmed) return;
+                sendMessage({ type: 'leaveGame' });
+                resetGameClientState();
+                setScreen('lobby');
+            };
+
+            const sendMessage = (message) => {
+                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                    wsRef.current.send(JSON.stringify(message));
+                } else {
+                    console.error("WebSocket is not connected.");
+                }
+            };
 
                 // --- SEARCHING LOBBY ---
                 if (screen === 'searching') {
