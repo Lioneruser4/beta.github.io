@@ -476,123 +476,154 @@ wss.on('close', () => clearInterval(pingInterval));
 
 // --- OYUN MANTIKLARI ---
 
-// TEK TELEGRAM HESABI KONTROLÜ İÇİN MAP
-const activeTelegramSessions = new Map(); // telegramId -> ws
-
 async function handleFindMatch(ws, data) {
     const telegramId = data.telegramId;
     const storedPlayerId = data.playerId; // Client provided stored ID
 
-    console.log(`🔎 Match Request: ${data.username} (TG: ${telegramId}, StoredID: ${storedPlayerId})`);
-
-    // 1. RECONNECT MANTIĞI (ÖNCELİKLİ)
-    // Önce bu oyuncu zaten bir odada mı kontrol et
+    // 1. Önce aktif bir oyunu var mı kontrol et (Memory & DB)
     if (telegramId || storedPlayerId) {
-        // A. Memory Kontrolü
+        // Memory check
         for (const [code, room] of rooms.entries()) {
             let playerEntry = null;
             if (telegramId) {
-                // Telegram ID ile ara
                 playerEntry = Object.entries(room.players).find(([pid, p]) => p.telegramId === telegramId);
-            }
-            if (!playerEntry && storedPlayerId && room.players[storedPlayerId]) {
-                // Stored ID ile ara (Guest veya DB'den dönen ID)
+            } else if (storedPlayerId && room.players[storedPlayerId]) {
                 playerEntry = [storedPlayerId, room.players[storedPlayerId]];
             }
 
             if (playerEntry) {
-                console.log(`♻️ RECONNECT (Memory): ${data.username} -> Room ${code}`);
+                console.log(`♻️ Oyuncu ${data.username || 'Guest'} tekrar bağlanıyor (Memory): ${code}`);
                 reconnectPlayer(ws, code, playerEntry[0], room);
                 return;
             }
         }
 
-        // B. Veritabanı (DB) Kontrolü (Server Restart Sonrası)
-        // Eğer memory'de yoksa ama DB'de "devam ediyor" görünüyorsa
-        if (telegramId) {
-            try {
-                const activeGame = await ActiveGame.findOne({ telegramIds: telegramId });
-                if (activeGame) {
-                    console.log(`♻️ RECONNECT (DB): ${data.username} -> Room ${activeGame.roomCode}`);
-                    await restoreGameFromDB(activeGame.roomCode); // Odayı memory'e geri yükle
+        // DB check (Server restart sonrası için)
+        try {
+            let activeGame = null;
+            if (telegramId) {
+                activeGame = await ActiveGame.findOne({ telegramIds: telegramId });
+            } else if (storedPlayerId) {
+                const query = {};
+                query[`players.${storedPlayerId}`] = { $exists: true };
+                activeGame = await ActiveGame.findOne(query);
+            }
 
-                    // Tekrar Memory kontrolü yap (artık yüklenmiş olmalı)
+            if (activeGame) {
+                console.log(`♻️ Oyuncu ${data.username} tekrar bağlanıyor (DB): ${activeGame.roomCode}`);
+
+                // Odayı memory'e geri yükle
+                if (!rooms.has(activeGame.roomCode)) {
+                    rooms.set(activeGame.roomCode, {
+                        code: activeGame.roomCode,
+                        players: activeGame.players,
+                        gameState: activeGame.gameState,
+                        type: activeGame.type,
+                        host: activeGame.host,
+                        startTime: activeGame.startTime
+                    });
+
+                    // Odayı geri yüklerken, diğer oyuncunun bağlı olup olmadığını kontrol et.
+                    // Eğer sunucu yeni başladıysa kimse bağlı değildir.
+                    // İlk bağlanan kişi odayı kurdu. Diğeri yok.
+                    // Diğer oyuncu için bir timeout başlatmalıyız, yoksa oyun sonsuza kadar bekler.
                     const room = rooms.get(activeGame.roomCode);
-                    if (room) {
-                        const pid = Object.keys(room.players).find(id => room.players[id].telegramId === telegramId);
-                        if (pid) {
-                            reconnectPlayer(ws, activeGame.roomCode, pid, room);
-                            return;
-                        }
+                    const otherPlayerId = Object.keys(room.players).find(pid => room.players[pid].telegramId !== telegramId);
+
+                    if (otherPlayerId) {
+                        // Diğer oyuncu henüz memory'de yok (çünkü server yeni başladı veya o da düştü)
+                        // Onun için disconnect sürecini başlat
+                        console.log(`⏳ Rakip (${otherPlayerId}) bekleniyor, timeout başlatıldı.`);
+                        const timeoutId = setTimeout(() => {
+                            const r = rooms.get(activeGame.roomCode);
+                            if (r && !playerConnections.has(otherPlayerId)) { // Hala bağlanmadıysa
+                                console.log(`⏱️ Timeout doldu (Server Restart Sonrası), kazanan: ${telegramId}`);
+                                // Mevcut bağlantıya bildir
+                                const myPid = Object.keys(r.players).find(pid => r.players[pid].telegramId === telegramId);
+                                const ws = playerConnections.get(myPid);
+                                if (ws) sendMessage(ws, { type: 'opponentTimeout', message: 'Rakip süre dolduğu için oyunu kaybetti.' });
+
+                                handleGameEnd(activeGame.roomCode, myPid, r.gameState);
+                            }
+                            activeDisconnects.delete(activeGame.roomCode);
+                        }, 20000); // 20 saniye bekle
+                        activeDisconnects.set(activeGame.roomCode, timeoutId);
                     }
                 }
-            } catch (e) { console.error('DB Reconnect Error:', e); }
-        }
-    }
 
-    // 2. TEK OTURUM KONTROLÜ (Single Session)
-    // Eğer oyuncu oyunda değilse (yukarıda return olmadıysa),
-    // ama başka bir cihazda bağlantısı açıksa, o bağlantıyı kapatalım.
-    if (telegramId) {
-        if (activeTelegramSessions.has(telegramId)) {
-            const oldWs = activeTelegramSessions.get(telegramId);
-            if (oldWs !== ws && oldWs.readyState === WebSocket.OPEN) {
-                console.log(`🚫 Eski oturum kapatılıyor: ${telegramId}`);
-                sendMessage(oldWs, { type: 'error', message: 'Başka bir cihazdan giriş yapıldığı için bağlantınız kesildi.' });
-                oldWs.close(); // Eski bağlantıyı kopar
+                const room = rooms.get(activeGame.roomCode);
+                const foundPlayerId = Object.keys(room.players).find(pid =>
+                    (telegramId && room.players[pid].telegramId === telegramId) ||
+                    (storedPlayerId && pid === storedPlayerId)
+                );
+
+                if (foundPlayerId) {
+                    reconnectPlayer(ws, activeGame.roomCode, foundPlayerId, room);
+                    return;
+                }
             }
+        } catch (err) {
+            console.error('DB Reconnect check error:', err);
         }
-        activeTelegramSessions.set(telegramId, ws);
     }
 
-    // 3. KUYRUK TEMİZLİĞİ (Zaten kuyrukta mı?)
-    const existingQueueIndex = matchQueue.findIndex(p =>
-        p.ws === ws ||
-        (telegramId && p.telegramId === telegramId) ||
-        (storedPlayerId && p.playerId === storedPlayerId)
-    );
-
-    if (existingQueueIndex !== -1) {
-        // Zaten kuyrukta. Sadece soketi güncelle veya hata ver.
-        // Biz soketi güncelleyelim, belki sayfa yeniledi ve tekrar aradı.
-        console.log(`⚠️ Zaten kuyrukta, güncelleniyor: ${data.username}`);
-        matchQueue[existingQueueIndex].ws = ws;
-        sendMessage(ws, { type: 'searchStatus', message: 'Hala rakip aranıyor...' });
-        return;
+    if (ws.playerId && playerConnections.has(ws.playerId)) {
+        const existingInQueue = matchQueue.find(p => p.playerId === ws.playerId);
+        if (existingInQueue) {
+            return sendMessage(ws, { type: 'error', message: 'Zaten kuyrukta bekliyorsunuz' });
+        }
+        if (ws.roomCode) {
+            return sendMessage(ws, { type: 'error', message: 'Zaten bir oyundasınız' });
+        }
     }
 
-    // 4. YENİ OYUNCU HAZIRLIĞI
-    const playerId = storedPlayerId || generateRoomCode(); // Varsa eski ID, yoksa yeni
+    const playerId = ws.playerId || storedPlayerId || generateRoomCode();
     ws.playerId = playerId;
     ws.playerName = data.playerName || data.username || 'Guest';
-    ws.telegramId = telegramId || null;
+    ws.telegramId = data.telegramId || null; // null ise guest
     ws.photoUrl = data.photoUrl || null;
-    ws.level = data.level || 0;
-    ws.elo = data.elo || 0;
-    ws.isGuest = !telegramId;
+    ws.level = data.level || 0; // 0 = guest
+    ws.elo = data.elo || 0; // 0 = guest
+    ws.isGuest = !data.telegramId; // Telegram yoksa guest
+
+    // Aynı Telegram hesabının ikinci kez kuyruğa girmesini engelle (TEST İÇİN DEVRE DIŞI)
+    /*
+    if (!ws.isGuest && ws.telegramId) {
+        const sameTelegramInQueue = matchQueue.find(p => p.telegramId === ws.telegramId);
+        if (sameTelegramInQueue) {
+            return sendMessage(ws, { type: 'error', message: 'Bu Telegram hesabı zaten eşleşme kuyruğunda' });
+        }
+    }
+    */
 
     playerConnections.set(playerId, ws);
 
-    // 5. EŞLEŞTİRME (MATCHMAKING)
-    // Kuyruktan uygun birini bul. 
-    // Kural: Kendisi olmayan İLK kişi. (Ranked/Casual ayrımı şimdilik kapalı, hızlı eşleşme için)
-
-    // Önce ölü bağlantıları temizle
+    // Ölü bağlantıları temizle ve Eşleşme Mantığı
     for (let i = matchQueue.length - 1; i >= 0; i--) {
         if (matchQueue[i].ws.readyState !== WebSocket.OPEN) {
             matchQueue.splice(i, 1);
         }
     }
 
-    const opponentIndex = matchQueue.findIndex(p => p.ws !== ws && p.telegramId !== (ws.telegramId || 'guest_nomatch'));
+    // Eşleşme Mantığı (BASİTLEŞTİRİLMİŞ - HERKES HERKESLE)
+
+    // Kendisi dışındaki İLK kişiyi bul
+    // Test için: Aynı Telegram ID olsa bile eşleşmesine izin veriyoruz (farklı sekmeler için)
+    let opponentIndex = matchQueue.findIndex(p => p.ws !== ws);
 
     if (opponentIndex !== -1) {
-        // RAKİP BULUNDU!
+        console.log(`✅ RAKİP BULUNDU! (Basit Mod)`);
+    } else {
+        console.log(`❌ RAKİP YOK, Kuyruğa ekleniyor...`);
+    }
+
+    if (opponentIndex !== -1) {
         const opponent = matchQueue.splice(opponentIndex, 1)[0];
-        console.log(`✅ MATCH FOUND: ${ws.playerName} vs ${opponent.playerName}`);
 
         const roomCode = generateRoomCode();
-        const gameType = (!ws.isGuest && !opponent.isGuest) ? 'ranked' : 'casual'; // İkisi de üye ise Ranked
+        const gameType = (ws.isGuest || opponent.isGuest) ? 'casual' : 'ranked';
+
+        console.log(`🎮 Maç oluşturuluyor (${gameType.toUpperCase()}): ${ws.playerName} vs ${opponent.playerName}`);
 
         const room = {
             code: roomCode,
@@ -622,58 +653,43 @@ async function handleFindMatch(ws, data) {
         ws.roomCode = roomCode;
         opponent.ws.roomCode = roomCode;
 
-        // DB'ye ActiveGame olarak kaydet (Yedek)
         const gameState = initializeGame(roomCode, ws.playerId, opponent.playerId);
-        saveActiveGame(roomCode, room);
 
-        // Bildirimler
+        // SYNC FIX: 
+        // 1. Send matchFound immediately.
+        // 2. Wait 6 seconds (server side delay).
+        // 3. Send gameStart to both.
+        // This ensures the intro screen is shown for exactly 6 sec on both client.
+
         sendMessage(ws, { type: 'matchFound', roomCode, opponent: room.players[opponent.playerId], gameType });
         sendMessage(opponent.ws, { type: 'matchFound', roomCode, opponent: room.players[ws.playerId], gameType });
 
-        // 6 saniye sonra oyunu başlat
         setTimeout(() => {
-            // Hala bağlılar mı kontrol et
-            if (ws.readyState === WebSocket.OPEN) {
-                sendMessage(ws, { type: 'gameStart', gameState: { ...gameState, playerId: ws.playerId } });
-            }
-            if (opponent.ws.readyState === WebSocket.OPEN) {
-                sendMessage(opponent.ws, { type: 'gameStart', gameState: { ...gameState, playerId: opponent.playerId } });
-            }
+            const gameStartMsg1 = { type: 'gameStart', gameState: { ...gameState, playerId: ws.playerId } };
+            sendMessage(ws, gameStartMsg1);
+
+            const gameStartMsg2 = { type: 'gameStart', gameState: { ...gameState, playerId: opponent.playerId } };
+            sendMessage(opponent.ws, gameStartMsg2);
+
+            console.log(`✅ Oyun başlatıldı (6s gecikmeli): ${roomCode}`);
         }, 6000);
 
     } else {
-        // RAKİP YOK, KUYRUĞA GİR
-        console.log(`⏳ Kuyruğa eklendi: ${ws.playerName}`);
         matchQueue.push({
             ws,
             playerId,
-            telegramId: ws.telegramId,
             playerName: ws.playerName,
+            telegramId: ws.telegramId,
             photoUrl: ws.photoUrl,
             level: ws.level,
             elo: ws.elo,
             isGuest: ws.isGuest
         });
+
+        const playerType = ws.isGuest ? 'GUEST' : `LVL ${ws.level}, ELO ${ws.elo}`;
+        console.log(`✅ ${ws.playerName} (${playerType}) kuyrukta - Toplam: ${matchQueue.length}`);
         sendMessage(ws, { type: 'searchStatus', message: 'Rakip aranıyor...' });
     }
-}
-
-// Yardımcı: DB'den odayı geri yükle
-async function restoreGameFromDB(roomCode) {
-    if (rooms.has(roomCode)) return; // Zaten memory'de var
-
-    const activeGame = await ActiveGame.findOne({ roomCode });
-    if (!activeGame) return;
-
-    rooms.set(roomCode, {
-        code: activeGame.roomCode,
-        players: activeGame.players,
-        gameState: activeGame.gameState,
-        type: activeGame.type,
-        host: activeGame.host,
-        startTime: activeGame.startTime
-    });
-    console.log(`📂 DB'den oda yüklendi: ${roomCode}`);
 }
 
 function handleCancelSearch(ws) {
