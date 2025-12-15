@@ -1,23 +1,9 @@
-const socket = io('https://mario-io-1.onrender.com', { // Ensure this matches user request URL if deploying there, otherwise relative for local
-    autoConnect: true
-    // UPDATE: The user asked to connect to https://mario-io-1.onrender.com.
-    // IF we are hosting ON that server, we can use relative path.
-    // BUT since I am writing the code for the project described, and the user prompt says:
-    // "The game must feature a robust online multiplayer system connecting to the backend server at: https://mario-io-1.onrender.com."
-    // I should probably set this URL explicitly if the frontend is separate from backend.
-    // However, the prompt says "designed to be hosted on Github Pages and deployed via Render".
-    // If hosted on GH Pages, it needs the full URL.
+```javascript
+const socket = io('https://mario-io-1.onrender.com', {
+    autoConnect: true 
 });
-// Note: If running locally with the server.js I made, this should point to localhost or relative. 
-// But the user specific prompt URL suggests use that. 
-// CHECK: If I am "Creating" the game, I am creating the Server AND Client.
-// The user prompt implies I am building the WHOLE thing.
-// So if I build the server, I should point the client to where the server WILL be.
-// For now, I'll make it dynamic or use the requested URL.
-// Actually, I'll stick to relative '/' because usually `server.js` serves `index.html`.
-// Wait, user says "hosted on Github Pages". GH Pages is static.
-// So the client MUST point to the Render URL.
-// I will use the Render URL provided in the prompt.
+// If hosting the frontend on the same server, you could use io() without arguments.
+// Since the prompt specifies hosting on Github Pages and connecting to a specific Render URL, we use the absolute URL.
 
 // CORRECTION: The user provided https://mario-io-1.onrender.com as the backend.
 // So the client socket connect string should be that.
@@ -91,9 +77,9 @@ socket.on('matchmaking_status', (data) => {
 });
 
 socket.on('room_created', (data) => {
-    alert(`Room Created! Code: ${data.roomId}`);
+    alert(`Room Created! Code: ${ data.roomId } `);
     ui.loadingOverlay.style.display = 'flex';
-    ui.loadingText.textContent = `Waiting for friend... Room: ${data.roomId}`;
+    ui.loadingText.textContent = `Waiting for friend...Room: ${ data.roomId } `;
     ui.cancelSearchBtn.textContent = "Cancel Room";
     ui.cancelSearchBtn.onclick = () => {
         // Implement leave room logic if needed
@@ -225,7 +211,7 @@ function renderBoard() {
         el.className = 'domino-tile horizontal'; // Simplification: all horizontal in row
         // Check if double?
         // Render dots/numbers
-        el.innerHTML = `<div class="domino-half">${tile[0]}</div><div class="domino-half">${tile[1]}</div>`;
+        el.innerHTML = `< div class="domino-half" > ${ tile[0] }</div > <div class="domino-half">${tile[1]}</div>`;
         container.appendChild(el);
     });
 }
@@ -237,7 +223,7 @@ function renderHand() {
     myHand.forEach((tile, index) => {
         const el = document.createElement('div');
         el.className = 'domino-tile';
-        el.innerHTML = `<div class="domino-half">${tile[0]}</div><div class="domino-half">${tile[1]}</div>`;
+        el.innerHTML = `< div class="domino-half" > ${ tile[0] }</div > <div class="domino-half">${tile[1]}</div>`;
 
         el.onclick = () => selectTile(index, el);
 
@@ -344,14 +330,14 @@ function renderLeaderboard(players, myRank) {
         if (i === 2) rankClass = 'lb-rank-3';
 
         row.innerHTML = `
-            <span class="${rankClass}">#${i + 1}</span>
+    < span class="${rankClass}" > #${ i + 1 }</span >
             <span>${p.username} ${getLevelIcon(p.level)}</span>
             <span>${p.elo} pts</span>
-        `;
+`;
         list.appendChild(row);
     });
 
     if (myRank !== -1) {
-        ui.userRankDisplay.textContent = `Your Rank: #${myRank} (${currentUser.username})`;
+        ui.userRankDisplay.textContent = `Your Rank: #${ myRank } (${ currentUser.username })`;
     }
 }
