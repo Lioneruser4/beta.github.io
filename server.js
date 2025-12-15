@@ -331,29 +331,49 @@ function playTileOnBoard(tile, board, position) {
 }
 
 function checkWinner(gameState) {
+    // Oyun taşlarının toplam sayısını kontrol et
+    let totalTiles = 0;
     for (const playerId in gameState.players) {
-        if (gameState.players[playerId].hand.length === 0) {
-            return playerId;
-        }
+        totalTiles += gameState.players[playerId].hand.length;
+    }
+    
+    // Eğer hiç taş kalmadıysa oyun biter
+    if (totalTiles === 0) {
+        return 'DRAW';
     }
 
+    // Her oyuncunun elindeki taşları kontrol et
     const player1Id = Object.keys(gameState.players)[0];
     const player2Id = Object.keys(gameState.players)[1];
     const player1Hand = gameState.players[player1Id].hand;
     const player2Hand = gameState.players[player2Id].hand;
 
+    // Eğer bir oyuncunun eli boşsa ve piyasada taş kalmadıysa o kazanır
+    if (player1Hand.length === 0 && gameState.market.length === 0) {
+        return player1Id;
+    }
+    
+    if (player2Hand.length === 0 && gameState.market.length === 0) {
+        return player2Id;
+    }
+
+    // Her iki oyuncunun da oynayabileceği hamlesi var mı kontrol et
     const player1CanPlay = player1Hand.some(tile => canPlayTile(tile, gameState.board));
     const player2CanPlay = player2Hand.some(tile => canPlayTile(tile, gameState.board));
 
+    // Eğer hiçbir oyuncu hamle yapamıyorsa
     if (!player1CanPlay && !player2CanPlay) {
+        // Puan hesapla
         const player1Sum = player1Hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
         const player2Sum = player2Hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
         
-        // Eşitlik durumunda beraberlik mantığı eklenebilir, şimdilik az puanlı kazanır
-        if (player1Sum === player2Sum) return 'DRAW'; 
+        // Eşitlik durumunda beraberlik
+        if (player1Sum === player2Sum) return 'DRAW';
+        // Düşük puan kazanır
         return player1Sum < player2Sum ? player1Id : player2Id;
     }
 
+    // Oyun devam ediyor
     return null;
 }
 
@@ -630,11 +650,19 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
 
     try {
         const playerIds = Object.keys(gameState.players);
+        if (playerIds.length < 2) return; // Eğer yeterli oyuncu yoksa çık
+
         const player1Id = playerIds[0];
         const player2Id = playerIds[1];
-
         const isDraw = winnerId === 'DRAW';
         let eloChanges = null;
+        
+        // Oyunun gerçekten bittiğinden emin ol
+        const winner = checkWinner(gameState);
+        if (winner === null) {
+            console.log('Oyun henüz bitmedi, devam ediyor...');
+            return; // Oyun devam ediyor, bitirme işlemi yapma
+        }
 
         // Guest kontrolu - Guest varsa ELO guncellemesi yapma
         const player1IsGuest = room.players[player1Id].isGuest;
