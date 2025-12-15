@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <meta name="theme-color" content="#1b4d3e">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Domino 101 Pro - Telegram Oyunu</title>
     
@@ -807,6 +808,14 @@
                     connectToServer();              // 2. Sonra serverə qoşul
                 };
 
+                // Yükleme ekranında takılmayı önlemek için zaman aşımı
+                initialLoadTimeoutRef.current = setTimeout(() => {
+                    if (screen === 'loading' && !connected) {
+                        showNotification('Serverə qoşulmaq mümkün olmadı. Zəhmət olmasa sonra yenidən cəhd edin.', 'error');
+                        setScreen('lobby');
+                    }
+                }, 10000); // 10 saniye bekle
+
                 connectionCheckRef.current = setInterval(() => {
                     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                         sendMessage({ type: 'ping' });
@@ -824,6 +833,7 @@
                     if (wsRef.current) wsRef.current.close(); 
                     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
                     if (connectionCheckRef.current) clearInterval(connectionCheckRef.current);
+                    if (initialLoadTimeoutRef.current) clearTimeout(initialLoadTimeoutRef.current);
                 };
             }, []);     
 
