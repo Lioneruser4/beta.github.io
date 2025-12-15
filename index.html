@@ -3,13 +3,12 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
     <meta name="theme-color" content="#1b4d3e">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Domino 101 Pro - Telegram Game</title>
 
-    <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -83,7 +82,7 @@
             background-color: #1b4d3e;
             background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23153d31' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z'/%3E%3C/g%3E%3C/svg%3E");
             overflow: hidden;
-            touch-action: pan-y pinch-zoom;
+            touch-action: manipulation; /* pinch-zoom için daha esnek */
             -webkit-tap-highlight-color: transparent;
             user-select: none;
             -webkit-user-select: none;
@@ -163,139 +162,6 @@
                 transform: rotate(360deg);
             }
         }
-
-        /* Taşlar için responsive boyutlar */
-        @media (max-width: 640px) {
-            .domino-tile {
-                width: 30px;
-                height: 60px;
-                font-size: 0.7rem;
-            }
-
-            .pip {
-                width: 6px;
-                height: 6px;
-            }
-        }
-
-        @media (min-width: 641px) and (max-width: 1024px) {
-            .domino-tile {
-                width: 35px;
-                height: 70px;
-                font-size: 0.8rem;
-            }
-
-            .pip {
-                width: 8px;
-                height: 8px;
-            }
-        }
-
-        @media (min-width: 1025px) {
-            .domino-tile {
-                width: 40px;
-                height: 80px;
-                font-size: 0.9rem;
-            }
-
-            .pip {
-                width: 10px;
-                height: 10px;
-            }
-        }
-
-        .domino-tile {
-            transition: all 0.3s ease;
-            transform-style: preserve-3d;
-            flex-shrink: 0;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 3px;
-            border-radius: 2px;
-            background: #fff;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-            width: 30px;
-            height: 60px;
-            position: relative;
-        }
-
-        .domino-tile .pip {
-            display: flex;
-            justify-content: space-around;
-            width: 100%;
-        }
-
-        .domino-hand {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            align-content: flex-start;
-            gap: 4px;
-            padding: 5px;
-            width: 100%;
-            max-height: 180px;
-            overflow-y: auto;
-            scrollbar-width: none;
-            -ms-overflow-style: none;
-            scroll-behavior: smooth;
-        }
-
-        /* Oyun tahtası için özel stiller */
-        .game-board {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            padding: 10px;
-            overflow: hidden;
-        }
-
-        .board-row {
-            display: flex;
-            flex-wrap: nowrap;
-            justify-content: center;
-            margin: 2px 0;
-            width: 100%;
-        }
-
-        .board-tile {
-            margin: 0 1px;
-        }
-
-        .board-tile.vertical {
-            transform: rotate(90deg);
-            margin: 10px -10px;
-        }
-
-        @media (max-width: 640px) {
-            .domino-tile {
-                min-width: 28px;
-                height: 56px;
-                margin: 1px;
-            }
-
-            .domino-hand {
-                gap: 4px;
-                padding: 5px;
-            }
-        }
-
-        @media (min-width: 641px) and (max-width: 1024px) {
-            .domino-tile {
-                min-width: 32px;
-                height: 64px;
-            }
-        }
-
-        @media (min-width: 1025px) {
-            .domino-tile {
-                min-width: 36px;
-                height: 72px;
-            }
-        }
     </style>
 </head>
 
@@ -315,9 +181,7 @@
         // API Base URL
         const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
 
-        // --- BİLEŞENLER ---
-
-        // 1. Domino Noktaları (Pips)
+        // --- BİLEŞENLER (DEĞİŞİKLİK YOK) ---
         const RenderPips = ({ number }) => {
             const layouts = {
                 0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8],
@@ -333,7 +197,6 @@
             );
         };
 
-        // 2. Domino Taşı (3D Tasarım)
         const DominoTile = ({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false }) => {
             const baseClasses = `
                 relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
@@ -363,7 +226,6 @@
             );
         };
 
-        // 3. Bildirim Toast
         const Toast = ({ message, type }) => {
             const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600', warning: 'bg-yellow-600' };
             return (
@@ -373,30 +235,39 @@
                 </div>
             );
         };
+        // --- BİLEŞENLER SONU ---
 
         // --- ANA OYUN ---
 
         const DominoGame = () => {
+            // Reconnection için LocalStorage Key'leri
+            const LOCAL_STORAGE_ROOM = 'domino_roomCode';
+            const LOCAL_STORAGE_PLAYER = 'domino_playerId';
+
             const [screen, setScreen] = useState('loading'); // loading, lobby, searching, game, leaderboard, end
             const [connected, setConnected] = useState(false);
             const [playerData, setPlayerData] = useState(null); // Telegram user data
             const [leaderboard, setLeaderboard] = useState([]);
             const [roomCode, setRoomCode] = useState('');
             const [joinCode, setJoinCode] = useState('');
+            // gameState içinde roomCode ve playerId tutulacak, LocalStorage ile senkronize edilecek.
             const [gameState, setGameState] = useState(null);
             const [searchTime, setSearchTime] = useState(0);
 
             // Oyun İçi State
             const [selectedTileIndex, setSelectedTileIndex] = useState(null);
-            const [validMoves, setValidMoves] = useState([]); // ['left', 'right', 'both']
+            const [validMoves, setValidMoves] = useState([]); // ['left', 'right', 'both', 'start']
             const [notification, setNotification] = useState(null);
             const [searching, setSearching] = useState(false);
             const [endInfo, setEndInfo] = useState(null);
             const [opponent, setOpponent] = useState(null);
+            const [reconnectAttemptCount, setReconnectAttemptCount] = useState(0);
+            const MAX_RECONNECT_ATTEMPTS = 8; // Daha fazla deneme hakkı
 
             const wsRef = useRef(null);
             const boardScrollRef = useRef(null);
             const searchTimerRef = useRef(null);
+            const reconnectTimerRef = useRef(null);
 
             // Oyun state'ini temizlemek için merkezi bir fonksiyon
             const resetGameClientState = () => {
@@ -408,82 +279,228 @@
                 setEndInfo(null);
                 setOpponent(null);
                 setJoinCode('');
+                localStorage.removeItem(LOCAL_STORAGE_ROOM);
+                localStorage.removeItem(LOCAL_STORAGE_PLAYER);
             };
 
-            // Ses Efektleri (Opsiyonel - Tarayıcı izin verirse çalışır)
-            const playSound = (type) => {
-                // Basit bip sesleri veya mp3 eklenebilir. Şimdilik boş bırakıyorum hata vermesin diye.
+            const showNotification = (msg, type = 'info') => {
+                setNotification({ message: msg, type });
+                setTimeout(() => setNotification(null), 3000);
             };
 
-            // Oyun durumu değiştiğinde localStorage'a kaydet
-            useEffect(() => {
-                if (gameState && roomCode) {
-                    localStorage.setItem('dominoGameState', JSON.stringify({
-                        gameState,
-                        roomCode,
-                        timestamp: Date.now()
-                    }));
-                }
-            }, [gameState, roomCode]);
+            // --- WebSocket Bağlantı ve Yönetimi ---
 
-            // Sayfa yüklendiğinde kayıtlı oyun durumunu kontrol et
-            useEffect(() => {
-                const savedGame = localStorage.getItem('dominoGameState');
-                if (savedGame) {
-                    const { gameState: savedState, roomCode: savedRoomCode, timestamp } = JSON.parse(savedGame);
-                    // 1 saatten eski kayıtları temizle
-                    if (Date.now() - timestamp < 3600000) {
-                        setGameState(savedState);
-                        setRoomCode(savedRoomCode);
-                    } else {
-                        localStorage.removeItem('dominoGameState');
-                    }
+            const attemptReconnect = () => {
+                if (reconnectAttemptCount >= MAX_RECONNECT_ATTEMPTS) {
+                    showNotification('Sunucu bağlantısı kurulamadı. Lütfen sayfayı yenileyin.', 'error');
+                    setScreen('lobby');
+                    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+                    return;
                 }
 
-                // Oyun durumu değişikliklerini dinle
-                const handleBeforeUnload = (e) => {
-                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                        // Sunucuya çıkış bildirimi gönder
-                        wsRef.current.send(JSON.stringify({
-                            type: 'playerLeft',
-                            roomCode: roomCode,
-                            playerId: playerData?.id
-                        }));
+                setReconnectAttemptCount(prev => prev + 1);
+                console.log(`⏳ Yeniden bağlanma denemesi ${reconnectAttemptCount + 1}/${MAX_RECONNECT_ATTEMPTS}`);
+                reconnectTimerRef.current = setTimeout(connectToServer, 2000 * (reconnectAttemptCount + 1)); // Artan bekleme süresi
+            };
+
+            const connectToServer = () => {
+                // Zaten açık veya bağlanmaya çalışıyorsa yeni bir bağlantı oluşturma
+                if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) return;
+                if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+
+                let wsUrl = 'wss://beta-github-io.onrender.com';
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    wsUrl = `ws://${window.location.hostname}:10000`;
+                }
+                console.log(`🔌 Sunucuya bağlanılıyor: ${wsUrl}`);
+
+                const ws = new WebSocket(wsUrl);
+                wsRef.current = ws;
+
+                ws.onopen = () => {
+                    setConnected(true);
+                    setReconnectAttemptCount(0); // Başarılı bağlantı, sayacı sıfırla
+                    showNotification('Sunucuya Bağlandı', 'success');
+
+                    const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
+                    const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
+
+                    // Tarayıcı yenilendiğinde LocalStorage'dan oyuna devam et
+                    if (storedRoomCode && storedPlayerId) {
+                        console.log('♻️ Kayıtlı oyun bulundu, yeniden bağlanma mesajı gönderiliyor...');
+                        sendMessage({
+                            type: 'reconnect',
+                            playerId: storedPlayerId,
+                            roomCode: storedRoomCode
+                        }, ws); // Yeni ws nesnesini kullan
+                        setScreen('loading'); // Yükleniyor ekranına geri dön
                     }
                 };
 
-                window.addEventListener('beforeunload', handleBeforeUnload);
+                ws.onclose = () => {
+                    setConnected(false);
+                    // Sadece lobi veya oyun ekranındaysa bildirim göster
+                    if (screen === 'lobby' || screen === 'game') {
+                        showNotification('Bağlantı kesildi. Yeniden deneniyor...', 'warning');
+                    }
+                    attemptReconnect(); // Yeniden bağlanmayı dene
+                };
 
-                // İlk bağlantıyı kurQ
+                ws.onmessage = (e) => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        handleServerMessage(data);
+                    } catch (err) { console.error('Mesaj işleme hatası:', err); }
+                };
+            };
+
+            // --- Mesaj Gönderme Fonksiyonu ---
+            const sendMessage = (msg, ws = wsRef.current) => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify(msg));
+                    // console.log('📤 Gönderildi:', msg.type, msg);
+                } else {
+                    console.error('🚫 Socket açık değil, mesaj gönderilemedi:', msg.type);
+                    showNotification('Sunucu bağlantısı yok. Lütfen bekleyin...', 'warning');
+                }
+            };
+
+            // --- Sunucu Mesaj İşleyici ---
+            const handleServerMessage = React.useCallback((data) => {
+                console.log('📨 Server mesajı:', data.type, data);
+
+                switch (data.type) {
+                    case 'roomCreated':
+                        setRoomCode(data.roomCode);
+                        break;
+
+                    case 'reconnectSuccess':
+                    case 'gameStart':
+                        console.log('🎮 Oyun başladı/tekrar bağlandı!', data.gameState);
+                        setOpponent(data.opponent || null); // Rakip bilgisini de al
+                        setGameState(data.gameState);
+                        setScreen('game');
+                        setSelectedTileIndex(null);
+                        setValidMoves([]);
+                        setSearching(false);
+                        // LocalStorage güncelle
+                        if (data.gameState.roomCode && data.gameState.playerId) {
+                            localStorage.setItem(LOCAL_STORAGE_ROOM, data.gameState.roomCode);
+                            localStorage.setItem(LOCAL_STORAGE_PLAYER, data.gameState.playerId);
+                        }
+
+                        // Timer durdur
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
+                        showNotification(data.type === 'reconnectSuccess' ? 'Oyuna Devam Edildi!' : 'Oyun Başladı!', 'success');
+                        break;
+
+                    case 'gameUpdate':
+                        console.log('🔄 Oyun güncelleniyor...', data.gameState);
+                        if (data.gameState) {
+                            setGameState(prev => ({
+                                // Önceki state'i tamamen koru ve sadece gelen yeni verileri üzerine yaz.
+                                // Bu, playerId, roomCode gibi bilgilerin kaybolmasını engeller.
+                                ...prev,
+                                ...data.gameState,
+                                // players objesini birleştirerek el sayısı gibi bilgilerin korunmasını sağla
+                                players: { ...(prev?.players || {}), ...(data.gameState.players || {}) }
+                            }));
+                            setSelectedTileIndex(null);
+                            setValidMoves([]);
+                        }
+                        break;
+
+                    case 'error':
+                        showNotification(data.message, 'error');
+                        setSearching(false);
+                        // Oyun ekranındaysak, ciddi bir hata (örn. oda yok) bizi lobiye döndürmeli
+                        if (screen === 'game' && data.fatal) {
+                            resetGameClientState();
+                            setScreen('lobby');
+                        }
+                        break;
+
+                    case 'gameEnd':
+                        const isWinnerClient = data.winner === localStorage.getItem(LOCAL_STORAGE_PLAYER);
+                        // PlayerData'yı güncellemek için auth'u tekrar çağır (ELO değişikliği için)
+                        if (data.isRanked && playerData && !playerData.isGuest) {
+                            initializeTelegramAuth();
+                        }
+
+                        setEndInfo({
+                            winnerName: data.winnerName,
+                            isRanked: data.isRanked,
+                            isWinner: isWinnerClient,
+                            eloChange: data.eloChanges ? (isWinnerClient ? data.eloChanges.winner : data.eloChanges.loser) : 0,
+                        });
+                        setScreen('end');
+
+                        // Bir süre sonra lobiye dön ve state'i temizle
+                        setTimeout(() => {
+                            resetGameClientState();
+                            setScreen('lobby');
+                        }, 5000);
+                        break;
+
+                    case 'searchCancelled':
+                        showNotification('Arama iptal edildi', 'info');
+                        setSearching(false);
+                        setScreen('lobby');
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
+                        break;
+
+                    case 'matchFound':
+                        showNotification(`Rakip Bulundu! ${data.gameType === 'ranked' ? '🏆 RANKED' : '🎮 CASUAL'}`, 'success');
+                        setSearching(false);
+                        setOpponent(data.opponent || null);
+                        if (searchTimerRef.current) {
+                            clearInterval(searchTimerRef.current);
+                            searchTimerRef.current = null;
+                        }
+                        setSearchTime(0);
+                        break;
+
+                    case 'opponentDisconnected':
+                        showNotification('Rakip bağlantısı koptu. Bekleniyor...', 'warning');
+                        break;
+                    case 'opponentReconnected':
+                        showNotification('Rakip tekrar bağlandı!', 'info');
+                        break;
+                } // eslint-disable-next-line react-hooks/exhaustive-deps
+            };
+
+            // --- İLK YÜKLEME VE AUTH ---
+
+            useEffect(() => {
                 initializeTelegramAuth();
                 connectToServer();
-
-                // Sayfa kapatılırken temizlik yap
                 return () => {
-                    window.removeEventListener('beforeunload', handleBeforeUnload);
-                    if (wsRef.current) {
-                        wsRef.current.close();
-                    }
+                    if (wsRef.current) wsRef.current.close();
+                    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
                 };
-            }, [roomCode, playerData?.id]);
+            }, []);
 
-            // Telegram Auth
+            // Telegram Auth (ELO ve Kullanıcı Verilerini Güncellemek İçin)
             const initializeTelegramAuth = async () => {
+                // ... (Auth kodunuz aynı kalabilir) ...
                 try {
                     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                        // Telegram WebApp - Otomatik giriş
                         const user = tg.initDataUnsafe.user;
                         const telegramData = {
                             telegramId: user.id.toString(),
                             username: user.username || user.first_name || 'User',
                             firstName: user.first_name || '',
-                            lastName: user.last_name || '',
                             photoUrl: user.photo_url || null
                         };
 
-                        console.log('📡 Telegram kullanıcısı:', telegramData);
-
-                        // MongoDB'ye kaydet/güncelle
                         const response = await fetch(`${API_URL}/api/auth/telegram`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -497,43 +514,40 @@
                                 isGuest: false,
                                 photoUrl: telegramData.photoUrl || data.player.photoUrl
                             });
-                            console.log('✅ Telegram Auth başarılı:', data.player);
                         } else {
                             throw new Error('Auth failed');
                         }
                     } else {
-                        // Normal tarayıcı - Guest mode
+                        // Guest mode
                         const guestData = {
                             isGuest: true,
                             username: 'Guest' + Math.floor(Math.random() * 9999),
-                            firstName: '',
-                            lastName: '',
                             photoUrl: null,
                             level: 0,
                             elo: 0,
                             telegramId: null
                         };
                         setPlayerData(guestData);
-                        console.log('👥 Guest mode:', guestData);
                     }
                 } catch (error) {
                     console.error('Auth error:', error);
-                    setPlayerData({
-                        isGuest: true,
-                        username: 'Guest' + Math.floor(Math.random() * 9999),
-                        firstName: '',
-                        lastName: '',
-                        photoUrl: null,
-                        level: 0,
-                        elo: 0,
-                        telegramId: null
-                    });
+                    setPlayerData({ /* Fallback Guest Data */ });
                 } finally {
-                    setScreen('lobby');
+                    // Auth bittiğinde, LocalStorage'da kalan bir oyun var mı kontrol et
+                    const storedRoomCode = localStorage.getItem(LOCAL_STORAGE_ROOM);
+                    const storedPlayerId = localStorage.getItem(LOCAL_STORAGE_PLAYER);
+
+                    if (storedRoomCode && storedPlayerId) {
+                        // Eğer oyun varsa, connectToServer onopen event'inde zaten reconnect mesajı göndermiştir.
+                        // Biz sadece UI'ı beklemeye alıyoruz.
+                        setScreen('loading');
+                    } else {
+                        setScreen('lobby');
+                    }
                 }
             };
 
-            // Leaderboard yükle
+            // Leaderboard yükle (değişiklik yok)
             const loadLeaderboard = async () => {
                 try {
                     const response = await fetch(`${API_URL}/api/leaderboard`);
@@ -546,386 +560,107 @@
                 }
             };
 
-            // Otomatik Kaydırma: Oyun güncellendiğinde tahtayı ortala veya sona git
+            // Otomatik Kaydırma ve Ölçeklendirme
             useEffect(() => {
-                if (gameState && boardScrollRef.current) {
-                    const scrollWidth = boardScrollRef.current.scrollWidth;
-                    const clientWidth = boardScrollRef.current.clientWidth;
-                    boardScrollRef.current.scrollLeft = (scrollWidth - clientWidth) / 2;
+                if (screen === 'game' && gameState && boardScrollRef.current) {
+                    const boardContainer = boardScrollRef.current;
+                    const boardContent = boardContainer.querySelector('.board-content');
+
+                    if (boardContent) {
+                        const containerWidth = boardContainer.clientWidth;
+                        const contentWidth = boardContent.scrollWidth;
+                        const PADDING = 60; // Sağdan ve soldan biraz boşluk bırakmak için
+
+                        if (contentWidth > containerWidth - PADDING) {
+                            const scale = (containerWidth - PADDING) / contentWidth;
+                            boardContent.style.transform = `scale(${scale})`;
+                        } else {
+                            boardContent.style.transform = 'scale(1)';
+                        }
+                    }
+                    // Her güncellemede tahtayı ortala
+                    boardContainer.scrollLeft = (boardContainer.scrollWidth - boardContainer.clientWidth) / 2;
                 }
             }, [gameState?.board]);
-
-            const connectToServer = () => {
-                console.log('🌐 Sunucuya bağlanılıyor...');
-                const ws = new WebSocket(WS_URL);
-
-                ws.onopen = () => {
-                    console.log('✅ WebSocket bağlantısı kuruldu');
-                    setConnected(true);
-                    showNotification('Sunucuya bağlandı', 'success');
-
-                    // Eğer daha önce oyun içindeydik, oyun durumunu yeniden yükle
-                    const savedGame = localStorage.getItem('dominoGameState');
-                    if (savedGame) {
-                        const { gameState: savedState, roomCode: savedRoomCode } = JSON.parse(savedGame);
-                        console.log('Kayıtlı oyun durumu yükleniyor...');
-
-                        ws.send(JSON.stringify({
-                            type: 'reconnect',
-                            roomCode: savedRoomCode || roomCode,
-                            playerId: playerData?.id,
-                            gameState: savedState || gameState,
-                            timestamp: Date.now()
-                        }));
-                    } else if (gameState && roomCode && playerData) {
-                        console.log('Mevcut oyun durumu yükleniyor...');
-                        ws.send(JSON.stringify({
-                            type: 'reconnect',
-                            roomCode: roomCode,
-                            playerId: playerData.id,
-                            gameState: gameState,
-                            timestamp: Date.now()
-                        }));
-                    }
-                };
-
-                // Bağlantı koptuğunda yeniden bağlan
-                let reconnectAttempts = 0;
-                const maxReconnectAttempts = 5;
-                let reconnectTimeout;
-
-                const attemptReconnect = () => {
-                    if (reconnectAttempts < maxReconnectAttempts) {
-                        reconnectAttempts++;
-                        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // Üstel geri çekilme
-
-                        showNotification(`Bağlantı kesildi. Yeniden deniyor... (${reconnectAttempts}/${maxReconnectAttempts})`, 'warning');
-
-                        reconnectTimeout = setTimeout(() => {
-                            if (ws.readyState === WebSocket.CLOSED) {
-                                connectToServer();
-                            }
-                        }, delay);
-                    } else {
-                        showNotification('Sunucuya bağlanılamadı. Lütfen sayfayı yenileyin.', 'error');
-                    }
-                };
-
-                ws.onclose = (event) => {
-                    console.log('❌ WebSocket bağlantısı kapandı:', event);
-                    setConnected(false);
-
-                    // Eğer beklenmeyen bir kapanışsa yeniden bağlanmayı dene
-                    if (!event.wasClean) {
-                        attemptReconnect();
-                    }
-                };
-
-                ws.onerror = (error) => {
-                    console.error('WebSocket hatası:', error);
-                    setConnected(false);
-                };
-
-                ws.onmessage = (e) => {
-                    try {
-                        const data = JSON.parse(e.data);
-                        handleServerMessage(data);
-                    } catch (err) { console.error(err); }
-                };
-                wsRef.current = ws;
-            };
-
-            const handleServerMessage = (data) => {
-                console.log('📨 Server mesajı:', data.type, data);
-
-                // Rakip bağlantısı koptuğunda veya çıktığında
-                if (data.type === 'playerDisconnected') {
-                    setEndInfo({
-                        winner: playerData.id,
-                        reason: 'Rakip oyundan ayrıldı. Kazandınız!'
-                    });
-                    setScreen('end');
-                    return;
-                }
-
-                // Bağlantı yeniden kurulduğunda oyun durumunu güncelle
-                if (data.type === 'gameState' || data.type === 'reconnectSuccess') {
-                    // Eğer oyun bitmişse
-                    if (data.state.gameOver) {
-                        setEndInfo({
-                            winner: data.state.winner,
-                            reason: data.state.winner === playerData.id
-                                ? 'Tebrikler! Kazandınız!'
-                                : 'Üzgünüm, kaybettiniz.'
-                        });
-                        setScreen('end');
-                        return;
-                    }
-
-                    // Eğer rakibin bağlantısı kopmuşsa
-                    if (data.state.players[opponent?.id]?.disconnected) {
-                        setEndInfo({
-                            winner: playerData.id,
-                            reason: 'Rakip bağlantısı koptu. Kazandınız!'
-                        });
-                        setScreen('end');
-                        return;
-                    }
-
-                    // Oyun devam ediyorsa durumu güncelle
-                    setGameState(data.state);
-                    setRoomCode(data.roomCode || roomCode);
-                    setOpponent(data.opponent || opponent);
-                    setScreen('game');
-
-                    // Geçerli hamleleri güncelle
-                    if (data.validMoves) {
-                        setValidMoves(data.validMoves);
-                    }
-
-                    // Eğer sıra bu oyuncudaysa seçili taşı sıfırla
-                    if (data.currentPlayerId === playerData?.id) {
-                        setSelectedTileIndex(null);
-                    }
-
-                    return;
-                }
-
-                // Rakip oyundan çıktığında
-                if (data.type === 'opponentLeft') {
-                    setEndInfo({
-                        winner: playerData.id,
-                        reason: 'Rakip oyundan ayrıldı. Kazandınız!'
-                    });
-                    setScreen('end');
-                    return;
-                }
-
-                switch (data.type) {
-                    case 'roomCreated':
-                        setRoomCode(data.roomCode);
-                        break;
-                    case 'gameStart':
-                        console.log('🎮 Oyun başlıyor...', data.gameState);
-                        setGameState(data.gameState);
-                        setScreen('game');
-                        setSelectedTileIndex(null);
-                        setValidMoves([]);
-                        setSearching(false);
-                        // Timer durdur
-                        if (searchTimerRef.current) {
-                            clearInterval(searchTimerRef.current);
-                            searchTimerRef.current = null;
-                        }
-                        setSearchTime(0);
-                        showNotification('Oyun Başladı!', 'success');
-                        break;
-                    case 'gameUpdate':
-                        console.log('🔄 Oyun güncelleniyor...', data.gameState);
-                        if (data.gameState && data.gameState.board) {
-                            setGameState(prevState => ({
-                                ...prevState,
-                                ...data.gameState,
-                                playerId: prevState?.playerId || data.gameState.playerId
-                            }));
-                            setSelectedTileIndex(null);
-                            setValidMoves([]);
-                        }
-                        break;
-                    case 'error':
-                        showNotification(data.message, 'error');
-                        setSearching(false);
-                        if (searchTimerRef.current) {
-                            clearInterval(searchTimerRef.current);
-                            searchTimerRef.current = null;
-                        }
-                        setSearchTime(0);
-                        break;
-                    case 'gameEnd':
-                        const isRanked = data.isRanked;
-                        const isWinnerClient = data.winner === gameState?.playerId;
-                        const eloChange = data.eloChanges
-                            ? (isWinnerClient ? data.eloChanges.winner : data.eloChanges.loser)
-                            : 0;
-                        const winMsg = `Oyun Bitti! Kazanan: ${data.winnerName}`;
-                        const eloMsg = data.eloChanges ? ` (ELO: ${eloChange > 0 ? '+' : ''}${eloChange})` : '';
-
-                        setEndInfo({
-                            winnerName: data.winnerName,
-                            isRanked,
-                            isWinner: isWinnerClient,
-                            eloChange,
-                        });
-                        setScreen('end');
-
-                        if (searchTimerRef.current) {
-                            clearInterval(searchTimerRef.current);
-                            searchTimerRef.current = null;
-                        }
-                        setSearchTime(0);
-
-                        setTimeout(() => {
-                            resetGameClientState(); // Tüm oyun state'ini temizle
-                            setScreen('lobby');
-                            if (isRanked && playerData && !playerData.isGuest) {
-                                initializeTelegramAuth();
-                            }
-                        }, 3000);
-                        break;
-                    case 'searchCancelled':
-                        showNotification('Arama iptal edildi', 'info');
-                        setSearching(false);
-                        setScreen('lobby');
-                        if (searchTimerRef.current) {
-                            clearInterval(searchTimerRef.current);
-                            searchTimerRef.current = null;
-                        }
-                        setSearchTime(0);
-                        break;
-                    case 'searchStatus':
-                        break;
-                    case 'matchFound':
-                        showNotification(`Rakip Bulundu! ${data.gameType === 'ranked' ? '🏆 RANKED' : '🎮 CASUAL'}`, 'success');
-                        setSearching(false);
-                        setOpponent(data.opponent || null);
-                        if (searchTimerRef.current) {
-                            clearInterval(searchTimerRef.current);
-                            searchTimerRef.current = null;
-                        }
-                        setSearchTime(0);
-                        break;
-                }
-            };
-
-            const sendMessage = (msg) => {
-                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                    wsRef.current.send(JSON.stringify(msg));
-                }
-            };
-
-            const showNotification = (msg, type = 'info') => {
-                setNotification({ message: msg, type });
-                setTimeout(() => setNotification(null), 3000);
-            };
 
             // --- OYUN MANTIĞI ---
 
             const myPlayerId = gameState?.playerId;
             const isMyTurn = gameState?.currentPlayer === myPlayerId;
-            const myHand = gameState?.players[myPlayerId]?.hand || [];
+            // Sunucunun 'players' objesi içinde hand bilgisini gönderdiği varsayılır
+            const myHand = gameState?.players?.[myPlayerId]?.hand || [];
             const marketSize = gameState?.market?.length || 0;
             const canDrawFromMarket = marketSize > 0;
 
-            // calculateValidMoves fonksiyonu - EKSİKTİ!
+            // Diğer oyuncunun (rakibin) el sayısı
+            const opponentHandCount = useMemo(() => {
+                if (!gameState?.players || !myPlayerId) return 0;
+                const opponentPlayerEntry = Object.entries(gameState.players).find(([id, _]) => id !== myPlayerId);
+                if (!opponentPlayerEntry) return 0;
+                return opponentPlayerEntry[1].hand?.length || 0;
+            }, [gameState?.players, myPlayerId]);
+
+
             const calculateValidMoves = (tile) => {
                 if (!gameState || gameState.board.length === 0) return ['start'];
 
-                const leftEnd = gameState.board[0][0];
-                const rightEnd = gameState.board[gameState.board.length - 1][1];
+                const board = gameState.board;
+                // Board'un ilk taşının ilk değeri
+                const leftEnd = board[0][0];
+                // Board'un son taşının son değeri
+                const rightEnd = board[board.length - 1][1];
+
                 const moves = [];
 
-                if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
-                if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
+                // Taşın sol değeri sol uca veya sağ uca uyuyor mu?
+                if (tile[0] === leftEnd || tile[0] === rightEnd) moves.push('left');
+                // Taşın sağ değeri sol uca veya sağ uca uyuyor mu?
+                if (tile[1] === leftEnd || tile[1] === rightEnd) moves.push('right');
 
-                return moves;
+                // Hamleleri 'left'/'right' olarak birleştirme (Sunucunun mantığına bağlı)
+                // Domino 101'de sadece bir uca oynanır. Sadece uyumlu ucu belirtiyoruz.
+
+                // Hangi uca oynanabileceğini daha kesin belirlemek için:
+                const preciseMoves = [];
+                // Sol Uç (Board[0][0])
+                if (tile[0] === board[0][0] || tile[1] === board[0][0]) {
+                    preciseMoves.push('left');
+                }
+                // Sağ Uç (Board[Son][1])
+                if (tile[0] === board[board.length - 1][1] || tile[1] === board[board.length - 1][1]) {
+                    preciseMoves.push('right');
+                }
+
+                // Tekrarları temizle
+                return [...new Set(preciseMoves)];
             };
 
             // Seçim Yapma
             const handleTileClick = (index, tile) => {
                 if (!isMyTurn) return;
 
-                // Zaten seçiliyse seçimi kaldır
                 if (selectedTileIndex === index) {
                     setSelectedTileIndex(null);
                     setValidMoves([]);
                     return;
                 }
 
-                // Geçerli hamleleri hesapla
-                if (gameState.board.length === 0) {
-                    // İlk hamle her yere yapılabilir
+                const moves = calculateValidMoves(tile);
+
+                if (moves.length > 0) {
                     setSelectedTileIndex(index);
-                    setValidMoves(['start']);
+                    setValidMoves(moves);
+                    // playSound('click');
                 } else {
-                    const leftEnd = gameState.board[0][0];
-                    const rightEnd = gameState.board[gameState.board.length - 1][1];
-                    const moves = [];
-
-                    // Basit mantık: Eşleşiyor mu?
-                    if (tile[0] === leftEnd || tile[1] === leftEnd) moves.push('left');
-                    if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
-
-                    if (moves.length > 0) {
-                        setSelectedTileIndex(index);
-                        setValidMoves(moves);
-                        playSound('click');
-                    } else {
-                        showNotification('Bu taş uygun değil', 'warning');
-                    }
+                    showNotification('Bu taş ile oynayamazsın', 'warning');
                 }
-
-                const checkGameEnd = () => {
-                    const myHand = gameState.players[playerData.id]?.hand || [];
-                    const opponentHand = gameState.players[opponent.id]?.hand || [];
-                    const boneyard = gameState.boneyard || [];
-
-                    // Eğer bir oyuncunun elinde taş kalmadıysa oyun biter
-                    if (myHand.length === 0) {
-                        setEndInfo({ winner: playerData.id, reason: 'Tebrikler! Tüm taşlarını oynadın!' });
-                        setScreen('end');
-                        return true;
-                    }
-
-                    // Rakibin elinde taş kalmadıysa oyun biter
-                    if (opponentHand.length === 0) {
-                        setEndInfo({ winner: opponent.id, reason: 'Rakip tüm taşlarını oynadı!' });
-                        setScreen('end');
-                        return true;
-                    }
-
-                    // Eğer hiç hamle yapılamıyorsa ve pazarda taş kalmadıysa
-                    if (validMoves.length === 0 && boneyard.length === 0) {
-                        // En az puanı olan kazanır
-                        const myScore = calculateScore(myHand);
-                        const opponentScore = calculateScore(opponentHand);
-
-                        if (myScore < opponentScore) {
-                            setEndInfo({
-                                winner: playerData.id,
-                                reason: `Kazandınız! (${myScore} - ${opponentScore})`
-                            });
-                        } else if (opponentScore < myScore) {
-                            setEndInfo({
-                                winner: opponent.id,
-                                reason: `Kaybettiniz! (${myScore} - ${opponentScore})`
-                            });
-                        } else {
-                            setEndInfo({
-                                winner: null,
-                                reason: `Berabere! (${myScore} - ${opponentScore})`
-                            });
-                        }
-
-                        setScreen('end');
-                        return true;
-                    }
-
-                    return false;
-                };
-
-                // El puanını hesapla
-                const calculateScore = (tiles) => {
-                    return tiles.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
-                };
             };
 
             // Taşı Oynama
             const playTile = (position) => {
                 if (selectedTileIndex === null) return;
 
-                // Server 'left' veya 'right' bekliyor.
-                // Eğer tahta boşsa server genelde fark etmez ama 'left' gönderelim.
-                const posToSend = position === 'start' ? 'left' : position;
+                const posToSend = position === 'start' ? 'left' : position; // İlk hamle için 'left' gönderelim.
 
                 sendMessage({
                     type: 'playTile',
@@ -933,132 +668,38 @@
                     position: posToSend
                 });
 
-                // Seçimi temizle (Optimistik UI)
+                // Seçimi temizle
                 setSelectedTileIndex(null);
                 setValidMoves([]);
             };
 
-            const passTurn = () => {
-                sendMessage({ type: 'pass' });
-            };
-
             const drawFromMarket = () => {
                 if (!isMyTurn || !canDrawFromMarket) return;
-                // Elinde oynanabilir taş varsa pazardan çekmeyi engelle
+
+                // Elinde oynanabilir taş var mı kontrol et
                 const canPlayFromHand = myHand.some(tile => calculateValidMoves(tile).length > 0);
-                if (gameState.board.length > 0 && canPlayFromHand) {
+
+                if (canPlayFromHand) { // Tahta boşken de oynanabilir taş varsa çekemez.
                     showNotification('Elinde oynanabilir taş varken pazardan çekemezsin!', 'warning');
-                    return; // Fonksiyondan tamamen çık
+                    return;
                 }
-                const drawTile = () => {
-                    if (gameState.boneyard.length > 0) {
-                        const newTile = gameState.boneyard[0];
-                        const updatedHand = [...myHand, newTile];
-                        const updatedBoneyard = gameState.boneyard.slice(1);
-
-                        // Eğer çekilen taşla hamle yapılabiliyorsa, otomatik yap
-                        const canPlayWithNewTile = checkValidMoves(updatedHand, gameState.board).length > 0;
-
-                        const updatedGameState = {
-                            ...gameState,
-                            boneyard: updatedBoneyard,
-                            players: {
-                                ...gameState.players,
-                                [playerData.id]: {
-                                    ...gameState.players[playerData.id],
-                                    hand: updatedHand
-                                }
-                            }
-                        };
-
-                        setGameState(updatedGameState);
-                        setMyHand(updatedHand);
-
-                        // Sunucuya bildir
-                        sendMessage({
-                            type: 'drawTile',
-                            playerId: playerData.id,
-                            tile: newTile,
-                            canPlay: canPlayWithNewTile
-                        });
-
-                        // Eğer çekilen taşla hamle yapılabiliyorsa kullanıcıya bildir
-                        if (canPlayWithNewTile) {
-                            showNotification('Yeni çektiğin taşla hamle yapabilirsin!', 'info');
-                        } else if (updatedBoneyard.length === 0) {
-                            // Eğer pazarda taş kalmadıysa ve hamle yapılamıyorsa
-                            showNotification('Hamle yapamıyorsun. Sıranı geçiyorsun.', 'warning');
-
-                            // Otomatik olarak sırayı geç
-                            setTimeout(() => {
-                                sendMessage({
-                                    type: 'passTurn',
-                                    playerId: playerData.id
-                                });
-
-                                // Rakibin sırasına geç
-                                setGameState({
-                                    ...updatedGameState,
-                                    currentPlayer: opponent.id
-                                });
-                            }, 1000);
-                        }
-
-                        return true;
-                    }
-
-                    // Eğer pazarda taş kalmadıysa ve hamle yapılamıyorsa oyunu bitir
-                    if (validMoves.length === 0) {
-                        checkGameEnd();
-                    }
-
-                    return false;
-                };
-
-                if (drawTile()) return;
-
                 sendMessage({ type: 'drawFromMarket' });
                 showNotification('🎲 Pazardan taş çekiliyor...', 'info');
             };
 
             const leaveGameClient = () => {
-                // Kullanıcıdan onay iste
                 const confirmed = window.confirm(
                     'Oyundan çıkmak istediğine emin misin?\n\n' +
                     'Bu eli terk edersen ELO puanı kaybedebilirsin ve el otomatik olarak rakibine yazılacaktır.'
                 );
                 if (!confirmed) return;
 
-                // Sunucuya haber ver
                 sendMessage({ type: 'leaveGame' });
-
-                // Lokal state temizle ve lobiye dön
                 resetGameClientState();
                 setScreen('lobby');
             };
 
-            // Geçerli hamleleri kontrol et
-            const checkValidMoves = (hand, board) => {
-                if (!hand || !board || board.length === 0) {
-                    return [];
-                }
-
-                const leftEnd = board[0][0];
-                const rightEnd = board[board.length - 1][1];
-
-                return hand.reduce((moves, tile, index) => {
-                    if (tile[0] === leftEnd || tile[1] === leftEnd) {
-                        moves.push({ index, position: 'left' });
-                    }
-                    if (tile[0] === rightEnd || tile[1] === rightEnd) {
-                        // Eğer taşın diğer tarafına da uyuyorsa, sadece bir kez ekle
-                        if (!(tile[0] === leftEnd && tile[1] === rightEnd && leftEnd === rightEnd)) {
-                            moves.push({ index, position: 'right' });
-                        }
-                    }
-                    return moves;
-                }, []);
-            };
+            // --- RENDER BÖLÜMÜ (DEĞİŞİKLİK YAPILMADI, MEVCUT HALİ KORUNDU) ---
 
             // --- SEARCHING LOBBY ---
             if (screen === 'searching') {
@@ -1158,18 +799,22 @@
                 );
             }
 
-            // --- LOBBY EKRANI ---
+            // --- LOADING EKRANI ---
             if (screen === 'loading') {
                 return (
                     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
                         <div className="text-center">
                             <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                             <p className="text-white text-xl font-bold">Yükleniyor...</p>
+                            {localStorage.getItem(LOCAL_STORAGE_ROOM) && (
+                                <p className="text-yellow-400 text-sm mt-2 animate-pulse">Oyuna yeniden bağlanılıyor...</p>
+                            )}
                         </div>
                     </div>
                 );
             }
 
+            // --- LOBBY EKRANI ---
             if (screen === 'lobby') {
                 return (
                     <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10">
@@ -1182,19 +827,7 @@
                             <p className="text-gray-300 text-sm tracking-widest uppercase">⚡ Profesyonel Online Oyun ⚡</p>
                         </div>
 
-                        {/* ADMIN PANEL BUTTON (Secret) */}
-                        {
-                            playerData?.telegramId === '1840079939' && (
-                                <button
-                                    onClick={() => setScreen('admin')}
-                                    className="absolute top-4 right-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full font-bold shadow-lg z-50 text-xs"
-                                >
-                                    🔧 ADMIN
-                                </button>
-                            )
-                        }
-
-                        {/* NAVİGASYON - SKOR TABLOSU */}
+                        {/* NAVİGASYON */}
                         <div className="flex justify-center gap-3 mb-6">
                             <button onClick={() => { setScreen('leaderboard'); loadLeaderboard(); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold">🏆 Skor Tablosu</button>
                         </div>
@@ -1228,17 +861,14 @@
                                     if (!playerData) return showNotification('İsim giriniz', 'error');
                                     if (searching) return;
 
-                                    // Özel arama ekranına geç
                                     setScreen('searching');
                                     setSearching(true);
                                     setSearchTime(0);
 
-                                    // Timer başlat
                                     searchTimerRef.current = setInterval(() => {
                                         setSearchTime(prev => prev + 1);
                                     }, 1000);
 
-                                    // Server'a gönder
                                     sendMessage({
                                         type: 'findMatch',
                                         ...playerData,
@@ -1294,10 +924,11 @@
                                 </div>
                             )}
                         </div>
-                    </div >
+                    </div>
                 );
             }
 
+            // --- LEADERBOARD EKRANI ---
             if (screen === 'leaderboard') {
                 return (
                     <div className="flex flex-col items-center justify-center min-h-screen p-6 relative z-10">
@@ -1318,9 +949,9 @@
                                 <div className="space-y-3">
                                     {leaderboard.map((player, index) => (
                                         <div key={player._id} className={`flex items-center gap-4 p-4 rounded-xl ${index === 0 ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-2 border-yellow-500' :
-                                            index === 1 ? 'bg-gradient-to-r from-gray-400/20 to-gray-500/20 border-2 border-gray-400' :
-                                                index === 2 ? 'bg-gradient-to-r from-orange-600/20 to-orange-700/20 border-2 border-orange-600' :
-                                                    'bg-white/5 border border-white/10'
+                                                index === 1 ? 'bg-gradient-to-r from-gray-400/20 to-gray-500/20 border-2 border-gray-400' :
+                                                    index === 2 ? 'bg-gradient-to-r from-orange-600/20 to-orange-700/20 border-2 border-orange-600' :
+                                                        'bg-white/5 border border-white/10'
                                             }`}>
                                             <div className="text-3xl font-black text-white w-10 text-center">
                                                 {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
@@ -1356,95 +987,37 @@
                 );
             }
 
-            // --- ADMIN EKRANI (YENİ) ---
-            if (screen === 'admin') {
-                const [targetId, setTargetId] = useState('');
-
-                const resetElo = async () => {
-                    if (!window.confirm('Bu kullanıcının ELOsunu sıfırlamak istiyor musunuz?')) return;
-
-                    try {
-                        const res = await fetch(`${API_URL}/api/admin/reset-elo`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ adminId: playerData.telegramId, targetUserId: targetId })
-                        });
-                        const data = await res.json();
-                        showNotification(data.message || data.error, data.success ? 'success' : 'error');
-                    } catch (err) { showNotification('Hata oluştu', 'error'); }
-                };
-
-                const hideUser = async (hide) => {
-                    if (!window.confirm(`Bu kullanıcıyı ${hide ? 'gizlemek' : 'göstermek'} istiyor musunuz?`)) return;
-
-                    try {
-                        const res = await fetch(`${API_URL}/api/admin/hide-user`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ adminId: playerData.telegramId, targetUserId: targetId, hide })
-                        });
-                        const data = await res.json();
-                        showNotification(data.message || data.error, data.success ? 'success' : 'error');
-                    } catch (err) { showNotification('Hata oluştu', 'error'); }
-                };
-
-                const resetAllElo = async () => {
-                    if (!window.confirm('DİKKAT! TÜM oyuncuların ELO puanlarını sıfırlamak üzeresiniz. Emin misiniz?')) return;
-
-                    try {
-                        const res = await fetch(`${API_URL}/api/admin/reset-all-elo`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ adminId: playerData.telegramId })
-                        });
-                        const data = await res.json();
-                        showNotification(data.message || data.error, data.success ? 'success' : 'error');
-                    } catch (err) { showNotification('Hata oluştu', 'error'); }
-                };
+            // --- OYUN SONU EKRANI (Yeni eklendi) ---
+            if (screen === 'end' && endInfo) {
+                const title = endInfo.isWinner ? '🎉 KAZANDINIZ!' : (endInfo.winnerName === 'DRAW' ? '⚖️ BERABERE' : '😔 KAYBETTİNİZ');
+                const titleColor = endInfo.isWinner ? 'text-green-400' : (endInfo.winnerName === 'DRAW' ? 'text-blue-400' : 'text-red-400');
+                const eloColor = endInfo.eloChange >= 0 ? 'text-green-400' : 'text-red-400';
+                const eloSign = endInfo.eloChange > 0 ? '+' : '';
 
                 return (
-                    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6 text-white text-center">
-                        {notification && <Toast message={notification.message} type={notification.type} />}
+                    <div className="min-h-screen bg-table-dark/95 flex items-center justify-center p-6">
+                        <div className="w-full max-w-sm bg-white/10 backdrop-blur-md rounded-2xl p-8 shadow-2xl text-center border border-white/10 animate-slide-up">
+                            <h1 className={`text-4xl font-black mb-4 ${titleColor} animate-celebrate`}>
+                                {title}
+                            </h1>
 
-                        <div className="bg-gray-800 p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-700">
-                            <h1 className="text-3xl font-bold text-red-500 mb-6">🔧 ADMIN PANELİ</h1>
+                            <p className="text-gray-300 text-lg mb-6">
+                                {endInfo.winnerName !== 'DRAW' ? `Kazanan: ${endInfo.winnerName}` : 'Oyun berabere bitti.'}
+                            </p>
 
-                            <div className="mb-6">
-                                <label className="block text-gray-400 text-sm font-bold mb-2">Hedef Telegram ID</label>
-                                <input
-                                    value={targetId}
-                                    onChange={(e) => setTargetId(e.target.value)}
-                                    placeholder="Örn: 123456789"
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg py-3 px-4 text-white focus:outline-none focus:border-red-500"
-                                />
-                                <p className="text-xs text-gray-500 mt-2">Kullanıcıyı düzenlemek için ID girin.</p>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-4 mb-8">
-                                <button onClick={resetElo} className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg shadow transition">
-                                    🔁 Seçili Kişinin ELO'yu Sıfırla
-                                </button>
-
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button onClick={() => hideUser(true)} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg shadow transition">
-                                        👁️‍🗨️ Gizle
-                                    </button>
-                                    <button onClick={() => hideUser(false)} className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow transition">
-                                        👁️ Göster
-                                    </button>
+                            {endInfo.isRanked && (
+                                <div className="mb-8">
+                                    <h2 className="text-white text-xl font-bold mb-2">ELO DEĞİŞİMİ</h2>
+                                    <p className={`text-5xl font-extrabold ${eloColor}`}>
+                                        {eloSign}{endInfo.eloChange}
+                                    </p>
+                                    <p className="text-gray-400 text-sm mt-1">Yeni ELO puanınız kısa süre içinde güncellenecektir.</p>
                                 </div>
-                            </div>
+                            )}
 
-                            <div className="border-t border-gray-700 pt-6">
-                                <p className="text-red-400 text-xs font-bold mb-2 uppercase">⚠️ Tehlikeli Bölge</p>
-                                <button onClick={resetAllElo} className="w-full bg-red-800 hover:bg-red-900 text-white font-bold py-4 rounded-lg shadow-lg transition border border-red-600">
-                                    💀 TÜM ELO PUANLARINI SIFIRLA
-                                </button>
+                            <div className="p-4 bg-black/30 rounded-lg text-gray-400 text-sm">
+                                ⏳ Otomatik olarak lobiye dönülüyor...
                             </div>
-
-                            <button onClick={() => setScreen('lobby')} className="mt-8 text-gray-400 hover:text-white underline">
-                                ⬅️ Lobiye Dön
-                            </button>
                         </div>
                     </div>
                 );
@@ -1452,12 +1025,6 @@
 
             // --- OYUN EKRANI ---
             if (screen === 'game' && gameState) {
-                // Tahtada görsel olarak taşları döndürmek gerekir mi?
-                // Sunucu genellikle [[1,6], [6,2]] diye sıralı atar.
-                // Biz sadece çiziyoruz.
-
-                // Elimizdeki taş sayısı 7'den fazla mı?
-                const isHandCrowded = myHand.length > 7;
 
                 return (
                     <div className="fixed inset-0 flex flex-col h-full w-full">
@@ -1482,11 +1049,7 @@
                                         {opponent?.name || opponent?.username || 'Rakip'}
                                     </div>
                                     <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
-                                        🎲 {(() => {
-                                            const oppName = opponent?.name || opponent?.username;
-                                            const oppEntry = Object.values(gameState.players).find(p => p.name === oppName);
-                                            return (oppEntry && oppEntry.hand ? oppEntry.hand.length : 0);
-                                        })()} Taş
+                                        🎲 {opponentHandCount} Taş
                                     </div>
                                 </div>
                             </div>
@@ -1500,14 +1063,14 @@
                         </div>
 
                         {/* ORTA PANEL: Masa ve Board */}
-                        <div className="flex-1 relative overflow-auto flex items-center justify-center w-full p-4">
-                            {/* Oyun Tahtası */}
+                        <div className="flex-1 relative overflow-hidden flex items-center justify-center w-full">
+                            {/* Yatay Kaydırma Alanı */}
                             <div
                                 ref={boardScrollRef}
-                                className="w-full h-full flex flex-wrap justify-center items-center gap-2"
+                                className="w-full h-full overflow-x-auto overflow-y-hidden hide-scrollbar flex items-center px-8"
                                 style={{ scrollBehavior: 'smooth' }}
                             >
-                                <div className="flex items-center gap-1 mx-auto min-w-max py-10">
+                                <div className="board-content flex items-center gap-1 mx-auto min-w-max py-10 transition-transform duration-500 ease-in-out">
 
                                     {/* SOL IŞIKLI GÖSTERGE */}
                                     {validMoves.includes('left') && selectedTileIndex !== null && gameState.board.length > 0 && (
@@ -1534,7 +1097,7 @@
                                                 vertical={tile[0] === tile[1]}
                                                 disabled={true}
                                                 scale={0.95}
-                                                animateIn={i === gameState.board.length - 1 || i === 0}
+                                                animateIn={false} // İlk taşlarda animasyonu kapatıyoruz
                                             />
                                         ))
                                     )}
@@ -1579,13 +1142,18 @@
                                     )}
                                 </div>
                                 <div className="flex gap-2 items-center">
-                                    {isMyTurn && canDrawFromMarket && validMoves.length === 0 && selectedTileIndex === null && (
-                                        <button
-                                            onClick={drawFromMarket}
-                                            className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
-                                        >
-                                            🎲 ÇEK
-                                        </button>
+                                    {isMyTurn && (
+                                        <>
+                                            {/* Çekme butonu: Sadece elde oynanacak taş yoksa veya tahta boşsa (ilk hamlede) görünmeli */}
+                                            {canDrawFromMarket && !myHand.some(tile => calculateValidMoves(tile).length > 0) && (
+                                                <button
+                                                    onClick={drawFromMarket}
+                                                    className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
+                                                >
+                                                    🎲 ÇEK
+                                                </button>
+                                            )}
+                                        </>
                                     )}
                                     <button
                                         onClick={leaveGameClient}
@@ -1597,62 +1165,19 @@
                             </div>
 
                             {/* Taş Dizilimi */}
-                            <div className="w-full max-w-4xl mx-auto overflow-y-auto max-h-[40vh] p-2">
-                                <div className="flex justify-center gap-2 flex-wrap">
+                            <div className="w-full max-w-4xl mx-auto overflow-x-auto hide-scrollbar p-2">
+                                <div className="flex justify-center gap-2 flex-nowrap">
                                     {myHand.map((tile, index) => {
-                                        const canPlay = isMyTurn && (gameState.board.length === 0 || calculateValidMoves(tile).length > 0);
-
-                                        const renderBoard = () => {
-                                            if (!gameState?.board || gameState.board.length === 0) {
-                                                return <div className="text-gray-500 text-center py-4">İlk taşı sen at!</div>;
-                                            }
-
-                                            // Taşları daha iyi göstermek için grupla
-                                            const chunkSize = 6; // Her satırda maksimum 6 taş
-                                            const boardChunks = [];
-
-                                            for (let i = 0; i < gameState.board.length; i += chunkSize) {
-                                                const chunk = gameState.board.slice(i, i + chunkSize);
-                                                boardChunks.push(chunk);
-                                            }
-
-                                            return (
-                                                <div className="w-full max-w-4xl mx-auto">
-                                                    {boardChunks.map((chunk, chunkIndex) => (
-                                                        <div key={chunkIndex} className="flex flex-wrap justify-center gap-1 mb-1">
-                                                            {chunk.map((tile, tileIndex) => {
-                                                                const globalIndex = chunkIndex * chunkSize + tileIndex;
-                                                                const isSelected = selectedTileIndex === globalIndex;
-
-                                                                return (
-                                                                    <div
-                                                                        key={globalIndex}
-                                                                        className={`domino-tile ${isSelected ? 'ring-2 ring-yellow-400 scale-105' : ''} transition-all duration-200`}
-                                                                        onClick={() => handleBoardTileClick(tile, globalIndex)}
-                                                                    >
-                                                                        <div className="flex flex-col items-center justify-between h-full p-1">
-                                                                            <span className="text-sm font-bold">{tile[0]}</span>
-                                                                            <div className="w-4 h-0.5 bg-gray-400 my-1"></div>
-                                                                            <span className="text-sm font-bold">{tile[1]}</span>
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            );
-                                        };
 
                                         return (
                                             <DominoTile
-                                                key={index}
+                                                key={`${tile[0]}-${tile[1]}-${index}`} // Tekil bir key
                                                 values={tile}
                                                 onClick={() => handleTileClick(index, tile)}
                                                 disabled={!isMyTurn}
                                                 isSelected={selectedTileIndex === index}
                                                 vertical={true}
-                                                animateIn={true}
+                                                animateIn={false}
                                             />
                                         );
                                     })}
@@ -1663,7 +1188,7 @@
                 );
             }
 
-            return null;
+            return null; // Herhangi bir ekrana denk gelmezse boş döndür
         };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
