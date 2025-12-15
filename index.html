@@ -997,61 +997,60 @@
                             {notification && <Toast message={notification.message} type={notification.type} />}
 
                             <div className="text-center mb-6">
-                                <div className="text-center mb-6">
-                                    <h1 className="text-4xl font-black text-white drop-shadow-lg mb-2">🏆 LİDERLƏR / LEADERBOARD</h1>
-                                </div>
+                                <h1 className="text-4xl font-black text-white drop-shadow-lg mb-2">🏆 LİDERLƏR / LEADERBOARD</h1>
+                            </div>
 
-                                <button onClick={() => setScreen('lobby')} className="mb-4 px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold">⬅️ Geri / Back</button>
+                            <button onClick={() => setScreen('lobby')} className="mb-4 px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold">⬅️ Geri / Back</button>
 
-                                <div className="w-full max-w-2xl bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
-                                    {leaderboard.length === 0 ? (
-                                        <div className="text-center text-gray-400 py-8">
-                                            <p className="text-xl">📊 Yüklənir / Loading...</p>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {leaderboard.map((player, index) => (
-                                                <div key={player._id} className={`flex items-center gap-4 p-4 rounded-xl ${index === 0 ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-2 border-yellow-500' :
-                                                    index === 1 ? 'bg-gradient-to-r from-gray-400/20 to-gray-500/20 border-2 border-gray-400' :
-                                                        index === 2 ? 'bg-gradient-to-r from-orange-600/20 to-orange-700/20 border-2 border-orange-600' :
-                                                            'bg-white/5 border border-white/10'
-                                                    }`}>
-                                                    <div className="text-3xl font-black text-white w-10 text-center">
-                                                        {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
-                                                    </div>
+                            <div className="w-full max-w-2xl bg-table-dark/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10">
+                                {leaderboard.length === 0 ? (
+                                    <div className="text-center text-gray-400 py-8">
+                                        <p className="text-xl">📊 Yüklənir / Loading...</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {leaderboard.map((player, index) => (
+                                            <div key={player._id} className={`flex items-center gap-4 p-4 rounded-xl ${index === 0 ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-2 border-yellow-500' :
+                                                index === 1 ? 'bg-gradient-to-r from-gray-400/20 to-gray-500/20 border-2 border-gray-400' :
+                                                    index === 2 ? 'bg-gradient-to-r from-orange-600/20 to-orange-700/20 border-2 border-orange-600' :
+                                                        'bg-white/5 border border-white/10'
+                                                }`}>
+                                                <div className="text-3xl font-black text-white w-10 text-center">
+                                                    {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
+                                                </div>
 
-                                                    {player.photoUrl && (
-                                                        <img src={player.photoUrl} alt={player.username} className="w-12 h-12 rounded-full border-2 border-white/30" />
-                                                    )}
+                                                {player.photoUrl && (
+                                                    <img src={player.photoUrl} alt={player.username} className="w-12 h-12 rounded-full border-2 border-white/30" />
+                                                )}
 
-                                                    <div className="flex-1">
-                                                        <div className="text-white font-bold text-lg">{player.username || player.firstName}</div>
-                                                        <div className="flex gap-2 text-sm">
-                                                            <span className="text-green-400">✓ {player.wins}</span>
-                                                            <span className="text-red-400">✗ {player.losses}</span>
-                                                            <span className="text-yellow-400">🔥 {player.winStreak}</span>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="text-right">
-                                                        <div className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-3 py-1 rounded-full text-sm font-bold mb-1">
-                                                            {player.elo} ELO
-                                                        </div>
-                                                        <div className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-xs font-bold">
-                                                            LVL {Math.min(player.level || 0, 10)}
-                                                        </div>
+                                                <div className="flex-1">
+                                                    <div className="text-white font-bold text-lg">{player.username || player.firstName}</div>
+                                                    <div className="flex gap-2 text-sm">
+                                                        <span className="text-green-400">✓ {player.wins}</span>
+                                                        <span className="text-red-400">✗ {player.losses}</span>
+                                                        <span className="text-yellow-400">🔥 {player.winStreak}</span>
                                                     </div>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+
+                                                <div className="text-right">
+                                                    <div className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-3 py-1 rounded-full text-sm font-bold mb-1">
+                                                        {player.elo} ELO
+                                                    </div>
+                                                    <div className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-3 py-1 rounded-full text-xs font-bold">
+                                                        LVL {Math.min(player.level || 0, 10)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                            );
+                        </div>
+                    );
                 }
 
-                            // --- OYUN EKRANI ---
-                            if (screen === 'game' && gameState) {
+                // --- OYUN EKRANI ---
+                if (screen === 'game' && gameState) {
                     // Tahtada görsel olarak taşları döndürmek gerekir mi?
                     // Sunucu genellikle [[1,6], [6,2]] diye sıralı atar.
                     // Biz sadece çiziyoruz.
@@ -1059,216 +1058,216 @@
                     // Elimizdeki taş sayısı 7'den fazla mı?
                     const isHandCrowded = myHand.length > 7;
 
-                            return (
-                            <div className="fixed inset-0 flex flex-col h-full w-full">
-                                {overlayState && (
-                                    <Overlay
-                                        title={overlayState.title}
-                                        message={overlayState.message}
-                                        timer={overlayState.timer}
-                                        type={overlayState.type}
-                                    />
-                                )}
-                                {notification && <Toast message={notification.message} type={notification.type} />}
+                    return (
+                        <div className="fixed inset-0 flex flex-col h-full w-full">
+                            {overlayState && (
+                                <Overlay
+                                    title={overlayState.title}
+                                    message={overlayState.message}
+                                    timer={overlayState.timer}
+                                    type={overlayState.type}
+                                />
+                            )}
+                            {notification && <Toast message={notification.message} type={notification.type} />}
 
-                                {/* ÜST PANEL: Rakip */}
-                                <div className="h-16 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between px-4 z-20">
-                                    <div className="flex items-center gap-3">
-                                        {opponent?.photoUrl ? (
-                                            <img
-                                                src={opponent.photoUrl}
-                                                alt={opponent.name || opponent.username || 'Rakip'}
-                                                className="w-10 h-10 rounded-full border-2 border-yellow-400 shadow-lg object-cover"
-                                            />
-                                        ) : (
-                                            <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center shadow-lg">
-                                                👤
-                                            </div>
-                                        )}
-                                        <div>
-                                            <div className="text-white text-sm font-bold shadow-black drop-shadow-md">
-                                                {opponent?.name || opponent?.username || 'Rakip'}
-                                            </div>
-                                            <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
-                                                🎲 {(() => {
-                                                    const oppName = opponent?.name || opponent?.username;
-                                                    const oppEntry = Object.values(gameState.players).find(p => p.name === oppName);
-                                                    return (oppEntry && oppEntry.hand ? oppEntry.hand.length : 0);
-                                                })()} Taş
-                                            </div>
+                            {/* ÜST PANEL: Rakip */}
+                            <div className="h-16 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between px-4 z-20">
+                                <div className="flex items-center gap-3">
+                                    {opponent?.photoUrl ? (
+                                        <img
+                                            src={opponent.photoUrl}
+                                            alt={opponent.name || opponent.username || 'Rakip'}
+                                            className="w-10 h-10 rounded-full border-2 border-yellow-400 shadow-lg object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center shadow-lg">
+                                            👤
                                         </div>
-                                    </div>
-                                    <div className="text-center">
-                                        {isMyTurn ? (
-                                            <div className="bg-yellow-500 text-black text-xs font-bold px-4 py-1 rounded-full animate-pulse shadow-glow">⚡ SENİN SIRAN ⚡</div>
-                                        ) : (
-                                            <div className="text-gray-400 text-xs font-medium bg-black/40 px-3 py-1 rounded-full">⏳ Rakip Oynuyor...</div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* ORTA PANEL: Masa ve Board */}
-                                <div className="flex-1 relative overflow-hidden flex items-center justify-center w-full">
-                                    {/* Yatay Kaydırma Alanı */}
-                                    <div
-                                        ref={boardScrollRef}
-                                        className="w-full h-full overflow-x-auto overflow-y-hidden hide-scrollbar flex items-center px-8"
-                                        style={{ scrollBehavior: 'smooth' }}
-                                    >
-                                        <div className="flex items-center gap-1 mx-auto min-w-max py-10">
-
-                                            {/* SOL IŞIKLI GÖSTERGE */}
-                                            {validMoves.includes('left') && selectedTileIndex !== null && gameState.board.length > 0 && (
-                                                <div className="mr-2 sm:mr-3 flex items-center" onClick={() => playTile('left')}>
-                                                    <div className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer">
-                                                        <div className="absolute inset-0 bg-yellow-400/20 rounded-lg valid-zone"></div>
-                                                        <div className="absolute inset-0 flex items-center justify-center">
-                                                            <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-yellow-400/10 rounded-md border-2 border-yellow-400 border-dashed animate-glow-pulse"></div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* TAHTADAKİ TAŞLAR */}
-                                            {gameState.board.length === 0 ? (
-                                                <div className="text-white/30 text-xl font-bold border-4 border-dashed border-white/10 rounded-3xl p-6">
-                                                    {selectedTileIndex !== null ? '👇 Taşı Buraya Koy' : 'Taş Seç ve Başla'}
-                                                </div>
-                                            ) : (
-                                                gameState.board.map((tile, i) => (
-                                                    <DominoTile
-                                                        key={i}
-                                                        values={tile}
-                                                        vertical={tile[0] === tile[1]}
-                                                        disabled={true}
-                                                        scale={0.95}
-                                                        animateIn={i === gameState.board.length - 1 || i === 0}
-                                                    />
-                                                ))
-                                            )}
-
-                                            {/* SAĞ IŞIKLI GÖSTERGE */}
-                                            {validMoves.includes('right') && selectedTileIndex !== null && gameState.board.length > 0 && (
-                                                <div className="ml-2 sm:ml-3 flex items-center" onClick={() => playTile('right')}>
-                                                    <div className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer">
-                                                        <div className="absolute inset-0 bg-yellow-400/20 rounded-lg valid-zone"></div>
-                                                        <div className="absolute inset-0 flex items-center justify-center">
-                                                            <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-yellow-400/10 rounded-md border-2 border-yellow-400 border-dashed animate-glow-pulse"></div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* İLK HAMLE (ORTAYA) */}
-                                            {validMoves.includes('start') && selectedTileIndex !== null && (
-                                                <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-30 animate-slide-up" onClick={() => playTile('start')}>
-                                                    <div className="bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold px-8 py-4 rounded-2xl animate-glow-pulse cursor-pointer shadow-glow transform scale-110">
-                                                        ✨ OYUNA BAŞLA
-                                                    </div>
-                                                </div>
-                                            )}
+                                    )}
+                                    <div>
+                                        <div className="text-white text-sm font-bold shadow-black drop-shadow-md">
+                                            {opponent?.name || opponent?.username || 'Rakip'}
+                                        </div>
+                                        <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
+                                            🎲 {(() => {
+                                                const oppName = opponent?.name || opponent?.username;
+                                                const oppEntry = Object.values(gameState.players).find(p => p.name === oppName);
+                                                return (oppEntry && oppEntry.hand ? oppEntry.hand.length : 0);
+                                            })()} Taş
                                         </div>
                                     </div>
                                 </div>
+                                <div className="text-center">
+                                    {isMyTurn ? (
+                                        <div className="bg-yellow-500 text-black text-xs font-bold px-4 py-1 rounded-full animate-pulse shadow-glow">⚡ SİZİN SIRANIZ / YOUR TURN ⚡</div>
+                                    ) : (
+                                        <div className="text-gray-400 text-xs font-medium bg-black/40 px-3 py-1 rounded-full">⏳ Gözlənilir / Waiting...</div>
+                                    )}
+                                </div>
+                            </div>
 
-                                {/* ALT PANEL: Oyuncu Eli */}
-                                <div className="bg-gradient-to-t from-black/90 via-table-dark to-transparent pb-6 pt-2 px-2 z-20">
+                            {/* ORTA PANEL: Masa ve Board */}
+                            <div className="flex-1 relative overflow-hidden flex items-center justify-center w-full">
+                                {/* Yatay Kaydırma Alanı */}
+                                <div
+                                    ref={boardScrollRef}
+                                    className="w-full h-full overflow-x-auto overflow-y-hidden hide-scrollbar flex items-center px-8"
+                                    style={{ scrollBehavior: 'smooth' }}
+                                >
+                                    <div className="flex items-center gap-1 mx-auto min-w-max py-10">
 
-                                    {/* Kontrol Butonları */}
-                                    <div className="flex justify-between items-center px-4 mb-2">
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-white text-xs font-bold tracking-widest opacity-70">
-                                                🎴 ELİNİZ ({myHand.length})
-                                            </span>
-                                            {marketSize > 0 && (
-                                                <span className="text-yellow-400 text-xs font-bold bg-black/40 px-2 py-1 rounded-full">
-                                                    🎲 PAZAR: {marketSize}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="flex gap-2 items-center">
-                                            {isMyTurn && canDrawFromMarket && validMoves.length === 0 && selectedTileIndex === null && (
-                                                <button
-                                                    onClick={drawFromMarket}
-                                                    className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
-                                                >
-                                                    🎲 ÇEK
-                                                </button>
-                                            )}
-                                            {isMyTurn && !canDrawFromMarket && validMoves.length === 0 && selectedTileIndex === null && (
-                                                <button
-                                                    onClick={passTurn}
-                                                    className="bg-gray-500/80 hover:bg-gray-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
-                                                >
-                                                    ⏭️ PAS
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={leaveGameClient}
-                                                className="bg-red-600/80 hover:bg-red-600 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95"
-                                            >
-                                                🚪 Çık
-                                            </button>
-                                        </div>
-                                    </div>
+                                        {/* SOL IŞIKLI GÖSTERGE */}
+                                        {validMoves.includes('left') && selectedTileIndex !== null && gameState.board.length > 0 && (
+                                            <div className="mr-2 sm:mr-3 flex items-center" onClick={() => playTile('left')}>
+                                                <div className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer">
+                                                    <div className="absolute inset-0 bg-yellow-400/20 rounded-lg valid-zone"></div>
+                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                        <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-yellow-400/10 rounded-md border-2 border-yellow-400 border-dashed animate-glow-pulse"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
 
-                                    {/* Taş Dizilimi */}
-                                    <div className="w-full max-w-4xl mx-auto overflow-y-auto max-h-[40vh] p-2">
-                                        <div className="flex justify-center gap-2 flex-wrap">
-                                            {myHand.map((tile, index) => {
-                                                const canPlay = isMyTurn && (gameState.board.length === 0 || calculateValidMoves(tile).length > 0);
+                                        {/* TAHTADAKİ TAŞLAR */}
+                                        {gameState.board.length === 0 ? (
+                                            <div className="text-white/30 text-xl font-bold border-4 border-dashed border-white/10 rounded-3xl p-6">
+                                                {selectedTileIndex !== null ? '👇 Daşı Bura Qoy / Place Here' : 'Daş Seç və Başla / Select Tile'}
+                                            </div>
+                                        ) : (
+                                            gameState.board.map((tile, i) => (
+                                                <DominoTile
+                                                    key={i}
+                                                    values={tile}
+                                                    vertical={tile[0] === tile[1]}
+                                                    disabled={true}
+                                                    scale={0.95}
+                                                    animateIn={i === gameState.board.length - 1 || i === 0}
+                                                />
+                                            ))
+                                        )}
 
-                                                return (
-                                                    <DominoTile
-                                                        key={index}
-                                                        values={tile}
-                                                        onClick={() => handleTileClick(index, tile)}
-                                                        disabled={!isMyTurn}
-                                                        isSelected={selectedTileIndex === index}
-                                                        vertical={true}
-                                                        animateIn={true}
-                                                    />
-                                                );
-                                            })}
-                                        </div>
+                                        {/* SAĞ IŞIKLI GÖSTERGE */}
+                                        {validMoves.includes('right') && selectedTileIndex !== null && gameState.board.length > 0 && (
+                                            <div className="ml-2 sm:ml-3 flex items-center" onClick={() => playTile('right')}>
+                                                <div className="relative w-10 h-20 sm:w-12 sm:h-24 cursor-pointer">
+                                                    <div className="absolute inset-0 bg-yellow-400/20 rounded-lg valid-zone"></div>
+                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                        <div className="w-9 h-[4.5rem] sm:w-10 sm:h-20 bg-yellow-400/10 rounded-md border-2 border-yellow-400 border-dashed animate-glow-pulse"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* İLK HAMLE (ORTAYA) */}
+                                        {validMoves.includes('start') && selectedTileIndex !== null && (
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-30 animate-slide-up" onClick={() => playTile('start')}>
+                                                <div className="bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold px-8 py-4 rounded-2xl animate-glow-pulse cursor-pointer shadow-glow transform scale-110">
+                                                    ✨ OYUNA BAŞLA / START
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
-                            );
+
+                            {/* ALT PANEL: Oyuncu Eli */}
+                            <div className="bg-gradient-to-t from-black/90 via-table-dark to-transparent pb-6 pt-2 px-2 z-20">
+
+                                {/* Kontrol Butonları */}
+                                <div className="flex justify-between items-center px-4 mb-2">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-white text-xs font-bold tracking-widest opacity-70">
+                                            🎴 ELİNİZ ({myHand.length})
+                                        </span>
+                                        {marketSize > 0 && (
+                                            <span className="text-yellow-400 text-xs font-bold bg-black/40 px-2 py-1 rounded-full">
+                                                🎲 PAZAR: {marketSize}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex gap-2 items-center">
+                                        {isMyTurn && canDrawFromMarket && validMoves.length === 0 && selectedTileIndex === null && (
+                                            <button
+                                                onClick={drawFromMarket}
+                                                className="bg-blue-500/80 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
+                                            >
+                                                🎲 ÇEK
+                                            </button>
+                                        )}
+                                        {isMyTurn && !canDrawFromMarket && validMoves.length === 0 && selectedTileIndex === null && (
+                                            <button
+                                                onClick={passTurn}
+                                                className="bg-gray-500/80 hover:bg-gray-500 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 animate-pulse"
+                                            >
+                                                ⏭️ PAS
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={leaveGameClient}
+                                            className="bg-red-600/80 hover:bg-red-600 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95"
+                                        >
+                                            🚪 Çık
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Taş Dizilimi */}
+                                <div className="w-full max-w-4xl mx-auto overflow-y-auto max-h-[40vh] p-2">
+                                    <div className="flex justify-center gap-2 flex-wrap">
+                                        {myHand.map((tile, index) => {
+                                            const canPlay = isMyTurn && (gameState.board.length === 0 || calculateValidMoves(tile).length > 0);
+
+                                            return (
+                                                <DominoTile
+                                                    key={index}
+                                                    values={tile}
+                                                    onClick={() => handleTileClick(index, tile)}
+                                                    disabled={!isMyTurn}
+                                                    isSelected={selectedTileIndex === index}
+                                                    vertical={true}
+                                                    animateIn={true}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
                 }
 
-                            // --- MATCH INTRO EKRANI ---
-                            if (screen === 'match_intro') {
+                // --- MATCH INTRO EKRANI ---
+                if (screen === 'match_intro') {
                     return <MatchIntroScreen opponent={opponent} myPlayer={playerData} />;
                 }
 
-                            // --- END SCREEN ---
-                            if (screen === 'end' && endInfo) {
+                // --- END SCREEN ---
+                if (screen === 'end' && endInfo) {
                     return <EndScreen info={endInfo} myPlayer={playerData} />;
                 }
 
-                            // --- OYUN EKRANI (Üzerine Overlay eklendi) ---
-                            if (screen === 'game' && gameState) {
-                                // ... (Game render logic starts here)
-                                // Overlay componentini return içinde en üstte çağıracağız
-                            }
+                // --- OYUN EKRANI (Üzerine Overlay eklendi) ---
+                if (screen === 'game' && gameState) {
+                    // ... (Game render logic starts here)
+                    // Overlay componentini return içinde en üstte çağıracağız
+                }
 
-                            return (
-                            <>
-                                {overlayState && (
-                                    <Overlay
-                                        title={overlayState.title}
-                                        message={overlayState.message}
-                                        timer={overlayState.timer}
-                                        type={overlayState.type}
-                                    />
-                                )}
-                            </>
-                            );
+                return (
+                    <>
+                        {overlayState && (
+                            <Overlay
+                                title={overlayState.title}
+                                message={overlayState.message}
+                                timer={overlayState.timer}
+                                type={overlayState.type}
+                            />
+                        )}
+                    </>
+                );
             };
 
-                            const root = ReactDOM.createRoot(document.getElementById('root'));
-                            root.render(<DominoGame />);
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<DominoGame />);
     </script>
 </body>
 
