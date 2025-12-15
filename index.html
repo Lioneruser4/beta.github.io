@@ -4,635 +4,425 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#1b4d3e">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Domino 101 Pro - Azure</title>
-
+    <title>Domino 101 Pro</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Roboto', 'sans-serif'] },
-                    colors: {
-                        table: {
-                            base: '#1b4d3e',
-                            dark: '#0f2b23',
-                            light: '#2c6b58'
-                        },
-                        bone: {
-                            face: '#fdfdfd',
-                            side: '#e2e2e2',
-                            shadow: '#00000040'
-                        }
-                    },
-                    boxShadow: {
-                        '3d': '0px 4px 0px #c7c7c7, 0px 6px 6px rgba(0,0,0,0.4)',
-                        '3d-active': '0px 2px 0px #c7c7c7, 0px 3px 3px rgba(0,0,0,0.4)',
-                    },
-                    animation: {
-                        'pulse-glow': 'pulseGlow 2s infinite',
-                    },
-                    keyframes: {
-                        pulseGlow: {
-                            '0%, 100%': { boxShadow: '0 0 10px rgba(251, 191, 36, 0.6)' },
-                            '50%': { boxShadow: '0 0 20px rgba(251, 191, 36, 1)' }
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
     <style>
         body {
-            background-color: #1b4d3e;
-            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23153d31' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z'/%3E%3C/g%3E%3C/svg%3E");
+            background: #0f172a;
+            font-family: 'Roboto', sans-serif;
             overflow: hidden;
             touch-action: none;
             -webkit-tap-highlight-color: transparent;
-            user-select: none;
-            -webkit-user-select: none;
-            overscroll-behavior: none;
-            position: fixed;
-            width: 100%;
-            height: 100%;
         }
 
-        .pip-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: repeat(3, 1fr);
-            width: 100%;
-            height: 100%;
-            padding: 2px;
+        .bg-table {
+            background: radial-gradient(circle at center, #1b4d3e 0%, #061812 100%);
+        }
+
+        .tile-shadow {
+            box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.5);
         }
 
         .pip {
-            background-color: #111;
+            width: 5px;
+            height: 5px;
+            background: #111;
             border-radius: 50%;
-            width: 4px;
-            height: 4px;
-            margin: auto;
         }
 
-        /* DOMINO BOARD STYLES */
-        .domino-board-container {
-            width: 100%;
-            height: 100%;
-            position: relative;
-            overflow: hidden;
-            touch-action: none;
-            /* Critical for custom gestures */
-            background: rgba(27, 77, 62, 0.5);
+        .animate-pop {
+            animation: pop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
-        .domino-board-inner {
+        @keyframes pop {
+            0% {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .valid-move {
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            margin: auto;
-            width: 100%;
-            height: 100%;
-            transform-origin: center center;
-            will-change: transform;
-        }
-
-        .domino-tile {
-            display: inline-flex;
-            background: #fff;
-            border: 1px solid #333;
-            /* Thinner border for gapless look */
-            border-radius: 4px;
-            box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-            position: relative;
-            box-sizing: border-box;
-        }
-
-        .domino-tile.horizontal {
-            flex-direction: row;
-        }
-
-        .domino-tile.vertical {
-            flex-direction: column;
-        }
-
-        .domino-tile-face {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-        }
-
-        .domino-divider {
-            background: #333;
-            position: absolute;
-            z-index: 1;
-        }
-
-        .domino-tile.horizontal .domino-divider {
-            width: 1px;
-            height: 80%;
-            top: 10%;
-            left: 50%;
-        }
-
-        .domino-tile.vertical .domino-divider {
-            height: 1px;
-            width: 80%;
-            left: 10%;
-            top: 50%;
-        }
-
-        /* Board Tile Specifics */
-        .board-tile-wrapper {
-            position: absolute;
-            transform: translate(-50%, -50%);
-        }
-
-        /* Hand Tiles Container */
-        .hand-tiles-container {
-            display: flex;
-            justify-content: center;
-            align-items: flex-end;
-            padding-bottom: 10px;
-            /* Normal domino layout: sitting next to each other */
-        }
-
-        .hand-tile-wrapper {
-            margin: 0 1px;
-            /* Very small gap */
-            transition: transform 0.2s;
-        }
-
-        .hand-tile-wrapper:hover {
-            transform: translateY(-10px);
-            z-index: 10;
-        }
-
-        /* Valid Move Indicator */
-        .valid-move-indicator {
-            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: rgba(255, 215, 0, 0.6);
+            border: 2px solid white;
+            border-radius: 50%;
             z-index: 50;
-            border: 2px dashed rgba(255, 215, 0, 0.8);
-            border-radius: 6px;
-            background: rgba(255, 215, 0, 0.2);
-            animation: pulse-glow 1.5s infinite;
-            transform: translate(-50%, -50%);
+            animation: pulse 1.5s infinite;
+            cursor: pointer;
+            box-shadow: 0 0 10px gold;
         }
 
-        .hide-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7);
+            }
 
-        .hide-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
+            70% {
+                transform: scale(1.1);
+                box-shadow: 0 0 0 10px rgba(255, 215, 0, 0);
+            }
+
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+            }
         }
     </style>
 </head>
 
 <body>
     <div id="root"></div>
-
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo, useCallback } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
         const tg = window.Telegram?.WebApp;
         if (tg) { tg.ready(); tg.expand(); }
 
-        const API_URL = 'https://beta-github-io.onrender.com';
         const WS_URL = 'wss://beta-github-io.onrender.com';
+        const API_URL = 'https://beta-github-io.onrender.com';
 
         // --- COMPONENTS ---
-        const RenderPips = ({ number }) => {
-            const layouts = {
-                0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8],
-                4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8]
-            };
-            const activePips = layouts[number] || [];
-            return (
-                <div className="pip-grid">
-                    {[...Array(9)].map((_, i) => (
-                        <div key={i} className="pip" style={{ opacity: activePips.includes(i) ? 1 : 0 }}></div>
-                    ))}
-                </div>
-            );
+        const Pips = ({ n }) => {
+            const map = { 0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+            return <div className="grid grid-cols-3 grid-rows-3 w-full h-full p-0.5 gap-0.5">{[...Array(9)].map((_, i) => <div key={i} className={`rounded-full ${map[n].includes(i) ? 'bg-black' : 'bg-transparent'}`} />)}</div>
         };
 
-        const DominoTile = ({ values, onClick, disabled, isSelected, direction = 'right', isBoardTile = false }) => {
-            const isVertical = direction === 'up' || direction === 'down';
+        const Tile = ({ vals, onClick, selected, isBoard, dir = 'right' }) => {
+            // Hand tiles: Vertical. Board tiles: Depends on dir.
+            const isVert = isBoard ? (dir === 'up' || dir === 'down') : true;
+            const dim = isBoard
+                ? (isVert ? { w: 30, h: 60 } : { w: 60, h: 30 })
+                : { w: 42, h: 84 }; // Hand size
 
-            // SIZING LOGIC
-            // Board tiles: 60x30 (Matches logic)
-            // Hand tiles: 40x80 (Standing up)
-            const style = isBoardTile
-                ? { width: '60px', height: '30px' }
-                : { width: '40px', height: '80px' };
-
-            // Start vertical for hand tiles usually, but here values determine face.
-            // If isBoardTile, rotation is handled by parent or css class.
-            // Wait, we need internal flex direction.
-            // Hand tiles: Vertical (standing).
-            // Board tiles: Depends on direction.
-
-            const flexDir = isBoardTile
-                ? (isVertical ? 'column' : 'row')
-                : 'column'; // Hand tiles always vertical
-
-            // Rotation for board tiles handled by transform in parent to keep pips rights side up? 
-            // Or just rotate the tile div.
-
-            let rotation = 0;
-            if (isBoardTile) {
-                if (direction === 'left') rotation = 180;
-                if (direction === 'up') rotation = -90;
-                if (direction === 'down') rotation = 90;
-            }
-
-            // Adjust width/height if rotated
-            const loadStyle = {
-                width: isBoardTile ? '60px' : '40px',
-                height: isBoardTile ? '30px' : '80px',
-                flexDirection: 'row', // Default horizontal
-            }
-
-            if (isBoardTile) {
-                if (isVertical) {
-                    loadStyle.width = '30px';
-                    loadStyle.height = '60px';
-                    loadStyle.flexDirection = 'column';
-                }
-            } else {
-                // Hand tiles are vertical
-                loadStyle.width = '40px';
-                loadStyle.height = '80px';
-                loadStyle.flexDirection = 'column';
-            }
+            // Flex direction inside the tile
+            // If Hand Vertical: Column.
+            // If Board Horizontal: Row. If Board Vertical: Column.
+            const flexDir = (isBoard && !isVert) ? 'row' : 'col';
 
             return (
-                <div
-                    onClick={onClick}
-                    className={`domino-tile ${isSelected ? 'ring-2 ring-yellow-400 transform -translate-y-2' : ''} ${disabled ? 'opacity-80' : 'cursor-pointer'}`}
-                    style={{
-                        ...loadStyle,
-                        transition: 'all 0.2s',
-                    }}
-                >
-                    <div className={`domino-tile-face ${loadStyle.flexDirection === 'column' ? 'border-b' : 'border-r'} border-gray-800`}>
-                        <RenderPips number={values[0]} />
+                <div onClick={onClick}
+                    className={`relative bg-white rounded flex border border-gray-400 tile-shadow transition-transform ${selected ? '-translate-y-4 ring-2 ring-yellow-400 z-10' : ''}`}
+                    style={{ width: dim.w, height: dim.h, flexDirection: flexDir === 'col' ? 'column' : 'row' }}>
+                    <div className={`flex-1 flex items-center justify-center ${flexDir === 'col' ? 'border-b' : 'border-r'} border-gray-300 relative`}>
+                        <Pips n={vals[0]} />
                     </div>
-                    <div className="domino-tile-face">
-                        <RenderPips number={values[1]} />
+                    <div className="flex-1 flex items-center justify-center relative">
+                        <Pips n={vals[1]} />
+                        <div className="absolute inset-0 flex items-center justify-center"><div className="w-1.5 h-1.5 rounded-full bg-black opacity-20" /></div>
                     </div>
-                    <div className="domino-divider"></div>
                 </div>
             );
         };
 
-        const Toast = ({ message, type }) => {
-            const bg = type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-blue-600';
+        const Avatar = ({ url, name, ring = 'gray', size = 'md' }) => {
+            const sz = size === 'lg' ? 'w-16 h-16' : size === 'xl' ? 'w-24 h-24' : 'w-10 h-10';
             return (
-                <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-white text-sm font-bold shadow-lg ${bg} animate-bounce`}>
-                    {message}
+                <div className="flex flex-col items-center">
+                    <div className={`${sz} rounded-full border-2 border-${ring}-400 overflow-hidden bg-gray-700 shadow-lg`}>
+                        {url ? <img src={url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xl">👤</div>}
+                    </div>
+                    {name && <span className="text-white text-xs font-bold mt-1 shadow-black drop-shadow-md">{name}</span>}
                 </div>
             );
         };
 
-        const DominoGame = () => {
-            const [screen, setScreen] = useState('loading');
-            const [connected, setConnected] = useState(false);
-            const [playerData, setPlayerData] = useState(null);
-            const [roomCode, setRoomCode] = useState('');
-            const [joinCode, setJoinCode] = useState('');
-            const [gameState, setGameState] = useState(null);
-            const [searchTime, setSearchTime] = useState(0);
-            const [isMatchFound, setIsMatchFound] = useState(false); // NEW STATE
+        // --- APP ---
+        const App = () => {
+            const [page, setPage] = useState('auth');
+            const [ws, setWs] = useState(null);
+            const [me, setMe] = useState(null);
+            const [game, setGame] = useState(null);
+            const [opp, setOpp] = useState(null);
+            const [lead, setLead] = useState([]);
+            const [loading, setLoading] = useState(false);
 
-            const [selectedTileIndex, setSelectedTileIndex] = useState(null);
+            // Game State
+            const [selTile, setSelTile] = useState(null);
             const [validMoves, setValidMoves] = useState([]);
-            const [notification, setNotification] = useState(null);
-            const [searching, setSearching] = useState(false);
-            const [endInfo, setEndInfo] = useState(null);
-            const [opponent, setOpponent] = useState(null);
-            const [leaderboard, setLeaderboard] = useState([]);
+            const [winInfo, setWinInfo] = useState(null);
 
-            // ZOOM/PAN STATE
-            const [boardZoom, setBoardZoom] = useState(1);
-            const [boardPosition, setBoardPosition] = useState({ x: 0, y: 0 });
-            const [isDragging, setIsDragging] = useState(false);
-            const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-            const [pinchDistance, setPinchDistance] = useState(null);
+            // Pan/Zoom
+            const [view, setView] = useState({ x: 0, y: 0, z: 1 });
+            const boardRef = useRef();
+            const touchStart = useRef(null);
 
-            const wsRef = useRef(null);
-            const boardContainerRef = useRef(null);
-            const reconnectTimerRef = useRef(null);
-            const searchTimerRef = useRef(null);
-
-            // --- NOTIFICATION ---
-            const showNotification = (msg, type = 'info') => {
-                setNotification({ message: msg, type });
-                setTimeout(() => setNotification(null), 3000);
-            };
-
-            // --- WS LOGIC ---
             useEffect(() => {
-                connectToServer();
-                return () => {
-                    if (wsRef.current) wsRef.current.close();
+                // Auth & Connect
+                const init = async () => {
+                    let u = { username: 'Guest', telegramId: 'guest_' + Date.now() };
+                    if (tg?.initDataUnsafe?.user) {
+                        const tgu = tg.initDataUnsafe.user;
+                        u = { telegramId: String(tgu.id), username: tgu.first_name, photoUrl: tgu.photo_url };
+                    }
+
+                    // Sync with server
+                    try {
+                        const res = await fetch(API_URL + '/api/auth/telegram', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(u)
+                        });
+                        const d = await res.json();
+                        if (d.success) setMe(d.player); else setMe(u);
+                    } catch (e) { setMe(u); }
+
+                    connectWS(u.telegramId);
                 };
+                init();
             }, []);
 
-            const connectToServer = () => {
-                const ws = new WebSocket(WS_URL);
-                wsRef.current = ws;
-
-                ws.onopen = () => {
-                    setConnected(true);
-                    showNotification('Serverə qoşuldu ✅', 'success');
-                    initializeTelegramAuth();
+            const connectWS = (tid) => {
+                const s = new WebSocket(WS_URL);
+                s.onopen = () => {
+                    setWs(s);
+                    s.send(JSON.stringify({ type: 'reconnect', telegramId: tid }));
                 };
-
-                ws.onclose = () => {
-                    setConnected(false);
-                    setTimeout(connectToServer, 3000);
-                };
-
-                ws.onmessage = (e) => {
-                    try {
-                        const data = JSON.parse(e.data);
-                        handleServerMessage(data);
-                    } catch (err) { console.error(err); }
-                };
+                s.onmessage = (e) => handleMsg(JSON.parse(e.data));
+                s.onclose = () => setTimeout(() => connectWS(tid), 3000);
             };
 
-            const sendMessage = (msg) => {
-                if (wsRef.current?.readyState === WebSocket.OPEN) {
-                    wsRef.current.send(JSON.stringify(msg));
-                }
+            const send = (type, data = {}) => {
+                if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type, telegramId: me.telegramId, ...data }));
             };
 
-            const handleServerMessage = (data) => {
-                switch (data.type) {
-                    case 'matchFound':
-                        // Fix for Game Not Starting UI
-                        console.log('Match Found!', data);
-                        setIsMatchFound(true);
-                        setOpponent(data.opponent);
-                        setSearching(false); // Stop internal searching logic
-                        if (searchTimerRef.current) clearInterval(searchTimerRef.current);
-                        // Do NOT change screen yet, wait for user to see "Match Found" or gameStart
-                        break;
-                    case 'gameStart':
+            const handleMsg = (d) => {
+                switch (d.type) {
                     case 'reconnectSuccess':
-                        console.log('Game Started');
-                        setGameState(data.gameState);
-                        setScreen('game');
-                        setSearching(false);
-                        setIsMatchFound(false);
-                        showNotification('Oyun Başladı! 🎮', 'success');
+                    case 'gameStart':
+                        setGame(d.gameState);
+                        // Find Opponent
+                        const opId = Object.keys(d.gameState.players).find(k => k !== me.telegramId);
+                        setOpp(d.gameState.players[opId]);
+                        setPage('game');
+                        setLoading(false);
                         break;
                     case 'gameUpdate':
-                        setGameState(prev => ({ ...prev, ...data.gameState }));
-                        setSelectedTileIndex(null);
-                        setValidMoves([]);
+                        setGame(curr => ({ ...curr, ...d.gameState }));
+                        setSelTile(null);
+                        break;
+                    case 'matchFound':
+                        setOpp(d.opponent); // Shows opponent immediately
+                        setLoading(true); // Wait for start
                         break;
                     case 'gameEnd':
-                        setEndInfo(data);
-                        setScreen('end');
-                        setTimeout(() => { setScreen('lobby'); setGameState(null); }, 5000);
+                        setWinInfo(d);
+                        setPage('result');
                         break;
-                    case 'roomCreated':
-                        setRoomCode(data.roomCode);
-                        break;
-                    default:
+                    case 'opponentDisconnected':
+                        alert('Rəqib internetdən ayrıldı! Gözlənilir...');
                         break;
                 }
             };
 
-            const initializeTelegramAuth = async () => {
-                // Simulated or Real Auth
-                if (tg?.initDataUnsafe?.user) {
-                    const u = tg.initDataUnsafe.user;
-                    setPlayerData({ username: u.first_name, photoUrl: u.photo_url, telegramId: u.id, isGuest: false });
-                    setScreen('lobby');
-                } else {
-                    setPlayerData({ username: 'Qonaq', isGuest: true });
-                    setScreen('lobby');
-                }
+            // Helpers
+            const getMoves = (tile) => {
+                if (!game?.board.length) return ['left']; // 'start' maps to left for simplicity here
+                const b = game.board;
+                const L = b[0][0], R = b[b.length - 1][1];
+                const m = [];
+                if (tile[0] === L || tile[1] === L) m.push('left');
+                if (tile[0] === R || tile[1] === R) m.push('right');
+                return m;
             };
 
-            // --- PAN / ZOOM LOGIC (BUTTONLESS) ---
-            const handleTouchStart = (e) => {
-                if (e.touches.length === 2) {
-                    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-                    setPinchDistance(d);
-                } else if (e.touches.length === 1) {
-                    setIsDragging(true);
-                    setDragStart({ x: e.touches[0].clientX - boardPosition.x, y: e.touches[0].clientY - boardPosition.y });
-                }
+            const play = (pos) => {
+                if (selTile === null) return;
+                send('playTile', { tileIndex: selTile, position: pos });
             };
 
-            const handleTouchMove = (e) => {
-                // Prevent Default to stop page scrolling while playing
-                if (e.cancelable) e.preventDefault();
-
-                if (e.touches.length === 2 && pinchDistance) {
-                    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-                    const scale = d / pinchDistance;
-                    setBoardZoom(z => Math.max(0.5, Math.min(3, z * scale))); // Limit zoom
-                    setPinchDistance(d);
-                } else if (e.touches.length === 1 && isDragging) {
-                    const x = e.touches[0].clientX - dragStart.x;
-                    const y = e.touches[0].clientY - dragStart.y;
-                    setBoardPosition({ x, y });
-                }
-            };
-
-            const handleTouchEnd = () => {
-                setIsDragging(false);
-                setPinchDistance(null);
-            };
-
-            useEffect(() => {
-                const el = boardContainerRef.current;
-                if (!el) return;
-                el.addEventListener('touchstart', handleTouchStart, { passive: false });
-                el.addEventListener('touchmove', handleTouchMove, { passive: false });
-                el.addEventListener('touchend', handleTouchEnd);
-                return () => {
-                    el.removeEventListener('touchstart', handleTouchStart);
-                    el.removeEventListener('touchmove', handleTouchMove);
-                    el.removeEventListener('touchend', handleTouchEnd);
-                };
-            }, [boardPosition, pinchDistance, isDragging, dragStart]);
-
-
-            // --- RENDER HELPERS ---
-            // Render Tiles Touching Logic
-            const renderBoardTiles = useMemo(() => {
-                if (!gameState?.board) return [];
-                const tiles = [];
+            // Render Board Logic
+            const renderBoard = () => {
+                if (!game?.board) return [];
+                const b = game.board;
                 let x = 0, y = 0;
-                let dir = 'right';
-                // Simple snake logic for demo or use advanced if available
-                // User requirement: "tiles touching".
-                // We use 60px width.
-                const TILE_W = 60;
-                const TILE_H = 30;
-
-                // Align them properly
-                // For simplicity in this fix, we will just render a straight line or simple snake
-                // to ensure they touch.
-
-                gameState.board.forEach((tile, i) => {
-                    tiles.push({ tile, x, y, dir });
-                    // Determine next pos
-                    x += TILE_W;
+                // Simple Straight Line for stability as requested "fix play"
+                // Complex snake can be added but let's ensure functionality first
+                // Using 60px width per tile
+                return b.map((t, i) => {
+                    const pos = { val: t, x: (i - b.length / 2) * 62, y: 0 };
+                    return pos;
                 });
-
-                // Center the board
-                if (tiles.length > 0) {
-                    const totalW = tiles[tiles.length - 1].x;
-                    const offX = -totalW / 2;
-                    return tiles.map(t => ({ ...t, x: t.x + offX }));
-                }
-                return tiles;
-            }, [gameState?.board]);
-
-            const playTile = (pos) => {
-                if (selectedTileIndex === null) return;
-                sendMessage({ type: 'playTile', tileIndex: selectedTileIndex, position: pos });
             };
 
-            const myHand = gameState?.players?.[gameState?.playerId]?.hand || [];
+            // --- PAGES ---
 
-            // --- SCREENS ---
-            if (screen === 'loading') return <div className="flex h-screen items-center justify-center text-white text-2xl font-bold">Yüklənir...</div>;
+            if (page === 'auth' || !me) return <div className="h-screen bg-slate-900 flex items-center justify-center text-white"><div className="animate-spin text-4xl">⏳</div></div>;
 
-            if (screen === 'searching') {
-                return (
-                    <div className="flex flex-col h-screen items-center justify-center bg-gray-900 text-white p-4 text-center">
-                        {isMatchFound ? (
-                            <div className="animate-pulse">
-                                <h1 className="text-4xl text-green-500 font-bold mb-4">Rəqib Tapıldı!</h1>
-                                <p className="text-xl">Oyun başladılır...</p>
-                                {opponent && <div className="mt-4 text-2xl font-bold">{opponent.name}</div>}
-                            </div>
-                        ) : (
-                            <div>
-                                <h1 className="text-3xl font-bold mb-4">Rəqib Axtarılır...</h1>
-                                <div className="animate-spin text-4xl mb-4">⏳</div>
-                                <button onClick={() => { setSearching(false); setScreen('lobby'); sendMessage({ type: 'cancelSearch' }) }} className="bg-red-600 px-6 py-2 rounded-full font-bold">LƏĞV ET</button>
-                            </div>
-                        )}
+            if (page === 'lobby') return (
+                <div className="h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 flex flex-col">
+                    <div className="flex justify-between items-center mb-8">
+                        <Avatar url={me.photoUrl} name={me.username} size="lg" ring="green" />
+                        <div className="text-right">
+                            <div className="text-2xl font-black text-yellow-400">{me.elo} ELO</div>
+                            <div className="text-sm text-gray-400">LVL {me.level}</div>
+                        </div>
                     </div>
-                );
-            }
 
-            if (screen === 'lobby') {
-                return (
-                    <div className="flex flex-col h-screen items-center justify-center bg-gradient-to-br from-green-900 to-black text-white p-4">
-                        <h1 className="text-5xl font-bold mb-2">DOMİNO 101</h1>
-                        <p className="mb-8 opacity-70">Azərbaycanın Ən Yaxşı Domino Oyunu</p>
-
-                        {playerData && <div className="mb-8 text-xl font-bold">Salam, {playerData.username}!</div>}
-
-                        <button onClick={() => {
-                            setScreen('searching'); setIsMatchFound(false); setSearching(true);
-                            sendMessage({ type: 'findMatch', ...playerData });
-                        }} className="bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-4 px-12 rounded-2xl shadow-lg mb-4 text-xl w-full max-w-sm">
-                            OYUN AXTAR
+                    <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                        <button onClick={() => { setPage('searching'); send('findMatch', me); }}
+                            className="w-full max-w-sm bg-gradient-to-r from-yellow-500 to-amber-600 py-6 rounded-2xl font-black text-2xl shadow-lg transform active:scale-95 transition-all">
+                            ⚔️ OYUN AXTAR
                         </button>
-
-                        <div className="flex gap-4 w-full max-w-sm">
-                            <button className="flex-1 bg-white/20 py-3 rounded-xl font-bold" onClick={() => { sendMessage({ type: 'createRoom', ...playerData }) }}>OTAQ YARAT</button>
-                            <input className="flex-1 bg-black/40 rounded-xl px-4 text-center font-mono uppercase" placeholder="KOD" value={joinCode} onChange={e => setJoinCode(e.target.value)} />
-                            <button className="bg-green-600 px-4 rounded-xl" onClick={() => sendMessage({ type: 'joinRoom', roomCode: joinCode, ...playerData })}>Go</button>
-                        </div>
-
-                        {roomCode && <div className="mt-4 bg-white/20 p-4 rounded-xl text-center">
-                            <div className="text-sm opacity-70">OTAQ KODU</div>
-                            <div className="text-3xl font-mono font-bold tracking-widest">{roomCode}</div>
-                            <div className="text-sm mt-2 text-yellow-300 animate-pulse">Rəqib gözlənilir...</div>
-                        </div>}
+                        <button onClick={async () => {
+                            const res = await fetch(API_URL + '/api/leaderboard');
+                            const d = await res.json();
+                            if (d.success) { setLead(d.leaderboard); setPage('leaderboard'); }
+                        }} className="w-full max-w-sm glass py-4 rounded-xl font-bold">
+                            🏆 LİDERLƏR
+                        </button>
                     </div>
-                );
-            }
+                </div>
+            );
 
-            if (screen === 'game') {
-                return (
-                    <div className="fixed inset-0 flex flex-col bg-table-base overflow-hidden">
-                        {/* Header */}
-                        <div className="flex justify-between items-center p-4 bg-black/40 text-white z-10">
-                            <div className="flex items-center gap-2">
-                                <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">👤</div>
-                                <div>{opponent ? (opponent.name || 'Rəqib') : 'Rəqib'}</div>
+            if (page === 'searching') return (
+                <div className="h-screen bg-slate-900 flex flex-col items-center justify-center text-white p-4">
+                    {opp ? (
+                        <div className="text-center animate-pop">
+                            <div className="text-green-400 text-2xl font-bold mb-4">RƏQİB TAPILDI!</div>
+                            <Avatar url={opp.photoUrl} name={opp.username} size="xl" ring="red" />
+                            <div className="mt-4 text-sm text-gray-400">Oyun başladılır...</div>
+                        </div>
+                    ) : (
+                        <div className="text-center">
+                            <div className="w-20 h-20 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
+                            <h2 className="text-2xl font-bold">Rəqib Axtarılır...</h2>
+                            <button onClick={() => { send('cancelSearch'); setPage('lobby'); }} className="mt-8 text-red-400">LƏĞV ET</button>
+                        </div>
+                    )}
+                </div>
+            );
+
+            if (page === 'leaderboard') return (
+                <div className="h-screen bg-slate-900 text-white p-4 flex flex-col">
+                    <div className="flex items-center mb-6"><button onClick={() => setPage('lobby')} className="text-2xl mr-4">⬅️</button><h1 className="text-2xl font-bold">Liderlər</h1></div>
+                    <div className="flex-1 overflow-y-auto space-y-3 pb-4">
+                        {lead.map((u, i) => (
+                            <div key={i} className="glass p-3 rounded-xl flex items-center gap-4">
+                                <div className="font-bold text-gray-400 w-6">#{i + 1}</div>
+                                <Avatar url={u.photoUrl} size="sm" />
+                                <div className="flex-1 font-bold">{u.username}</div>
+                                <div className="text-yellow-400 font-bold">{u.elo}</div>
                             </div>
-                            <div className={`px-4 py-1 rounded-full text-xs font-bold ${gameState?.currentPlayer === gameState?.playerId ? 'bg-yellow-500 text-black animate-pulse' : 'bg-gray-700'}`}>
-                                {gameState?.currentPlayer === gameState?.playerId ? 'SİZİN NÖVBƏNİZ' : 'RƏQİB OYNAYIR'}
+                        ))}
+                    </div>
+                </div>
+            );
+
+            if (page === 'result' && winInfo) return (
+                <div className="h-screen bg-black/90 flex flex-col items-center justify-center text-white p-6 text-center">
+                    <h1 className={`text-5xl font-black mb-4 ${winInfo.isWinner ? 'text-green-500' : 'text-red-500'}`}>
+                        {winInfo.isWinner ? 'QAZANDINIZ! 🎉' : 'UDUZDUNUZ 💀'}
+                    </h1>
+                    <p className="text-xl mb-8">{winInfo.message}</p>
+                    <div className="text-3xl font-bold mb-8">
+                        {winInfo.eloChange > 0 ? '+' : ''}{winInfo.eloChange} ELO
+                    </div>
+                    <button onClick={() => { setPage('lobby'); setGame(null); }} className="bg-white text-black px-8 py-3 rounded-full font-bold">
+                        LOBBİYƏ QAYIT
+                    </button>
+                </div>
+            );
+
+            if (page === 'game' && game) return (
+                <div className="fixed inset-0 bg-table flex flex-col">
+                    {/* Header */}
+                    <div className="h-16 glass flex items-center justify-between px-4 z-20">
+                        <div className="flex items-center gap-3">
+                            <Avatar url={opp?.photoUrl} size="sm" ring="red" />
+                            <div className="leading-tight">
+                                <div className="font-bold text-white">{opp?.name}</div>
+                                <div className="text-xs text-gray-300">Daş: {opp?.handCount}</div>
                             </div>
                         </div>
-
-                        {/* Board */}
-                        <div className="flex-1 relative overflow-hidden" ref={boardContainerRef}>
-                            <div className="domino-board-inner" style={{
-                                transform: `translate(${boardPosition.x}px, ${boardPosition.y}px) scale(${boardZoom})`
-                            }}>
-                                {renderBoardTiles.map((t, i) => (
-                                    <div key={i} className="board-tile-wrapper" style={{ left: t.x, top: t.y }}>
-                                        <DominoTile values={t.tile} isBoardTile={true} direction={t.dir} />
-                                    </div>
-                                ))}
-
-                                {/* Indicators - simplified logic for demo */}
-                                {validMoves.includes('start') && (
-                                    <div className="valid-move-indicator" style={{ left: 0, top: 0, width: '80px', height: '40px' }} onClick={() => playTile('start')}>BAŞLA</div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Hand */}
-                        <div className="bg-black/80 p-2 z-10">
-                            <div className="hand-tiles-container">
-                                {myHand.map((tile, i) => (
-                                    <div key={i} className="hand-tile-wrapper">
-                                        <DominoTile
-                                            values={tile}
-                                            onClick={() => {
-                                                if (selectedTileIndex === i) { setSelectedTileIndex(null); setValidMoves([]); }
-                                                else { setSelectedTileIndex(i); setValidMoves(['left', 'right']); /* Simulating valid moves for UI click */ }
-                                            }}
-                                            isSelected={selectedTileIndex === i}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="flex justify-between mt-2 px-4">
-                                <button className="text-white text-xs bg-red-600 px-3 py-1 rounded" onClick={() => { setScreen('lobby'); sendMessage({ type: 'leaveGame' }) }}>Çıxış</button>
-                                <button className="text-white text-xs bg-blue-600 px-3 py-1 rounded" onClick={() => sendMessage({ type: 'drawFromMarket' })}>Bazar</button>
-                            </div>
+                        <div className={`px-3 py-1 rounded-full text-xs font-bold ${game.currentPlayer === me.telegramId ? 'bg-yellow-500 text-black animate-pulse' : 'bg-gray-700 text-white'}`}>
+                            {game.currentPlayer === me.telegramId ? 'SİZİN NÖVBƏNİZ' : 'RƏQİB GÖZLƏNİLİR'}
                         </div>
                     </div>
-                );
-            }
+
+                    {/* Board */}
+                    <div className="flex-1 relative overflow-hidden"
+                        onTouchStart={e => {
+                            if (e.touches.length === 1) touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                            if (e.touches.length === 2) touchStart.current = { d: Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY) };
+                        }}
+                        onTouchMove={e => {
+                            if (e.touches.length === 1 && touchStart.current?.x) {
+                                const dx = e.touches[0].clientX - touchStart.current.x;
+                                const dy = e.touches[0].clientY - touchStart.current.y;
+                                setView(v => ({ ...v, x: v.x + dx, y: v.y + dy }));
+                                touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                            }
+                            if (e.touches.length === 2 && touchStart.current?.d) {
+                                const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                                const s = d / touchStart.current.d;
+                                setView(v => ({ ...v, z: Math.max(0.5, Math.min(3, v.z * s)) }));
+                                touchStart.current.d = d;
+                            }
+                        }}
+                    >
+                        <div className="absolute top-1/2 left-1/2 transition-transform duration-75"
+                            style={{ transform: `translate(-50%,-50%) translate(${view.x}px,${view.y}px) scale(${view.z})` }}>
+
+                            {renderBoard().map((pos, i) => (
+                                <div key={i} className="absolute transition-all duration-300" style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
+                                    <Tile vals={pos.val} isBoard={true} />
+                                </div>
+                            ))}
+
+                            {/* Interactive Indicators */}
+                            {selTile !== null && getMoves(game.players[me.telegramId].hand[selTile]).map(dir => (
+                                <div key={dir} className="valid-move"
+                                    style={{
+                                        left: dir === 'left' ? (renderBoard()[0]?.x || 0) - 50 : (renderBoard()[renderBoard.length - 1]?.x || 0) + 50,
+                                        top: 15
+                                    }}
+                                    onClick={() => play(dir)}
+                                />
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Hand */}
+                    <div className="bg-black/80 p-4 pb-8 z-20">
+                        <div className="flex justify-center gap-2 mb-4 overflow-x-auto px-4 min-h-[90px]">
+                            {game.players[me.telegramId].hand.map((t, i) => (
+                                <Tile key={i} vals={t} selected={selTile === i} onClick={() => {
+                                    if (game.currentPlayer === me.telegramId) setSelTile(selTile === i ? null : i);
+                                }} />
+                            ))}
+                        </div>
+                        <div className="flex justify-between items-center px-4">
+                            <button onClick={() => send('leaveGame')} className="text-red-400 font-bold text-sm">⛔ ÇIXIŞ</button>
+                            <button onClick={() => send('drawFromMarket')} className="bg-blue-600 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg active:scale-95 disabled:opacity-50"
+                                disabled={game.market === 0 || game.currentPlayer !== me.telegramId}>
+                                🎲 BAZAR ({game.market})
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
 
             return null;
         };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<DominoGame />);
+        root.render(<App />);
     </script>
 </body>
 
