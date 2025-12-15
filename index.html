@@ -1,577 +1,437 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Domino Master Online</title>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Dominoes Online - Professional Multiplayer</title>
     <style>
-        :root {
-            --primary-glow: #0ff;
-            --secondary-glow: #f0f;
-            --gold: #ffd700;
-            --bg-color: #050505;
-            --panel-bg: rgba(20, 20, 20, 0.9);
-            --text-color: #fff;
-        }
-
-        body {
+        * {
             margin: 0;
             padding: 0;
-            font-family: 'Roboto', sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-image: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
         }
-
-        #app {
-            width: 100%;
-            height: 100%;
-            max-width: 1200px;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+        
+        body {
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 100%);
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
         }
-
-        /* --- Notifications & Status --- */
-        #status-bar {
-            position: absolute;
+        
+        .connection-status {
+            position: fixed;
             top: 10px;
-            right: 20px;
+            right: 10px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+        
+        .connected {
+            background: rgba(46, 204, 113, 0.2);
+            border: 2px solid #2ecc71;
+            color: #2ecc71;
+        }
+        
+        .disconnected {
+            background: rgba(231, 76, 60, 0.2);
+            border: 2px solid #e74c3c;
+            color: #e74c3c;
+        }
+        
+        .lobby-container {
             display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 0.9rem;
-            z-index: 100;
-        }
-
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background-color: red;
-            box-shadow: 0 0 5px red;
-        }
-
-        .connected .status-dot {
-            background-color: #0f0;
-            box-shadow: 0 0 10px #0f0;
-        }
-
-        /* --- Screens --- */
-        .screen {
-            display: none;
-            width: 100%;
-            height: 100%;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            animation: fadeIn 0.5s ease-in-out;
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
         }
-
-        .active {
-            display: flex;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: scale(0.95);
-            }
-
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
-        }
-
-        /* --- Login Screen --- */
-        .login-card {
-            background: var(--panel-bg);
-            padding: 40px;
-            border-radius: 20px;
-            border: 1px solid #333;
-            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+        
+        .title-container {
             text-align: center;
+            margin-bottom: 60px;
+            position: relative;
         }
-
-        .login-btn {
-            background: #24a1de;
-            color: white;
-            border: none;
-            padding: 15px 30px;
+        
+        .main-title {
+            font-size: 4rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, #ff0080, #ff8c00, #40e0d0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(255, 255, 255, 0.1);
+            animation: title-glow 3s ease-in-out infinite alternate;
+        }
+        
+        .subtitle {
             font-size: 1.2rem;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            color: #a0a0c0;
+            margin-top: 10px;
+            letter-spacing: 3px;
         }
-
-        .login-btn:hover {
-            box-shadow: 0 0 15px #24a1de;
+        
+        .buttons-container {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .lobby-button {
+            padding: 25px 40px;
+            font-size: 1.4rem;
+            font-weight: 700;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        
+        .ranked-play {
+            background: linear-gradient(135deg, #ff0080 0%, #ff8c00 100%);
+            color: white;
+            box-shadow: 0 0 30px rgba(255, 0, 128, 0.4);
+            animation: pulse-button 2s infinite;
+        }
+        
+        .play-friend {
+            background: linear-gradient(135deg, #40e0d0 0%, #ff8c00 50%, #ff0080 100%);
+            color: white;
+            box-shadow: 0 0 30px rgba(64, 224, 208, 0.4);
+        }
+        
+        .join-room {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 0 30px rgba(102, 126, 234, 0.4);
+        }
+        
+        .leaderboard-btn {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            box-shadow: 0 0 30px rgba(240, 147, 251, 0.4);
+            margin-top: 20px;
+        }
+        
+        .lobby-button:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px rgba(255, 255, 255, 0.2);
+        }
+        
+        .lobby-button:active {
             transform: translateY(-2px);
         }
-
-        /* --- Lobby --- */
-        h1 {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 3rem;
-            text-shadow: 0 0 10px var(--primary-glow);
-            margin-bottom: 40px;
-            letter-spacing: 2px;
-        }
-
-        .lobby-menu {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            width: 300px;
-        }
-
-        .menu-btn {
-            background: rgba(30, 30, 30, 0.8);
-            border: 1px solid #555;
-            color: #fff;
+        
+        .room-code-container {
+            margin-top: 30px;
             padding: 20px;
-            font-size: 1.2rem;
-            border-radius: 10px;
-            cursor: pointer;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            font-weight: bold;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            display: none;
         }
-
-        .menu-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: 0.5s;
-        }
-
-        .menu-btn:hover::before {
-            left: 100%;
-        }
-
-        .rank-btn {
-            border-color: var(--primary-glow);
-            box-shadow: 0 0 10px var(--primary-glow);
-        }
-
-        .rank-btn:hover {
-            background: rgba(0, 255, 255, 0.1);
-            box-shadow: 0 0 20px var(--primary-glow);
-        }
-
-        .friend-btn {
-            border-color: var(--secondary-glow);
-            box-shadow: 0 0 10px var(--secondary-glow);
-        }
-
-        .friend-btn:hover {
-            background: rgba(255, 0, 255, 0.1);
-            box-shadow: 0 0 20px var(--secondary-glow);
-        }
-
-        .join-container {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .room-input {
-            padding: 10px;
-            background: #222;
-            border: 1px solid #555;
-            color: #fff;
-            border-radius: 5px;
+        
+        .room-code {
+            font-size: 3rem;
+            font-weight: 800;
+            color: #40e0d0;
             text-align: center;
-            font-family: 'Orbitron';
+            letter-spacing: 10px;
+            margin: 20px 0;
+            text-shadow: 0 0 20px rgba(64, 224, 208, 0.5);
         }
-
-        .connect-btn {
-            padding: 10px;
-            background: #333;
+        
+        .copy-button {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #40e0d0, #667eea);
             border: none;
-            color: #ccc;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
             cursor: pointer;
-            transition: 0.3s;
+            transition: all 0.3s ease;
         }
-
-        .connect-btn:hover {
-            background: #444;
-            color: #fff;
+        
+        .join-container {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            display: none;
         }
-
-        /* --- User Profile & Leaderboard --- */
-        .profile-section {
+        
+        .code-input {
+            width: 200px;
+            padding: 15px;
+            font-size: 1.5rem;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            color: white;
+            outline: none;
+        }
+        
+        .connect-button {
+            margin-top: 15px;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .game-container {
+            display: none;
+            width: 100%;
+            height: 100vh;
+            position: relative;
+        }
+        
+        .player-info {
             position: absolute;
-            top: 20px;
-            left: 20px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
             display: flex;
             align-items: center;
             gap: 15px;
         }
-
-        .avatar {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            border: 2px solid #fff;
-            object-fit: cover;
-        }
-
-        .level-icon {
-            font-size: 1.5rem;
-            animation: pulse 2s infinite;
-        }
-
-        .elo-badge {
-            background: #222;
-            padding: 5px 10px;
-            border-radius: 10px;
-            font-size: 0.8rem;
-            color: #aaa;
-        }
-
-        @keyframes pulse {
-            0% {
-                transform: scale(1);
-                text-shadow: 0 0 5px currentColor;
-            }
-
-            50% {
-                transform: scale(1.1);
-                text-shadow: 0 0 15px currentColor;
-            }
-
-            100% {
-                transform: scale(1);
-                text-shadow: 0 0 5px currentColor;
-            }
-        }
-
-        .leaderboard-btn {
-            position: absolute;
+        
+        .player-you {
             bottom: 20px;
+            left: 20px;
+            border: 2px solid #40e0d0;
+        }
+        
+        .player-opponent {
+            top: 20px;
             right: 20px;
-            background: none;
-            border: 1px solid var(--gold);
-            color: var(--gold);
-            padding: 10px 20px;
-            cursor: pointer;
-            border-radius: 20px;
-            font-family: 'Orbitron';
+            border: 2px solid #ff0080;
         }
-
-        /* --- Leaderboard Modal --- */
-        #leaderboard-screen h2 {
-            color: var(--gold);
-            text-shadow: 0 0 10px var(--gold);
-        }
-
-        .leaderboard-list {
-            width: 80%;
-            max-width: 600px;
-            background: rgba(0, 0, 0, 0.8);
-            border-radius: 10px;
-            padding: 20px;
-            max-height: 70vh;
-            overflow-y: auto;
-        }
-
-        .lb-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            border-bottom: 1px solid #333;
-        }
-
-        .lb-rank-1 {
-            color: #ffd700;
-            font-weight: bold;
-            font-size: 1.2rem;
-            text-shadow: 0 0 10px #ffd700;
-        }
-
-        .lb-rank-2 {
-            color: #c0c0c0;
-            font-weight: bold;
-        }
-
-        .lb-rank-3 {
-            color: #cd7f32;
-            font-weight: bold;
-        }
-
-        /* --- Game Board --- */
-        #game-screen {
-            background: radial-gradient(#2a2a2a, #000);
-        }
-
-        .game-header {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            padding: 20px;
-            background: rgba(0, 0, 0, 0.5);
-            margin-bottom: 20px;
-        }
-
-        .player-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .turn-active {
-            box-shadow: 0 0 20px var(--primary-glow);
-            border-radius: 10px;
-            padding: 5px;
-        }
-
-        #board-area {
-            flex-grow: 1;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: auto;
-            position: relative;
-            min-height: 400px;
-        }
-
-        .domino-tile {
-            width: 40px;
-            height: 80px;
-            background: #fff;
-            border-radius: 5px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            position: relative;
-            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-
-        .domino-tile.horizontal {
-            width: 80px;
-            height: 40px;
-            flex-direction: row;
-        }
-
-        .domino-tile:hover {
-            transform: scale(1.1);
-            z-index: 10;
-        }
-
-        .domino-half {
-            flex: 1;
-            border: 1px solid #ccc;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-weight: bold;
-            color: #000;
-        }
-
-        .highlight-zone {
-            width: 40px;
-            height: 40px;
-            background: rgba(0, 255, 0, 0.3);
-            border: 2px dashed #0f0;
-            border-radius: 50%;
-            animation: pulse-green 1s infinite;
-        }
-
-        @keyframes pulse-green {
-            0% {
-                opacity: 0.5;
-            }
-
-            50% {
-                opacity: 1;
-            }
-
-            100% {
-                opacity: 0.5;
-            }
-        }
-
-        #hand-area {
-            height: 120px;
-            width: 100%;
-            background: rgba(20, 20, 20, 0.9);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            padding-bottom: 10px;
-        }
-
-        /* Loading Overlay */
-        #loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 200;
-            display: none;
-        }
-
-        .spinner {
+        
+        .level-icon {
             width: 50px;
             height: 50px;
-            border: 5px solid #333;
-            border-top: 5px solid var(--primary-glow);
             border-radius: 50%;
-            animation: spin 1s linear infinite;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.2rem;
+            animation: icon-glow 2s infinite alternate;
         }
-
-        @keyframes spin {
-            100% {
-                transform: rotate(360deg);
-            }
+        
+        .elo-score {
+            font-size: 1.1rem;
+            color: #ffd700;
+        }
+        
+        .game-board {
+            width: 90%;
+            height: 300px;
+            margin: 150px auto;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .tile {
+            position: absolute;
+            width: 80px;
+            height: 160px;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+        }
+        
+        .valid-spot {
+            position: absolute;
+            width: 100px;
+            height: 180px;
+            border: 3px dashed #2ecc71;
+            border-radius: 10px;
+            animation: spot-pulse 1.5s infinite;
+        }
+        
+        .leaderboard-container {
+            display: none;
+            width: 90%;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 30px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .leaderboard-title {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+            background: linear-gradient(90deg, #ffd700, #ff8c00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .leaderboard-entry {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .leaderboard-entry:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(10px);
+        }
+        
+        .rank-1, .rank-2, .rank-3 {
+            border: 3px solid;
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 140, 0, 0.1));
+        }
+        
+        .rank-1 { border-color: #ffd700; }
+        .rank-2 { border-color: #c0c0c0; }
+        .rank-3 { border-color: #cd7f32; }
+        
+        .back-button {
+            margin-top: 30px;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        @keyframes title-glow {
+            from { text-shadow: 0 0 20px rgba(255, 255, 255, 0.1); }
+            to { text-shadow: 0 0 40px rgba(255, 255, 255, 0.3); }
+        }
+        
+        @keyframes pulse-button {
+            0% { box-shadow: 0 0 30px rgba(255, 0, 128, 0.4); }
+            50% { box-shadow: 0 0 50px rgba(255, 0, 128, 0.6); }
+            100% { box-shadow: 0 0 30px rgba(255, 0, 128, 0.4); }
+        }
+        
+        @keyframes icon-glow {
+            from { box-shadow: 0 0 10px currentColor; }
+            to { box-shadow: 0 0 25px currentColor; }
+        }
+        
+        @keyframes spot-pulse {
+            0% { opacity: 0.3; }
+            50% { opacity: 1; }
+            100% { opacity: 0.3; }
         }
     </style>
 </head>
-
 <body>
-
-    <div id="app">
-        <!-- Status Bar -->
-        <div id="status-bar">
-            <span id="connection-status-text">Connecting...</span>
-            <div id="connection-dot" class="status-dot"></div>
+    <div class="connection-status disconnected" id="connectionStatus">
+        Connecting to server...
+    </div>
+    
+    <div class="lobby-container" id="lobbyContainer">
+        <div class="title-container">
+            <h1 class="main-title">DOMINOES ONLINE</h1>
+            <p class="subtitle">Professional Multiplayer Arena</p>
         </div>
-
-        <!-- Login Screen -->
-        <div id="login-screen" class="screen active">
-            <div class="login-card">
-                <h1>DOMINO ONLINE</h1>
-                <p>Connect your Telegram to Play</p>
-                <button id="telegram-login-btn" class="login-btn">
-                    <i class="fab fa-telegram-plane"></i> Login with Telegram
-                </button>
-                <br>
-                <small style="color: #666;">Mock Login available for browser testing</small>
-            </div>
-        </div>
-
-        <!-- Lobby Screen -->
-        <div id="lobby-screen" class="screen">
-            <div class="profile-section">
-                <img id="user-avatar" src="" class="avatar" alt="User">
-                <div>
-                    <div id="user-name" style="font-weight: bold; font-size: 1.1rem;">Player</div>
-                    <div class="elo-badge">ELO: <span id="user-elo">0</span></div>
-                </div>
-                <div id="user-level-icon" class="level-icon">⭐</div>
-            </div>
-
-            <h1>LOBBY</h1>
-
-            <div class="lobby-menu">
-                <button id="ranked-btn" class="menu-btn rank-btn">
-                    <i class="fas fa-trophy"></i> Ranked Play
-                </button>
-
-                <button id="friend-btn" class="menu-btn friend-btn">
-                    <i class="fas fa-user-friends"></i> Play with Friend
-                </button>
-
-                <div class="join-container">
-                    <input type="text" id="room-code-input" class="room-input" placeholder="Enter Room Code">
-                    <button id="join-room-btn" class="connect-btn">CONNECT</button>
-                </div>
-            </div>
-
-            <button class="leaderboard-btn" id="open-leaderboard">
-                <i class="fas fa-chart-bar"></i> Leaderboard
+        
+        <div class="buttons-container">
+            <button class="lobby-button ranked-play" onclick="startRankedMatchmaking()">
+                🏆 Ranked Play (Dereceli)
+            </button>
+            
+            <button class="lobby-button play-friend" onclick="createPrivateRoom()">
+                👥 Play with Friend (Arkadaşla Oyna)
+            </button>
+            
+            <button class="lobby-button join-room" onclick="showJoinRoom()">
+                🔗 Join Room
+            </button>
+            
+            <button class="lobby-button leaderboard-btn" onclick="showLeaderboard()">
+                🏅 Leaderboard (Skor Tablosu)
             </button>
         </div>
-
-        <!-- Leaderboard Screen -->
-        <div id="leaderboard-screen" class="screen">
-            <h2>TOP PLAYERS</h2>
-            <div id="leaderboard-list" class="leaderboard-list">
-                <!-- Items injected here -->
-            </div>
-            <div id="user-rank-display" style="margin-top: 20px; font-weight: bold;"></div>
-            <button onclick="showScreen('lobby-screen')"
-                style="margin-top: 20px; background: none; border: 1px solid #fff; color: #fff; padding: 10px; cursor: pointer;">Back</button>
+        
+        <div class="room-code-container" id="roomCodeContainer">
+            <h3>Room Code (Arkadaşınızla paylaşın):</h3>
+            <div class="room-code" id="roomCode">0000</div>
+            <button class="copy-button" onclick="copyRoomCode()">📋 Copy Code</button>
         </div>
-
-        <!-- Game Screen -->
-        <div id="game-screen" class="screen">
-            <div class="game-header">
-                <div class="player-info" id="opponent-info">
-                    <div class="level-icon" id="opp-level-icon">⭐</div>
-                    <img id="opp-avatar" src="" class="avatar">
-                    <span id="opp-name">Waiting...</span>
-                </div>
-                <div style="font-family: Orbitron; font-size: 1.5rem;" id="game-timer">10:00</div>
-                <div class="player-info" id="my-info">
-                    <span id="my-name-display">Me</span>
-                    <img id="my-avatar-display" src="" class="avatar">
-                </div>
-            </div>
-
-            <div id="board-area">
-                <!-- Tiles placed here -->
-                <div id="board-container" style="display: flex; align-items: center; gap: 2px;">
-                    <!-- Center point for board -->
-                </div>
-            </div>
-
-            <div id="hand-area">
-                <!-- My Tiles -->
+        
+        <div class="join-container" id="joinContainer">
+            <h3>Enter Room Code:</h3>
+            <input type="text" class="code-input" id="roomCodeInput" maxlength="4" placeholder="0000">
+            <br>
+            <button class="connect-button" onclick="joinRoom()">🎮 Connect</button>
+        </div>
+    </div>
+    
+    <div class="game-container" id="gameContainer">
+        <div class="player-info player-you">
+            <div class="level-icon" id="playerLevelIcon">1</div>
+            <div>
+                <h3 id="playerName">Player</h3>
+                <p class="elo-score" id="playerElo">Elo: 1000</p>
             </div>
         </div>
-
-        <!-- Matchmaking Overlay -->
-        <div id="loading-overlay">
-            <div class="spinner"></div>
-            <h2 id="loading-text" style="margin-top: 20px;">Searching for match...</h2>
-            <button id="cancel-search-btn"
-                style="margin-top: 20px; padding: 10px 20px; background: red; color: white; border: none; cursor: pointer;">Cancel</button>
+        
+        <div class="player-info player-opponent">
+            <div class="level-icon" id="opponentLevelIcon">1</div>
+            <div>
+                <h3 id="opponentName">Opponent</h3>
+                <p class="elo-score" id="opponentElo">Elo: 1000</p>
+            </div>
         </div>
-
+        
+        <div class="game-board" id="gameBoard">
+            <!-- Game board tiles will be rendered here -->
+        </div>
+    </div>
+    
+    <div class="leaderboard-container" id="leaderboardContainer">
+        <h2 class="leaderboard-title">🏆 Global Leaderboard 🏆</h2>
+        <div id="leaderboardList">
+            <!-- Leaderboard entries will be inserted here -->
+        </div>
+        <div id="personalRanking" style="margin-top: 30px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 10px;">
+            <h3>Your Ranking:</h3>
+            <div id="userRank">Loading...</div>
+        </div>
+        <button class="back-button" onclick="hideLeaderboard()">← Back to Lobby</button>
     </div>
 
-    <!-- Socket.io -->
-    <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
 </body>
-
 </html>
