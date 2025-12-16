@@ -1028,6 +1028,15 @@ async function handleReconnect(ws, data) {
         ws.playerId = newPlayerId;
         ws.roomCode = roomCode;
         ws.playerName = gs.players[newPlayerId].name;
+        
+        // EKSİK BİLGİLERİ EKLE: Oyuncunun ELO, level gibi bilgilerini de ws objesine yeniden ata.
+        const reconnectingPlayerData = roomForMatch.players[newPlayerId];
+        ws.telegramId = reconnectingPlayerData.telegramId;
+        ws.photoUrl = reconnectingPlayerData.photoUrl;
+        ws.level = reconnectingPlayerData.level;
+        ws.elo = reconnectingPlayerData.elo;
+        ws.isGuest = reconnectingPlayerData.isGuest;
+
         playerConnections.set(newPlayerId, ws);
         playerRooms.set(newPlayerId, roomCode);
 
