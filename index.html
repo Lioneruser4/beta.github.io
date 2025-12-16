@@ -485,15 +485,7 @@
                         // Sunucu oyunun tamamen bittiğini ve temizlik yapılması gerektiğini söylediğinde
                         resetGameClientState();
                         break;
-
-                        setTimeout(() => {
-                            resetGameClientState(); // Tüm oyun state'ini temizle
-                            setScreen('lobby');
-                            if (isRanked && playerData && !playerData.isGuest) {
-                                initializeTelegramAuth();
-                            }
-                        }, 4000);
-                        break;
+                    // NOT: 'cleanup' case'inden sonraki hatalı 'setTimeout' bloğu kaldırıldı.
                     case 'searchCancelled':
                         showNotification('Arama iptal edildi', 'info');
                         setSearching(false);
@@ -1005,9 +997,9 @@
                                     </div>
                                     <div className="text-xs text-gray-300 bg-black/40 px-2 py-0.5 rounded-full inline-block">
                                         🎲 {(() => {
-                                            const oppName = opponent?.name || opponent?.username;
-                                            const oppEntry = Object.values(gameState.players).find(p => p.name === oppName);
-                                            return (oppEntry && oppEntry.hand ? oppEntry.hand.length : 0);
+                                            const oppId = Object.keys(gameState.players).find(id => id !== myPlayerId);
+                                            const oppPlayer = oppId ? gameState.players[oppId] : null;
+                                            return (oppPlayer && oppPlayer.hand ? oppPlayer.hand.length : 0);
                                         })()} Taş
                                     </div>
                                 </div>
