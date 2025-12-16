@@ -364,13 +364,14 @@
                         if (activeRoom && activePlayerId && playerData) {
                             console.log(`🔄 ${activeRoom} odasına yeniden bağlanma isteği gönderiliyor...`);
                             sendMessage({
-                                type: 'reconnectGame',
+                                type: 'reconnectGame', // Sunucuyla eşleşmesi için 'reconnectGame' olmalı
                                 roomCode: activeRoom,
                                 playerId: activePlayerId,
-                                telegramId: playerData.telegramId // Sunucunun oyuncuyu doğrulaması için
+                                telegramId: playerData.telegramId, // Sunucunun oyuncuyu doğrulaması için
+                                username: playerData.username
                             });
                         }
-                    } catch (e) { console.warn('Session storage okunurken hata:', e); }
+                    } catch (e) { console.warn('Session storage okunurken hata:', e); sessionStorage.clear(); }
                 };
                 ws.onclose = () => { setConnected(false); setTimeout(connectToServer, 3000); };
                 ws.onmessage = (e) => {
@@ -445,27 +446,45 @@
                         setSearchTime(0);
                         break;
                     case 'gameEnd':
-                        const isRanked = data.isRanked;
-                        const isWinnerClient = data.winner === gameState?.playerId;
-                        const eloChange = data.eloChanges
-                            ? (isWinnerClient ? data.eloChanges.winner : data.eloChanges.loser)
-                            : 0;
-                        const winMsg = `Oyun Bitti! Kazanan: ${data.winnerName}`;
-                        const eloMsg = data.eloChanges ? ` (ELO: ${eloChange > 0 ? '+' : ''}${eloChange})` : '';
-
                         setEndInfo({
                             winnerName: data.winnerName,
-                            isRanked,
-                            isWinner: isWinnerClient,
-                            eloChange,
+                            isRanked: data.isRanked,
+                            isWinner: data.isWinner,
+                            eloChange: data.eloChange || 0,
                         });
                         setScreen('end');
 
-                        if (searchTimerRef.current) {
-                            clearInterval(searchTimerRef.current);
-                            searchTimerRef.current = null;
-                        }
-                        setSearchTime(0);
+                        setTimeout(() => {
+                            resetGameClientState();
+                            setScreen('lobby');
+                            if (data.isRanked && playerData && !playerData.isGuest) {
+                                initializeTelegramAuth(); // ELO güncellenmiş olabilir, verileri yeniden çek
+                            }
+                        }, 4000);
+                        break;
+                    case 'opponentLeft': // Bu case artık handleGameEnd içinde yönetiliyor ama yedek olarak kalabilir.
+                        showNotification('Rakip oyundan ayrıldı. Kazandınız!', 'success');
+                        setEndInfo({
+                            winnerName: playerData?.username || 'Siz',
+                            isRanked: data.isRanked,
+                            isWinner: true,
+                            eloChange: data.eloChange || 0,
+                            reason: 'Rakip oyundan ayrıldı.'
+                        });
+                        setScreen('end');
+                        setTimeout(() => {
+                            resetGameClientState();
+                            setScreen('lobby');
+                            if (data.isRanked && playerData && !playerData.isGuest) initializeTelegramAuth();
+                        }, 4000);
+                        break;
+                    case 'info':
+                        showNotification(data.message, 'info');
+                        break;
+                    case 'cleanup':
+                        // Sunucu oyunun tamamen bittiğini ve temizlik yapılması gerektiğini söylediğinde
+                        resetGameClientState();
+                        break;
 
                         setTimeout(() => {
                             resetGameClientState(); // Tüm oyun state'ini temizle
@@ -473,7 +492,7 @@
                             if (isRanked && playerData && !playerData.isGuest) {
                                 initializeTelegramAuth();
                             }
-                        }, 3000);
+                        }, 4000);
                         break;
                     case 'searchCancelled':
                         showNotification('Arama iptal edildi', 'info');
@@ -617,24 +636,6 @@
                 // Lokal state temizle ve lobiye dön
                 resetGameClientState();
                 setScreen('lobby');
-            };
-
-            // Rakip ayrıldığında oyun sonu
-            const handleOpponentLeft = (data) => {
-                showNotification('Rakip oyundan ayrıldı. Kazandınız!', 'success');
-                setEndInfo({
-                    winnerName: playerData?.username || 'Siz',
-                    isRanked: data.isRanked,
-                    isWinner: true,
-                    eloChange: data.eloChange || 0,
-                    reason: 'Rakip oyundan ayrıldı.'
-                });
-                setScreen('end');
-                setTimeout(() => {
-                    resetGameClientState();
-                    setScreen('lobby');
-                    if (data.isRanked && playerData && !playerData.isGuest) initializeTelegramAuth();
-                }, 4000);
             };
 
             // --- EKRAN RENDERLAMA ---
