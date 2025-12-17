@@ -1,29 +1,37 @@
 /**
- * DOMINO ELITE PRO - FULL ENGINE (v4.3)
- * Automatic Telegram Sync - Reliable Socket - Clean UI
+ * DOMINO ELITE PRO - TÜRKÇE MOTOR (v4.4)
+ * Tam Otomatik Senkronizasyon ve Gelişmiş Kurallar
  */
 
 const CONFIG = {
     SERVER: 'https://mario-io-1.onrender.com',
-    TIER: 100 // Points per level
+    TIER: 100 // Her seviye için puan
 };
 
 let socket, myId, myTurn = false, gameActive = false;
 let myHand = [], board = { stones: [], left: null, right: null };
-let currentUser = { id: 'guest_' + Math.floor(Math.random() * 9999), name: 'Agent', photo: '', elo: 0, level: 1 };
+let currentUser = { id: 'guest_' + Math.floor(Math.random() * 9999), name: 'Oyuncu', photo: '', elo: 0, level: 1 };
 let selectedIdx = -1;
 
-// --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
     initTelegram();
     setupSocket();
     setupButtons();
+
+    // Yükleme ekranı donması için emniyet (10sn)
+    setTimeout(() => {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay.style.display !== 'none') {
+            overlay.style.display = 'none';
+            showToast("Bağlantı bekleniyor...");
+        }
+    }, 10000);
 });
 
 function initTelegram() {
     const tg = window.Telegram.WebApp;
-    tg.ready(); // CRITICAL: Tell Telegram we're ready
-    tg.expand(); // Make it full height
+    tg.ready();
+    tg.expand();
 
     if (tg.initDataUnsafe?.user) {
         const u = tg.initDataUnsafe.user;
@@ -31,17 +39,14 @@ function initTelegram() {
         currentUser.name = u.first_name + (u.last_name ? ' ' + u.last_name : '');
         currentUser.photo = u.photo_url || '';
 
-        // Save to local for persistence
         localStorage.setItem('domino_elite_uid', currentUser.id);
         localStorage.setItem('domino_elite_name', currentUser.name);
         localStorage.setItem('domino_elite_photo', currentUser.photo);
     } else {
-        // Fallback or use stored
         currentUser.id = localStorage.getItem('domino_elite_uid') || currentUser.id;
-        currentUser.name = localStorage.getItem('domino_elite_name') || currentUser.name;
-        currentUser.photo = localStorage.getItem('domino_elite_photo') || currentUser.photo;
+        currentUser.name = localStorage.getItem('domino_elite_name') || 'Misafir';
+        currentUser.photo = localStorage.getItem('domino_elite_photo') || '';
     }
-
     updateHeaderUI();
 }
 
@@ -49,7 +54,8 @@ function setupSocket() {
     socket = io(CONFIG.SERVER, {
         query: { id: currentUser.id, name: currentUser.name, photo: currentUser.photo },
         transports: ['websocket', 'polling'],
-        reconnection: true
+        reconnection: true,
+        reconnectionAttempts: 20
     });
 
     socket.on('connect', () => {
@@ -59,13 +65,11 @@ function setupSocket() {
     });
 
     socket.on('profile_sync', data => {
-        // Full profile from DB
         currentUser.elo = data.elo;
         currentUser.name = data.name || currentUser.name;
         currentUser.photo = data.photo || currentUser.photo;
         currentUser.level = Math.min(10, Math.floor(data.elo / CONFIG.TIER) + 1);
         updateHeaderUI();
-
         if (data.leaderboard) updateLeaderboard(data.leaderboard, data.myRank);
     });
 
@@ -78,18 +82,16 @@ function setupSocket() {
         myHand = data.hand;
         board = { stones: [], left: null, right: null };
         showScreen('screen-game');
-        document.getElementById('ui-opponent').style.display = 'block';
         document.getElementById('ui-opp-name').innerText = data.opponent.name;
         renderHand();
         renderBoard();
-        showToast("MAÇ BAŞLADI");
+        showToast("MAÇ BAŞLADI!");
     });
 
     socket.on('game_update', data => {
         board = data.board;
         myHand = data.hands[currentUser.id] || [];
         myTurn = (data.currentTurn === currentUser.id);
-
         renderHand();
         renderBoard();
         document.getElementById('ui-turn-bar').style.display = myTurn ? 'block' : 'none';
@@ -97,10 +99,7 @@ function setupSocket() {
 
     socket.on('game_over', data => {
         gameActive = false;
-        alert(`OYUN BİTTİ!\nKazanan: ${data.winnerName}\nELO Değişimi: ${data.eloChange}`);
-        showScreen('screen-lobby');
-        document.getElementById('ui-opponent').style.display = 'none';
-        requestLeaderboard();
+        showResultModal(data);
     });
 
     socket.on('private_room_created', code => {
@@ -123,16 +122,24 @@ function setupButtons() {
         const c = document.getElementById('ui-room-code').innerText;
         navigator.clipboard.writeText(c).then(() => showToast("KOD KOPYALANDI"));
     };
+    document.getElementById('btn-quit').onclick = () => {
+        if (confirm("Maçtan çıkmak üzeresin. ELO kaybedebilirsin. Emin misin?")) {
+            socket.emit('quit_game');
+        }
+    };
 }
 
-// --- LOGIC & RENDERING ---
+// --- KURALLAR VE MANTIK ---
+
+function canPlayerPlay() {
+    if (board.stones.length === 0) return true;
+    return myHand.some(s => s[0] === board.left || s[1] === board.left || s[0] === board.right || s[1] === board.right);
+}
 
 function updateHeaderUI() {
     document.getElementById('ui-name').innerText = currentUser.name.toUpperCase();
     document.getElementById('ui-avatar').src = currentUser.photo || 'https://via.placeholder.com/50';
     document.getElementById('ui-elo').innerText = currentUser.elo + " PTS";
-
-    // Level Badge
     const lvl = document.getElementById('ui-level');
     lvl.innerText = currentUser.level;
     lvl.className = 'level-tag ' + (currentUser.level >= 7 ? 'lvl-high' : currentUser.level >= 4 ? 'lvl-mid' : 'lvl-low');
@@ -159,20 +166,16 @@ function showHints(stone) {
     layer.innerHTML = '';
     if (!stone) return;
 
-    // Center
     if (board.stones.length === 0) {
-        addHint(layer, 600, 600, 'any', stone);
+        addHint(layer, 750, 750, 'any', stone);
         return;
     }
 
     const cont = document.getElementById('board-container');
-
-    // Left
     if (stone[0] === board.left || stone[1] === board.left) {
         const first = cont.firstChild;
         addHint(layer, first.offsetLeft - 60, first.offsetTop - 5, 'left', stone);
     }
-    // Right
     if (stone[0] === board.right || stone[1] === board.right) {
         const last = cont.lastChild;
         const offset = last.classList.contains('horizontal') ? 100 : 50;
@@ -182,7 +185,7 @@ function showHints(stone) {
 
 function addHint(layer, x, y, side, stone) {
     const h = document.createElement('div');
-    h.style.cssText = `position:absolute; left:${x}px; top:${y}px; width:50px; height:50px; border:2px dashed #00f2ff; border-radius:50%; cursor:pointer; pointer-events:auto;`;
+    h.style.cssText = `position:absolute; left:${x}px; top:${y}px; width:50px; height:50px; border:3px dashed #00f2ff; border-radius:50%; cursor:pointer; pointer-events:auto; animation:pulse-hint 1s infinite;`;
     h.onclick = () => {
         socket.emit('play_move', { stone, side });
         selectedIdx = -1;
@@ -194,8 +197,7 @@ function addHint(layer, x, y, side, stone) {
 function renderBoard() {
     const cont = document.getElementById('board-container');
     cont.innerHTML = '';
-    let x = 600, y = 600;
-
+    let x = 750, y = 750;
     board.stones.forEach(item => {
         const isD = item.v[0] === item.v[1];
         const el = createStoneElement(item.v[0], item.v[1], !isD);
@@ -209,28 +211,41 @@ function renderBoard() {
 function createStoneElement(v1, v2, horiz) {
     const s = document.createElement('div');
     s.className = `stone ${horiz ? 'horizontal' : ''}`;
-
     [v1, v2].forEach((v, i) => {
         const h = document.createElement('div');
         h.className = 'half';
-        const dots = [
-            [4], [0, 8], [0, 4, 8], [0, 2, 6, 8], [0, 2, 4, 6, 8], [0, 2, 3, 5, 6, 8]
-        ][v - 1] || [];
+        const dots = [[4], [0, 8], [0, 4, 8], [0, 2, 6, 8], [0, 2, 4, 6, 8], [0, 2, 3, 5, 6, 8]][v - 1] || [];
         for (let j = 0; j < 9; j++) {
             const d = document.createElement('div');
             d.className = 'dot';
-            if (dots.includes(j)) d.style.opacity = '1'; else d.style.opacity = '0';
+            d.style.opacity = dots.includes(j) ? '1' : '0';
             h.appendChild(d);
         }
         s.appendChild(h);
-        if (i === 0) {
-            const l = document.createElement('div');
-            l.className = 'line';
-            s.appendChild(l);
-        }
+        if (i === 0) { const l = document.createElement('div'); l.className = 'line'; s.appendChild(l); }
     });
     return s;
 }
+
+function showResultModal(data) {
+    const modal = document.getElementById('result-modal');
+    const isWin = data.winnerId === currentUser.id;
+
+    document.getElementById('res-title').innerText = isWin ? "GALİBİYET" : "MAĞLUBİYET";
+    document.getElementById('res-title').className = isWin ? "res-win" : "res-lose";
+    document.getElementById('res-icon').innerHTML = isWin ? '<i class="fas fa-trophy res-win"></i>' : '<i class="fas fa-heart-broken res-lose"></i>';
+    document.getElementById('res-elo').innerText = (isWin ? "+" : "-") + data.eloChange + " ELO";
+
+    modal.style.display = 'flex';
+
+    setTimeout(() => {
+        modal.style.display = 'none';
+        showScreen('screen-lobby');
+        requestLeaderboard();
+    }, 4000);
+}
+
+// --- DİĞER FONKSİYONLAR ---
 
 function updateLeaderboard(list, myRank) {
     const cont = document.getElementById('lb-list');
@@ -240,16 +255,15 @@ function updateLeaderboard(list, myRank) {
         row.className = `lb-row ${u.telegramId === currentUser.id ? 'me' : ''}`;
         row.innerHTML = `
             <div class="lb-rank">${i + 1}</div>
-            <img src="${u.photo || 'https://via.placeholder.com/30'}" class="lb-img">
+            <img src="${u.photo || 'https://via.placeholder.com/40'}" class="lb-img">
             <div class="lb-name">${u.name}</div>
             <div class="lb-elo">${u.elo} PTS</div>
         `;
         cont.appendChild(row);
     });
-
     const footer = document.getElementById('lb-footer');
     if (myRank > 10) {
-        footer.innerHTML = `<div class="lb-row me"><div class="lb-rank">${myRank}</div><div class="lb-name">YOU</div><div class="lb-elo">${currentUser.elo} PTS</div></div>`;
+        footer.innerHTML = `<div class="lb-row me"><div class="lb-rank">${myRank}</div><div class="lb-name">SİZ</div><div class="lb-elo">${currentUser.elo} PTS</div></div>`;
     } else footer.innerHTML = '';
 }
 
