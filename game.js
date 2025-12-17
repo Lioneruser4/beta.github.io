@@ -1,11 +1,11 @@
 /**
- * DOMINO ELITE PRO - TÜRKÇE MOTOR (v4.4)
- * Tam Otomatik Senkronizasyon ve Gelişmiş Kurallar
+ * DOMINO ELITE - FINAL CLIENT (v4.6)
+ * Profesyonel Mobil Deneyimi - Garantili Bağlantı
  */
 
 const CONFIG = {
     SERVER: 'https://mario-io-1.onrender.com',
-    TIER: 100 // Her seviye için puan
+    TIER: 100
 };
 
 let socket, myId, myTurn = false, gameActive = false;
@@ -13,19 +13,11 @@ let myHand = [], board = { stones: [], left: null, right: null };
 let currentUser = { id: 'guest_' + Math.floor(Math.random() * 9999), name: 'Oyuncu', photo: '', elo: 0, level: 1 };
 let selectedIdx = -1;
 
+// --- BAŞLATMA ---
 document.addEventListener('DOMContentLoaded', () => {
     initTelegram();
     setupSocket();
-    setupButtons();
-
-    // Yükleme ekranı donması için emniyet (10sn)
-    setTimeout(() => {
-        const overlay = document.getElementById('loading-overlay');
-        if (overlay.style.display !== 'none') {
-            overlay.style.display = 'none';
-            showToast("Bağlantı bekleniyor...");
-        }
-    }, 10000);
+    initUIEvents();
 });
 
 function initTelegram() {
@@ -36,56 +28,66 @@ function initTelegram() {
     if (tg.initDataUnsafe?.user) {
         const u = tg.initDataUnsafe.user;
         currentUser.id = u.id.toString();
-        currentUser.name = u.first_name + (u.last_name ? ' ' + u.last_name : '');
+        currentUser.name = u.first_name;
         currentUser.photo = u.photo_url || '';
-
         localStorage.setItem('domino_elite_uid', currentUser.id);
-        localStorage.setItem('domino_elite_name', currentUser.name);
-        localStorage.setItem('domino_elite_photo', currentUser.photo);
     } else {
         currentUser.id = localStorage.getItem('domino_elite_uid') || currentUser.id;
-        currentUser.name = localStorage.getItem('domino_elite_name') || 'Misafir';
-        currentUser.photo = localStorage.getItem('domino_elite_photo') || '';
     }
-    updateHeaderUI();
 }
 
 function setupSocket() {
+    updateStatusOverlay(true, "SUNUCUYA BAĞLANILIYOR...");
+
+    // Socket.io initialization with robust settings
     socket = io(CONFIG.SERVER, {
         query: { id: currentUser.id, name: currentUser.name, photo: currentUser.photo },
         transports: ['websocket', 'polling'],
         reconnection: true,
-        reconnectionAttempts: 20
+        reconnectionAttempts: Infinity,
+        timeout: 10000
     });
 
     socket.on('connect', () => {
-        document.getElementById('loading-overlay').style.display = 'none';
+        updateStatusOverlay(false);
+        showToast("BAĞLANILDI");
         socket.emit('check_rejoin');
-        requestLeaderboard();
+        socket.emit('get_leaderboard');
+    });
+
+    socket.on('connect_error', (err) => {
+        updateStatusOverlay(true, "BAĞLANTI HATASI! YENİDEN DENENİYOR...");
+        console.error("Socket error:", err);
     });
 
     socket.on('profile_sync', data => {
-        currentUser.elo = data.elo;
-        currentUser.name = data.name || currentUser.name;
-        currentUser.photo = data.photo || currentUser.photo;
-        currentUser.level = Math.min(10, Math.floor(data.elo / CONFIG.TIER) + 1);
-        updateHeaderUI();
-        if (data.leaderboard) updateLeaderboard(data.leaderboard, data.myRank);
+        currentUser.elo = data.elo || 0;
+        currentUser.level = Math.min(10, Math.floor(currentUser.elo / CONFIG.TIER) + 1);
+        if (data.name) currentUser.name = data.name;
+        if (data.photo) currentUser.photo = data.photo;
+
+        syncProfileToUI();
+        if (data.leaderboard) renderLeaderboard(data.leaderboard);
     });
 
     socket.on('mm_status', status => {
-        document.getElementById('mm-modal').style.display = (status === 'searching' ? 'flex' : 'none');
+        if (status === 'searching') {
+            updateStatusOverlay(true, "EŞLEŞME ARANIYOR...", true);
+        } else {
+            updateStatusOverlay(false);
+        }
     });
 
     socket.on('game_start', data => {
         gameActive = true;
         myHand = data.hand;
         board = { stones: [], left: null, right: null };
-        showScreen('screen-game');
-        document.getElementById('ui-opp-name').innerText = data.opponent.name;
+        updateStatusOverlay(false);
+        changeScreen('screen-game');
+        document.getElementById('ui-opp').innerText = data.opponent.name;
         renderHand();
         renderBoard();
-        showToast("MAÇ BAŞLADI!");
+        showToast("MAÇ BAŞLADI");
     });
 
     socket.on('game_update', data => {
@@ -94,7 +96,7 @@ function setupSocket() {
         myTurn = (data.currentTurn === currentUser.id);
         renderHand();
         renderBoard();
-        document.getElementById('ui-turn-bar').style.display = myTurn ? 'block' : 'none';
+        document.getElementById('ui-turn').style.display = myTurn ? 'block' : 'none';
     });
 
     socket.on('game_over', data => {
@@ -103,89 +105,83 @@ function setupSocket() {
     });
 
     socket.on('private_room_created', code => {
-        document.getElementById('room-modal').style.display = 'flex';
-        document.getElementById('ui-room-code').innerText = code;
+        updateStatusOverlay(false);
+        document.getElementById('ov-code').style.display = 'flex';
+        document.getElementById('ui-code').innerText = code;
     });
 
-    socket.on('error_msg', msg => showToast(msg));
+    socket.on('error_msg', msg => {
+        updateStatusOverlay(false);
+        showToast(msg);
+    });
 }
 
-function setupButtons() {
-    document.getElementById('btn-play-ranked').onclick = () => socket.emit('join_mm');
-    document.getElementById('btn-cancel-mm').onclick = () => socket.emit('cancel_mm');
-    document.getElementById('btn-create-friend').onclick = () => socket.emit('create_private');
-    document.getElementById('btn-join-code').onclick = () => {
-        const code = document.getElementById('input-join-code').value;
+function initUIEvents() {
+    document.getElementById('btn-ranked').onclick = () => socket.emit('join_mm');
+    document.getElementById('btn-create').onclick = () => socket.emit('create_private');
+    document.getElementById('btn-join').onclick = () => {
+        const code = document.getElementById('input-code').value;
         if (code.length === 4) socket.emit('join_private', code);
+        else showToast("GEÇERSİZ KOD");
     };
-    document.getElementById('btn-copy-room').onclick = () => {
-        const c = document.getElementById('ui-room-code').innerText;
-        navigator.clipboard.writeText(c).then(() => showToast("KOD KOPYALANDI"));
-    };
-    document.getElementById('btn-quit').onclick = () => {
-        if (confirm("Maçtan çıkmak üzeresin. ELO kaybedebilirsin. Emin misin?")) {
+    document.getElementById('btn-abort').onclick = () => socket.emit('cancel_mm');
+    document.getElementById('btn-exit').onclick = () => {
+        if (confirm("Maçı terk etmek üzeresin. ELO kaybedeceksin!")) {
             socket.emit('quit_game');
         }
     };
 }
 
-// --- KURALLAR VE MANTIK ---
+// --- GÖRSEL VE OYUN MANTIĞI ---
 
-function canPlayerPlay() {
-    if (board.stones.length === 0) return true;
-    return myHand.some(s => s[0] === board.left || s[1] === board.left || s[0] === board.right || s[1] === board.right);
-}
-
-function updateHeaderUI() {
+function syncProfileToUI() {
     document.getElementById('ui-name').innerText = currentUser.name.toUpperCase();
-    document.getElementById('ui-avatar').src = currentUser.photo || 'https://via.placeholder.com/50';
     document.getElementById('ui-elo').innerText = currentUser.elo + " PTS";
-    const lvl = document.getElementById('ui-level');
-    lvl.innerText = currentUser.level;
-    lvl.className = 'level-tag ' + (currentUser.level >= 7 ? 'lvl-high' : currentUser.level >= 4 ? 'lvl-mid' : 'lvl-low');
+    document.getElementById('ui-lvl').innerText = "Lv " + currentUser.level;
+    document.getElementById('ui-avatar').src = currentUser.photo || 'https://via.placeholder.com/100';
 }
 
 function renderHand() {
     const cont = document.getElementById('ui-hand');
     cont.innerHTML = '';
     myHand.forEach((s, i) => {
-        const el = createStoneElement(s[0], s[1], false);
+        const el = makeStoneEl(s[0], s[1], false);
         if (selectedIdx === i) el.classList.add('selected');
         el.onclick = () => {
             if (!myTurn) return;
             selectedIdx = (selectedIdx === i ? -1 : i);
             renderHand();
-            showHints(selectedIdx === -1 ? null : s);
+            drawHints(selectedIdx === -1 ? null : s);
         };
         cont.appendChild(el);
     });
 }
 
-function showHints(stone) {
-    const layer = document.getElementById('hint-layer');
+function drawHints(stone) {
+    const layer = document.getElementById('hint-cont');
     layer.innerHTML = '';
     if (!stone) return;
 
     if (board.stones.length === 0) {
-        addHint(layer, 750, 750, 'any', stone);
+        placeHint(layer, 750, 750, 'any', stone);
         return;
     }
 
-    const cont = document.getElementById('board-container');
+    const cont = document.getElementById('board-cont');
     if (stone[0] === board.left || stone[1] === board.left) {
-        const first = cont.firstChild;
-        addHint(layer, first.offsetLeft - 60, first.offsetTop - 5, 'left', stone);
+        const f = cont.firstChild;
+        placeHint(layer, f.offsetLeft - 70, f.offsetTop, 'left', stone);
     }
     if (stone[0] === board.right || stone[1] === board.right) {
-        const last = cont.lastChild;
-        const offset = last.classList.contains('horizontal') ? 100 : 50;
-        addHint(layer, last.offsetLeft + offset, last.offsetTop - 5, 'right', stone);
+        const l = cont.lastChild;
+        const off = l.classList.contains('horiz') ? 100 : 50;
+        placeHint(layer, l.offsetLeft + off, l.offsetTop, 'right', stone);
     }
 }
 
-function addHint(layer, x, y, side, stone) {
+function placeHint(layer, x, y, side, stone) {
     const h = document.createElement('div');
-    h.style.cssText = `position:absolute; left:${x}px; top:${y}px; width:50px; height:50px; border:3px dashed #00f2ff; border-radius:50%; cursor:pointer; pointer-events:auto; animation:pulse-hint 1s infinite;`;
+    h.style.cssText = `position:absolute; left:${x}px; top:${y}px; width:50px; height:50px; border:3px dashed var(--secondary); border-radius:50%; z-index:200; pointer-events:auto; box-shadow:0 0 15px var(--secondary);`;
     h.onclick = () => {
         socket.emit('play_move', { stone, side });
         selectedIdx = -1;
@@ -195,22 +191,23 @@ function addHint(layer, x, y, side, stone) {
 }
 
 function renderBoard() {
-    const cont = document.getElementById('board-container');
+    const cont = document.getElementById('board-cont');
     cont.innerHTML = '';
-    let x = 750, y = 750;
+    let currX = 750, currY = 700;
+
     board.stones.forEach(item => {
         const isD = item.v[0] === item.v[1];
-        const el = createStoneElement(item.v[0], item.v[1], !isD);
-        el.style.left = x + 'px';
-        el.style.top = y + 'px';
+        const el = makeStoneEl(item.v[0], item.v[1], !isD);
+        el.style.left = currX + 'px';
+        el.style.top = currY + 'px';
         cont.appendChild(el);
-        x += (isD ? 50 : 100);
+        currX += (isD ? 50 : 100);
     });
 }
 
-function createStoneElement(v1, v2, horiz) {
+function makeStoneEl(v1, v2, horiz) {
     const s = document.createElement('div');
-    s.className = `stone ${horiz ? 'horizontal' : ''}`;
+    s.className = `stone ${horiz ? 'horiz' : ''}`;
     [v1, v2].forEach((v, i) => {
         const h = document.createElement('div');
         h.className = 'half';
@@ -218,67 +215,57 @@ function createStoneElement(v1, v2, horiz) {
         for (let j = 0; j < 9; j++) {
             const d = document.createElement('div');
             d.className = 'dot';
-            d.style.opacity = dots.includes(j) ? '1' : '0';
+            if (dots.includes(j)) d.style.visibility = 'visible';
             h.appendChild(d);
         }
         s.appendChild(h);
-        if (i === 0) { const l = document.createElement('div'); l.className = 'line'; s.appendChild(l); }
+        if (i === 0) { const l = document.createElement('div'); l.className = 'dv'; s.appendChild(l); }
     });
     return s;
 }
 
-function showResultModal(data) {
-    const modal = document.getElementById('result-modal');
-    const isWin = data.winnerId === currentUser.id;
-
-    document.getElementById('res-title').innerText = isWin ? "GALİBİYET" : "MAĞLUBİYET";
-    document.getElementById('res-title').className = isWin ? "res-win" : "res-lose";
-    document.getElementById('res-icon').innerHTML = isWin ? '<i class="fas fa-trophy res-win"></i>' : '<i class="fas fa-heart-broken res-lose"></i>';
-    document.getElementById('res-elo').innerText = (isWin ? "+" : "-") + data.eloChange + " ELO";
-
-    modal.style.display = 'flex';
-
-    setTimeout(() => {
-        modal.style.display = 'none';
-        showScreen('screen-lobby');
-        requestLeaderboard();
-    }, 4000);
-}
-
-// --- DİĞER FONKSİYONLAR ---
-
-function updateLeaderboard(list, myRank) {
+function renderLeaderboard(list) {
     const cont = document.getElementById('lb-list');
     cont.innerHTML = '';
     list.forEach((u, i) => {
         const row = document.createElement('div');
-        row.className = `lb-row ${u.telegramId === currentUser.id ? 'me' : ''}`;
-        row.innerHTML = `
-            <div class="lb-rank">${i + 1}</div>
-            <img src="${u.photo || 'https://via.placeholder.com/40'}" class="lb-img">
-            <div class="lb-name">${u.name}</div>
-            <div class="lb-elo">${u.elo} PTS</div>
-        `;
+        row.className = 'lb-row';
+        row.innerHTML = `<span class="lb-rank">#${i + 1}</span> <span class="lb-name">${u.name}</span> <span class="lb-elo">${u.elo}</span>`;
+        if (u.id === currentUser.id) row.style.color = 'var(--secondary)';
         cont.appendChild(row);
     });
-    const footer = document.getElementById('lb-footer');
-    if (myRank > 10) {
-        footer.innerHTML = `<div class="lb-row me"><div class="lb-rank">${myRank}</div><div class="lb-name">SİZ</div><div class="lb-elo">${currentUser.elo} PTS</div></div>`;
-    } else footer.innerHTML = '';
 }
 
-function requestLeaderboard() { socket.emit('get_leaderboard'); }
-function toggleLeaderboard() {
-    const lb = document.getElementById('leaderboard');
-    lb.style.display = (lb.style.display === 'flex' ? 'none' : 'flex');
+function showResultModal(data) {
+    const ov = document.getElementById('ov-res');
+    const isWin = data.winnerId === currentUser.id;
+    document.getElementById('res-msg').innerText = isWin ? "GALİBİYET" : "MAĞLUBİYET";
+    document.getElementById('res-msg').style.color = isWin ? "var(--secondary)" : "var(--primary)";
+    document.getElementById('res-pts').innerText = (isWin ? "+" : "-") + data.eloChange + " ELO";
+    ov.style.display = 'flex';
+    setTimeout(() => {
+        ov.style.display = 'none';
+        changeScreen('screen-lobby');
+        socket.emit('get_leaderboard');
+    }, 4500);
 }
-function showScreen(id) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
+
+// --- YARDIMCI ---
+
+function updateStatusOverlay(show, text = "", abortable = false) {
+    document.getElementById('ov-txt').innerText = text;
+    document.getElementById('btn-abort').style.display = abortable ? 'block' : 'none';
+    document.getElementById('ov-status').style.display = show ? 'flex' : 'none';
 }
+
 function showToast(msg) {
     const t = document.getElementById('toast');
     t.innerText = msg;
     t.style.display = 'block';
     setTimeout(() => t.style.display = 'none', 3000);
+}
+
+function changeScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
 }
