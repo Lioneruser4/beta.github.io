@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 
 <head>
     <meta charset="UTF-8">
@@ -17,7 +17,6 @@
             --bg: #07090c;
             --card: #12161c;
             --primary: #ff4655;
-            /* Valorant/Faceit Style Red */
             --secondary: #00f2ff;
             --accent: #ffb800;
             --text: #ffffff;
@@ -37,9 +36,9 @@
             color: var(--text);
             overflow: hidden;
             height: 100vh;
+            touch-action: none;
         }
 
-        /* App Wrapper */
         #app {
             display: flex;
             flex-direction: column;
@@ -48,14 +47,15 @@
             position: relative;
         }
 
-        /* Top Bar - Minimalized */
+        /* Üst Menü */
         .top-bar {
             padding: 15px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba(0, 0, 0, 0.5);
             border-bottom: 1px solid var(--glass);
+            z-index: 100;
         }
 
         .profile-compact {
@@ -66,8 +66,8 @@
 
         .avatar-wrap {
             position: relative;
-            width: 42px;
-            height: 42px;
+            width: 45px;
+            height: 45px;
         }
 
         .avatar-img {
@@ -82,18 +82,17 @@
             position: absolute;
             bottom: -5px;
             right: -5px;
-            width: 20px;
-            height: 20px;
-            border-radius: 4px;
-            border: 1px solid #fff;
-            font-size: 10px;
+            width: 22px;
+            height: 22px;
+            border-radius: 5px;
+            border: 1.5px solid #fff;
+            font-size: 11px;
             font-weight: 800;
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        /* Faceit Levels */
         .lvl-low {
             background: #fee101;
             color: #000;
@@ -108,16 +107,16 @@
         .lvl-high {
             background: #ff4655;
             color: #fff;
-            animation: pulse-level 1s infinite alternate;
+            animation: glow-red 1s infinite alternate;
         }
 
-        @keyframes pulse-level {
+        @keyframes glow-red {
             from {
                 box-shadow: 0 0 5px #ff4655;
             }
 
             to {
-                box-shadow: 0 0 15px #ff4655;
+                box-shadow: 0 0 20px #ff4655;
             }
         }
 
@@ -127,24 +126,25 @@
         }
 
         .user-meta .name {
-            font-weight: 700;
-            font-size: 0.9rem;
+            font-weight: 800;
+            font-size: 1rem;
+            color: #fff;
         }
 
         .user-meta .elo {
-            font-size: 0.75rem;
+            font-size: 0.8rem;
             color: var(--secondary);
-            font-weight: 600;
+            font-weight: 700;
         }
 
-        /* Screens */
+        /* Ekranlar */
         .screen {
             flex: 1;
             display: none;
             flex-direction: column;
             animation: fadeIn 0.3s ease;
-            overflow-y: auto;
             padding: 20px;
+            overflow: hidden;
         }
 
         .screen.active {
@@ -154,43 +154,49 @@
         @keyframes fadeIn {
             from {
                 opacity: 0;
-                transform: translateY(10px);
             }
 
             to {
                 opacity: 1;
-                transform: translateY(0);
             }
         }
 
-        /* Lobby Buttons - Clean & Square */
+        /* Lobi */
+        .lobby-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
         .lobby-grid {
+            width: 100%;
+            max-width: 360px;
             display: grid;
             gap: 15px;
-            margin-top: auto;
-            margin-bottom: 30px;
+            margin-top: 40px;
         }
 
         .btn-action {
             background: var(--card);
-            border: 1px solid var(--glass);
-            padding: 20px;
-            border-radius: 12px;
+            border: 1.5px solid var(--glass);
+            padding: 22px;
+            border-radius: 16px;
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 20px;
             transition: 0.2s;
         }
 
         .btn-action:active {
-            transform: scale(0.98);
-            background: rgba(255, 255, 255, 0.05);
+            transform: scale(0.96);
         }
 
         .btn-action i {
-            font-size: 1.4rem;
-            width: 30px;
+            font-size: 1.6rem;
         }
 
         .btn-action.ranked {
@@ -205,35 +211,33 @@
         .input-group {
             display: flex;
             gap: 10px;
-            margin-top: 5px;
+            width: 100%;
         }
 
         .input-box {
             background: var(--card);
-            border: 1px solid var(--glass);
-            padding: 15px;
-            border-radius: 12px;
+            border: 1.5px solid var(--glass);
+            padding: 18px;
+            border-radius: 16px;
             color: #fff;
             flex: 1;
             outline: none;
             font-family: inherit;
-        }
-
-        .input-box:focus {
-            border-color: var(--secondary);
+            font-size: 1rem;
         }
 
         .btn-sq {
-            width: 55px;
-            height: 55px;
-            border-radius: 12px;
+            width: 60px;
+            height: 60px;
+            border-radius: 16px;
             background: var(--secondary);
             border: none;
             color: #000;
             cursor: pointer;
+            font-size: 1.2rem;
         }
 
-        /* Game Board */
+        /* Oyun Alanı */
         #game-board {
             flex: 1;
             position: relative;
@@ -245,21 +249,21 @@
         }
 
         .board-canvas {
-            min-width: 1200px;
-            min-height: 1200px;
+            min-width: 1500px;
+            min-height: 1500px;
             position: relative;
         }
 
-        /* Stone Styles - Professional */
+        /* Taşlar */
         .stone {
-            width: 44px;
-            height: 88px;
-            background: #fdfdfd;
-            border-radius: 4px;
+            width: 46px;
+            height: 92px;
+            background: #f0f0f0;
+            border-radius: 5px;
             display: flex;
             flex-direction: column;
-            border: 2px solid #111;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+            border: 2.5px solid #111;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
             position: absolute;
             cursor: pointer;
             transition: 0.2s;
@@ -269,68 +273,81 @@
             flex: 1;
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            padding: 4px;
+            padding: 5px;
             gap: 2px;
+            align-items: center;
+            justify-items: center;
         }
 
         .stone .dot {
-            width: 6px;
-            height: 6px;
+            width: 7px;
+            height: 7px;
             background: #111;
             border-radius: 50%;
-            place-self: center;
-            opacity: 0.9;
         }
 
         .stone .line {
             height: 2px;
-            background: #ccc;
-            width: 80%;
+            background: #bbb;
+            width: 85%;
             margin: 0 auto;
         }
 
         .stone.horizontal {
-            width: 88px;
-            height: 44px;
+            width: 92px;
+            height: 46px;
             flex-direction: row;
         }
 
         .stone.horizontal .line {
             width: 2px;
-            height: 80%;
+            height: 85%;
             margin: auto 0;
         }
 
         .stone.selected {
             border-color: var(--secondary);
-            box-shadow: 0 0 15px var(--secondary);
-            transform: scale(1.05);
-            z-index: 50;
+            box-shadow: 0 0 20px var(--secondary);
+            z-index: 100;
+            transform: translateY(-5px);
         }
 
-        /* Hand List */
+        /* El */
         .player-hand {
-            padding: 15px;
-            background: rgba(18, 22, 28, 0.9);
+            padding: 20px;
+            background: rgba(18, 22, 28, 0.95);
             border-top: 1px solid var(--glass);
             display: flex;
-            gap: 8px;
+            gap: 10px;
             overflow-x: auto;
             justify-content: center;
+            align-items: center;
         }
 
         .player-hand .stone {
             position: relative;
-            flex-shrink: 0;
             transform: scale(0.9);
+            flex-shrink: 0;
+            position: static;
         }
 
-        /* Overlays */
+        /* Sıra Göstergesi */
+        .turn-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: var(--primary);
+            display: none;
+        }
+
+        /* Modal ve Overlay */
         #loading-overlay {
             position: fixed;
             inset: 0;
             background: var(--bg);
-            z-index: 1000;
+            z-index: 2000;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -338,9 +355,9 @@
         }
 
         .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid var(--glass);
+            width: 50px;
+            height: 50px;
+            border: 4px solid var(--glass);
             border-top-color: var(--primary);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
@@ -352,114 +369,78 @@
             }
         }
 
-        /* Leaderboard Modal */
-        #leaderboard {
+        .modal {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.9);
-            z-index: 500;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 1500;
             display: none;
             flex-direction: column;
-            padding: 25px;
-        }
-
-        .lb-header {
-            display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 25px;
+            justify-content: center;
+            padding: 30px;
         }
 
-        .lb-row {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 12px;
-            background: var(--card);
-            border-radius: 10px;
-            margin-bottom: 8px;
-            border: 1px solid transparent;
+        /* Sonuç Ekranı */
+        #result-modal {
+            background: rgba(7, 9, 12, 0.98);
         }
 
-        .lb-row.me {
-            border-color: var(--secondary);
-            background: rgba(0, 242, 255, 0.05);
-        }
-
-        .lb-rank {
-            width: 25px;
-            font-weight: 800;
-            opacity: 0.5;
-        }
-
-        .lb-img {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            border: 1px solid var(--glass);
-        }
-
-        .lb-name {
-            flex: 1;
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
-
-        .lb-elo {
+        .res-win {
             color: var(--secondary);
-            font-weight: 800;
-            font-size: 0.8rem;
+            text-shadow: 0 0 20px var(--secondary);
         }
 
-        /* Turn Indicator */
-        .turn-bar {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 4px;
-            background: var(--primary);
-            display: none;
-            animation: pulse-turn 1s infinite;
-        }
-
-        @keyframes pulse-turn {
-            from {
-                opacity: 0.3;
-            }
-
-            to {
-                opacity: 1;
-            }
+        .res-lose {
+            color: var(--primary);
+            text-shadow: 0 0 20px var(--primary);
         }
 
         #toast {
             position: fixed;
-            top: 20px;
+            top: 100px;
             left: 50%;
             transform: translateX(-50%);
-            background: var(--primary);
-            padding: 10px 25px;
+            background: var(--card);
+            border: 1px solid var(--primary);
+            padding: 12px 30px;
             border-radius: 50px;
             font-weight: 700;
-            font-size: 0.8rem;
-            z-index: 2000;
+            z-index: 3000;
             display: none;
+        }
+
+        .quit-btn {
+            background: #222;
+            border: 1px solid #444;
+            color: #888;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .quit-btn:hover {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
         }
     </style>
 </head>
 
 <body>
 
+    <!-- Yükleme Ekranı -->
     <div id="loading-overlay">
         <div class="spinner"></div>
-        <p style="margin-top:20px; font-weight:700; letter-spacing:2px; opacity:0.5;">PREPARING ARENA</p>
+        <p style="margin-top:20px; font-weight:800; letter-spacing:3px; color:var(--primary);">ARENA HAZIRLANIYOR</p>
     </div>
 
-    <div id="toast">Message here</div>
+    <div id="toast">Bildirim</div>
 
     <div id="app">
-        <!-- TOP BAR -->
+        <!-- ÜST PANEL -->
         <div class="top-bar">
             <div class="profile-compact">
                 <div class="avatar-wrap">
@@ -467,62 +448,60 @@
                     <div id="ui-level" class="level-tag lvl-low">1</div>
                 </div>
                 <div class="user-meta">
-                    <span id="ui-name" class="name">PLAYER</span>
+                    <span id="ui-name" class="name">OYUNCU</span>
                     <span id="ui-elo" class="elo">0 PTS</span>
                 </div>
             </div>
             <button onclick="toggleLeaderboard()"
-                style="background:none; border:none; color:var(--accent); font-size:1.4rem; cursor:pointer;">
-                <i class="fas fa-chart-bar"></i>
+                style="background:none; border:none; color:var(--accent); font-size:1.6rem; cursor:pointer;">
+                <i class="fas fa-crown"></i>
             </button>
         </div>
 
-        <!-- LOBBY SCREEN -->
+        <!-- LOBİ EKRANI -->
         <div id="screen-lobby" class="screen active">
-            <div style="text-align:center; padding: 40px 0;">
-                <h2 style="font-weight:800; font-size:2rem; letter-spacing:3px;">DOMINO <span
-                        style="color:var(--primary)">ELITE</span></h2>
-                <p style="font-size:0.7rem; opacity:0.4; text-transform:uppercase;">Professional Pro League</p>
-            </div>
+            <div class="lobby-content">
+                <h1 style="font-weight:900; font-size:2.5rem; letter-spacing:5px;">DOMINO<span
+                        style="color:var(--primary)">PRO</span></h1>
+                <p style="opacity:0.4; font-size:0.8rem; margin-top:5px; text-transform:uppercase;">Elit Lig Arenası</p>
 
-            <div class="lobby-grid">
-                <button id="btn-play-ranked" class="btn-action ranked">
-                    <i class="fas fa-trophy"></i>
-                    <div style="text-align:left;">
-                        <div style="font-weight:800;">DERECE PRO</div>
-                        <div style="font-size:0.7rem; opacity:0.6;">Gerçek rakiplerle ELO kazan</div>
+                <div class="lobby-grid">
+                    <button id="btn-play-ranked" class="btn-action ranked">
+                        <i class="fas fa-bolt"></i>
+                        <div style="text-align:left;">
+                            <div style="font-weight:800; font-size:1.2rem;">DERECELİ MAÇ</div>
+                            <div style="font-size:0.75rem; opacity:0.6;">Gerçek rakiplerle yarış</div>
+                        </div>
+                    </button>
+
+                    <button id="btn-create-friend" class="btn-action">
+                        <i class="fas fa-users"></i>
+                        <div style="text-align:left;">
+                            <div style="font-weight:800; font-size:1.2rem;">ODA KUR</div>
+                            <div style="font-size:0.75rem; opacity:0.6;">Arkadaşınla oyna</div>
+                        </div>
+                    </button>
+
+                    <div class="input-group">
+                        <input type="text" id="input-join-code" class="input-box" placeholder="ODA KODU GİR">
+                        <button id="btn-join-code" class="btn-sq"><i class="fas fa-play"></i></button>
                     </div>
-                </button>
-
-                <button id="btn-create-friend" class="btn-action">
-                    <i class="fas fa-plus-circle"></i>
-                    <div style="text-align:left;">
-                        <div style="font-weight:800;">ODA KUR</div>
-                        <div style="font-size:0.7rem; opacity:0.6;">Arkadaşınla özel oyna</div>
-                    </div>
-                </button>
-
-                <div class="input-group">
-                    <input type="text" id="input-join-code" class="input-box" placeholder="ODA KODU">
-                    <button id="btn-join-code" class="btn-sq"><i class="fas fa-sign-in-alt"></i></button>
                 </div>
-            </div>
-
-            <div
-                style="margin-top:auto; padding: 20px; background:var(--card); border-radius:12px; border-left:4px solid var(--secondary);">
-                <p style="font-size:0.8rem; font-weight:600;">
-                    <i class="fas fa-lightbulb" style="color:var(--secondary)"></i>
-                    Taşa dokunduğunda parlayan yerler nereye oynayabileceğini gösterir.
-                </p>
             </div>
         </div>
 
-        <!-- GAME SCREEN -->
+        <!-- OYUN EKRANI -->
         <div id="screen-game" class="screen">
             <div class="turn-bar" id="ui-turn-bar"></div>
-            <div id="ui-opponent"
-                style="padding:10px; background:rgba(255,70,85,0.1); text-align:center; font-size:0.8rem; font-weight:800; display:none;">
-                RAKİP: <span id="ui-opp-name">---</span>
+
+            <div id="ui-opp-bar"
+                style="padding:15px; background:rgba(255,255,255,0.03); display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="width:8px; height:8px; border-radius:50%; background:var(--primary);"></div>
+                    <span style="font-weight:800; font-size:0.9rem;">RAKİP: <span id="ui-opp-name"
+                            style="color:var(--primary)">---</span></span>
+                </div>
+                <button id="btn-quit" class="quit-btn">OYUNDAN ÇIK</button>
             </div>
 
             <div id="game-board">
@@ -533,41 +512,53 @@
             <div class="player-hand" id="ui-hand"></div>
         </div>
 
-        <!-- MATCHMAKING MODAL -->
-        <div id="mm-modal"
-            style="position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:1100; display:none; flex-direction:column; align-items:center; justify-content:center;">
+        <!-- EŞLEŞME MODAL -->
+        <div id="mm-modal" class="modal">
             <div class="spinner"></div>
-            <h3 style="margin-top:30px; font-weight:800;">EŞLEŞME ARANIYOR</h3>
-            <p style="font-size:0.8rem; opacity:0.5; margin-top:10px;">Faceit liginden rakip aranıyor...</p>
+            <h2 style="margin-top:30px; font-weight:900; letter-spacing:2px;">RAKİP ARANIYOR</h2>
+            <p style="opacity:0.5; margin-top:10px;">Sana uygun eşleşme bulunuyor...</p>
             <button id="btn-cancel-mm"
-                style="margin-top:40px; background:none; border:1px solid #fff; color:#fff; padding:10px 30px; border-radius:50px; cursor:pointer;">İPTAL</button>
+                style="margin-top:40px; background:none; border:1px solid rgba(255,255,255,0.2); color:#fff; padding:12px 40px; border-radius:50px; cursor:pointer; font-weight:700;">İPTAL
+                ET</button>
         </div>
 
-        <!-- PRIVATE ROOM MODAL -->
-        <div id="room-modal"
-            style="position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:1100; display:none; flex-direction:column; align-items:center; justify-content:center;">
-            <p style="opacity:0.6; font-size:0.8rem;">ODA KODU</p>
-            <h1 id="ui-room-code" style="font-size:4rem; font-weight:900; letter-spacing:10px; color:var(--primary);">
+        <!-- ÖZEL ODA MODAL -->
+        <div id="room-modal" class="modal">
+            <p style="opacity:0.5; font-size:0.8rem; letter-spacing:2px;">ODA KODUNUZ</p>
+            <h1 id="ui-room-code"
+                style="font-size:4.5rem; font-weight:900; letter-spacing:10px; color:var(--primary); margin:20px 0;">
                 0000</h1>
-            <button id="btn-copy-room" class="btn-action" style="background:var(--card); margin-top:20px;">
+            <button id="btn-copy-room" class="btn-action" style="background:#1a1a1a; padding:15px 30px;">
                 <i class="fas fa-copy"></i> KODU KOPYALA
             </button>
-            <p style="margin-top:40px; color:#888; font-size:0.9rem;">Arkadaşın kodu yazınca oyun başlar.</p>
+            <p style="margin-top:40px; opacity:0.6; font-size:0.9rem;">Arkadaşın bu kodu girince oyun başlar.</p>
             <button onclick="location.reload()"
-                style="margin-top:50px; color:var(--primary); background:none; border:none; cursor:pointer;">VAZGEÇ</button>
+                style="margin-top:50px; color:var(--primary); background:none; border:none; cursor:pointer; font-weight:800;">VAZGEÇ</button>
         </div>
 
-        <!-- LEADERBOARD MODAL -->
-        <div id="leaderboard">
-            <div class="lb-header">
-                <h2 style="font-weight:800; font-size:1.5rem;">TOP 10 ELITE</h2>
-                <button onclick="toggleLeaderboard()"
-                    style="background:none; border:none; color:#fff; font-size:1.2rem;"><i
-                        class="fas fa-times"></i></button>
+        <!-- LİDERLİK TABLOSU -->
+        <div id="leaderboard" class="modal">
+            <div style="width:100%; max-width:500px; display:flex; flex-direction:column; height:80vh;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
+                    <h2 style="font-weight:900; font-size:1.8rem;">DÜNYA SIRALAMASI</h2>
+                    <button onclick="toggleLeaderboard()"
+                        style="background:none; border:none; color:#fff; font-size:1.5rem;"><i
+                            class="fas fa-times"></i></button>
+                </div>
+                <div id="lb-list" style="flex:1; overflow-y:auto; padding-right:10px;"></div>
+                <div id="lb-footer" style="margin-top:20px;"></div>
             </div>
-            <div id="lb-list" style="flex:1; overflow-y:auto;"></div>
-            <div id="lb-footer" style="margin-top:20px;"></div>
         </div>
+
+        <!-- SONUÇ EKRANI -->
+        <div id="result-modal" class="modal">
+            <div id="res-icon" style="font-size:5rem; margin-bottom:20px;"></div>
+            <h1 id="res-title" style="font-size:3.5rem; font-weight:900;">GALİBİYET</h1>
+            <div id="res-elo" style="font-size:2rem; font-weight:800; color:var(--secondary); margin:20px 0;">+20 ELO
+            </div>
+            <p style="opacity:0.5; font-size:0.9rem;">Lobiye yönlendiriliyorsunuz...</p>
+        </div>
+
     </div>
 
     <script src="game.js"></script>
