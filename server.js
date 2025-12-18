@@ -259,10 +259,7 @@ function initializeGame(roomCode, ...playerIds) {
     playerIds.forEach(pid => {
         players[pid] = {
             hand: tiles.slice(currentIndex * 7, (currentIndex + 1) * 7),
-            name: room.players[pid].name,
-            photoUrl: room.players[pid].photoUrl,
-            level: room.players[pid].level,
-            elo: room.players[pid].elo
+            name: room.players[pid].name
         };
         currentIndex++;
     });
