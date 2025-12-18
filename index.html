@@ -658,13 +658,14 @@
                         const winnerId = String(data.winner || '');
                         const myName = String(playerData?.username || '');
 
-                        console.log('🧐 Win Check:', { myId, winnerId, myName, winnerName: data.winnerName });
+                        console.log('🧐 Win Check Debug:', { myId, winnerId, myName, winnerName: data.winnerName });
 
                         let amIWinner = false;
-                        if (winnerId !== 'DRAW' && winnerId !== '') {
-                            if (winnerId === myId) {
-                                amIWinner = true;
-                            } else if (data.winnerName === myName) {
+                        let isDrawMatch = winnerId === 'DRAW' || data.winnerName === 'Beraberlik';
+
+                        if (!isDrawMatch) {
+                            // Hem ID hem isim bazlı kontrol (Isim bazlı kontrol her ihtimale karşı eklenmiştir)
+                            if (winnerId === myId || data.winnerName === myName) {
                                 amIWinner = true;
                             }
                         }
@@ -673,10 +674,11 @@
                             winnerName: data.winnerName,
                             isRanked: data.isRanked,
                             isWinner: amIWinner,
-                            eloChange: data.eloChanges ? (amIWinner ? data.eloChanges.winner : data.eloChanges.loser) : 0
+                            isDraw: isDrawMatch,
+                            eloChange: data.eloChanges ? (amIWinner ? data.eloChanges.winner : (isDrawMatch ? 0 : data.eloChanges.loser)) : 0
                         });
                         setScreen('end');
-                        if (amIWinner) playSound('win'); else playSound('lose');
+                        if (amIWinner) playSound('win'); else if (!isDrawMatch) playSound('lose');
 
                         localStorage.removeItem('domino_session');
                         setTimeout(() => {
@@ -1255,8 +1257,14 @@
                     <div className="h-48 z-30 bg-black/60 backdrop-blur-xl border-t border-white/10 p-4">
                         <div className="flex items-center justify-between mb-2">
                             <div className="text-white/50 text-xs font-bold uppercase tracking-widest">Senin Elin ({myHand.length})</div>
-                            {marketSize > 0 && isMyTurn && (
-                                <button onClick={() => sendMessage({ type: 'drawFromMarket' })} className="bg-yellow-500 text-black px-4 py-1 rounded-full text-xs font-bold shadow-glow">TAŞ ÇEK ({marketSize})</button>
+                            {isMyTurn && (
+                                marketSize > 0 ? (
+                                    <button onClick={() => sendMessage({ type: 'drawFromMarket' })} className="bg-yellow-500 text-black px-4 py-1 rounded-full text-xs font-bold shadow-glow">TAŞ ÇEK ({marketSize})</button>
+                                ) : (
+                                    !myHand.some(tile => isPlayable(tile)) && (
+                                        <button onClick={() => sendMessage({ type: 'pass' })} className="bg-red-500 text-white px-6 py-1 rounded-full text-sm font-black shadow-glow animate-pulse">PAS GEÇ</button>
+                                    )
+                                )
                             )}
                         </div>
                         <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar justify-center">
@@ -1275,18 +1283,44 @@
             );
 
             if (screen === 'end') return (
-                <div className="flex flex-col items-center justify-center min-h-screen bg-black/90 p-10 text-center">
-                    <div className="text-8xl mb-6">{endInfo.isWinner ? '🎉' : '💀'}</div>
-                    <h1 className="text-6xl font-black text-white mb-2">{endInfo.isWinner ? 'TEBRİKLER!' : 'KAYBETTİN'}</h1>
-                    <p className="text-white/60 text-xl font-bold mb-8">{endInfo.winnerName} kazandı!</p>
+                <div className="flex flex-col items-center justify-center min-h-screen bg-black/90 p-10 text-center animate-fade-in relative overflow-hidden">
+                    <div className="absolute inset-0 bg-radial-gradient from-white/5 to-transparent"></div>
 
-                    {endInfo.isRanked && (
-                        <div className={`text-4xl font-black ${endInfo.eloChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {endInfo.eloChange > 0 ? '+' : ''}{endInfo.eloChange} ELO
+                    <div className="relative z-10">
+                        <div className="text-9xl mb-10 drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">
+                            {endInfo.isDraw ? '🤝' : (endInfo.isWinner ? '🏆' : '💀')}
                         </div>
-                    )}
 
-                    <div className="mt-12 text-white/30 animate-pulse">Lobiye dönülüyor...</div>
+                        <h1 className="text-7xl font-black text-white mb-4 tracking-tighter drop-shadow-2xl">
+                            {endInfo.isDraw ? 'BERABERLİK!' : (endInfo.isWinner ? 'TEBRİKLER!' : 'MAALESEF...')}
+                        </h1>
+
+                        <div className="bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10 mb-12 min-w-[320px]">
+                            <p className="text-white/40 text-xs font-black uppercase tracking-[0.4em] mb-2">{endInfo.isWinner ? 'KAZANAN' : (endInfo.isDraw ? 'SONUÇ' : 'KAZANAN')}</p>
+                            <p className="text-3xl text-white font-black">{endInfo.winnerName}</p>
+
+                            {!endInfo.isDraw && !endInfo.isWinner && (
+                                <p className="text-red-500 text-sm font-bold mt-4 animate-pulse">RAKİP DAHA AZ PUAN TOPLADI</p>
+                            )}
+                        </div>
+
+                        {endInfo.isRanked && (
+                            <div className={`text-5xl font-black flex items-center justify-center gap-3 ${endInfo.eloChange > 0 ? 'text-green-400' : (endInfo.isDraw ? 'text-white/40' : 'text-red-400')}`}>
+                                <span className="opacity-40 text-2xl tracking-widest font-light">ELO</span>
+                                <span>{endInfo.eloChange > 0 ? '+' : ''}{endInfo.eloChange}</span>
+                            </div>
+                        )}
+
+                        <div className="mt-20 flex flex-col items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-ping"></span>
+                                <span className="text-white/20 text-xs font-bold uppercase tracking-widest">Lobiye Aktarılıyor</span>
+                            </div>
+                            <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
+                                <div className="h-full bg-yellow-500 animate-progress"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             );
 
