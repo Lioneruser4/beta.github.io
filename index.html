@@ -428,6 +428,7 @@
 
             // Telegram Auth
             const initializeTelegramAuth = async () => {
+                console.log('📡 Auth başlatılıyor...');
                 try {
                     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
                         // Telegram WebApp - Otomatik giriş
@@ -440,7 +441,8 @@
                             photoUrl: user.photo_url || null
                         };
 
-                        console.log('📡 Telegram kullanıcısı:', telegramData);
+                        console.log('📡 Telegram Kullanıcı Verisi:', telegramData);
+                        showNotification('Giriş yapılıyor...', 'info');
 
                         // MongoDB'ye kaydet/güncelle
                         const response = await fetch(`${API_URL}/api/auth/telegram`, {
@@ -449,6 +451,12 @@
                             body: JSON.stringify(telegramData)
                         });
 
+                        if (!response.ok) {
+                            const errTxt = await response.text();
+                            console.error('❌ Sunucu Hatası:', errTxt);
+                            throw new Error(`Sunucu hatası: ${response.status}`);
+                        }
+
                         const data = await response.json();
                         if (data.success) {
                             setPlayerData({
@@ -456,11 +464,13 @@
                                 isGuest: false,
                                 photoUrl: telegramData.photoUrl || data.player.photoUrl
                             });
-                            console.log('✅ Telegram Auth başarılı:', data.player);
+                            console.log('✅ Auth Başarılı:', data.player);
+                            showNotification(`Hoş geldin, ${data.player.username}!`, 'success');
                         } else {
-                            throw new Error('Auth failed');
+                            throw new Error(data.error || 'Auth failed');
                         }
                     } else {
+                        console.warn('⚠️ Telegram verisi bulunamadı (Bot içinden girilmemiş olabilir)');
                         // Normal tarayıcı - Guest mode
                         const guestData = {
                             isGuest: true,
@@ -473,10 +483,10 @@
                             telegramId: null
                         };
                         setPlayerData(guestData);
-                        console.log('👥 Guest mode:', guestData);
                     }
                 } catch (error) {
-                    console.error('Auth error:', error);
+                    console.error('❌ Auth Error:', error);
+                    showNotification('Giriş başarısız, Misafir olarak devam ediliyor.', 'warning');
                     setPlayerData({
                         isGuest: true,
                         username: 'Guest' + Math.floor(Math.random() * 9999),
