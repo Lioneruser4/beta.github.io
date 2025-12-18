@@ -264,8 +264,18 @@
             tg.expand();
         }
 
-        // API Base URL
-        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
+        // API Base URL - Robust detection for Local and Production
+        const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.includes('192.168.');
+        const API_URL = IS_LOCAL ? `http://${window.location.hostname}:10000` : 'https://mario-io-1.onrender.com';
+        const WS_URL = IS_LOCAL ? `ws://${window.location.hostname}:10000` : 'wss://mario-io-1.onrender.com';
+
+        // Helper: Taşı oynanabilir mi?
+        const canPlayOnBoard = (tile, board) => {
+            if (!board || board.length === 0) return true;
+            const leftEnd = board[0][0];
+            const rightEnd = board[board.length - 1][1];
+            return tile[0] === leftEnd || tile[1] === leftEnd || tile[0] === rightEnd || tile[1] === rightEnd;
+        };
 
         // --- BİLEŞENLER ---
 
@@ -545,12 +555,7 @@
             };
 
             const connectToServer = () => {
-                let wsUrl = 'wss://beta-github-io.onrender.com';
-                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                    wsUrl = `ws://${window.location.hostname}:10000`;
-                }
-
-                const ws = new WebSocket(wsUrl);
+                const ws = new WebSocket(WS_URL);
 
                 ws.onopen = () => {
                     setConnected(true);
@@ -654,24 +659,24 @@
                     case 'gameEnd':
                         console.log('🏁 Oyun Bitti!', data);
                         // Get current user's ID
-                        const myId = String(playerId || gameState?.playerId || playerData?.id || playerData?.telegramId || '');
+                        const currentId = String(playerId || gameState?.playerId || playerData?.id || '');
                         const winnerId = String(data.winner || '');
-                        const myName = String(playerData?.username || '');
+                        const currentName = String(playerData?.username || '').trim();
+                        const winnerName = String(data.winnerName || '').trim();
 
-                        console.log('🧐 Win Check Debug:', { myId, winnerId, myName, winnerName: data.winnerName });
+                        console.log('🧐 Win Check Debug:', { currentId, winnerId, currentName, winnerName });
 
+                        let isDrawMatch = winnerId === 'DRAW' || winnerName === 'Beraberlik';
                         let amIWinner = false;
-                        let isDrawMatch = winnerId === 'DRAW' || data.winnerName === 'Beraberlik';
 
                         if (!isDrawMatch) {
-                            // Hem ID hem isim bazlı kontrol (Isim bazlı kontrol her ihtimale karşı eklenmiştir)
-                            if (winnerId === myId || data.winnerName === myName) {
+                            if (winnerId === currentId || (winnerName && currentName && winnerName === currentName)) {
                                 amIWinner = true;
                             }
                         }
 
                         setEndInfo({
-                            winnerName: data.winnerName,
+                            winnerName: winnerName,
                             isRanked: data.isRanked,
                             isWinner: amIWinner,
                             isDraw: isDrawMatch,
@@ -1261,7 +1266,7 @@
                                 marketSize > 0 ? (
                                     <button onClick={() => sendMessage({ type: 'drawFromMarket' })} className="bg-yellow-500 text-black px-4 py-1 rounded-full text-xs font-bold shadow-glow">TAŞ ÇEK ({marketSize})</button>
                                 ) : (
-                                    !myHand.some(tile => isPlayable(tile)) && (
+                                    !myHand.some(tile => canPlayOnBoard(tile, gameState?.board)) && (
                                         <button onClick={() => sendMessage({ type: 'pass' })} className="bg-red-500 text-white px-6 py-1 rounded-full text-sm font-black shadow-glow animate-pulse">PAS GEÇ</button>
                                     )
                                 )
@@ -1296,8 +1301,8 @@
                         </h1>
 
                         <div className="bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10 mb-12 min-w-[320px]">
-                            <p className="text-white/40 text-xs font-black uppercase tracking-[0.4em] mb-2">{endInfo.isWinner ? 'KAZANAN' : (endInfo.isDraw ? 'SONUÇ' : 'KAZANAN')}</p>
-                            <p className="text-3xl text-white font-black">{endInfo.winnerName}</p>
+                            <p className="text-white/40 text-xs font-black uppercase tracking-[0.4em] mb-2">{endInfo.isWinner ? 'TEBRİKLER' : (endInfo.isDraw ? 'SONUÇ' : 'KAZANAN')}</p>
+                            <p className="text-3xl text-white font-black">{endInfo.isWinner ? 'OYUNU KAZANDIN!' : (endInfo.isDraw ? 'BERABERE BİTTİ' : endInfo.winnerName)}</p>
 
                             {!endInfo.isDraw && !endInfo.isWinner && (
                                 <p className="text-red-500 text-sm font-bold mt-4 animate-pulse">RAKİP DAHA AZ PUAN TOPLADI</p>
