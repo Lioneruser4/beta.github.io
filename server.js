@@ -345,11 +345,12 @@ function checkWinner(gameState) {
     const player1CanPlay = player1Hand.some(tile => canPlayTile(tile, gameState.board));
     const player2CanPlay = player2Hand.some(tile => canPlayTile(tile, gameState.board));
 
-    if (!player1CanPlay && !player2CanPlay) {
+    const marketEmpty = !gameState.market || gameState.market.length === 0;
+
+    if (!player1CanPlay && !player2CanPlay && marketEmpty) {
         const player1Sum = player1Hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
         const player2Sum = player2Hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
 
-        // Eşitlik durumunda beraberlik mantığı eklenebilir, şimdilik az puanlı kazanır
         if (player1Sum === player2Sum) return 'DRAW';
         return player1Sum < player2Sum ? player1Id : player2Id;
     }
@@ -407,6 +408,7 @@ wss.on('connection', (ws, req) => {
                 case 'joinRoom': handleJoinRoom(ws, data); break;
                 case 'playTile': handlePlayTile(ws, data); break;
                 case 'drawFromMarket': handleDrawFromMarket(ws); break;
+                case 'passTurn': handlePass(ws); break;
                 case 'leaveGame': handleLeaveGame(ws); break;
                 case 'rejoin': handleRejoin(ws, data); break;
             }
@@ -739,8 +741,8 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
 
         broadcastToRoom(roomCode, {
             type: 'gameEnd',
-            winner: winnerId,
-            winnerName: isDraw ? 'Beraberlik' : gameState.players[winnerId].name,
+            winner: String(winnerId),
+            winnerName: isDraw ? 'Beraberlik' : (gameState.players[winnerId]?.name || 'Rakip'),
             isRanked: isRankedMatch,
             eloChanges: eloChanges ? {
                 winner: eloChanges.winnerChange,
@@ -799,6 +801,12 @@ function handleDrawFromMarket(ws) {
 
     const player = gs.players[ws.playerId];
 
+    // Elinde oynanacak taş var mı kontrol et
+    const canPlay = player.hand.some(tile => canPlayTile(tile, gs.board));
+    if (canPlay && gs.board.length > 0) {
+        return sendMessage(ws, { type: 'error', message: 'Elinizde oynanabilir taş var, pazardan çekemezsiniz!' });
+    }
+
     // Pazarda taş var mı?
     if (!gs.market || gs.market.length === 0) {
         // Pazar boş, otomatik sıra geç
@@ -831,6 +839,13 @@ function handleDrawFromMarket(ws) {
             console.log(`❌ ${player.name} oynanabilir taş bulamadı - Sıra geçiyor`);
             gs.turn++;
             gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
+
+            // Sıra geçtikten sonra oyun kilitlendi mi kontrol et
+            const winner = checkWinner(gs);
+            if (winner) {
+                handleGameEnd(ws.roomCode, winner, gs);
+                return;
+            }
         }
     }
 
