@@ -264,10 +264,9 @@
             tg.expand();
         }
 
-        // API Base URL - Robust detection for Local and Production
-        const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.includes('192.168.');
-        const API_URL = IS_LOCAL ? `http://${window.location.hostname}:10000` : 'https://mario-io-1.onrender.com';
-        const WS_URL = IS_LOCAL ? `ws://${window.location.hostname}:10000` : 'wss://mario-io-1.onrender.com';
+        // API Base URL - Production Server
+        const API_URL = 'https://mario-io-1.onrender.com';
+        const WS_URL = 'wss://mario-io-1.onrender.com';
 
         // Helper: Taşı oynanabilir mi?
         const canPlayOnBoard = (tile, board) => {
@@ -849,6 +848,20 @@
             const marketSize = gameState?.market?.length || 0;
             const canDrawFromMarket = marketSize > 0;
 
+            // Otomatik Pas Geçme Mantığı
+            useEffect(() => {
+                if (screen === 'game' && gameState && isMyTurn) {
+                    const hasPlayableTile = myHand.some(tile => canPlayOnBoard(tile, gameState.board));
+                    if (!hasPlayableTile && marketSize === 0) {
+                        console.log('🔄 Oynanabilir taş yok ve pazar boş. 1.5 sn içinde otomatik pas geçiliyor...');
+                        const timer = setTimeout(() => {
+                            sendMessage({ type: 'pass' });
+                        }, 1500);
+                        return () => clearTimeout(timer);
+                    }
+                }
+            }, [gameState?.board, isMyTurn, myHand.length, marketSize, screen]);
+
             const calculateValidMoves = (tile) => {
                 if (!gameState || gameState.board.length === 0) return ['start'];
                 const leftEnd = gameState.board[0][0];
@@ -1266,9 +1279,7 @@
                                 marketSize > 0 ? (
                                     <button onClick={() => sendMessage({ type: 'drawFromMarket' })} className="bg-yellow-500 text-black px-4 py-1 rounded-full text-xs font-bold shadow-glow">TAŞ ÇEK ({marketSize})</button>
                                 ) : (
-                                    !myHand.some(tile => canPlayOnBoard(tile, gameState?.board)) && (
-                                        <button onClick={() => sendMessage({ type: 'pass' })} className="bg-red-500 text-white px-6 py-1 rounded-full text-sm font-black shadow-glow animate-pulse">PAS GEÇ</button>
-                                    )
+                                    null
                                 )
                             )}
                         </div>
