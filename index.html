@@ -370,10 +370,6 @@
             const [searching, setSearching] = useState(false);
             const [endInfo, setEndInfo] = useState(null);
             const [opponent, setOpponent] = useState(null);
-            const [opponents, setOpponents] = useState([]); // multiple opponents for 4p
-            const [roomPlayers, setRoomPlayers] = useState([]); // for private lobby
-            const [roomHost, setRoomHost] = useState(null);
-            const [roomCapacity, setRoomCapacity] = useState(2);
             const [lastSoundIndex, setLastSoundIndex] = useState(0); // For sequential sounds 6, 7, 8
 
             const [playerId, setPlayerId] = useState(null);
@@ -394,9 +390,6 @@
                 setValidMoves([]);
                 setEndInfo(null);
                 setOpponent(null);
-                setOpponents([]);
-                setRoomPlayers([]);
-                setRoomHost(null);
                 setJoinCode('');
             };
 
@@ -578,6 +571,9 @@
                             roomCode: data.roomCode
                         }));
                         break;
+                    case 'roomCreated':
+                        setRoomCode(data.roomCode);
+                        break;
                     case 'gameStart':
                     case 'gameUpdate':
                         if (data.gameState) {
@@ -601,38 +597,10 @@
                                         roomCode: data.gameState.roomCode
                                     }));
                                 }
-                                // Rakipleri belirle
-                                const myCurId = data.gameState.playerId || data.playerId || playerId;
-                                const otherIds = Object.keys(data.gameState.players).filter(id => id !== myCurId);
-                                const others = otherIds.map(id => ({ ...data.gameState.players[id], id }));
-                                setOpponents(others);
-                                if (others.length === 1) setOpponent(others[0]);
                             }
                         }
                         setSelectedTileIndex(null);
                         setValidMoves([]);
-                        break;
-                    case 'profileUpdate':
-                        setPlayerData(prev => ({
-                            ...prev,
-                            elo: data.elo,
-                            level: data.level
-                        }));
-                        break;
-                    case 'info':
-                        showNotification(data.message, 'info');
-                        break;
-                    case 'roomUpdated':
-                        setRoomPlayers(data.players);
-                        setRoomHost(data.host);
-                        setScreen('room_lobby');
-                        break;
-                    case 'roomCreated':
-                        setRoomCode(data.roomCode);
-                        setRoomCapacity(data.capacity);
-                        setScreen('room_lobby');
-                        setRoomPlayers([{ ...playerData, id: playerId }]);
-                        setRoomHost(playerId);
                         break;
                     case 'error':
                         showNotification(data.message, 'error');
@@ -641,19 +609,15 @@
                     case 'gameEnd':
                         console.log('🏁 Oyun Bitti!', data);
                         // Get current user's ID
-                        const myId = String(playerId || gameState?.playerId || playerData?.id || playerData?.telegramId || '');
+                        const myId = String(playerId || gameState?.playerId || playerData?.id || '');
                         const winnerId = String(data.winner || '');
-                        const myName = String(playerData?.username || '');
 
-                        console.log('🧐 Win Check:', { myId, winnerId, myName, winnerName: data.winnerName });
+                        // Check winner by ID or Name (as fallback)
+                        let amIWinner = (winnerId !== '' && winnerId !== 'DRAW' && winnerId === myId);
 
-                        let amIWinner = false;
-                        if (winnerId !== 'DRAW' && winnerId !== '') {
-                            if (winnerId === myId) {
-                                amIWinner = true;
-                            } else if (data.winnerName === myName) {
-                                amIWinner = true;
-                            }
+                        // If ID match fails, check if the winner name matches my name
+                        if (!amIWinner && winnerId !== 'DRAW' && data.winnerName === (playerData?.username || gameState?.players[myId]?.name)) {
+                            amIWinner = true;
                         }
 
                         setEndInfo({
@@ -684,13 +648,7 @@
                     case 'matchFound':
                         playSound('found');
                         setSearching(false);
-                        if (data.opponents) {
-                            setOpponents(data.opponents);
-                            setOpponent(data.opponents[0]);
-                        } else if (data.opponent) {
-                            setOpponent(data.opponent);
-                            setOpponents([data.opponent]);
-                        }
+                        setOpponent(data.opponent);
                         setScreen('matching_lobby');
                         break;
                 }
@@ -896,107 +854,59 @@
 
                     <div className="w-full max-w-sm bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10 shadow-2xl">
                         {playerData && (
-                            <div className="mb-8 text-center bg-white/5 p-4 rounded-2xl border border-white/5">
-                                {playerData.photoUrl && <img src={playerData.photoUrl} className="w-16 h-16 rounded-full mx-auto mb-3 border-2 border-yellow-400 p-0.5" />}
-                                <div className="text-white text-xl font-black">{playerData.username}</div>
+                            <div className="mb-8 text-center">
+                                {playerData.photoUrl && <img src={playerData.photoUrl} className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 p-1" />}
+                                <div className="text-white text-2xl font-bold">{playerData.username}</div>
                                 <div className="flex justify-center gap-2 mt-2">
                                     <LevelBadge level={playerData.level} />
-                                    <span className="bg-blue-600 text-white px-3 py-0.5 rounded-full text-[10px] font-black">{playerData.elo} ELO</span>
+                                    <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold">{playerData.elo} ELO</span>
                                 </div>
                             </div>
                         )}
+                        <button onClick={() => {
+                            setScreen('searching');
+                            setSearching(true);
+                            sendMessage({ type: 'findMatch', ...playerData });
+                        }} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl mb-4 transition-all transform active:scale-95 shadow-lg">MAÇ ARA</button>
 
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                            <button onClick={() => {
-                                setScreen('searching');
-                                setSearching(true);
-                                sendMessage({ type: 'findMatch', mode: '2', ...playerData });
-                            }} className="group relative flex flex-col items-center justify-center bg-yellow-500 hover:bg-yellow-400 p-4 rounded-2xl transition-all active:scale-95 shadow-lg overflow-hidden">
-                                <span className="text-2xl mb-1">👤👤</span>
-                                <span className="text-black font-black text-xs">1VS1 ARA</span>
-                                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                            </button>
-                            <button onClick={() => {
-                                setScreen('searching');
-                                setSearching(true);
-                                sendMessage({ type: 'findMatch', mode: '4', ...playerData });
-                            }} className="group relative flex flex-col items-center justify-center bg-white/10 hover:bg-white/20 p-4 rounded-2xl transition-all active:scale-95 border border-white/10">
-                                <span className="text-2xl mb-1">👥👥</span>
-                                <span className="text-white font-black text-xs">4 KİŞİ ARA</span>
-                            </button>
-                        </div>
+                        <div className="flex flex-col gap-3">
+                            <button onClick={() => sendMessage({ type: 'createRoom', ...playerData })} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all">🏠 ÖZEL ODA KUR</button>
 
-                        <div className="space-y-3">
                             <div className="flex gap-2">
-                                <button onClick={() => sendMessage({ type: 'createRoom', capacity: 2, ...playerData })} className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-xl text-xs font-bold border border-white/5 transition-all">🏠 ODA KUR (2)</button>
-                                <button onClick={() => sendMessage({ type: 'createRoom', capacity: 4, ...playerData })} className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-xl text-xs font-bold border border-white/5 transition-all">🏠 ODA KUR (4)</button>
-                            </div>
-
-                            <div className="flex gap-2 h-12">
                                 <input
                                     value={joinCode}
                                     onChange={e => setJoinCode(e.target.value)}
                                     placeholder="ODA KODU"
-                                    className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 text-white text-center font-bold focus:border-yellow-500 transition-all text-sm uppercase"
+                                    className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 text-white text-center font-bold focus:border-yellow-500 transition-all"
                                 />
                                 <button
                                     onClick={() => {
                                         if (!joinCode) return showNotification('Lütfen oda kodu girin', 'warning');
                                         sendMessage({ type: 'joinRoom', roomCode: joinCode, ...playerData });
                                     }}
-                                    className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 rounded-xl font-black transition-all shadow-glow"
+                                    className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-black transition-all shadow-glow"
                                 >
                                     GİR
                                 </button>
                             </div>
                         </div>
 
-                        <button onClick={() => { loadLeaderboard(); setScreen('leaderboard'); }} className="w-full mt-6 text-white/30 hover:text-white transition-colors text-[10px] font-black uppercase tracking-widest">🏆 Liderlik Tablosu</button>
-                    </div>
-                </div>
-            );
-
-            if (screen === 'room_lobby') return (
-                <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-black/20 backdrop-blur-md">
-                    <div className="w-full max-w-sm bg-black/60 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white/10 shadow-2xl relative overflow-hidden">
-                        <div className="text-center mb-8">
-                            <h2 className="text-white/40 text-xs font-black uppercase tracking-[0.3em] mb-2">Özel Oda Lobisi</h2>
-                            <div className="text-4xl text-white font-black tracking-[0.2em]">{roomCode}</div>
-                            <div className="mt-2 text-yellow-500/60 text-[10px] font-bold uppercase tracking-widest">{roomCapacity} KİŞİLİK MOD</div>
-                        </div>
-
-                        <div className="space-y-3 mb-8">
-                            {[...Array(roomCapacity)].map((_, i) => {
-                                const p = roomPlayers[i];
-                                return (
-                                    <div key={i} className={`flex items-center gap-3 p-3 rounded-2xl border ${p ? 'bg-white/10 border-white/10' : 'bg-black/20 border-white/5 border-dashed'}`}>
-                                        <div className="w-10 h-10 rounded-full overflow-hidden bg-white/5 flex items-center justify-center border border-white/10">
-                                            {p?.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover" /> : <span className="text-white/20">?</span>}
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className={`font-bold text-sm ${p ? 'text-white' : 'text-white/10'}`}>{p ? p.name : 'Bekleniyor...'}</div>
-                                            {p && <div className="text-[10px] text-yellow-500/60 font-bold uppercase">{p.elo} ELO {p.id === roomHost && '• HOST'}</div>}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {playerId === roomHost ? (
-                            <button
-                                onClick={() => sendMessage({ type: 'startPrivateGame' })}
-                                className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl transition-all active:scale-95 shadow-lg disabled:opacity-50"
-                                disabled={roomPlayers.length < (roomCapacity === 4 ? 3 : 2)}
+                        {roomCode && (
+                            <div
+                                onClick={() => {
+                                    navigator.clipboard.writeText(roomCode);
+                                    showNotification('Oda kodu kopyalandı!', 'success');
+                                }}
+                                className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/40 rounded-2xl text-center cursor-pointer hover:bg-yellow-500/20 active:scale-95 transition-all group"
                             >
-                                OYUNU BAŞLAT
-                            </button>
-                        ) : (
-                            <div className="w-full py-4 text-center text-white/40 font-bold text-sm animate-pulse">
-                                Hostun oyunu başlatması bekleniyor...
+                                <div className="text-yellow-400 text-xs font-bold flex items-center justify-center gap-2">
+                                    ODA KODU <span className="text-[10px] bg-yellow-500/20 px-2 py-0.5 rounded-full">KOPYALA</span>
+                                </div>
+                                <div className="text-4xl text-white font-black tracking-widest mt-1 group-hover:text-yellow-400">{roomCode}</div>
                             </div>
                         )}
 
-                        <button onClick={() => { resetGameClientState(); setScreen('lobby'); }} className="w-full mt-4 text-white/20 hover:text-red-500 transition-colors text-xs font-bold">ODADAN AYRIL</button>
+                        <button onClick={() => { loadLeaderboard(); setScreen('leaderboard'); }} className="w-full mt-6 text-white/40 hover:text-white transition-colors text-sm font-bold">🏆 SKOR TABLOSU</button>
                     </div>
                 </div>
             );
@@ -1004,39 +914,40 @@
             if (screen === 'matching_lobby') return (
                 <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-black/60 backdrop-blur-2xl">
                     <div className="text-center mb-16">
-                        <h2 className="text-4xl font-black text-yellow-500 animate-pulse">AÇILIYOR...</h2>
-                        <p className="text-white/40 mt-2 uppercase tracking-[0.3em]">Hemen Başlıyoruz</p>
+                        <h2 className="text-4xl font-black text-yellow-500 animate-pulse">RAKİP BULUNDU!</h2>
+                        <p className="text-white/40 mt-2 uppercase tracking-[0.3em]">Maç Başlıyor...</p>
                     </div>
 
-                    <div className={`grid ${opponents.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-8 w-full max-w-2xl px-4`}>
+                    <div className="flex items-center gap-4 sm:gap-12 w-full max-w-2xl px-4">
                         {/* Ben */}
-                        <div className="flex flex-col items-center gap-4 animate-slide-right order-first">
+                        <div className="flex-1 flex flex-col items-center gap-4 animate-slide-right">
                             <div className="relative">
-                                <img src={playerData?.photoUrl || 'https://via.placeholder.com/100'} className="w-20 h-20 sm:w-28 sm:h-28 rounded-3xl border-4 border-white/20 shadow-2xl object-cover" />
+                                <img src={playerData?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-white/20 shadow-2xl object-cover" />
                                 <div className="absolute -bottom-2 -right-2"><LevelBadge level={playerData?.level || 1} /></div>
                             </div>
                             <div className="text-center">
-                                <div className="text-white font-black text-sm truncate max-w-[100px]">{playerData?.username}</div>
-                                <div className="text-yellow-500 font-bold text-[10px] tracking-widest">{playerData?.elo} ELO</div>
+                                <div className="text-white font-black text-xl truncate max-w-[120px]">{playerData?.username}</div>
+                                <div className="text-yellow-500 font-bold text-sm tracking-widest">{playerData?.elo} ELO</div>
                             </div>
                         </div>
 
-                        {/* Rakipler */}
-                        {opponents.map((opp, idx) => (
-                            <div key={idx} className="flex flex-col items-center gap-4 animate-slide-left">
-                                <div className="relative">
-                                    <img src={opp?.photoUrl || 'https://via.placeholder.com/100'} className="w-20 h-20 sm:w-28 sm:h-28 rounded-3xl border-4 border-yellow-500/50 shadow-2xl object-cover" />
-                                    <div className="absolute -bottom-2 -right-2"><LevelBadge level={opp?.level || 1} /></div>
-                                </div>
-                                <div className="text-center">
-                                    <div className="text-white font-black text-sm truncate max-w-[100px]">{opp?.name || opp?.username || 'Rakip'}</div>
-                                    <div className="text-yellow-500 font-bold text-[10px] tracking-widest">{opp?.elo || 0} ELO</div>
-                                </div>
+                        {/* VS */}
+                        <div className="text-white/20 text-4xl sm:text-6xl font-black italic">VS</div>
+
+                        {/* Rakip */}
+                        <div className="flex-1 flex flex-col items-center gap-4 animate-slide-left">
+                            <div className="relative">
+                                <img src={opponent?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-yellow-500/50 shadow-2xl object-cover" />
+                                <div className="absolute -bottom-2 -right-2"><LevelBadge level={opponent?.level || 1} /></div>
                             </div>
-                        ))}
+                            <div className="text-center">
+                                <div className="text-white font-black text-xl truncate max-w-[120px]">{opponent?.name || opponent?.username || 'Rakip'}</div>
+                                <div className="text-yellow-500 font-bold text-sm tracking-widest">{opponent?.elo || 0} ELO</div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="mt-20 w-48 h-1 bg-white/10 rounded-full overflow-hidden">
+                    <div className="mt-20 w-48 h-1.5 bg-white/10 rounded-full overflow-hidden">
                         <div className="h-full bg-yellow-500 animate-progress"></div>
                     </div>
                 </div>
@@ -1047,21 +958,22 @@
                     {notification && <Toast message={notification.message} type={notification.type} />}
 
                     {/* Header */}
-                    <div className="h-16 flex items-center justify-between px-4 bg-black/40 backdrop-blur-md z-30">
-                        <div className="flex -space-x-2">
-                            {opponents.map((opp, idx) => (
-                                <div key={idx} className={`w-10 h-10 rounded-full border-2 ${gameState?.currentPlayer === opp.id ? 'border-yellow-500 animate-pulse scale-110' : 'border-white/20'} overflow-hidden relative group`}>
-                                    {opp.photoUrl ? <img src={opp.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 flex items-center justify-center">👤</div>}
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                        <span className="text-[8px] text-white font-bold">{opp.name}</span>
-                                    </div>
+                    <div className="h-16 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full border-2 border-white/20 overflow-hidden">
+                                {opponent?.photoUrl ? <img src={opponent.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 flex items-center justify-center">👤</div>}
+                            </div>
+                            <div className="flex flex-col">
+                                <div className="text-white font-bold text-sm leading-none">{opponent?.name || opponent?.username || 'Rakip'}</div>
+                                <div className="mt-1 scale-75 origin-left">
+                                    <LevelBadge level={opponent?.level || 1} />
                                 </div>
-                            ))}
+                            </div>
                         </div>
-                        <div className={`px-4 py-1.5 rounded-full text-[10px] font-black ${isMyTurn ? 'bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.4)]' : 'bg-white/5 text-white/30'}`}>
-                            {isMyTurn ? 'SIRA SENDE' : 'RAKİPTE'}
+                        <div className={`px-4 py-1 rounded-full text-[10px] font-bold ${isMyTurn ? 'bg-yellow-500 text-black animate-pulse' : 'bg-white/10 text-white/50'}`}>
+                            {isMyTurn ? 'SIRA SENDE' : `${String(opponent?.name || opponent?.username || 'Rakip').toUpperCase()} OYNUYOR`}
                         </div>
-                        <button onClick={leaveGameClient} className="w-10 h-10 flex items-center justify-center text-red-500 bg-red-500/10 rounded-xl active:scale-90 transition-all">✕</button>
+                        <button onClick={leaveGameClient} className="text-red-500 font-bold text-sm">AYRIL</button>
                     </div>
 
                     {/* Board Area */}
