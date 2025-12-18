@@ -264,17 +264,8 @@
             tg.expand();
         }
 
-        // API Base URL - Production Server
-        const API_URL = 'https://mario-io-1.onrender.com';
-        const WS_URL = 'wss://mario-io-1.onrender.com';
-
-        // Helper: Taşı oynanabilir mi?
-        const canPlayOnBoard = (tile, board) => {
-            if (!board || board.length === 0) return true;
-            const leftEnd = board[0][0];
-            const rightEnd = board[board.length - 1][1];
-            return tile[0] === leftEnd || tile[1] === leftEnd || tile[0] === rightEnd || tile[1] === rightEnd;
-        };
+        // API Base URL
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
 
         // --- BİLEŞENLER ---
 
@@ -295,18 +286,38 @@
         };
 
         // 2. Domino Taşı (3D Tasarım)
-        const DominoTile = ({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false, showBack = false }) => {
+        const DominoTile = ({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false, isBack = false }) => {
             const baseClasses = `
                 relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
                 transition-all duration-300 select-none
-                ${vertical ? 'flex-col w-[35px] h-[70px]' : 'flex-row w-[70px] h-[35px]'}
+                ${vertical ? 'flex-col w-[40px] h-[80px]' : 'flex-row w-[80px] h-[40px]'}
                 ${isGhost ? 'opacity-0 pointer-events-none' : 'shadow-3d'}
                 ${isSelected ? '-translate-y-4 shadow-3d-active ring-2 ring-yellow-500 z-10 animate-celebrate' : ''}
                 ${animateIn ? 'animate-slide-in' : ''}
-                ${!disabled && !isGhost ? 'cursor-pointer active:translate-y-1 active:shadow-3d-active hover:brightness-110' : ''}
+                ${!disabled && !isGhost && !isBack ? 'cursor-pointer active:translate-y-1 active:shadow-3d-active hover:brightness-110' : ''}
                 ${disabled ? 'brightness-90 cursor-default' : ''}
-                ${showBack ? 'bg-slate-200 shadow-inner' : ''}
+                ${isBack ? 'brightness-100' : ''}
             `;
+
+            if (isBack) {
+                return (
+                    <div
+                        onClick={onClick}
+                        className={baseClasses}
+                        style={{
+                            transform: `scale(${scale})`,
+                            background: 'linear-gradient(135deg, #fdfdfd 0%, #e2e2e2 100%)',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                        }}
+                    >
+                        <div className="absolute inset-2 border border-black/5 rounded-sm bg-black/5 shadow-inner flex flex-col items-center justify-around opacity-30">
+                            <div className="w-1.5 h-1.5 rounded-full bg-black/40"></div>
+                            <div className="w-full h-[1px] bg-black/40"></div>
+                            <div className="w-1.5 h-1.5 rounded-full bg-black/40"></div>
+                        </div>
+                    </div>
+                );
+            }
 
             return (
                 <div
@@ -317,21 +328,13 @@
                         boxShadow: isGhost ? 'none' : '0 2px 4px rgba(0,0,0,0.2)'
                     }}
                 >
-                    {showBack ? (
-                        <div className="w-full h-full flex items-center justify-center opacity-40">
-                            <div className="w-1 h-1 rounded-full bg-slate-400"></div>
-                        </div>
-                    ) : (
-                        <>
-                            <div className={`flex-1 flex items-center justify-center ${vertical ? 'border-b' : 'border-r'} border-gray-200`}>
-                                <RenderPips number={values[0]} />
-                            </div>
-                            <div className="flex-1 flex items-center justify-center">
-                                <RenderPips number={values[1]} />
-                            </div>
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-300 border border-gray-400 shadow-inner z-10 opacity-50"></div>
-                        </>
-                    )}
+                    <div className={`flex-1 flex items-center justify-center ${vertical ? 'border-b' : 'border-r'} border-gray-200`}>
+                        <RenderPips number={values[0]} />
+                    </div>
+                    <div className="flex-1 flex items-center justify-center">
+                        <RenderPips number={values[1]} />
+                    </div>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-300 border border-gray-400 shadow-inner z-10 opacity-50"></div>
                 </div>
             );
         };
@@ -428,7 +431,6 @@
 
             // Telegram Auth
             const initializeTelegramAuth = async () => {
-                console.log('📡 Auth başlatılıyor...');
                 try {
                     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
                         // Telegram WebApp - Otomatik giriş
@@ -441,8 +443,7 @@
                             photoUrl: user.photo_url || null
                         };
 
-                        console.log('📡 Telegram Kullanıcı Verisi:', telegramData);
-                        showNotification('Giriş yapılıyor...', 'info');
+                        console.log('📡 Telegram kullanıcısı:', telegramData);
 
                         // MongoDB'ye kaydet/güncelle
                         const response = await fetch(`${API_URL}/api/auth/telegram`, {
@@ -451,12 +452,6 @@
                             body: JSON.stringify(telegramData)
                         });
 
-                        if (!response.ok) {
-                            const errTxt = await response.text();
-                            console.error('❌ Sunucu Hatası:', errTxt);
-                            throw new Error(`Sunucu hatası: ${response.status}`);
-                        }
-
                         const data = await response.json();
                         if (data.success) {
                             setPlayerData({
@@ -464,13 +459,11 @@
                                 isGuest: false,
                                 photoUrl: telegramData.photoUrl || data.player.photoUrl
                             });
-                            console.log('✅ Auth Başarılı:', data.player);
-                            showNotification(`Hoş geldin, ${data.player.username}!`, 'success');
+                            console.log('✅ Telegram Auth başarılı:', data.player);
                         } else {
-                            throw new Error(data.error || 'Auth failed');
+                            throw new Error('Auth failed');
                         }
                     } else {
-                        console.warn('⚠️ Telegram verisi bulunamadı (Bot içinden girilmemiş olabilir)');
                         // Normal tarayıcı - Guest mode
                         const guestData = {
                             isGuest: true,
@@ -483,10 +476,10 @@
                             telegramId: null
                         };
                         setPlayerData(guestData);
+                        console.log('👥 Guest mode:', guestData);
                     }
                 } catch (error) {
-                    console.error('❌ Auth Error:', error);
-                    showNotification('Giriş başarısız, Misafir olarak devam ediliyor.', 'warning');
+                    console.error('Auth error:', error);
                     setPlayerData({
                         isGuest: true,
                         username: 'Guest' + Math.floor(Math.random() * 9999),
@@ -564,7 +557,12 @@
             };
 
             const connectToServer = () => {
-                const ws = new WebSocket(WS_URL);
+                let wsUrl = 'wss://beta-github-io.onrender.com';
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    wsUrl = `ws://${window.location.hostname}:10000`;
+                }
+
+                const ws = new WebSocket(wsUrl);
 
                 ws.onopen = () => {
                     setConnected(true);
@@ -661,38 +659,32 @@
                         showNotification(data.message, 'error');
                         setSearching(false);
                         break;
-                    case 'gameBlocked':
-                        setBlockedInfo(data);
-                        setScreen('blocked');
-                        break;
                     case 'gameEnd':
                         console.log('🏁 Oyun Bitti!', data);
                         // Get current user's ID
-                        const currentId = String(playerId || gameState?.playerId || playerData?.id || '');
+                        const myId = String(playerId || gameState?.playerId || playerData?.id || playerData?.telegramId || '');
                         const winnerId = String(data.winner || '');
-                        const currentName = String(playerData?.username || '').trim();
-                        const winnerName = String(data.winnerName || '').trim();
+                        const myName = String(playerData?.username || '');
 
-                        console.log('🧐 Win Check Debug:', { currentId, winnerId, currentName, winnerName });
+                        console.log('🧐 Win Check:', { myId, winnerId, myName, winnerName: data.winnerName });
 
-                        let isDrawMatch = winnerId === 'DRAW' || winnerName === 'Beraberlik';
                         let amIWinner = false;
-
-                        if (!isDrawMatch) {
-                            if (winnerId === currentId || (winnerName && currentName && winnerName === currentName)) {
+                        if (winnerId !== 'DRAW' && winnerId !== '') {
+                            if (winnerId === myId) {
+                                amIWinner = true;
+                            } else if (data.winnerName === myName) {
                                 amIWinner = true;
                             }
                         }
 
                         setEndInfo({
-                            winnerName: winnerName,
+                            winnerName: data.winnerName,
                             isRanked: data.isRanked,
                             isWinner: amIWinner,
-                            isDraw: isDrawMatch,
-                            eloChange: data.eloChanges ? (amIWinner ? data.eloChanges.winner : (isDrawMatch ? 0 : data.eloChanges.loser)) : 0
+                            eloChange: data.eloChanges ? (amIWinner ? data.eloChanges.winner : data.eloChanges.loser) : 0
                         });
                         setScreen('end');
-                        if (amIWinner) playSound('win'); else if (!isDrawMatch) playSound('lose');
+                        if (amIWinner) playSound('win'); else playSound('lose');
 
                         localStorage.removeItem('domino_session');
                         setTimeout(() => {
@@ -857,20 +849,6 @@
             const myHand = gameState?.players[myPlayerId]?.hand || [];
             const marketSize = gameState?.market?.length || 0;
             const canDrawFromMarket = marketSize > 0;
-
-            // Otomatik Pas Geçme Mantığı
-            useEffect(() => {
-                if (screen === 'game' && gameState && isMyTurn) {
-                    const hasPlayableTile = myHand.some(tile => canPlayOnBoard(tile, gameState.board));
-                    if (!hasPlayableTile && marketSize === 0) {
-                        console.log('🔄 Oynanabilir taş yok ve pazar boş. 1.5 sn içinde otomatik pas geçiliyor...');
-                        const timer = setTimeout(() => {
-                            sendMessage({ type: 'pass' });
-                        }, 1500);
-                        return () => clearTimeout(timer);
-                    }
-                }
-            }, [gameState?.board, isMyTurn, myHand.length, marketSize, screen]);
 
             const calculateValidMoves = (tile) => {
                 if (!gameState || gameState.board.length === 0) return ['start'];
@@ -1044,112 +1022,50 @@
                 </div>
             );
 
-            if (screen === 'blocked') return (
-                <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-[#0b241c]/95 backdrop-blur-3xl z-[100] animate-fade-in">
-                    <div className="text-center mb-12">
-                        <div className="inline-block px-4 py-1 rounded-full bg-yellow-500/20 text-yellow-500 text-[10px] font-black uppercase tracking-[0.3em] mb-4 border border-yellow-500/30 font-display">
-                            {blockedInfo?.resultType === 'BLOCKED' ? 'Oyun Kapandı' : (blockedInfo?.resultType === 'LEAVE' ? 'Oyuncu Ayrıldı' : 'Oyun Bitti')}
-                        </div>
-                        <h2 className="text-5xl sm:text-6xl font-black text-white mb-4 drop-shadow-2xl">
-                            {blockedInfo?.winnerId === 'DRAW' ? 'BERABERLİK!' : 'HESAPLANIYOR'}
-                        </h2>
-                        <div className="flex items-center justify-center gap-3">
-                            <span className="w-2 h-2 bg-yellow-500 rounded-full animate-ping"></span>
-                            <p className="text-white/60 font-bold tracking-widest uppercase text-sm">Taşlar Toplanıyor...</p>
-                        </div>
+            if (screen === 'matching_lobby') return (
+                <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-black/60 backdrop-blur-2xl">
+                    <div className="text-center mb-16">
+                        <h2 className="text-4xl font-black text-yellow-500 animate-pulse uppercase">EŞLEŞME KURULDU</h2>
+                        <p className="text-white/40 mt-2 uppercase tracking-[0.3em]">Hemen Başlıyoruz</p>
                     </div>
 
-                    <div className="flex items-center justify-center gap-4 sm:gap-12 w-full max-w-3xl px-4">
+                    <div className="flex items-center justify-center gap-4 sm:gap-12 w-full max-w-2xl px-4">
                         {/* Ben */}
-                        <div className="flex-1 flex flex-col items-center gap-4 bg-white/5 p-8 rounded-[2.5rem] border border-white/10 transition-all hover:bg-white/10 relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 p-3">
-                                <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Senin Puanın</span>
+                        <div className="flex flex-col items-center gap-4 animate-slide-right w-1/3">
+                            <div className="relative">
+                                <img src={playerData?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-white/20 shadow-2xl object-cover" />
+                                <div className="absolute -bottom-2 -right-2"><LevelBadge level={playerData?.level || 1} /></div>
                             </div>
-                            <img src={playerData?.photoUrl || 'https://via.placeholder.com/100'} className="relative w-24 h-24 rounded-3xl border-2 border-white/20 object-cover shadow-2xl transition-transform group-hover:scale-110" />
                             <div className="text-center">
-                                <div className="text-5xl text-white font-black tabular-nums drop-shadow-lg">
-                                    {blockedInfo?.sums?.[playerId] ?? 0}
-                                </div>
+                                <div className="text-white font-black text-sm truncate w-full">{playerData?.username}</div>
+                                <div className="text-yellow-500 font-bold text-[10px] tracking-widest">{playerData?.elo} ELO</div>
                             </div>
                         </div>
 
                         {/* VS */}
-                        <div className="text-2xl font-black text-white/10 italic">VS</div>
+                        <div className="flex flex-col items-center justify-center w-1/6">
+                            <div className="text-5xl font-black text-white/10 italic">VS</div>
+                        </div>
 
                         {/* Rakipler */}
-                        {opponents.slice(0, 1).map((opp, idx) => (
-                            <div key={idx} className="flex-1 flex flex-col items-center gap-4 bg-yellow-500/5 p-8 rounded-[2.5rem] border border-yellow-500/10 transition-all hover:bg-yellow-500/10 relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 p-3">
-                                    <span className="text-[8px] font-black text-yellow-500/20 uppercase tracking-widest">Rakip Puanı</span>
-                                </div>
-                                <img src={opp?.photoUrl || 'https://via.placeholder.com/100'} className="relative w-24 h-24 rounded-3xl border-2 border-yellow-500/20 object-cover shadow-2xl transition-transform group-hover:scale-110" />
-                                <div className="text-center">
-                                    <div className="text-5xl text-yellow-500 font-black tabular-nums drop-shadow-lg">
-                                        {blockedInfo?.sums?.[opp.id] ?? 0}
+                        <div className="flex flex-wrap items-center justify-center gap-4 w-1/2">
+                            {opponents.map((opp, idx) => (
+                                <div key={idx} className="flex flex-col items-center gap-4 animate-slide-left">
+                                    <div className="relative">
+                                        <img src={opp?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-yellow-500/50 shadow-2xl object-cover" />
+                                        <div className="absolute -bottom-2 -right-2"><LevelBadge level={opp?.level || 1} /></div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-white font-black text-sm truncate max-w-[100px]">{opp?.name || opp?.username || 'Rakip'}</div>
+                                        <div className="text-yellow-500 font-bold text-[10px] tracking-widest">{opp?.elo || 0} ELO</div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Footer / Timer */}
-                    <div className="mt-20 text-center">
-                        <div className="text-white/20 text-[10px] font-black uppercase tracking-[0.5em] mb-4">Lobiye Dönülüyor</div>
-                        <div className="w-64 h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5 p-[1px]">
-                            <div className="h-full bg-gradient-to-r from-yellow-500 via-white to-yellow-500 rounded-full animate-progress-7"></div>
-                        </div>
-                    </div>
-                </div>
-            );
-
-            if (screen === 'matching_lobby') return (
-                <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-[#0b241c] overflow-hidden relative">
-                    <div className="absolute inset-0 bg-radial-gradient from-yellow-500/10 to-transparent"></div>
-                    <div className="text-center mb-16 relative z-10">
-                        <h2 className="text-5xl font-black text-white mb-2 tracking-[0.2em]">HAZIR OL</h2>
-                        <div className="flex items-center justify-center gap-2">
-                            <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-ping"></span>
-                            <p className="text-yellow-500 font-black uppercase tracking-[0.4em] text-xs">Oyun Başlıyor</p>
+                            ))}
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-center gap-4 sm:gap-16 w-full max-w-4xl px-4 relative z-10">
-                        {/* Ben */}
-                        <div className="flex flex-col items-center gap-6 animate-slide-right">
-                            <div className="relative group">
-                                <div className="absolute -inset-4 bg-white/5 rounded-[40%] blur-2xl group-hover:bg-white/10 transition-all"></div>
-                                <img src={playerData?.photoUrl || 'https://via.placeholder.com/100'} className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-[2rem] border-4 border-white/20 shadow-2xl object-cover ring-4 ring-white/5" />
-                                <div className="absolute -bottom-3 left-1/2 -translate-x-1/2"><LevelBadge level={playerData?.level || 1} /></div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-white font-black text-lg tracking-tight truncate max-w-[120px] mb-1">{playerData?.username}</div>
-                                <div className="inline-block px-3 py-1 rounded-full bg-white/5 text-white/40 font-bold text-[10px] tracking-widest">{playerData?.elo} ELO</div>
-                            </div>
-                        </div>
-
-                        {/* VS Divider */}
-                        <div className="flex flex-col items-center animate-pulse">
-                            <div className="text-4xl font-black text-yellow-500 opacity-20 italic">VS</div>
-                        </div>
-
-                        {/* Rakipler */}
-                        {opponents.slice(0, 1).map((opp, idx) => (
-                            <div key={idx} className="flex flex-col items-center gap-6 animate-slide-left">
-                                <div className="relative group">
-                                    <div className="absolute -inset-4 bg-yellow-500/10 rounded-[40%] blur-2xl group-hover:bg-yellow-500/20 transition-all"></div>
-                                    <img src={opp?.photoUrl || 'https://via.placeholder.com/100'} className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-[2rem] border-4 border-yellow-500/30 shadow-2xl object-cover ring-4 ring-yellow-500/10" />
-                                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2"><LevelBadge level={opp?.level || 1} /></div>
-                                </div>
-                                <div className="text-center">
-                                    <div className="text-white font-black text-lg tracking-tight truncate max-w-[120px] mb-1">{opp?.name || opp?.username || 'Rakip'}</div>
-                                    <div className="inline-block px-3 py-1 rounded-full bg-yellow-500/10 text-yellow-500 font-bold text-[10px] tracking-widest">{opp?.elo || 0} ELO</div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="mt-24 w-64 h-1.5 bg-white/5 rounded-full overflow-hidden relative z-10 border border-white/5">
-                        <div className="h-full bg-gradient-to-r from-yellow-500 to-white animate-progress"></div>
+                    <div className="mt-20 w-48 h-1 bg-white/10 rounded-full overflow-hidden">
+                        <div className="h-full bg-yellow-500 animate-progress"></div>
                     </div>
                 </div>
             );
@@ -1158,55 +1074,44 @@
                 <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden">
                     {notification && <Toast message={notification.message} type={notification.type} />}
 
-                    {/* Header */}
-                    <div className="h-20 flex items-center justify-between px-6 bg-black/50 backdrop-blur-xl z-30 border-b border-white/10">
-                        {/* Sol Taraf - Ben */}
-                        <div className="flex items-center gap-3">
-                            <div className={`relative ${isMyTurn ? 'ring-2 ring-yellow-500 animate-pulse' : ''} rounded-2xl p-0.5`}>
-                                <img src={playerData?.photoUrl || 'https://via.placeholder.com/50'} className="w-10 h-10 rounded-xl object-cover" />
-                                <div className="absolute -bottom-1 -right-1 scale-75"><LevelBadge level={playerData?.level} /></div>
+                    {/* Header: Opponent Info & Their Hand */}
+                    <div className="h-24 flex flex-col bg-black/50 backdrop-blur-md z-30 border-b border-white/5">
+                        <div className="flex-1 flex items-center justify-between px-4">
+                            <div className="flex items-center gap-4">
+                                {opponents.map((oppObj, idx) => {
+                                    const opp = gameState?.players[oppObj.id] || oppObj || {};
+                                    const currentPid = oppObj.id || opp.id;
+                                    return (
+                                        <div key={idx} className="flex items-center gap-3">
+                                            <div className={`w-12 h-12 rounded-2xl border-2 ${gameState?.currentPlayer === currentPid ? 'border-yellow-500 animate-pulse scale-105 shadow-glow' : 'border-white/10'} overflow-hidden relative shadow-lg`}>
+                                                {opp.photoUrl ? <img src={opp.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-800 flex items-center justify-center text-xl">👤</div>}
+                                                <div className="absolute -bottom-1 -right-1 scale-75 origin-bottom-right">
+                                                    <LevelBadge level={opp.level || 0} />
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-white font-black text-xs uppercase tracking-tighter truncate max-w-[80px]">{opp.name || 'RAKİP'}</span>
+                                                <div className="flex items-center gap-1 mt-0.5">
+                                                    <div className="flex -space-x-4">
+                                                        {[...Array(opp.hand?.length || 0)].map((_, i) => (
+                                                            <div key={i} className="w-3 h-5 bg-white rounded-[2px] border border-black/10 shadow-sm first:opacity-100 opacity-80" style={{ transform: `rotate(${Math.random() * 4 - 2}deg)` }}></div>
+                                                        ))}
+                                                    </div>
+                                                    <span className="text-yellow-500 font-bold text-[10px] ml-1">{opp.hand?.length || 0}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
-                            <div className="hidden sm:block">
-                                <div className="text-white font-black text-[10px] uppercase truncate max-w-[80px]">{playerData?.username}</div>
-                                <div className="text-yellow-500 font-bold text-[8px] tracking-tighter">{playerData?.elo} ELO</div>
-                            </div>
-                        </div>
 
-                        {/* Orta - Durum */}
-                        <div className="flex flex-col items-center">
-                            <div className={`px-5 py-1.5 rounded-full text-[10px] font-black transition-all ${isMyTurn ? 'bg-yellow-500 text-black shadow-glow' : 'bg-white/5 text-white/40'}`}>
-                                {isMyTurn ? 'SIRA SENDE' : 'RAKİPTE'}
-                            </div>
-                            <div className="text-white/20 text-[8px] mt-1 font-bold uppercase tracking-[0.2em] animate-pulse">Oyun Devam Ediyor</div>
-                        </div>
-
-                        {/* Sağ Taraf - Rakipler */}
-                        <div className="flex items-center gap-3">
-                            <div className="hidden sm:block text-right">
-                                <div className="text-white font-black text-[10px] uppercase truncate max-w-[80px]">{opponents[0]?.name || 'Rakip'}</div>
-                                <div className="text-yellow-500 font-bold text-[8px] tracking-tighter">{opponents[0]?.elo || 0} ELO</div>
-                            </div>
-                            <div className="flex -space-x-4">
-                                {opponents.map((opp, idx) => (
-                                    <div key={idx} className={`w-10 h-10 rounded-xl border-2 ${gameState?.currentPlayer === opp.id ? 'border-yellow-500 animate-pulse scale-110 z-10' : 'border-white/10'} overflow-hidden relative group transition-all`}>
-                                        {opp.photoUrl ? <img src={opp.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 flex items-center justify-center text-xs">👤</div>}
-                                        <div className="absolute -bottom-1 -right-1 scale-75"><LevelBadge level={opp.level || 1} /></div>
-                                    </div>
-                                ))}
-                            </div>
-                            <button onClick={leaveGameClient} className="ml-2 w-8 h-8 flex items-center justify-center text-red-500/50 hover:text-red-500 bg-red-500/5 rounded-lg active:scale-90 transition-all">✕</button>
-                        </div>
-                    </div>
-
-                    {/* Opponent Hand Area */}
-                    <div className="h-16 flex items-center justify-center bg-black/20 gap-1 border-b border-white/5 px-4 overflow-hidden">
-                        <div className="text-white/20 text-[8px] font-black uppercase tracking-widest mr-4">Rakip Eli</div>
-                        <div className="flex -space-x-4 overflow-hidden">
-                            {[...Array(gameState?.otherHandCounts?.[opponents[0]?.id] || 0)].map((_, i) => (
-                                <div key={i} className="animate-slide-up" style={{ animationDelay: `${i * 0.05}s` }}>
-                                    <DominoTile values={[0, 0]} showBack={true} disabled={true} />
+                            <div className="flex flex-col items-center">
+                                <div className={`px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest ${isMyTurn ? 'bg-yellow-500 text-black shadow-glow' : 'bg-white/5 text-white/30'}`}>
+                                    {isMyTurn ? 'SIRA SENDE' : 'RAKİPTE'}
                                 </div>
-                            ))}
+                            </div>
+
+                            <button onClick={leaveGameClient} className="w-10 h-10 flex items-center justify-center text-red-500 bg-red-500/10 rounded-xl active:scale-95 transition-all text-xl font-bold">✕</button>
                         </div>
                     </div>
 
@@ -1251,7 +1156,7 @@
                                                 transform: 'translate(-50%, -50%)'
                                             }}
                                         >
-                                            <span className="text-yellow-400 font-black text-[10px] drop-shadow-md">BURAYA</span>
+                                            <span className="text-yellow-400 font-black text-[10px] drop-shadow-md uppercase">Buraya</span>
                                         </div>
                                     )}
                                     {validMoves.includes('right') && boardLayout[boardLayout.length - 1] && (
@@ -1264,7 +1169,7 @@
                                                 transform: 'translate(-50%, -50%)'
                                             }}
                                         >
-                                            <span className="text-yellow-400 font-black text-[10px] drop-shadow-md">BURAYA</span>
+                                            <span className="text-yellow-400 font-black text-[10px] drop-shadow-md uppercase">Buraya</span>
                                         </div>
                                     )}
                                 </>
@@ -1282,18 +1187,33 @@
                     </div>
 
                     {/* Controls Footer */}
-                    <div className="h-48 z-30 bg-black/60 backdrop-blur-xl border-t border-white/10 p-4">
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="text-white/50 text-xs font-bold uppercase tracking-widest">Senin Elin ({myHand.length})</div>
-                            {isMyTurn && (
-                                marketSize > 0 ? (
-                                    <button onClick={() => sendMessage({ type: 'drawFromMarket' })} className="bg-yellow-500 text-black px-4 py-1 rounded-full text-xs font-bold shadow-glow">TAŞ ÇEK ({marketSize})</button>
-                                ) : (
-                                    null
-                                )
+                    <div className="h-44 z-30 bg-black/70 backdrop-blur-xl border-t border-white/10 p-4 pb-6">
+                        <div className="flex items-center justify-between mb-3 px-2">
+                            <div className="flex items-center gap-3">
+                                <div className="text-white font-black text-[10px] uppercase tracking-[0.2em]">Elin</div>
+                                <div className="bg-white/10 px-2 py-0.5 rounded text-white text-[10px] font-bold">{myHand.length}</div>
+                            </div>
+
+                            {marketSize > 0 && (
+                                <div className="flex items-center gap-2">
+                                    <div className="flex -space-x-3 mr-2">
+                                        {[...Array(Math.min(3, marketSize))].map((_, i) => (
+                                            <div key={i} className="w-5 h-8 bg-bone-face rounded-[3px] border border-gray-300 shadow-sm transform -rotate-12"></div>
+                                        ))}
+                                    </div>
+                                    <button
+                                        onClick={() => sendMessage({ type: 'drawFromMarket' })}
+                                        disabled={!isMyTurn}
+                                        className={`bg-yellow-500 text-black px-6 py-2 rounded-xl text-xs font-black shadow-glow active:scale-95 transition-all flex items-center gap-2 ${!isMyTurn ? 'opacity-50 grayscale' : ''}`}
+                                    >
+                                        TAŞ ÇEK
+                                        <span className="bg-black/10 px-1.5 rounded-md">{marketSize}</span>
+                                    </button>
+                                </div>
                             )}
                         </div>
-                        <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar justify-center">
+
+                        <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
                             {myHand.map((tile, idx) => (
                                 <DominoTile
                                     key={idx}
@@ -1309,44 +1229,18 @@
             );
 
             if (screen === 'end') return (
-                <div className="flex flex-col items-center justify-center min-h-screen bg-black/90 p-10 text-center animate-fade-in relative overflow-hidden">
-                    <div className="absolute inset-0 bg-radial-gradient from-white/5 to-transparent"></div>
+                <div className="flex flex-col items-center justify-center min-h-screen bg-black/90 p-10 text-center">
+                    <div className="text-8xl mb-6">{endInfo.isWinner ? '🎉' : '💀'}</div>
+                    <h1 className="text-6xl font-black text-white mb-2">{endInfo.isWinner ? 'TEBRİKLER!' : 'KAYBETTİN'}</h1>
+                    <p className="text-white/60 text-xl font-bold mb-8">{endInfo.winnerName} kazandı!</p>
 
-                    <div className="relative z-10">
-                        <div className="text-9xl mb-10 drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">
-                            {endInfo.isDraw ? '🤝' : (endInfo.isWinner ? '🏆' : '💀')}
+                    {endInfo.isRanked && (
+                        <div className={`text-4xl font-black ${endInfo.eloChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {endInfo.eloChange > 0 ? '+' : ''}{endInfo.eloChange} ELO
                         </div>
+                    )}
 
-                        <h1 className="text-7xl font-black text-white mb-4 tracking-tighter drop-shadow-2xl">
-                            {endInfo.isDraw ? 'BERABERLİK!' : (endInfo.isWinner ? 'TEBRİKLER!' : 'MAALESEF...')}
-                        </h1>
-
-                        <div className="bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10 mb-12 min-w-[320px]">
-                            <p className="text-white/40 text-xs font-black uppercase tracking-[0.4em] mb-2">{endInfo.isWinner ? 'TEBRİKLER' : (endInfo.isDraw ? 'SONUÇ' : 'KAZANAN')}</p>
-                            <p className="text-3xl text-white font-black">{endInfo.isWinner ? 'OYUNU KAZANDIN!' : (endInfo.isDraw ? 'BERABERE BİTTİ' : endInfo.winnerName)}</p>
-
-                            {!endInfo.isDraw && !endInfo.isWinner && (
-                                <p className="text-red-500 text-sm font-bold mt-4 animate-pulse">RAKİP DAHA AZ PUAN TOPLADI</p>
-                            )}
-                        </div>
-
-                        {endInfo.isRanked && (
-                            <div className={`text-5xl font-black flex items-center justify-center gap-3 ${endInfo.eloChange > 0 ? 'text-green-400' : (endInfo.isDraw ? 'text-white/40' : 'text-red-400')}`}>
-                                <span className="opacity-40 text-2xl tracking-widest font-light">ELO</span>
-                                <span>{endInfo.eloChange > 0 ? '+' : ''}{endInfo.eloChange}</span>
-                            </div>
-                        )}
-
-                        <div className="mt-20 flex flex-col items-center gap-4">
-                            <div className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-ping"></span>
-                                <span className="text-white/20 text-xs font-bold uppercase tracking-widest">Lobiye Aktarılıyor</span>
-                            </div>
-                            <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
-                                <div className="h-full bg-yellow-500 animate-progress"></div>
-                            </div>
-                        </div>
-                    </div>
+                    <div className="mt-12 text-white/30 animate-pulse">Lobiye dönülüyor...</div>
                 </div>
             );
 
