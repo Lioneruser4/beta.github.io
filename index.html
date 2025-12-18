@@ -163,6 +163,91 @@
                 transform: rotate(360deg);
             }
         }
+
+        @keyframes progress {
+            from {
+                width: 0%;
+            }
+
+            to {
+                width: 100%;
+            }
+        }
+
+        .animate-progress {
+            animation: progress 4s linear forwards;
+        }
+
+        @keyframes slide-right {
+            from {
+                transform: translateX(-50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slide-left {
+            from {
+                transform: translateX(50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .animate-slide-right {
+            animation: slide-right 0.5s ease-out forwards;
+        }
+
+        .animate-slide-left {
+            animation: slide-left 0.5s ease-out forwards;
+        }
+
+        @keyframes neon-pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 10px rgba(255, 0, 0, 0.8), 0 0 20px rgba(255, 0, 0, 0.4);
+                filter: brightness(1.2);
+            }
+
+            50% {
+                box-shadow: 0 0 20px rgba(255, 0, 0, 1), 0 0 40px rgba(255, 0, 0, 0.6);
+                filter: brightness(1.5);
+            }
+        }
+
+        @keyframes border-flow {
+            0% {
+                border-color: #ff0000;
+            }
+
+            33% {
+                border-color: #00ff00;
+            }
+
+            66% {
+                border-color: #0000ff;
+            }
+
+            100% {
+                border-color: #ff0000;
+            }
+        }
+
+        .neon-pro {
+            animation: neon-pulse 1.5s infinite ease-in-out, border-flow 3s infinite linear;
+            background: linear-gradient(135deg, #111 0%, #333 100%);
+            border-width: 2px;
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+        }
     </style>
 </head>
 
@@ -244,6 +329,28 @@
             );
         };
 
+        // 4. Level Badge (Dynamic Colors & PRO Animation)
+        const LevelBadge = ({ level }) => {
+            const lvl = parseInt(level);
+            let colors = "bg-sky-400 text-white"; // 1-3
+            let label = `LVL ${lvl}`;
+
+            if (lvl >= 4 && lvl <= 6) {
+                colors = "bg-yellow-500 text-black";
+            } else if (lvl >= 7 && lvl < 10) {
+                colors = "bg-red-600 text-white";
+            } else if (lvl >= 10) {
+                colors = "neon-pro text-white border-red-500";
+                label = "PRO";
+            }
+
+            return (
+                <span className={`${colors} px-3 py-1 rounded-full text-[10px] font-black tracking-tighter shadow-sm flex items-center justify-center min-w-[50px] uppercase`}>
+                    {label}
+                </span>
+            );
+        };
+
         // --- ANA OYUN ---
 
         const DominoGame = () => {
@@ -263,6 +370,7 @@
             const [searching, setSearching] = useState(false);
             const [endInfo, setEndInfo] = useState(null);
             const [opponent, setOpponent] = useState(null);
+            const [lastSoundIndex, setLastSoundIndex] = useState(0); // For sequential sounds 6, 7, 8
 
             const [playerId, setPlayerId] = useState(null);
             const wsRef = useRef(null);
@@ -389,25 +497,35 @@
 
             // Ses Efektleri
             const playSound = (type) => {
-                try {
-                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
+                const sounds = {
+                    found: 'sound1found.mp3',
+                    start: 'sound2oyunbasladi.mp3',
+                    lose: 'sound3lose.mp3',
+                    win: 'sound4win.mp3',
+                    pass: 'sound5bel.mp3',
+                    place6: 'sound6.mp3',
+                    place7: 'sound7.mp3',
+                    place8: 'sound8.mp3'
+                };
 
-                    if (type === 'click') {
-                        osc.frequency.setValueAtTime(440, ctx.currentTime);
-                        gain.gain.setValueAtTime(0.1, ctx.currentTime);
-                        osc.start();
-                        osc.stop(ctx.currentTime + 0.1);
-                    } else if (type === 'place') {
-                        osc.frequency.setValueAtTime(220, ctx.currentTime);
-                        gain.gain.setValueAtTime(0.2, ctx.currentTime);
-                        osc.start();
-                        osc.stop(ctx.currentTime + 0.15);
-                    }
-                } catch (e) { }
+                let soundFile = '';
+                if (type === 'place') {
+                    // Sira ile 6, 7, 8 çal
+                    const nextIdx = (lastSoundIndex % 3) + 6; // 6, 7, 8
+                    soundFile = sounds[`place${nextIdx}`];
+                    setLastSoundIndex(prev => prev + 1);
+                } else {
+                    soundFile = sounds[type];
+                }
+
+                if (!soundFile) return;
+
+                try {
+                    const audio = new Audio(soundFile);
+                    audio.play().catch(e => console.log('Ses çalınamadı (Interaksiyon gerekli):', e));
+                } catch (e) {
+                    console.error('Audio error:', e);
+                }
             };
 
             const connectToServer = () => {
@@ -470,7 +588,7 @@
                             setScreen('game');
                             setSearching(false);
                             if (data.type === 'gameStart') {
-                                playSound('click');
+                                playSound('start');
                                 showNotification('Oyun Başladı!', 'success');
                                 // Save session
                                 if (data.gameState.playerId && data.gameState.roomCode) {
@@ -509,6 +627,8 @@
                             eloChange: data.eloChanges ? (amIWinner ? data.eloChanges.winner : data.eloChanges.loser) : 0
                         });
                         setScreen('end');
+                        if (amIWinner) playSound('win'); else playSound('lose');
+
                         localStorage.removeItem('domino_session');
                         setTimeout(() => {
                             resetGameClientState();
@@ -521,10 +641,15 @@
                     case 'playerReconnected':
                         showNotification(`${data.playerName} geri döndü!`, 'success');
                         break;
+                    case 'turnPassed':
+                        showNotification(`${data.playerName} pas geçti`, 'info');
+                        playSound('pass');
+                        break;
                     case 'matchFound':
-                        showNotification('Rakip Bulundu!', 'success');
+                        playSound('found');
                         setSearching(false);
                         setOpponent(data.opponent);
+                        setScreen('matching_lobby');
                         break;
                 }
             };
@@ -733,7 +858,7 @@
                                 {playerData.photoUrl && <img src={playerData.photoUrl} className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 p-1" />}
                                 <div className="text-white text-2xl font-bold">{playerData.username}</div>
                                 <div className="flex justify-center gap-2 mt-2">
-                                    <span className="bg-yellow-500 text-black px-3 py-1 rounded-full text-xs font-bold">LVL {playerData.level}</span>
+                                    <LevelBadge level={playerData.level} />
                                     <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold">{playerData.elo} ELO</span>
                                 </div>
                             </div>
@@ -786,6 +911,48 @@
                 </div>
             );
 
+            if (screen === 'matching_lobby') return (
+                <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-black/60 backdrop-blur-2xl">
+                    <div className="text-center mb-16">
+                        <h2 className="text-4xl font-black text-yellow-500 animate-pulse">RAKİP BULUNDU!</h2>
+                        <p className="text-white/40 mt-2 uppercase tracking-[0.3em]">Maç Başlıyor...</p>
+                    </div>
+
+                    <div className="flex items-center gap-4 sm:gap-12 w-full max-w-2xl px-4">
+                        {/* Ben */}
+                        <div className="flex-1 flex flex-col items-center gap-4 animate-slide-right">
+                            <div className="relative">
+                                <img src={playerData?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-white/20 shadow-2xl object-cover" />
+                                <div className="absolute -bottom-2 -right-2"><LevelBadge level={playerData?.level || 1} /></div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-white font-black text-xl truncate max-w-[120px]">{playerData?.username}</div>
+                                <div className="text-yellow-500 font-bold text-sm tracking-widest">{playerData?.elo} ELO</div>
+                            </div>
+                        </div>
+
+                        {/* VS */}
+                        <div className="text-white/20 text-4xl sm:text-6xl font-black italic">VS</div>
+
+                        {/* Rakip */}
+                        <div className="flex-1 flex flex-col items-center gap-4 animate-slide-left">
+                            <div className="relative">
+                                <img src={opponent?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-yellow-500/50 shadow-2xl object-cover" />
+                                <div className="absolute -bottom-2 -right-2"><LevelBadge level={opponent?.level || 1} /></div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-white font-black text-xl truncate max-w-[120px]">{opponent?.name || opponent?.username || 'Rakip'}</div>
+                                <div className="text-yellow-500 font-bold text-sm tracking-widest">{opponent?.elo || 0} ELO</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-20 w-48 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                        <div className="h-full bg-yellow-500 animate-progress"></div>
+                    </div>
+                </div>
+            );
+
             if (screen === 'game') return (
                 <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden">
                     {notification && <Toast message={notification.message} type={notification.type} />}
@@ -796,10 +963,15 @@
                             <div className="w-10 h-10 rounded-full border-2 border-white/20 overflow-hidden">
                                 {opponent?.photoUrl ? <img src={opponent.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 flex items-center justify-center">👤</div>}
                             </div>
-                            <div className="text-white font-bold">{opponent?.username || 'Rakip'}</div>
+                            <div className="flex flex-col">
+                                <div className="text-white font-bold text-sm leading-none">{opponent?.name || opponent?.username || 'Rakip'}</div>
+                                <div className="mt-1 scale-75 origin-left">
+                                    <LevelBadge level={opponent?.level || 1} />
+                                </div>
+                            </div>
                         </div>
-                        <div className={`px-4 py-1 rounded-full text-xs font-bold ${isMyTurn ? 'bg-yellow-500 text-black animate-pulse' : 'bg-white/10 text-white/50'}`}>
-                            {isMyTurn ? 'SIRA SENDE' : 'RAKİP OYNUYOR'}
+                        <div className={`px-4 py-1 rounded-full text-[10px] font-bold ${isMyTurn ? 'bg-yellow-500 text-black animate-pulse' : 'bg-white/10 text-white/50'}`}>
+                            {isMyTurn ? 'SIRA SENDE' : `${String(opponent?.name || opponent?.username || 'Rakip').toUpperCase()} OYNUYOR`}
                         </div>
                         <button onClick={leaveGameClient} className="text-red-500 font-bold text-sm">AYRIL</button>
                     </div>
@@ -943,7 +1115,10 @@
                                 <img src={p.photoUrl || 'https://via.placeholder.com/50'} className="w-12 h-12 rounded-full" />
                                 <div className="flex-1">
                                     <div className="text-white font-bold">{p.username}</div>
-                                    <div className="text-white/40 text-xs">LVL {p.level} • {p.wins} Galibiyet</div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <LevelBadge level={p.level} />
+                                        <div className="text-white/40 text-xs">{p.wins} Galibiyet</div>
+                                    </div>
                                 </div>
                                 <div className="text-yellow-400 font-black">{p.elo} ELO</div>
                             </div>
