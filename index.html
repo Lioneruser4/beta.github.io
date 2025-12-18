@@ -744,14 +744,40 @@
                             sendMessage({ type: 'findMatch', ...playerData });
                         }} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl mb-4 transition-all transform active:scale-95 shadow-lg">MAÇ ARA</button>
 
-                        <div className="flex gap-2">
-                            <button onClick={() => sendMessage({ type: 'createRoom', ...playerData })} className="flex-1 bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold">ODA KUR</button>
-                            <input value={joinCode} onChange={e => setJoinCode(e.target.value)} placeholder="KOD" className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 text-white text-center font-bold" />
+                        <div className="flex flex-col gap-3">
+                            <button onClick={() => sendMessage({ type: 'createRoom', ...playerData })} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all">🏠 ÖZEL ODA KUR</button>
+
+                            <div className="flex gap-2">
+                                <input
+                                    value={joinCode}
+                                    onChange={e => setJoinCode(e.target.value)}
+                                    placeholder="ODA KODU"
+                                    className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 text-white text-center font-bold focus:border-yellow-500 transition-all"
+                                />
+                                <button
+                                    onClick={() => {
+                                        if (!joinCode) return showNotification('Lütfen oda kodu girin', 'warning');
+                                        sendMessage({ type: 'joinRoom', roomCode: joinCode, ...playerData });
+                                    }}
+                                    className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-black transition-all shadow-glow"
+                                >
+                                    GİR
+                                </button>
+                            </div>
                         </div>
+
                         {roomCode && (
-                            <div className="mt-4 p-4 bg-yellow-500/20 border border-yellow-500/40 rounded-2xl text-center">
-                                <div className="text-yellow-400 text-xs">ODA KODU</div>
-                                <div className="text-3xl text-white font-black">{roomCode}</div>
+                            <div
+                                onClick={() => {
+                                    navigator.clipboard.writeText(roomCode);
+                                    showNotification('Oda kodu kopyalandı!', 'success');
+                                }}
+                                className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/40 rounded-2xl text-center cursor-pointer hover:bg-yellow-500/20 active:scale-95 transition-all group"
+                            >
+                                <div className="text-yellow-400 text-xs font-bold flex items-center justify-center gap-2">
+                                    ODA KODU <span className="text-[10px] bg-yellow-500/20 px-2 py-0.5 rounded-full">KOPYALA</span>
+                                </div>
+                                <div className="text-4xl text-white font-black tracking-widest mt-1 group-hover:text-yellow-400">{roomCode}</div>
                             </div>
                         )}
 
