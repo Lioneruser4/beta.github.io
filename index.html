@@ -269,8 +269,9 @@
         }
 
         // API Base URL
-        // API Base URL
-        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
+        // API Base URL - Dinamik URL tespiti
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const API_URL = isLocal ? 'http://localhost:10000' : window.location.origin;
 
         // --- BİLEŞENLER ---
 
@@ -543,10 +544,10 @@
             };
 
             const connectToServer = () => {
-                let wsUrl = 'wss://beta-github-io.onrender.com';
-                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                    wsUrl = `ws://${window.location.hostname}:10000`;
-                }
+                const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                let wsUrl = isLocal
+                    ? `ws://${window.location.hostname}:10000`
+                    : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
 
                 const ws = new WebSocket(wsUrl);
 
