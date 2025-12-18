@@ -205,7 +205,7 @@
             const baseClasses = `
                 relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
                 transition-all duration-300 select-none
-                ${vertical ? 'flex-col w-9 h-[4.5rem] sm:w-10 sm:h-20' : 'flex-row w-[4.5rem] h-9 sm:w-20 sm:h-10'}
+                ${vertical ? 'flex-col w-12 h-24 sm:w-10 sm:h-20' : 'flex-row w-24 h-12 sm:w-20 sm:h-10'}
                 ${isGhost ? 'opacity-0 pointer-events-none' : 'shadow-3d'}
                 ${isSelected ? '-translate-y-4 shadow-3d-active ring-2 ring-yellow-500 z-10 animate-celebrate' : ''}
                 ${animateIn ? 'animate-slide-in' : ''}
@@ -217,15 +217,18 @@
                 <div
                     onClick={onClick}
                     className={baseClasses}
-                    style={{ transform: isSelected ? 'translateY(-15px) scale(1.1)' : `scale(${scale})` }}
+                    style={{
+                        transform: isSelected ? 'translateY(-15px) scale(1.1)' : `scale(${scale})`,
+                        boxShadow: isGhost ? 'none' : '0 2px 4px rgba(0,0,0,0.2)'
+                    }}
                 >
-                    <div className={`flex-1 flex items-center justify-center ${vertical ? 'border-b' : 'border-r'} border-gray-300`}>
+                    <div className={`flex-1 flex items-center justify-center ${vertical ? 'border-b' : 'border-r'} border-gray-200`}>
                         <RenderPips number={values[0]} />
                     </div>
                     <div className="flex-1 flex items-center justify-center">
                         <RenderPips number={values[1]} />
                     </div>
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-400 border border-gray-500 shadow-inner z-10"></div>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-300 border border-gray-400 shadow-inner z-10 opacity-50"></div>
                 </div>
             );
         };
@@ -261,6 +264,7 @@
             const [endInfo, setEndInfo] = useState(null);
             const [opponent, setOpponent] = useState(null);
 
+            const [playerId, setPlayerId] = useState(null);
             const wsRef = useRef(null);
             const searchTimerRef = useRef(null);
 
@@ -437,6 +441,7 @@
 
                 switch (data.type) {
                     case 'session':
+                        setPlayerId(data.playerId);
                         // Save session for reconnection
                         localStorage.setItem('domino_session', JSON.stringify({
                             playerId: data.playerId,
@@ -449,6 +454,9 @@
                     case 'gameStart':
                     case 'gameUpdate':
                         if (data.gameState) {
+                            if (data.gameState.playerId || data.playerId) {
+                                setPlayerId(data.gameState.playerId || data.playerId);
+                            }
                             setGameState(prevState => ({
                                 ...prevState,
                                 ...data.gameState,
@@ -476,11 +484,16 @@
                         setSearching(false);
                         break;
                     case 'gameEnd':
+                        console.log('🏁 Oyun Bitti!', data);
+                        const myId = String(playerId || gameState?.playerId || '');
+                        const winnerIdFromServer = String(data.winner || '');
+                        const amIWinner = winnerIdFromServer === myId && winnerIdFromServer !== '';
+
                         setEndInfo({
                             winnerName: data.winnerName,
                             isRanked: data.isRanked,
-                            isWinner: data.winner === (gameState?.playerId || data.playerId),
-                            eloChange: data.eloChanges ? (data.winner === (gameState?.playerId || data.playerId) ? data.eloChanges.winner : data.eloChanges.loser) : 0
+                            isWinner: amIWinner,
+                            eloChange: data.eloChanges ? (amIWinner ? data.eloChanges.winner : data.eloChanges.loser) : 0
                         });
                         setScreen('end');
                         localStorage.removeItem('domino_session');
@@ -509,44 +522,60 @@
                 const layout = [];
                 const T_LONG = 80;
                 const T_SHORT = 40;
-                const GAP = 4;
 
                 let curX = 0;
                 let curY = 0;
                 let dirX = 1; // 1: Right, -1: Left
                 let isVerticalTransition = false;
-                const limit = window.innerWidth * 0.38; // Slightly wider limit
+                const limit = window.innerWidth * 0.35;
 
                 board.forEach((tile, i) => {
                     const isDouble = tile[0] === tile[1];
-                    const w = isDouble ? T_SHORT : T_LONG;
-                    const h = isDouble ? T_LONG : T_SHORT;
-
                     let rotation = 0;
+                    let w = T_LONG;
+                    let h = T_SHORT;
+
                     if (isDouble) {
                         rotation = 90;
+                        w = T_SHORT;
+                        h = T_LONG;
                     } else if (dirX === -1) {
                         rotation = 180;
                     }
 
-                    // Special case for transition tiles
                     if (isVerticalTransition) {
                         rotation = 90;
+                        w = T_SHORT;
+                        h = T_LONG;
                         isVerticalTransition = false;
                     }
 
-                    layout.push({ tile, x: curX, y: curY, isDouble, rotation });
+                    layout.push({ tile, x: curX, y: curY, isDouble, rotation, w, h });
 
-                    // Calculate next position
-                    const step = (isDouble ? T_SHORT : T_LONG) + GAP;
+                    const nextTile = board[i + 1];
+                    if (nextTile) {
+                        const nextIsDouble = nextTile[0] === nextTile[1];
+                        const nextW = nextIsDouble ? T_SHORT : T_LONG;
+                        const currentIsHorizontal = !isDouble && rotation !== 90;
+                        const nextIsTurn = currentIsHorizontal && ((dirX === 1 && curX + w / 2 + nextW > limit) || (dirX === -1 && curX - w / 2 - nextW < -limit));
 
-                    if (!isDouble && ((dirX === 1 && curX + step > limit) || (dirX === -1 && curX - step < -limit))) {
-                        // Turn Down
-                        curY += T_LONG + GAP;
-                        dirX *= -1; // Change horizontal direction
-                        isVerticalTransition = true;
-                    } else {
-                        curX += step * dirX;
+                        if (nextIsTurn) {
+                            curX += (w / 2 - T_SHORT / 2) * dirX;
+                            curY += (h / 2 + T_LONG / 2);
+                            dirX *= -1;
+                            isVerticalTransition = true;
+                        } else {
+                            const nextRotation = nextIsDouble ? 90 : (dirX === -1 ? 180 : 0);
+                            const nextStepW = (nextIsDouble || nextRotation === 90) ? T_SHORT : T_LONG;
+
+                            if (rotation === 90 && !isDouble) {
+                                // Transition from vertical connector to horizontal
+                                curX += (T_SHORT / 2 - nextStepW / 2) * dirX;
+                                curY += (T_LONG / 2 + T_SHORT / 2);
+                            } else {
+                                curX += (w / 2 + nextStepW / 2) * dirX;
+                            }
+                        }
                     }
                 });
 
@@ -756,44 +785,44 @@
                             ))}
 
                             {/* Move Indicators */}
-                            {isMyTurn && selectedTileIndex !== null && (
+                            {isMyTurn && selectedTileIndex !== null && boardLayout.length > 0 && (
                                 <>
-                                    {validMoves.includes('left') && (
+                                    {validMoves.includes('left') && boardLayout[0] && (
                                         <div
-                                            className="absolute w-20 h-10 border-4 border-yellow-400 border-dashed rounded-xl flex items-center justify-center animate-pulse cursor-pointer hover:bg-yellow-400/20 z-50"
+                                            className="absolute w-20 h-10 border-4 border-yellow-400 border-dashed rounded-xl flex items-center justify-center animate-pulse cursor-pointer hover:bg-yellow-400/20 z-50 bg-black/40"
                                             onClick={() => playTile('left')}
                                             style={{
-                                                left: boardLayout[0]?.x - 100 || 0,
-                                                top: boardLayout[0]?.y || 0,
+                                                left: boardLayout[0].x + (boardLayout[0].rotation === 90 ? 0 : (boardLayout[0].rotation === 180 ? 60 : -60)),
+                                                top: boardLayout[0].y + (boardLayout[0].rotation === 90 ? -60 : 0),
                                                 transform: 'translate(-50%, -50%)'
                                             }}
                                         >
-                                            <span className="text-yellow-400 font-black text-[10px]">BURAYA</span>
+                                            <span className="text-yellow-400 font-black text-[10px] drop-shadow-md">BURAYA</span>
                                         </div>
                                     )}
-                                    {validMoves.includes('right') && (
+                                    {validMoves.includes('right') && boardLayout[boardLayout.length - 1] && (
                                         <div
-                                            className="absolute w-20 h-10 border-4 border-yellow-400 border-dashed rounded-xl flex items-center justify-center animate-pulse cursor-pointer hover:bg-yellow-400/20 z-50"
+                                            className="absolute w-20 h-10 border-4 border-yellow-400 border-dashed rounded-xl flex items-center justify-center animate-pulse cursor-pointer hover:bg-yellow-400/20 z-50 bg-black/40"
                                             onClick={() => playTile('right')}
                                             style={{
-                                                left: boardLayout.slice(-1)[0]?.x + (boardLayout.slice(-1)[0]?.rotation === 180 ? -100 : 100) || 0,
-                                                top: boardLayout.slice(-1)[0]?.y || 0,
+                                                left: boardLayout[boardLayout.length - 1].x + (boardLayout[boardLayout.length - 1].rotation === 90 ? 0 : (boardLayout[boardLayout.length - 1].rotation === 180 ? -60 : 60)),
+                                                top: boardLayout[boardLayout.length - 1].y + (boardLayout[boardLayout.length - 1].rotation === 90 ? 60 : 0),
                                                 transform: 'translate(-50%, -50%)'
                                             }}
                                         >
-                                            <span className="text-yellow-400 font-black text-[10px]">BURAYA</span>
-                                        </div>
-                                    )}
-                                    {(validMoves.includes('start') || boardLayout.length === 0) && validMoves.length > 0 && (
-                                        <div
-                                            className="absolute w-32 h-16 border-4 border-yellow-400 border-dashed rounded-2xl flex items-center justify-center animate-bounce cursor-pointer bg-yellow-400/10 z-50"
-                                            onClick={() => playTile('start')}
-                                            style={{ left: 0, top: 0, transform: 'translate(-50%, -50%)' }}
-                                        >
-                                            <span className="text-yellow-400 font-black">BAŞLA</span>
+                                            <span className="text-yellow-400 font-black text-[10px] drop-shadow-md">BURAYA</span>
                                         </div>
                                     )}
                                 </>
+                            )}
+                            {isMyTurn && selectedTileIndex !== null && boardLayout.length === 0 && validMoves.includes('start') && (
+                                <div
+                                    className="absolute w-32 h-16 border-4 border-yellow-400 border-dashed rounded-2xl flex items-center justify-center animate-bounce cursor-pointer bg-yellow-400/10 z-50"
+                                    onClick={() => playTile('start')}
+                                    style={{ left: 0, top: 0, transform: 'translate(-50%, -50%)' }}
+                                >
+                                    <span className="text-yellow-400 font-black">BAŞLA</span>
+                                </div>
                             )}
                         </div>
                     </div>
