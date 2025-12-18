@@ -23,7 +23,7 @@ const playerSchema = new mongoose.Schema({
     firstName: { type: String },
     lastName: { type: String },
     photoUrl: { type: String },
-    elo: { type: Number, default: 100 },
+    elo: { type: Number, default: 0 },
     level: { type: Number, default: 1 },
     wins: { type: Number, default: 0 },
     losses: { type: Number, default: 0 },
@@ -149,7 +149,7 @@ app.post('/api/auth/telegram', async (req, res) => {
 
 app.get('/api/leaderboard', async (req, res) => {
     try {
-        const players = await Player.find({ elo: { $gte: 0 } }) // Tüm oyuncuları göster
+        const players = await Player.find({ elo: { $gt: 0 } }) // Guest/Yeni oyuncular gözükmesin
             .sort({ elo: -1 })
             .limit(10) // Top 10
             .select('telegramId username firstName lastName photoUrl elo level wins losses draws totalGames winStreak');
@@ -367,11 +367,11 @@ function checkWinner(gameState) {
 
         if (!anyoneCanPlay) {
             // Oyun kilitlendi, elindeki taşların toplamı en az olan kazanır
-            const sums = {};
-            let minSum = Infinity;
             let winnerId = gameState.playerOrder[0];
+            let minSum = Infinity;
             let isDraw = false;
 
+            const sums = {};
             gameState.playerOrder.forEach(pid => {
                 const sum = gameState.players[pid].hand.reduce((s, t) => s + t[0] + t[1], 0);
                 sums[pid] = sum;
@@ -384,11 +384,7 @@ function checkWinner(gameState) {
                 }
             });
 
-            return {
-                type: 'BLOCKED',
-                winnerId: isDraw ? 'DRAW' : winnerId,
-                sums
-            };
+            return isDraw ? 'DRAW' : winnerId;
         }
     }
 
@@ -664,20 +660,7 @@ function handlePlayTile(ws, data) {
 
     const winner = checkWinner(gs);
     if (winner) {
-        if (winner.type === 'BLOCKED') {
-            // Oyun tıkandı, puanları hesapla ve 7 saniye beklet
-            broadcastToRoom(ws.roomCode, {
-                type: 'gameBlocked',
-                sums: winner.sums,
-                winnerId: winner.winnerId
-            });
-
-            setTimeout(() => {
-                handleGameEnd(ws.roomCode, winner.winnerId, gs);
-            }, 7000);
-        } else {
-            handleGameEnd(ws.roomCode, winner, gs);
-        }
+        handleGameEnd(ws.roomCode, winner, gs);
     } else {
         gs.turn++;
         gs.currentPlayer = getNextPlayer(gs);
@@ -859,18 +842,7 @@ function handlePass(ws) {
 
     const winner = checkWinner(gs);
     if (winner) {
-        if (winner.type === 'BLOCKED') {
-            broadcastToRoom(ws.roomCode, {
-                type: 'gameBlocked',
-                sums: winner.sums,
-                winnerId: winner.winnerId
-            });
-            setTimeout(() => {
-                handleGameEnd(ws.roomCode, winner.winnerId, gs);
-            }, 7000);
-        } else {
-            handleGameEnd(ws.roomCode, winner, gs);
-        }
+        handleGameEnd(ws.roomCode, winner, gs);
         return;
     }
 
