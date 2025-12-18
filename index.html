@@ -270,6 +270,7 @@
 
         // API Base URL
         // API Base URL
+        // API Base URL
         const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://mario-io-1.onrender.com';
 
         // --- BİLEŞENLER ---
@@ -415,11 +416,25 @@
                 return () => { if (wsRef.current) wsRef.current.close(); };
             }, []);
 
-            // Telegram Auth
             const initializeTelegramAuth = async () => {
+                // Varsayılan olarak Guest ile başla ama arka planda Telegram'ı kontrol et
+                const guestData = {
+                    isGuest: true,
+                    username: 'Guest' + Math.floor(Math.random() * 9999),
+                    firstName: '',
+                    lastName: '',
+                    photoUrl: null,
+                    level: 0,
+                    elo: 0,
+                    telegramId: null
+                };
+                setPlayerData(guestData);
+
+                // Yüklenme ekranından hemen çık, arka planda giriş yapacak
+                setScreen('lobby');
+
                 try {
                     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                        // Telegram WebApp - Otomatik giriş
                         const user = tg.initDataUnsafe.user;
                         const telegramData = {
                             telegramId: user.id.toString(),
@@ -429,13 +444,13 @@
                             photoUrl: user.photo_url || null
                         };
 
-                        console.log('📡 Telegram kullanıcısı:', telegramData);
+                        console.log('📡 Telegram ile giriş deneniyor...', telegramData);
 
-                        // MongoDB'ye kaydet/güncelle
                         const response = await fetch(`${API_URL}/api/auth/telegram`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(telegramData)
+                            body: JSON.stringify(telegramData),
+                            signal: AbortSignal.timeout(8000) // 8 saniye sonra vazgeç
                         });
 
                         const data = await response.json();
@@ -445,39 +460,12 @@
                                 isGuest: false,
                                 photoUrl: telegramData.photoUrl || data.player.photoUrl
                             });
-                            console.log('✅ Telegram Auth başarılı:', data.player);
-                        } else {
-                            throw new Error('Auth failed');
+                            console.log('✅ Telegram girişi başarılı:', data.player);
+                            showNotification(`${data.player.username} olarak giriş yapıldı`, 'success');
                         }
-                    } else {
-                        // Normal tarayıcı - Guest mode
-                        const guestData = {
-                            isGuest: true,
-                            username: 'Guest' + Math.floor(Math.random() * 9999),
-                            firstName: '',
-                            lastName: '',
-                            photoUrl: null,
-                            level: 0,
-                            elo: 0,
-                            telegramId: null
-                        };
-                        setPlayerData(guestData);
-                        console.log('👥 Guest mode:', guestData);
                     }
                 } catch (error) {
-                    console.error('Auth error:', error);
-                    setPlayerData({
-                        isGuest: true,
-                        username: 'Guest' + Math.floor(Math.random() * 9999),
-                        firstName: '',
-                        lastName: '',
-                        photoUrl: null,
-                        level: 0,
-                        elo: 0,
-                        telegramId: null
-                    });
-                } finally {
-                    setScreen('lobby');
+                    console.error('❌ Auth hatası (Lobiye devam ediliyor):', error);
                 }
             };
 
