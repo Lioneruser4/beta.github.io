@@ -85,7 +85,8 @@ function calculateElo(winnerElo, loserElo, winnerLevel) {
 // Level Calculation - User requested shifts
 function calculateLevel(elo) {
     if (elo < 200) return 1; // 0-199 is Level 1
-    return Math.floor(elo / 100); // 200-299 = 2, 300-399 = 3
+    let lvl = Math.floor(elo / 100); // 200-299 = 2, 300-399 = 3...
+    return Math.min(10, lvl); // Max Level 10
 }
 
 // API Endpoints
@@ -124,7 +125,7 @@ app.post('/api/auth/telegram', async (req, res) => {
         res.json({
             success: true,
             player: {
-                id: player._id,
+                id: String(player._id),
                 telegramId: player.telegramId,
                 username: player.username,
                 firstName: player.firstName,
@@ -895,8 +896,8 @@ function handleLeaveGame(ws) {
         return;
     }
 
-    const leaverId = ws.playerId;
-    const winnerId = playerIds.find(id => id !== leaverId);
+    const leaverId = String(ws.playerId);
+    const winnerId = playerIds.find(id => String(id) !== leaverId);
 
     handleGameEnd(ws.roomCode, winnerId, gs);
 
