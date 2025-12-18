@@ -82,9 +82,10 @@ function calculateElo(winnerElo, loserElo, winnerLevel) {
     };
 }
 
-// Level Calculation - Every 100 points = 1 level
+// Level Calculation - User requested shifts
 function calculateLevel(elo) {
-    return Math.floor(elo / 100) + 1; // Start at level 1 (0 ELO)
+    if (elo < 200) return 1; // 0-199 is Level 1
+    return Math.floor(elo / 100); // 200-299 = 2, 300-399 = 3
 }
 
 // API Endpoints
@@ -147,7 +148,7 @@ app.post('/api/auth/telegram', async (req, res) => {
 
 app.get('/api/leaderboard', async (req, res) => {
     try {
-        const players = await Player.find()
+        const players = await Player.find({ elo: { $gt: 0 } }) // Guest/Yeni oyuncular gözükmesin
             .sort({ elo: -1 })
             .limit(10) // Top 10
             .select('telegramId username firstName lastName photoUrl elo level wins losses draws totalGames winStreak');
