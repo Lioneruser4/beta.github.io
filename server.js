@@ -528,7 +528,7 @@ function handleFindMatch(ws, data) {
         sendMessage(p1.ws, { type: 'matchFound', roomCode, opponent: room.players[p2.playerId], gameType });
         sendMessage(p2.ws, { type: 'matchFound', roomCode, opponent: room.players[p1.playerId], gameType });
 
-        // CRITICAL FIX: Send gameStart immediately to both players
+        // 4 saniye bekleme (Lobi süresi)
         setTimeout(() => {
             const gameStartMsg = { type: 'gameStart', gameState: { ...gameState, playerId: p1.playerId } };
             sendMessage(p1.ws, gameStartMsg);
@@ -539,7 +539,7 @@ function handleFindMatch(ws, data) {
             sendMessage(p1.ws, { type: 'session', playerId: p1.playerId, roomCode });
             sendMessage(p2.ws, { type: 'session', playerId: p2.playerId, roomCode });
             console.log(`✅ Oyun başladı: ${roomCode}`);
-        }, 500);
+        }, 4000); // 4 saniye
     } else {
         sendMessage(ws, { type: 'searchStatus', message: 'Rakip aranıyor...' });
     }
@@ -555,51 +555,85 @@ function handleCancelSearch(ws) {
 }
 
 function handleCreateRoom(ws, data) {
-    const roomCode = generateRoomCode();
-    const playerId = generateRoomCode();
-    ws.playerId = playerId;
-    ws.playerName = data.playerName;
+    const roomCode = generateRoomCode(); // generateRoomCode already returns uppercase
+    ws.playerName = data.playerName || data.username || 'Guest';
     ws.roomCode = roomCode;
-    playerConnections.set(playerId, ws);
+
+    // Host data with full profile
+    const hostData = {
+        name: ws.playerName,
+        telegramId: data.telegramId || null,
+        photoUrl: data.photoUrl || null,
+        level: data.level || 0,
+        elo: data.elo || 0,
+        isGuest: !data.telegramId
+    };
 
     rooms.set(roomCode, {
         code: roomCode,
-        players: { [playerId]: { name: data.playerName } },
+        players: { [ws.playerId]: hostData },
         type: 'private',
-        host: playerId
+        host: ws.playerId,
+        startTime: Date.now()
     });
 
     sendMessage(ws, { type: 'roomCreated', roomCode });
 }
 
 function handleJoinRoom(ws, data) {
-    const room = rooms.get(data.roomCode);
-    if (!room || Object.keys(room.players).length >= 2) {
-        return sendMessage(ws, { type: 'error', message: 'Oda bulunamadı veya dolu' });
-    }
+    if (!data.roomCode) return sendMessage(ws, { type: 'error', message: 'Oda kodu gerekli' });
+    const code = data.roomCode.trim().toUpperCase();
+    const room = rooms.get(code);
 
-    const playerId = generateRoomCode();
-    ws.playerId = playerId;
-    ws.playerName = data.playerName;
-    ws.roomCode = data.roomCode;
-    playerConnections.set(playerId, ws);
-    room.players[playerId] = { name: data.playerName };
+    if (!room) return sendMessage(ws, { type: 'error', message: 'Oda bulunamadı' });
+    if (Object.keys(room.players).length >= 2) return sendMessage(ws, { type: 'error', message: 'Oda dolu' });
+    if (room.host === ws.playerId) return sendMessage(ws, { type: 'error', message: 'Kendi odanıza bağlanamazsınız' });
+
+    const pid = ws.playerId || generateRoomCode();
+    ws.playerId = pid;
+    ws.playerName = data.playerName || data.username || 'Guest';
+    ws.telegramId = data.telegramId || null;
+    ws.photoUrl = data.photoUrl || null;
+    ws.level = data.level || 0;
+    ws.elo = data.elo || 0;
+    ws.isGuest = !data.telegramId;
+    ws.roomCode = code;
+    playerConnections.set(pid, ws);
+
+    // Add player with full data for private rooms too
+    room.players[pid] = {
+        name: ws.playerName,
+        telegramId: ws.telegramId,
+        photoUrl: ws.photoUrl,
+        level: ws.level,
+        elo: ws.elo,
+        isGuest: ws.isGuest
+    };
 
     const hostId = room.host;
-    const gameState = initializeGame(data.roomCode, hostId, playerId);
+    const gameState = initializeGame(code, hostId, pid);
 
+    // Communicate to both players
+    const p2Data = room.players[pid];
+    const p1Data = room.players[hostId];
+    const hostSocket = playerConnections.get(hostId);
+
+    if (hostSocket) {
+        sendMessage(hostSocket, { type: 'matchFound', roomCode: code, opponent: p2Data, gameType: 'casual' });
+    }
+    sendMessage(ws, { type: 'matchFound', roomCode: code, opponent: p1Data, gameType: 'casual' });
+
+    // 4 saniye sonra oyunu başlat
     setTimeout(() => {
-        sendGameState(data.roomCode, hostId);
-        sendGameState(data.roomCode, playerId);
-        // Herkese oyunun başladığını bildir
-        [hostId, playerId].forEach(pid => {
-            const socket = playerConnections.get(pid);
+        [hostId, pid].forEach(targetId => {
+            const socket = playerConnections.get(targetId);
             if (socket) {
-                socket.send(JSON.stringify({ type: 'session', playerId: pid, roomCode: data.roomCode }));
-                socket.send(JSON.stringify({ type: 'gameStart', gameState: { ...gameState, playerId: pid } }));
+                socket.send(JSON.stringify({ type: 'session', playerId: targetId, roomCode: code }));
+                socket.send(JSON.stringify({ type: 'gameStart', gameState: { ...gameState, playerId: targetId } }));
             }
         });
-    }, 500);
+        console.log(`✅ Özel oyun başladı: ${code}`);
+    }, 4000);
 }
 
 function handlePlayTile(ws, data) {
@@ -781,17 +815,17 @@ function handlePass(ws) {
     gs.turn++;
     gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
 
+    // Pas geçildiğini herkese bildir (Ses efekti için)
+    broadcastToRoom(ws.roomCode, { type: 'turnPassed', playerName: ws.playerName });
+
     const winner = checkWinner(gs);
     if (winner) {
-        broadcastToRoom(ws.roomCode, {
-            type: 'gameEnd',
-            winner,
-            winnerName: winner === 'DRAW' ? 'Beraberlik' : gs.players[winner].name
-        });
-        rooms.delete(ws.roomCode);
-    } else {
-        Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+        handleGameEnd(ws.roomCode, winner, gs);
+        return;
     }
+
+    // Sıradaki durumu herkese gönder
+    Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
 }
 
 function handleDrawFromMarket(ws) {
@@ -841,6 +875,9 @@ function handleDrawFromMarket(ws) {
             console.log(`❌ ${player.name} oynanabilir taş bulamadı - Sıra geçiyor`);
             gs.turn++;
             gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
+
+            // Pas geçildiğini bildir
+            broadcastToRoom(ws.roomCode, { type: 'turnPassed', playerName: player.name });
 
             // Sıra geçtikten sonra oyun kilitlendi mi kontrol et
             const winner = checkWinner(gs);
