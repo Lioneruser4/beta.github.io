@@ -286,7 +286,7 @@
         };
 
         // 2. Domino Taşı (3D Tasarım)
-        const DominoTile = ({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false, isBack = false }) => {
+        const DominoTile = ({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false }) => {
             const baseClasses = `
                 relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
                 transition-all duration-300 select-none
@@ -294,30 +294,9 @@
                 ${isGhost ? 'opacity-0 pointer-events-none' : 'shadow-3d'}
                 ${isSelected ? '-translate-y-4 shadow-3d-active ring-2 ring-yellow-500 z-10 animate-celebrate' : ''}
                 ${animateIn ? 'animate-slide-in' : ''}
-                ${!disabled && !isGhost && !isBack ? 'cursor-pointer active:translate-y-1 active:shadow-3d-active hover:brightness-110' : ''}
+                ${!disabled && !isGhost ? 'cursor-pointer active:translate-y-1 active:shadow-3d-active hover:brightness-110' : ''}
                 ${disabled ? 'brightness-90 cursor-default' : ''}
-                ${isBack ? 'brightness-100' : ''}
             `;
-
-            if (isBack) {
-                return (
-                    <div
-                        onClick={onClick}
-                        className={baseClasses}
-                        style={{
-                            transform: `scale(${scale})`,
-                            background: 'linear-gradient(135deg, #fdfdfd 0%, #e2e2e2 100%)',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                        }}
-                    >
-                        <div className="absolute inset-2 border border-black/5 rounded-sm bg-black/5 shadow-inner flex flex-col items-center justify-around opacity-30">
-                            <div className="w-1.5 h-1.5 rounded-full bg-black/40"></div>
-                            <div className="w-full h-[1px] bg-black/40"></div>
-                            <div className="w-1.5 h-1.5 rounded-full bg-black/40"></div>
-                        </div>
-                    </div>
-                );
-            }
 
             return (
                 <div
@@ -1025,43 +1004,36 @@
             if (screen === 'matching_lobby') return (
                 <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-black/60 backdrop-blur-2xl">
                     <div className="text-center mb-16">
-                        <h2 className="text-4xl font-black text-yellow-500 animate-pulse uppercase">EŞLEŞME KURULDU</h2>
+                        <h2 className="text-4xl font-black text-yellow-500 animate-pulse">AÇILIYOR...</h2>
                         <p className="text-white/40 mt-2 uppercase tracking-[0.3em]">Hemen Başlıyoruz</p>
                     </div>
 
-                    <div className="flex items-center justify-center gap-4 sm:gap-12 w-full max-w-2xl px-4">
+                    <div className={`grid ${opponents.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-8 w-full max-w-2xl px-4`}>
                         {/* Ben */}
-                        <div className="flex flex-col items-center gap-4 animate-slide-right w-1/3">
+                        <div className="flex flex-col items-center gap-4 animate-slide-right order-first">
                             <div className="relative">
-                                <img src={playerData?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-white/20 shadow-2xl object-cover" />
+                                <img src={playerData?.photoUrl || 'https://via.placeholder.com/100'} className="w-20 h-20 sm:w-28 sm:h-28 rounded-3xl border-4 border-white/20 shadow-2xl object-cover" />
                                 <div className="absolute -bottom-2 -right-2"><LevelBadge level={playerData?.level || 1} /></div>
                             </div>
                             <div className="text-center">
-                                <div className="text-white font-black text-sm truncate w-full">{playerData?.username}</div>
+                                <div className="text-white font-black text-sm truncate max-w-[100px]">{playerData?.username}</div>
                                 <div className="text-yellow-500 font-bold text-[10px] tracking-widest">{playerData?.elo} ELO</div>
                             </div>
                         </div>
 
-                        {/* VS */}
-                        <div className="flex flex-col items-center justify-center w-1/6">
-                            <div className="text-5xl font-black text-white/10 italic">VS</div>
-                        </div>
-
                         {/* Rakipler */}
-                        <div className="flex flex-wrap items-center justify-center gap-4 w-1/2">
-                            {opponents.map((opp, idx) => (
-                                <div key={idx} className="flex flex-col items-center gap-4 animate-slide-left">
-                                    <div className="relative">
-                                        <img src={opp?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-yellow-500/50 shadow-2xl object-cover" />
-                                        <div className="absolute -bottom-2 -right-2"><LevelBadge level={opp?.level || 1} /></div>
-                                    </div>
-                                    <div className="text-center">
-                                        <div className="text-white font-black text-sm truncate max-w-[100px]">{opp?.name || opp?.username || 'Rakip'}</div>
-                                        <div className="text-yellow-500 font-bold text-[10px] tracking-widest">{opp?.elo || 0} ELO</div>
-                                    </div>
+                        {opponents.map((opp, idx) => (
+                            <div key={idx} className="flex flex-col items-center gap-4 animate-slide-left">
+                                <div className="relative">
+                                    <img src={opp?.photoUrl || 'https://via.placeholder.com/100'} className="w-20 h-20 sm:w-28 sm:h-28 rounded-3xl border-4 border-yellow-500/50 shadow-2xl object-cover" />
+                                    <div className="absolute -bottom-2 -right-2"><LevelBadge level={opp?.level || 1} /></div>
                                 </div>
-                            ))}
-                        </div>
+                                <div className="text-center">
+                                    <div className="text-white font-black text-sm truncate max-w-[100px]">{opp?.name || opp?.username || 'Rakip'}</div>
+                                    <div className="text-yellow-500 font-bold text-[10px] tracking-widest">{opp?.elo || 0} ELO</div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
 
                     <div className="mt-20 w-48 h-1 bg-white/10 rounded-full overflow-hidden">
@@ -1074,45 +1046,22 @@
                 <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden">
                     {notification && <Toast message={notification.message} type={notification.type} />}
 
-                    {/* Header: Opponent Info & Their Hand */}
-                    <div className="h-24 flex flex-col bg-black/50 backdrop-blur-md z-30 border-b border-white/5">
-                        <div className="flex-1 flex items-center justify-between px-4">
-                            <div className="flex items-center gap-4">
-                                {opponents.map((oppObj, idx) => {
-                                    const opp = gameState?.players[oppObj.id] || oppObj || {};
-                                    const currentPid = oppObj.id || opp.id;
-                                    return (
-                                        <div key={idx} className="flex items-center gap-3">
-                                            <div className={`w-12 h-12 rounded-2xl border-2 ${gameState?.currentPlayer === currentPid ? 'border-yellow-500 animate-pulse scale-105 shadow-glow' : 'border-white/10'} overflow-hidden relative shadow-lg`}>
-                                                {opp.photoUrl ? <img src={opp.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-800 flex items-center justify-center text-xl">👤</div>}
-                                                <div className="absolute -bottom-1 -right-1 scale-75 origin-bottom-right">
-                                                    <LevelBadge level={opp.level || 0} />
-                                                </div>
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-white font-black text-xs uppercase tracking-tighter truncate max-w-[80px]">{opp.name || 'RAKİP'}</span>
-                                                <div className="flex items-center gap-1 mt-0.5">
-                                                    <div className="flex -space-x-4">
-                                                        {[...Array(opp.hand?.length || 0)].map((_, i) => (
-                                                            <div key={i} className="w-3 h-5 bg-white rounded-[2px] border border-black/10 shadow-sm first:opacity-100 opacity-80" style={{ transform: `rotate(${Math.random() * 4 - 2}deg)` }}></div>
-                                                        ))}
-                                                    </div>
-                                                    <span className="text-yellow-500 font-bold text-[10px] ml-1">{opp.hand?.length || 0}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            <div className="flex flex-col items-center">
-                                <div className={`px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest ${isMyTurn ? 'bg-yellow-500 text-black shadow-glow' : 'bg-white/5 text-white/30'}`}>
-                                    {isMyTurn ? 'SIRA SENDE' : 'RAKİPTE'}
+                    {/* Header */}
+                    <div className="h-16 flex items-center justify-between px-4 bg-black/40 backdrop-blur-md z-30">
+                        <div className="flex -space-x-2">
+                            {opponents.map((opp, idx) => (
+                                <div key={idx} className={`w-10 h-10 rounded-full border-2 ${gameState?.currentPlayer === opp.id ? 'border-yellow-500 animate-pulse scale-110' : 'border-white/20'} overflow-hidden relative group`}>
+                                    {opp.photoUrl ? <img src={opp.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 flex items-center justify-center">👤</div>}
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                        <span className="text-[8px] text-white font-bold">{opp.name}</span>
+                                    </div>
                                 </div>
-                            </div>
-
-                            <button onClick={leaveGameClient} className="w-10 h-10 flex items-center justify-center text-red-500 bg-red-500/10 rounded-xl active:scale-95 transition-all text-xl font-bold">✕</button>
+                            ))}
                         </div>
+                        <div className={`px-4 py-1.5 rounded-full text-[10px] font-black ${isMyTurn ? 'bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.4)]' : 'bg-white/5 text-white/30'}`}>
+                            {isMyTurn ? 'SIRA SENDE' : 'RAKİPTE'}
+                        </div>
+                        <button onClick={leaveGameClient} className="w-10 h-10 flex items-center justify-center text-red-500 bg-red-500/10 rounded-xl active:scale-90 transition-all">✕</button>
                     </div>
 
                     {/* Board Area */}
@@ -1156,7 +1105,7 @@
                                                 transform: 'translate(-50%, -50%)'
                                             }}
                                         >
-                                            <span className="text-yellow-400 font-black text-[10px] drop-shadow-md uppercase">Buraya</span>
+                                            <span className="text-yellow-400 font-black text-[10px] drop-shadow-md">BURAYA</span>
                                         </div>
                                     )}
                                     {validMoves.includes('right') && boardLayout[boardLayout.length - 1] && (
@@ -1169,7 +1118,7 @@
                                                 transform: 'translate(-50%, -50%)'
                                             }}
                                         >
-                                            <span className="text-yellow-400 font-black text-[10px] drop-shadow-md uppercase">Buraya</span>
+                                            <span className="text-yellow-400 font-black text-[10px] drop-shadow-md">BURAYA</span>
                                         </div>
                                     )}
                                 </>
@@ -1187,33 +1136,14 @@
                     </div>
 
                     {/* Controls Footer */}
-                    <div className="h-44 z-30 bg-black/70 backdrop-blur-xl border-t border-white/10 p-4 pb-6">
-                        <div className="flex items-center justify-between mb-3 px-2">
-                            <div className="flex items-center gap-3">
-                                <div className="text-white font-black text-[10px] uppercase tracking-[0.2em]">Elin</div>
-                                <div className="bg-white/10 px-2 py-0.5 rounded text-white text-[10px] font-bold">{myHand.length}</div>
-                            </div>
-
-                            {marketSize > 0 && (
-                                <div className="flex items-center gap-2">
-                                    <div className="flex -space-x-3 mr-2">
-                                        {[...Array(Math.min(3, marketSize))].map((_, i) => (
-                                            <div key={i} className="w-5 h-8 bg-bone-face rounded-[3px] border border-gray-300 shadow-sm transform -rotate-12"></div>
-                                        ))}
-                                    </div>
-                                    <button
-                                        onClick={() => sendMessage({ type: 'drawFromMarket' })}
-                                        disabled={!isMyTurn}
-                                        className={`bg-yellow-500 text-black px-6 py-2 rounded-xl text-xs font-black shadow-glow active:scale-95 transition-all flex items-center gap-2 ${!isMyTurn ? 'opacity-50 grayscale' : ''}`}
-                                    >
-                                        TAŞ ÇEK
-                                        <span className="bg-black/10 px-1.5 rounded-md">{marketSize}</span>
-                                    </button>
-                                </div>
+                    <div className="h-48 z-30 bg-black/60 backdrop-blur-xl border-t border-white/10 p-4">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="text-white/50 text-xs font-bold uppercase tracking-widest">Senin Elin ({myHand.length})</div>
+                            {marketSize > 0 && isMyTurn && (
+                                <button onClick={() => sendMessage({ type: 'drawFromMarket' })} className="bg-yellow-500 text-black px-4 py-1 rounded-full text-xs font-bold shadow-glow">TAŞ ÇEK ({marketSize})</button>
                             )}
                         </div>
-
-                        <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
+                        <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar justify-center">
                             {myHand.map((tile, idx) => (
                                 <DominoTile
                                     key={idx}
