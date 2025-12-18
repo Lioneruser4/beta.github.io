@@ -3,42 +3,127 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Domino Global Elite</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <title>Domino Elite Royale</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #ffcc00; --secondary: #1a1a1a; --accent: #00f2fe; }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { background: #050505; color: white; font-family: 'Rajdhani', sans-serif; overflow: hidden; height: 100vh; }
+
+        /* ARKA PLAN EFEKTİ */
+        #bg-canvas { position: fixed; top: 0; left: 0; z-index: -1; }
+
+        /* KATMANLAR */
+        .screen {
+            position: fixed; inset: 0; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; z-index: 10;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(10px);
+            transition: opacity 0.5s ease;
+        }
+
+        /* LOBİ TASARIMI */
+        .profile-section { margin-bottom: 40px; text-align: center; }
+        .avatar-ring {
+            width: 100px; height: 100px; border-radius: 50%;
+            border: 3px solid var(--primary); padding: 5px;
+            box-shadow: 0 0 20px var(--primary); margin: 0 auto 15px;
+        }
+        .avatar-ring img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+
+        /* BUTONLAR */
+        .btn-container { display: flex; flex-direction: column; gap: 20px; width: 80%; max-width: 300px; }
+        .btn-pro {
+            position: relative; padding: 18px; border: none; border-radius: 8px;
+            background: var(--secondary); color: white; font-family: 'Orbitron', sans-serif;
+            font-size: 14px; letter-spacing: 2px; cursor: pointer;
+            border-left: 4px solid var(--primary); transition: 0.3s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        .btn-pro:active { transform: scale(0.95); background: var(--primary); color: black; }
+
+        /* EŞLEŞME ANİMASYONU */
+        .radar {
+            width: 150px; height: 150px; border-radius: 50%;
+            border: 2px solid var(--accent); position: relative;
+            animation: pulse 2s infinite; margin-bottom: 30px;
+        }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+
+        /* HUD (OYUN İÇİ) */
+        #hud { position: fixed; top: 20px; width: 100%; display: none; justify-content: space-between; padding: 0 20px; z-index: 5; }
+        .hand-container {
+            position: fixed; bottom: 20px; width: 100%; display: flex; 
+            justify-content: center; gap: 10px; overflow-x: auto; padding: 10px;
+        }
+        .domino-card {
+            background: white; color: black; padding: 15px 10px; border-radius: 5px;
+            min-width: 45px; height: 70px; display: flex; flex-direction: column;
+            align-items: center; justify-content: space-between; font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3); border-bottom: 4px solid #ccc;
+        }
+    </style>
 </head>
 <body>
-    <div id="lobby-screen" class="overlay">
-        <div class="profile-card">
-            <img id="user-photo" src="https://via.placeholder.com/80" alt="Avatar">
-            <h2 id="user-name">Yükleniyor...</h2>
+
+    <div id="screen-lobby" class="screen">
+        <div class="profile-section">
+            <div class="avatar-ring"><img id="user-img" src="https://via.placeholder.com/100"></div>
+            <h2 id="user-name">GUEST_123</h2>
+            <p style="color: var(--primary)">LEVEL 1 - ROOKIE</p>
         </div>
-        <div class="menu">
-            <button id="btn-find" class="main-btn">OYUN BUL (MATCHMAKING)</button>
-            <button id="btn-private" class="secondary-btn">ÖZEL ODA KUR</button>
+        <div class="btn-container">
+            <button class="btn-pro" onclick="startMatchmaking()">QUICK MATCH</button>
+            <button class="btn-pro" style="border-left-color: var(--accent)">CREATE ROOM</button>
         </div>
-        <div id="status-text">Sunucuya bağlanıyor...</div>
     </div>
 
-    <div id="match-screen" class="overlay" style="display:none;">
-        <div class="loader-ripple"></div>
-        <h3>Rakip Aranıyor...</h3>
-        <p>Küresel oyuncular taranıyor</p>
+    <div id="screen-match" class="screen" style="display:none; opacity:0;">
+        <div class="radar"></div>
+        <h2 style="letter-spacing: 5px;">SCANNING...</h2>
+        <p>Finding global opponent</p>
+        <button onclick="cancelMatch()" style="margin-top: 30px; background:none; border:none; color:grey;">CANCEL</button>
     </div>
 
-    <div id="result-screen" class="overlay" style="display:none;">
-        <h1 id="result-title">TEBRİKLER!</h1>
-        <p id="result-msg">Harika bir oyun çıkardın.</p>
-        <button onclick="location.reload()" class="main-btn">LOBİYE DÖN</button>
+    <div id="screen-result" class="screen" style="display:none;">
+        <h1 id="res-status" style="font-size: 3rem; margin-bottom: 20px;">VICTORY</h1>
+        <button class="btn-pro" onclick="location.reload()">BACK TO LOBBY</button>
     </div>
 
-    <div id="game-hud" style="display:none;">
-        <div class="turn-indicator" id="turn-info">SIRADA: BEKLENİYOR</div>
-        <div id="my-hand" class="hand-container"></div>
+    <div id="hud">
+        <div class="score">YOU: 0</div>
+        <div class="timer">TIME: 20s</div>
+        <div class="score">ENEMY: 0</div>
     </div>
+    <div id="hand" class="hand-container" style="display:none;"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="game.js" type="module"></script>
+    <script>
+        const socket = io("https://mario-io-1.onrender.com");
+        
+        function startMatchmaking() {
+            fade('screen-lobby', 'screen-match');
+            socket.emit('find_match');
+        }
+
+        function fade(from, to) {
+            const f = document.getElementById(from);
+            const t = document.getElementById(to);
+            f.style.opacity = '0';
+            setTimeout(() => {
+                f.style.display = 'none';
+                t.style.display = 'flex';
+                setTimeout(() => t.style.opacity = '1', 50);
+            }, 500);
+        }
+
+        socket.on('game_started', (data) => {
+            fade('screen-match', 'hud');
+            document.getElementById('hand').style.display = 'flex';
+            init3DGame(data);
+        });
+
+        // Üç boyutlu sahne ve oyun mantığı buraya entegre edilecek (game.js mantığı)
+    </script>
 </body>
 </html>
