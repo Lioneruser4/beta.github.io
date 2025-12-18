@@ -23,7 +23,7 @@ const playerSchema = new mongoose.Schema({
     firstName: { type: String },
     lastName: { type: String },
     photoUrl: { type: String },
-    elo: { type: Number, default: 100 },
+    elo: { type: Number, default: 0 },
     level: { type: Number, default: 1 },
     wins: { type: Number, default: 0 },
     losses: { type: Number, default: 0 },
@@ -121,7 +121,6 @@ app.post('/api/auth/telegram', async (req, res) => {
         }
 
         playerSessions.set(telegramId, player);
-        console.log(`📡 Auth Başarılı: ${username} - ELO: ${player.elo}`);
 
         res.json({
             success: true,
@@ -150,9 +149,9 @@ app.post('/api/auth/telegram', async (req, res) => {
 
 app.get('/api/leaderboard', async (req, res) => {
     try {
-        const players = await Player.find({ elo: { $gte: 0 } })
+        const players = await Player.find({ elo: { $gt: 0 } }) // Guest/Yeni oyuncular gözükmesin
             .sort({ elo: -1 })
-            .limit(50) // Top 50
+            .limit(10) // Top 10
             .select('telegramId username firstName lastName photoUrl elo level wins losses draws totalGames winStreak');
 
         res.json({ success: true, leaderboard: players });
@@ -348,16 +347,10 @@ function playTileOnBoard(tile, board, position) {
 }
 
 function checkWinner(gameState) {
-    const playerIds = gameState.playerOrder;
-    const sums = {};
-    playerIds.forEach(pid => {
-        sums[pid] = gameState.players[pid].hand.reduce((s, t) => s + t[0] + t[1], 0);
-    });
-
     // 1. Taşını bitiren var mı?
-    for (const pid of playerIds) {
-        if (gameState.players[pid].hand.length === 0) {
-            return { type: 'FINISHED', winnerId: pid, sums };
+    for (const playerId in gameState.players) {
+        if (gameState.players[playerId].hand.length === 0) {
+            return playerId;
         }
     }
 
@@ -365,7 +358,7 @@ function checkWinner(gameState) {
     const marketEmpty = !gameState.market || gameState.market.length === 0;
     if (marketEmpty) {
         let anyoneCanPlay = false;
-        for (const pid of playerIds) {
+        for (const pid of gameState.playerOrder) {
             if (gameState.players[pid].hand.some(tile => canPlayTile(tile, gameState.board))) {
                 anyoneCanPlay = true;
                 break;
@@ -374,12 +367,14 @@ function checkWinner(gameState) {
 
         if (!anyoneCanPlay) {
             // Oyun kilitlendi, elindeki taşların toplamı en az olan kazanır
+            let winnerId = gameState.playerOrder[0];
             let minSum = Infinity;
-            let winnerId = playerIds[0];
             let isDraw = false;
 
-            playerIds.forEach(pid => {
-                const sum = sums[pid];
+            const sums = {};
+            gameState.playerOrder.forEach(pid => {
+                const sum = gameState.players[pid].hand.reduce((s, t) => s + t[0] + t[1], 0);
+                sums[pid] = sum;
                 if (sum < minSum) {
                     minSum = sum;
                     winnerId = pid;
@@ -389,11 +384,7 @@ function checkWinner(gameState) {
                 }
             });
 
-            return {
-                type: 'BLOCKED',
-                winnerId: isDraw ? 'DRAW' : winnerId,
-                sums
-            };
+            return isDraw ? 'DRAW' : winnerId;
         }
     }
 
@@ -667,18 +658,9 @@ function handlePlayTile(ws, data) {
     player.hand.splice(data.tileIndex, 1);
     gs.moves = (gs.moves || 0) + 1;
 
-    const winResult = checkWinner(gs);
-    if (winResult) {
-        // Her turlu bıtıste (Fınıshed veya Blocked) puanları goster ve 7sn beklet
-        broadcastToRoom(ws.roomCode, {
-            type: 'gameBlocked', // Frontend bu ismi 'Hesaplanıyor' olarak kullanıyor
-            sums: winResult.sums,
-            winnerId: winResult.winnerId
-        });
-
-        setTimeout(() => {
-            handleGameEnd(ws.roomCode, winResult.winnerId, gs);
-        }, 7000);
+    const winner = checkWinner(gs);
+    if (winner) {
+        handleGameEnd(ws.roomCode, winner, gs);
     } else {
         gs.turn++;
         gs.currentPlayer = getNextPlayer(gs);
@@ -858,16 +840,9 @@ function handlePass(ws) {
     // Pas geçildiğini herkese bildir (Ses efekti için)
     broadcastToRoom(ws.roomCode, { type: 'turnPassed', playerName: ws.playerName });
 
-    const winResult = checkWinner(gs);
-    if (winResult) {
-        broadcastToRoom(ws.roomCode, {
-            type: 'gameBlocked',
-            sums: winResult.sums,
-            winnerId: winResult.winnerId
-        });
-        setTimeout(() => {
-            handleGameEnd(ws.roomCode, winResult.winnerId, gs);
-        }, 7000);
+    const winner = checkWinner(gs);
+    if (winner) {
+        handleGameEnd(ws.roomCode, winner, gs);
         return;
     }
 
@@ -929,16 +904,9 @@ function handleDrawFromMarket(ws) {
             broadcastToRoom(ws.roomCode, { type: 'turnPassed', playerName: player.name });
 
             // Sıra geçtikten sonra oyun kilitlendi mi kontrol et
-            const winResult = checkWinner(gs);
-            if (winResult) {
-                broadcastToRoom(ws.roomCode, {
-                    type: 'gameBlocked',
-                    sums: winResult.sums,
-                    winnerId: winResult.winnerId
-                });
-                setTimeout(() => {
-                    handleGameEnd(ws.roomCode, winResult.winnerId, gs);
-                }, 7000);
+            const winner = checkWinner(gs);
+            if (winner) {
+                handleGameEnd(ws.roomCode, winner, gs);
                 return;
             }
         }
@@ -993,27 +961,13 @@ function handleLeaveGame(ws) {
     const leaverName = room.players[leaverId]?.name || 'Rakip';
     const winnerId = playerIds.find(id => String(id) !== leaverId);
 
-    // Ayrılan kişi için sum'ları hesapla (ayrılan en fazla puana sahip sayılsın ya da elindeki kalsın)
-    // Kullanıcı talebi: Puanlar hesaplansın.
-    const sums = {};
-    playerIds.forEach(pid => {
-        sums[pid] = gs.players[pid].hand.reduce((s, t) => s + t[0] + t[1], 0);
-    });
-    // Ayrılan kişinin puanını cezalı olarak artıralım mı? 
-    // Kullanıcı "kiminki azsa o kazansın" dediği için ayrılan otomatik kaybederse daha iyi.
-    // Ama puanları gösterelim.
-    sums[leaverId] = Math.max(sums[leaverId], 99); // Ayrılana 99 puan cezası
-
+    // Ayrılan kişinin odasını sil ama karşı tarafa bildir
     broadcastToRoom(ws.roomCode, {
-        type: 'gameBlocked',
-        sums: sums,
-        winnerId: winnerId,
-        message: `${leaverName} oyundan ayrıldı!`
-    });
+        type: 'info',
+        message: `${leaverName} oyundan ayrıldı, sen kazandın!`
+    }, leaverId);
 
-    setTimeout(() => {
-        handleGameEnd(ws.roomCode, winnerId, gs);
-    }, 7000);
+    handleGameEnd(ws.roomCode, winnerId, gs);
 }
 
 function handleDisconnect(ws) {
@@ -1021,13 +975,11 @@ function handleDisconnect(ws) {
 
     if (ws.playerId) playerConnections.delete(ws.playerId);
 
-    Object.values(matchQueues).forEach(q => {
-        const qIdx = q.findIndex(p => p.ws === ws);
-        if (qIdx !== -1) {
-            q.splice(qIdx, 1);
-            console.log(`❌ Kuyruktan çıkarıldı`);
-        }
-    });
+    const qIdx = matchQueue.findIndex(p => p.ws === ws);
+    if (qIdx !== -1) {
+        matchQueue.splice(qIdx, 1);
+        console.log(`❌ Kuyruktan çıkarıldı - Kalan: ${matchQueue.length}`);
+    }
 
     if (ws.roomCode) {
         const room = rooms.get(ws.roomCode);
