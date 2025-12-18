@@ -178,10 +178,6 @@
             animation: progress 4s linear forwards;
         }
 
-        .animate-progress-7 {
-            animation: progress 7s linear forwards;
-        }
-
         @keyframes slide-right {
             from {
                 transform: translateX(-50px);
@@ -269,8 +265,7 @@
         }
 
         // API Base URL
-        // API Base URL - Sadece Render
-        const API_URL = 'https://mario-io-1.onrender.com';
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000' : 'https://beta-github-io.onrender.com';
 
         // --- BİLEŞENLER ---
 
@@ -380,7 +375,6 @@
             const [roomHost, setRoomHost] = useState(null);
             const [roomCapacity, setRoomCapacity] = useState(2);
             const [lastSoundIndex, setLastSoundIndex] = useState(0); // For sequential sounds 6, 7, 8
-            const [blockedInfo, setBlockedInfo] = useState(null); // { sums: {}, winnerId: '' }
 
             const [playerId, setPlayerId] = useState(null);
             const wsRef = useRef(null);
@@ -404,7 +398,6 @@
                 setRoomPlayers([]);
                 setRoomHost(null);
                 setJoinCode('');
-                setBlockedInfo(null);
             };
 
             // Ses Efektleri (Opsiyonel - Tarayıcı izin verirse çalışır)
@@ -543,7 +536,10 @@
             };
 
             const connectToServer = () => {
-                const wsUrl = 'wss://mario-io-1.onrender.com';
+                let wsUrl = 'wss://beta-github-io.onrender.com';
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    wsUrl = `ws://${window.location.hostname}:10000`;
+                }
 
                 const ws = new WebSocket(wsUrl);
 
@@ -625,10 +621,6 @@
                         break;
                     case 'info':
                         showNotification(data.message, 'info');
-                        break;
-                    case 'gameBlocked':
-                        setBlockedInfo(data);
-                        setScreen('blocked');
                         break;
                     case 'roomUpdated':
                         setRoomPlayers(data.players);
@@ -1005,43 +997,6 @@
                         )}
 
                         <button onClick={() => { resetGameClientState(); setScreen('lobby'); }} className="w-full mt-4 text-white/20 hover:text-red-500 transition-colors text-xs font-bold">ODADAN AYRIL</button>
-                    </div>
-                </div>
-            );
-
-            if (screen === 'blocked') return (
-                <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-black/80 backdrop-blur-3xl z-[100]">
-                    <div className="text-center mb-12">
-                        <h2 className="text-5xl font-black text-yellow-500 mb-4 animate-pulse">
-                            {blockedInfo?.message || (blockedInfo?.winnerId === 'DRAW' ? 'BERABERLİK!' : 'OYUN BİTTİ!')}
-                        </h2>
-                        <p className="text-white/60 font-bold tracking-widest uppercase text-sm">Taşlar Hesaplanıyor...</p>
-                    </div>
-
-                    <div className={`grid ${opponents.length > 0 ? 'grid-cols-2' : 'grid-cols-1'} gap-8 w-full max-w-2xl px-4`}>
-                        {/* Ben */}
-                        <div className="flex flex-col items-center gap-4 bg-white/5 p-6 rounded-3xl border border-white/10">
-                            <img src={playerData?.photoUrl || 'https://via.placeholder.com/100'} className="w-20 h-20 rounded-2xl border-2 border-white/20 object-cover" />
-                            <div className="text-center">
-                                <div className="text-white/40 text-[10px] font-black uppercase mb-1">SENİN PUANIN</div>
-                                <div className="text-4xl text-white font-black">{blockedInfo?.sums[playerId] || 0}</div>
-                            </div>
-                        </div>
-
-                        {/* Rakipler */}
-                        {opponents.map((opp, idx) => (
-                            <div key={idx} className="flex flex-col items-center gap-4 bg-yellow-500/5 p-6 rounded-3xl border border-yellow-500/10">
-                                <img src={opp?.photoUrl || 'https://via.placeholder.com/100'} className="w-20 h-20 rounded-2xl border-2 border-yellow-500/20 object-cover" />
-                                <div className="text-center">
-                                    <div className="text-yellow-500/40 text-[10px] font-black uppercase mb-1">{opp.name ? opp.name.toUpperCase() : 'RAKİP'} PUANI</div>
-                                    <div className="text-4xl text-yellow-500 font-black">{blockedInfo?.sums[opp.id] || 0}</div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="mt-16 w-64 h-2 bg-white/5 rounded-full overflow-hidden">
-                        <div className="h-full bg-red-500 animate-progress-7"></div>
                     </div>
                 </div>
             );
