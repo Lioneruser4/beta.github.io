@@ -205,7 +205,7 @@
             const baseClasses = `
                 relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
                 transition-all duration-300 select-none
-                ${vertical ? 'flex-col w-12 h-24 sm:w-10 sm:h-20' : 'flex-row w-24 h-12 sm:w-20 sm:h-10'}
+                ${vertical ? 'flex-col w-[40px] h-[80px]' : 'flex-row w-[80px] h-[40px]'}
                 ${isGhost ? 'opacity-0 pointer-events-none' : 'shadow-3d'}
                 ${isSelected ? '-translate-y-4 shadow-3d-active ring-2 ring-yellow-500 z-10 animate-celebrate' : ''}
                 ${animateIn ? 'animate-slide-in' : ''}
@@ -267,6 +267,11 @@
             const [playerId, setPlayerId] = useState(null);
             const wsRef = useRef(null);
             const searchTimerRef = useRef(null);
+
+            // Set playerId when playerData is loaded
+            useEffect(() => {
+                if (playerData?.id) setPlayerId(String(playerData.id));
+            }, [playerData]);
 
             // Oyun state'ini temizlemek için merkezi bir fonksiyon
             const resetGameClientState = () => {
@@ -485,9 +490,17 @@
                         break;
                     case 'gameEnd':
                         console.log('🏁 Oyun Bitti!', data);
-                        const myId = String(playerId || gameState?.playerId || '');
-                        const winnerIdFromServer = String(data.winner || '');
-                        const amIWinner = winnerIdFromServer === myId && winnerIdFromServer !== '';
+                        // Get current user's ID
+                        const myId = String(playerId || gameState?.playerId || playerData?.id || '');
+                        const winnerId = String(data.winner || '');
+
+                        // Check winner by ID or Name (as fallback)
+                        let amIWinner = (winnerId !== '' && winnerId !== 'DRAW' && winnerId === myId);
+
+                        // If ID match fails, check if the winner name matches my name
+                        if (!amIWinner && winnerId !== 'DRAW' && data.winnerName === (playerData?.username || gameState?.players[myId]?.name)) {
+                            amIWinner = true;
+                        }
 
                         setEndInfo({
                             winnerName: data.winnerName,
@@ -522,7 +535,7 @@
                 const layout = [];
                 const T_LONG = 80;
                 const T_SHORT = 40;
-                const OVERLAP = 2; // Hafif üst üste binme
+                const OVERLAP = 0; // Sıfır bindirme (tam direnme)
 
                 let curX = 0;
                 let curY = 0;
