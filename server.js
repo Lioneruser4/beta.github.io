@@ -259,7 +259,10 @@ function initializeGame(roomCode, ...playerIds) {
     playerIds.forEach(pid => {
         players[pid] = {
             hand: tiles.slice(currentIndex * 7, (currentIndex + 1) * 7),
-            name: room.players[pid].name
+            name: room.players[pid].name,
+            photoUrl: room.players[pid].photoUrl || null,
+            level: room.players[pid].level || 1,
+            elo: room.players[pid].elo || 0
         };
         currentIndex++;
     });
@@ -415,10 +418,22 @@ function sendGameState(roomCode, playerId) {
     const ws = playerConnections.get(playerId);
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
+    // Diğer oyuncuların elindeki taş sayısını gönder
+    const otherPlayersHandCounts = {};
+    Object.keys(room.gameState.players).forEach(pid => {
+        if (pid !== playerId) {
+            otherPlayersHandCounts[pid] = room.gameState.players[pid].hand.length;
+        }
+    });
+
     try {
         ws.send(JSON.stringify({
             type: 'gameUpdate',
-            gameState: { ...room.gameState, playerId: playerId }
+            gameState: {
+                ...room.gameState,
+                playerId: playerId,
+                otherHandCounts: otherPlayersHandCounts
+            }
         }));
     } catch (error) { console.error(error); }
 }
@@ -664,20 +679,17 @@ function handlePlayTile(ws, data) {
 
     const winner = checkWinner(gs);
     if (winner) {
-        if (winner.type === 'BLOCKED') {
-            // Oyun tıkandı, puanları hesapla ve 7 saniye beklet
-            broadcastToRoom(ws.roomCode, {
-                type: 'gameBlocked',
-                sums: winner.sums,
-                winnerId: winner.winnerId
-            });
+        // Her türlü bitişte (FINISHED veya BLOCKED) puanları göster ve 7sn beklet
+        broadcastToRoom(ws.roomCode, {
+            type: 'gameBlocked', // Frontend bu ismi 'Hesaplanıyor' olarak kullanıyor
+            sums: winner.sums,
+            winnerId: winner.winnerId,
+            resultType: winner.type
+        });
 
-            setTimeout(() => {
-                handleGameEnd(ws.roomCode, winner.winnerId, gs);
-            }, 7000);
-        } else {
-            handleGameEnd(ws.roomCode, winner, gs);
-        }
+        setTimeout(() => {
+            handleGameEnd(ws.roomCode, winner.winnerId, gs);
+        }, 7000);
     } else {
         gs.turn++;
         gs.currentPlayer = getNextPlayer(gs);
@@ -859,18 +871,15 @@ function handlePass(ws) {
 
     const winner = checkWinner(gs);
     if (winner) {
-        if (winner.type === 'BLOCKED') {
-            broadcastToRoom(ws.roomCode, {
-                type: 'gameBlocked',
-                sums: winner.sums,
-                winnerId: winner.winnerId
-            });
-            setTimeout(() => {
-                handleGameEnd(ws.roomCode, winner.winnerId, gs);
-            }, 7000);
-        } else {
-            handleGameEnd(ws.roomCode, winner, gs);
-        }
+        broadcastToRoom(ws.roomCode, {
+            type: 'gameBlocked',
+            sums: winner.sums,
+            winnerId: winner.winnerId,
+            resultType: winner.type
+        });
+        setTimeout(() => {
+            handleGameEnd(ws.roomCode, winner.winnerId, gs);
+        }, 7000);
         return;
     }
 
@@ -934,7 +943,15 @@ function handleDrawFromMarket(ws) {
             // Sıra geçtikten sonra oyun kilitlendi mi kontrol et
             const winner = checkWinner(gs);
             if (winner) {
-                handleGameEnd(ws.roomCode, winner, gs);
+                broadcastToRoom(ws.roomCode, {
+                    type: 'gameBlocked',
+                    sums: winner.sums,
+                    winnerId: winner.winnerId,
+                    resultType: winner.type
+                });
+                setTimeout(() => {
+                    handleGameEnd(ws.roomCode, winner.winnerId, gs);
+                }, 7000);
                 return;
             }
         }
@@ -989,13 +1006,24 @@ function handleLeaveGame(ws) {
     const leaverName = room.players[leaverId]?.name || 'Rakip';
     const winnerId = playerIds.find(id => String(id) !== leaverId);
 
-    // Ayrılan kişinin odasını sil ama karşı tarafa bildir
-    broadcastToRoom(ws.roomCode, {
-        type: 'info',
-        message: `${leaverName} oyundan ayrıldı, sen kazandın!`
-    }, leaverId);
+    // Ayrılan kişi için sum'ları hesapla (ayrılan en fazla puana sahip sayılsın)
+    const sums = {};
+    playerIds.forEach(pid => {
+        sums[pid] = gs.players[pid].hand.reduce((s, t) => s + t[0] + t[1], 0);
+    });
+    sums[leaverId] = Math.max(sums[leaverId] || 0, 99); // Ayrılana 99 puan cezası
 
-    handleGameEnd(ws.roomCode, winnerId, gs);
+    broadcastToRoom(ws.roomCode, {
+        type: 'gameBlocked',
+        sums: sums,
+        winnerId: winnerId,
+        resultType: 'LEAVE',
+        message: `${leaverName} oyundan ayrıldı!`
+    });
+
+    setTimeout(() => {
+        handleGameEnd(ws.roomCode, winnerId, gs);
+    }, 7000);
 }
 
 function handleDisconnect(ws) {
