@@ -271,7 +271,10 @@
         // API Base URL
         // API Base URL - Dinamik URL tespiti
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const API_URL = isLocal ? 'http://localhost:10000' : window.location.origin;
+        const isFile = window.location.protocol === 'file:';
+        // Burayı kendi Render URL'nizle değiştirebilirsiniz eğer localden çalıştıracaksanız
+        const RENDER_URL = 'https://mario-io-1.onrender.com';
+        const API_URL = isLocal ? 'http://localhost:10000' : (isFile ? RENDER_URL : window.location.origin);
 
         // --- BİLEŞENLER ---
 
@@ -545,9 +548,12 @@
 
             const connectToServer = () => {
                 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                const isFile = window.location.protocol === 'file:';
+                const RENDER_WS_URL = 'wss://mario-io-1.onrender.com';
+
                 let wsUrl = isLocal
                     ? `ws://${window.location.hostname}:10000`
-                    : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
+                    : (isFile ? RENDER_WS_URL : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
 
                 const ws = new WebSocket(wsUrl);
 
@@ -1016,8 +1022,10 @@
             if (screen === 'blocked') return (
                 <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-black/80 backdrop-blur-3xl z-[100]">
                     <div className="text-center mb-12">
-                        <h2 className="text-5xl font-black text-red-500 mb-4 animate-pulse">OYUN TIKANDI!</h2>
-                        <p className="text-white/60 font-bold tracking-widest uppercase text-sm">Puanlar Hesaplanıyor...</p>
+                        <h2 className="text-5xl font-black text-yellow-500 mb-4 animate-pulse">
+                            {blockedInfo?.message || (blockedInfo?.winnerId === 'DRAW' ? 'BERABERLİK!' : 'OYUN BİTTİ!')}
+                        </h2>
+                        <p className="text-white/60 font-bold tracking-widest uppercase text-sm">Taşlar Hesaplanıyor...</p>
                     </div>
 
                     <div className={`grid ${opponents.length > 0 ? 'grid-cols-2' : 'grid-cols-1'} gap-8 w-full max-w-2xl px-4`}>
