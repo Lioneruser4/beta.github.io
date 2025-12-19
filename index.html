@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html lang="tr">
-
 <head>
+    <head>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#1b4d3e">
@@ -1134,6 +1135,32 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<DominoGame />);
     </script>
+        </script>
+
+    <script>
+        const tgApp = window.Telegram.WebApp;
+        tgApp.ready();
+        tgApp.expand();
+        if (tgApp.requestFullscreen) {
+            tgApp.requestFullscreen();
+        }
+        tgApp.disableVerticalSwipes();
+        tgApp.setHeaderColor('secondary_bg_color');
+    </script>
+<script>
+    const tgApp = window.Telegram.WebApp;
+    tgApp.ready();
+    tgApp.expand();
+    if (tgApp.requestFullscreen) {
+        tgApp.requestFullscreen();
+    }
+    tgApp.disableVerticalSwipes();
+    tgApp.setHeaderColor('#1b4d3e');
+</script>
+
+</body>
+</html>
+
 </body>
 
 </html>
