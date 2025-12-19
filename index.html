@@ -868,16 +868,16 @@
                             setScreen('searching');
                             setSearching(true);
                             sendMessage({ type: 'findMatch', ...playerData });
-                        }} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl mb-4 transition-all transform active:scale-95 shadow-lg">MAÇ ARA</button>
+                        }} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl mb-4 transition-all transform active:scale-95 shadow-lg">🔍 Dərəcəli / Ranked 🔍</button>
 
                         <div className="flex flex-col gap-3">
-                            <button onClick={() => sendMessage({ type: 'createRoom', ...playerData })} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all">🏠 ÖZEL ODA KUR</button>
+                            <button onClick={() => sendMessage({ type: 'createRoom', ...playerData })} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all">🏠 Otaq Yarat / Create Room</button>
 
                             <div className="flex gap-2">
                                 <input
                                     value={joinCode}
                                     onChange={e => setJoinCode(e.target.value)}
-                                    placeholder="ODA KODU"
+                                    placeholder="Otaq Kodu"
                                     className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 text-white text-center font-bold focus:border-yellow-500 transition-all"
                                 />
                                 <button
@@ -1108,7 +1108,7 @@
                     >
                         ←
                     </button>
-                    <h1 className="text-4xl font-black text-white mb-8">SKOR TABLOSU</h1>
+                    <h1 className="text-4xl font-black text-white mb-8">📊 LADERBOARD 📊</h1>
                     <div className="w-full max-w-xl space-y-3">
                         {leaderboard.map((p, i) => (
                             <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-3xl border border-white/5">
