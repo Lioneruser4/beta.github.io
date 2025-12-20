@@ -672,8 +672,36 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
     const room = rooms.get(roomCode);
     if (!room) return;
 
+    // --- OYUN KİLİTLENDİ Mİ (BLOCKED) KONTROLÜ ---
+    const playerIds = Object.keys(gameState.players);
+    const p1Id = playerIds[0];
+    const p2Id = playerIds[1];
+    const p1Hand = gameState.players[p1Id].hand;
+    const p2Hand = gameState.players[p2Id].hand;
+
+    // Eğer kazanan belirlendiği halde kimsenin eli bitmediyse oyun kilitlenmiştir
+    const isBlocked = p1Hand.length > 0 && p2Hand.length > 0;
+
+    if (isBlocked) {
+        const p1Sum = p1Hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
+        const p2Sum = p2Hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
+
+        // 8 saniye bekleme ekranı ve puan gösterimi
+        broadcastToRoom(roomCode, {
+            type: 'gameBlocked',
+            message: 'Oyun kapalı! Puanlar hesaplanıyor...',
+            scores: { [p1Id]: p1Sum, [p2Id]: p2Sum },
+            winner: winnerId,
+            duration: 8
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 8000));
+        
+        // Oda bu sürede silindiyse işlem yapma
+        if (!rooms.has(roomCode)) return;
+    }
+
     try {
-        const playerIds = Object.keys(gameState.players);
         const player1Id = playerIds[0];
         const player2Id = playerIds[1];
 
