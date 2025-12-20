@@ -280,7 +280,8 @@ function initializeGame(roomCode, player1Id, player2Id) {
         currentPlayer: startingPlayer,
         turn: 1,
         lastMove: null,
-        startingDouble: highestDouble
+        startingDouble: highestDouble,
+        consecutivePasses: 0
     };
 
     rooms.set(roomCode, room);
@@ -657,6 +658,7 @@ function handlePlayTile(ws, data) {
 
     player.hand.splice(data.tileIndex, 1);
     gs.moves = (gs.moves || 0) + 1;
+    gs.consecutivePasses = 0; // Hamle yapıldığında pas sayacını sıfırla
 
     const winner = checkWinner(gs);
     if (winner) {
@@ -799,84 +801,66 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
 }
 
 function handlePass(ws) {
-    const player = playerConnections.get(ws);
-    if (!player || !player.roomCode) return;
+    if (!ws.playerId || !ws.roomCode) return;
+    const room = rooms.get(ws.roomCode);
+    if (!room || room.gameState.currentPlayer !== ws.playerId) return;
 
-    const room = rooms.get(player.roomCode);
-    if (!room || room.gameState.currentPlayer !== player.id) return;
-
+    const gs = room.gameState;
     // Check if player can actually pass (no valid moves)
-    const playerHand = room.gameState.players[player.id].hand;
-    const canPlayAnyTile = playerHand.some(tile => 
-        canPlayTile(tile, room.gameState.board)
-    );
+    const playerHand = gs.players[ws.playerId].hand;
+    const canPlayAnyTile = playerHand.some(tile => canPlayTile(tile, gs.board));
 
-    // If market is empty and no valid moves, end the game
-    if (room.gameState.market.length === 0 && !canPlayAnyTile) {
-        // Calculate scores
-        const opponentId = Object.keys(room.gameState.players).find(id => id !== player.id);
-        const playerScore = playerHand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
-        const opponentHand = room.gameState.players[opponentId].hand;
-        const opponentScore = opponentHand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
-        
-        // Determine winner (player with lower score wins)
+    if (canPlayAnyTile) {
+        return sendMessage(ws, { type: 'error', message: 'Oynayabileceğiniz hamleler var!' });
+    }
+
+    if (gs.market.length > 0) {
+        return sendMessage(ws, { type: 'error', message: 'Pazardan taş çekmelisiniz!' });
+    }
+
+    // Pazar boş ve hamle yok -> PAS
+    gs.consecutivePasses = (gs.consecutivePasses || 0) + 1;
+
+    if (gs.consecutivePasses >= 2) {
+        // OYUN KİLİTLENDİ (BLOCKED) - İki taraf da pas geçti
+        const pIds = Object.keys(gs.players);
+        const p1Id = pIds[0];
+        const p2Id = pIds[1];
+
+        const p1Hand = gs.players[p1Id].hand;
+        const p2Hand = gs.players[p2Id].hand;
+
+        const p1Score = p1Hand.reduce((a, b) => a + b[0] + b[1], 0);
+        const p2Score = p2Hand.reduce((a, b) => a + b[0] + b[1], 0);
+
         let winnerId;
-        if (playerScore < opponentScore) {
-            winnerId = player.id;
-        } else if (playerScore > opponentScore) {
-            winnerId = opponentId;
-        } else {
-            // If scores are equal, it's a draw
-            winnerId = 'DRAW';
-        }
-        
-        // Show scores to players for 8 seconds before ending game
+        if (p1Score < p2Score) winnerId = p1Id;
+        else if (p2Score < p1Score) winnerId = p2Id;
+        else winnerId = 'DRAW';
+
+        const p1Name = gs.players[p1Id].name;
+        const p2Name = gs.players[p2Id].name;
+
         broadcastToRoom(room.code, {
             type: 'gameMessage',
-            message: `Oyun Kapalı! Puanlar hesaplanıyor...\n\n` +
-                    `Senin puanın: ${playerScore}\n` +
-                    `Rakibin puanı: ${opponentScore}\n\n` +
-                    (winnerId === 'DRAW' ? 'Berabere!' : 
-                    (winnerId === player.id ? 'Kazandın! 🎉' : 'Kaybettin! 😢')),
+            message: `🔒 OYUN KAPALI! 🔒\nPuanlar Hesaplanıyor...\n\n` +
+                `${p1Name}: ${p1Score} Puan\n` +
+                `${p2Name}: ${p2Score} Puan\n\n` +
+                (winnerId === 'DRAW' ? 'BERABERE!' :
+                    (winnerId === p1Id ? `🏆 ${p1Name} KAZANDI!` : `🏆 ${p2Name} KAZANDI!`)),
             duration: 8000
         });
 
-        // End the game after showing scores
         setTimeout(() => {
-            handleGameEnd(room.code, winnerId, room.gameState);
+            handleGameEnd(room.code, winnerId, gs);
         }, 8000);
-        
-        return;
-    }
-
-    // If there are tiles in market but player has no valid moves, draw a tile
-    if (!canPlayAnyTile && room.gameState.market.length > 0) {
-        const drawnTile = room.gameState.market.pop();
-        room.gameState.players[player.id].hand.push(drawnTile);
-        
-        // Check if the drawn tile can be played
-        if (!canPlayTile(drawnTile, room.gameState.board)) {
-            // If still can't play, switch to next player
-            const opponentId = Object.keys(room.gameState.players).find(id => id !== player.id);
-            room.gameState.currentPlayer = opponentId;
-            
-            // Play pass sound
-            broadcastToRoom(room.code, {
-                type: 'playSound',
-                sound: 'pass'
-            });
-        }
-        
-        sendGameState(room.code);
-        return;
-    }
-
-    // If player can play but chooses to pass
-    if (canPlayAnyTile) {
-        sendMessage(ws, {
-            type: 'error',
-            message: 'Oynayabileceğiniz hamleler var!'
-        });
+    } else {
+        // Sadece sıra geçer
+        gs.turn++;
+        gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
+        broadcastToRoom(room.code, { type: 'turnPassed', playerName: gs.players[ws.playerId].name });
+        broadcastToRoom(room.code, { type: 'playSound', sound: 'pass' });
+        Object.keys(gs.players).forEach(pid => sendGameState(room.code, pid));
     }
 }
 
