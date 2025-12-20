@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+    <head>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#1b4d3e">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>3D Online Ranked Domino</title>
-    
+    <title>3D Online Ranked Domino </title>
+
     <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
@@ -86,6 +88,7 @@
             -webkit-tap-highlight-color: transparent;
             user-select: none;
             -webkit-user-select: none;
+            padding-top: 40px; /* Siteyi biraz aşağı indir */
         }
 
         .pip-grid {
@@ -247,18 +250,6 @@
             border-width: 2px;
             text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
         }
-
-        /* Görkemli Arka Plan Animasyonu */
-        @keyframes gradientBG {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-        .animated-bg {
-            background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #1b4d3e);
-            background-size: 400% 400%;
-            animation: gradientBG 15s ease infinite;
-        }
     </style>
 </head>
 
@@ -365,7 +356,7 @@
         // --- ANA OYUN ---
 
         const DominoGame = () => {
-            const [screen, setScreen] = useState('loading'); // loading, lobby, searching, game, leaderboard, end, calculating
+            const [screen, setScreen] = useState('loading'); // loading, lobby, searching, game, leaderboard, end
             const [connected, setConnected] = useState(false);
             const [playerData, setPlayerData] = useState(null); // Telegram user data
             const [leaderboard, setLeaderboard] = useState([]);
@@ -373,6 +364,7 @@
             const [joinCode, setJoinCode] = useState('');
             const [gameState, setGameState] = useState(null);
             const [searchTime, setSearchTime] = useState(0);
+            const [serverMessage, setServerMessage] = useState(null); // Sunucudan gelen özel mesajlar için
 
             // Oyun İçi State
             const [selectedTileIndex, setSelectedTileIndex] = useState(null);
@@ -382,12 +374,10 @@
             const [endInfo, setEndInfo] = useState(null);
             const [opponent, setOpponent] = useState(null);
             const [lastSoundIndex, setLastSoundIndex] = useState(0); // For sequential sounds 6, 7, 8
-            const [calculationData, setCalculationData] = useState(null); // Hesaplama ekranı verisi
 
             const [playerId, setPlayerId] = useState(null);
             const wsRef = useRef(null);
             const searchTimerRef = useRef(null);
-            const reconnectAttemptsRef = useRef(0);
 
             // Set playerId when playerData is loaded
             useEffect(() => {
@@ -404,7 +394,6 @@
                 setEndInfo(null);
                 setOpponent(null);
                 setJoinCode('');
-                setCalculationData(null);
             };
 
             // Ses Efektleri (Opsiyonel - Tarayıcı izin verirse çalışır)
@@ -551,7 +540,6 @@
                 const ws = new WebSocket(wsUrl);
 
                 ws.onopen = () => {
-                    reconnectAttemptsRef.current = 0; // Reset on successful connection
                     setConnected(true);
                     showNotification('Sunucuya Bağlandı', 'success');
 
@@ -564,23 +552,7 @@
                         }));
                     }
                 };
-                ws.onclose = () => {
-                    setConnected(false);
-                    reconnectAttemptsRef.current += 1;
-
-                    if (reconnectAttemptsRef.current > 5) {
-                        console.error("Yeniden bağlanılamadı. Lobiye dönülüyor.");
-                        if (screen === 'game') {
-                            showNotification("Sunucuya bağlanılamadı. Lobiye dönülüyor.", "error");
-                            resetGameClientState();
-                            localStorage.removeItem('domino_session');
-                            setScreen('lobby');
-                        }
-                        return; // Stop trying
-                    }
-
-                    setTimeout(connectToServer, 3000);
-                };
+                ws.onclose = () => { setConnected(false); setTimeout(connectToServer, 3000); };
                 ws.onmessage = (e) => {
                     try {
                         const data = JSON.parse(e.data);
@@ -607,32 +579,31 @@
                         break;
                     case 'gameStart':
                     case 'gameUpdate':
-                        // Check for a valid gameState object before proceeding
-                        if (data.gameState && data.gameState.players && data.gameState.board && data.gameState.currentPlayer) { // currentPlayer kontrolü eklendi
-                            setGameState(data.gameState); // Replace state, don't merge
-                            setPlayerId(data.gameState.playerId);
-
+                        if (data.gameState) {
+                            if (data.gameState.playerId || data.playerId) {
+                                setPlayerId(data.gameState.playerId || data.playerId);
+                            }
+                            setGameState(prevState => ({
+                                ...prevState,
+                                ...data.gameState,
+                                playerId: prevState?.playerId || data.gameState.playerId || data.playerId
+                            }));
                             setScreen('game');
                             setSearching(false);
-
                             if (data.type === 'gameStart') {
                                 playSound('start');
                                 showNotification('Oyun Başladı!', 'success');
                                 // Save session
-                                if (data.gameState.roomCode && data.gameState.playerId) { // playerId kontrolü eklendi
+                                if (data.gameState.playerId && data.gameState.roomCode) {
                                     localStorage.setItem('domino_session', JSON.stringify({
                                         playerId: data.gameState.playerId,
                                         roomCode: data.gameState.roomCode
                                     }));
                                 }
                             }
-                            setSelectedTileIndex(null);
-                            setValidMoves([]);
-                        } else {
-                            console.error("Invalid or incomplete gameState received:", data);
-                            showNotification("Oyun məlumatı alınmadı. Xəta!", "error");
-                            if (screen !== 'lobby') setScreen('lobby');
                         }
+                        setSelectedTileIndex(null);
+                        setValidMoves([]);
                         break;
                     case 'error':
                         showNotification(data.message, 'error');
@@ -640,19 +611,32 @@
                         break;
                     case 'gameEnd':
                         console.log('🏁 Oyun Bitti!', data);
-                        
-                        // Eğer oyun kilitlendiyse (blocked) hesaplama ekranını göster
-                        // Eğer biri çıktıysa (disconnect/forfeit) direkt sonuca git
-                        if (data.reason === 'blocked') {
-                            setCalculationData(data);
-                            setScreen('calculating');
-                            setTimeout(() => {
-                                processGameResult(data);
-                            }, 8000);
-                        } else {
-                            // Biri çıktıysa direkt sonuç
-                            processGameResult(data);
+                        // Get current user's ID
+                        const myId = String(playerId || gameState?.playerId || playerData?.id || '');
+                        const winnerId = String(data.winner || '');
+
+                        // Check winner by ID or Name (as fallback)
+                        let amIWinner = (winnerId !== '' && winnerId !== 'DRAW' && winnerId === myId);
+
+                        // If ID match fails, check if the winner name matches my name
+                        if (!amIWinner && winnerId !== 'DRAW' && data.winnerName === (playerData?.username || gameState?.players[myId]?.name)) {
+                            amIWinner = true;
                         }
+
+                        setEndInfo({
+                            winnerName: data.winnerName,
+                            isRanked: data.isRanked,
+                            isWinner: amIWinner,
+                            eloChange: data.eloChanges ? (amIWinner ? data.eloChanges.winner : data.eloChanges.loser) : 0
+                        });
+                        setScreen('end');
+                        if (amIWinner) playSound('win'); else playSound('lose');
+
+                        localStorage.removeItem('domino_session');
+                        setTimeout(() => {
+                            resetGameClientState();
+                            setScreen('lobby');
+                        }, 5000);
                         break;
                     case 'playerDisconnected':
                         showNotification('Rakip bağlantısı koptu, bekleniyor...', 'warning');
@@ -670,33 +654,11 @@
                         setOpponent(data.opponent);
                         setScreen('matching_lobby');
                         break;
+                    case 'gameMessage':
+                        setServerMessage(data);
+                        setTimeout(() => setServerMessage(null), data.duration || 3000);
+                        break;
                 }
-            };
-
-            const processGameResult = (data) => {
-                // Get current user's ID
-                const myId = String(playerData?.telegramId || playerData?.id || playerId || '');
-                const winnerId = String(data.winner || '');
-
-                // Check winner by ID or Name (as fallback)
-                let amIWinner = (winnerId !== '' && winnerId !== 'DRAW' && winnerId === myId);
-
-                // If ID match fails, check if the winner name matches my name
-                if (!amIWinner && winnerId !== 'DRAW' && data.winnerName === (playerData?.username || gameState?.players[myId]?.name)) {
-                    amIWinner = true;
-                }
-
-                setEndInfo({
-                    winnerName: data.winnerName,
-                    isRanked: data.isRanked,
-                    isWinner: amIWinner,
-                    eloChange: data.eloChanges ? (amIWinner ? data.eloChanges.winner : data.eloChanges.loser) : 0,
-                    scores: data.scores // Puanları göster
-                });
-                setScreen('end');
-                if (amIWinner) playSound('win'); else playSound('lose');
-
-                localStorage.removeItem('domino_session');
             };
 
             // Dynamics: Snake Layout Calculation
@@ -827,13 +789,10 @@
 
             // --- OYUN MANTIĞI ---
             const myPlayerId = gameState?.playerId;
-            const isMyTurn = gameState?.currentPlayer === myPlayerId; // currentPlayer ile playerId karşılaştırması
+            const isMyTurn = gameState?.currentPlayer === myPlayerId;
             const myHand = gameState?.players[myPlayerId]?.hand || [];
             const marketSize = gameState?.market?.length || 0;
             const canDrawFromMarket = marketSize > 0;
-            
-            // Elimde oynayacak taş var mı kontrolü
-            const hasValidMoves = myHand.some(tile => calculateValidMoves(tile).length > 0);
 
             const calculateValidMoves = (tile) => {
                 if (!gameState || gameState.board.length === 0) return ['start'];
@@ -844,19 +803,6 @@
                 if (tile[0] === rightEnd || tile[1] === rightEnd) moves.push('right');
                 return moves;
             };
-
-            // Otomatik Pass Kontrolü
-            useEffect(() => {
-                if (isMyTurn && gameState && !gameState.winner) {
-                    if (!hasValidMoves && marketSize === 0) {
-                        console.log("Hamle yok ve pazar boş. Otomatik pass geçiliyor...");
-                        setTimeout(() => {
-                            sendMessage({ type: 'passTurn' });
-                            playSound('pass'); // Pass sesi
-                        }, 1500);
-                    }
-                }
-            }, [isMyTurn, hasValidMoves, gameState, marketSize]);
 
             const handleTileClick = (index, tile) => {
                 if (!isMyTurn) return;
@@ -900,20 +846,20 @@
             // --- RENDER PARTS ---
 
             if (screen === 'loading') return (
-                <div className="flex items-center justify-center min-h-screen animated-bg pt-2">
-                    <div className="text-white animate-pulse text-2xl font-bold">YÜKLƏNİR... / LOADING...</div>
+                <div className="flex items-center justify-center min-h-screen">
+                    <div className="text-white animate-pulse text-2xl font-bold">YÜKLENİYOR...</div>
                 </div>
             );
 
             if (screen === 'lobby') return (
-                <div className="flex flex-col items-center justify-center min-h-screen px-6 pb-6 pt-8 animated-bg">
+                <div className="flex flex-col items-center justify-center min-h-screen p-6">
                     {notification && <Toast message={notification.message} type={notification.type} />}
                     <div className="text-center mb-10 animate-float">
                         <h1 className="text-6xl font-black text-white drop-shadow-2xl mb-2">DOMINO <span className="text-yellow-400">101</span></h1>
                         <p className="text-white/60 tracking-widest uppercase">Premium Multiplayer Experience</p>
                     </div>
 
-                    <div className="w-full max-w-sm bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl">
+                    <div className="w-full max-w-sm bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10 shadow-2xl">
                         {playerData && (
                             <div className="mb-8 text-center">
                                 {playerData.photoUrl && <img src={playerData.photoUrl} className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 p-1" />}
@@ -924,24 +870,20 @@
                                 </div>
                             </div>
                         )}
-                        <button onClick={() => { 
+                        <button onClick={() => {
                             setScreen('searching');
                             setSearching(true);
                             sendMessage({ type: 'findMatch', ...playerData });
-                        }} className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-black py-4 rounded-2xl mb-4 transition-all transform active:scale-95 shadow-lg flex items-center justify-center gap-2">
-                            <span>🏆</span> Dərəcəli / Ranked
-                        </button>
+                        }} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl mb-4 transition-all transform active:scale-95 shadow-lg">🔍 Dərəcəli / Ranked 🔍</button>
 
                         <div className="flex flex-col gap-3">
-                            <button onClick={() => sendMessage({ type: 'createRoom', ...playerData })} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
-                                <span>🏠</span> Otaq Qur / Create Room
-                            </button>
+                            <button onClick={() => sendMessage({ type: 'createRoom', ...playerData })} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all">🏠 Otaq Yarat / Create Room</button>
 
                             <div className="flex gap-2">
                                 <input
                                     value={joinCode}
                                     onChange={e => setJoinCode(e.target.value)}
-                                    placeholder="Otaq Kodu / Room Code"
+                                    placeholder="Otaq Kodu"
                                     className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 text-white text-center font-bold focus:border-yellow-500 transition-all"
                                 />
                                 <button
@@ -951,7 +893,7 @@
                                     }}
                                     className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-black transition-all shadow-glow"
                                 >
-                                    DAXİL OL / JOIN
+                                    GİR
                                 </button>
                             </div>
                         </div>
@@ -965,24 +907,22 @@
                                 className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/40 rounded-2xl text-center cursor-pointer hover:bg-yellow-500/20 active:scale-95 transition-all group"
                             >
                                 <div className="text-yellow-400 text-xs font-bold flex items-center justify-center gap-2">
-                                    OTAQ KODU / ROOM CODE <span className="text-[10px] bg-yellow-500/20 px-2 py-0.5 rounded-full">COPY</span>
+                                    ODA KODU <span className="text-[10px] bg-yellow-500/20 px-2 py-0.5 rounded-full">KOPYALA</span>
                                 </div>
                                 <div className="text-4xl text-white font-black tracking-widest mt-1 group-hover:text-yellow-400">{roomCode}</div>
                             </div>
                         )}
 
-                        <button onClick={() => { loadLeaderboard(); setScreen('leaderboard'); }} className="w-full mt-6 bg-blue-600/20 hover:bg-blue-600/40 text-blue-200 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
-                            <span>📊</span> LİDERLƏR / LEADERBOARD
-                        </button>
+                        <button onClick={() => { loadLeaderboard(); setScreen('leaderboard'); }} className="w-full mt-6 text-white/40 hover:text-white transition-colors text-sm font-bold">🏆 SKOR TABLOSU</button>
                     </div>
                 </div>
             );
 
             if (screen === 'matching_lobby') return (
-                <div className="flex flex-col items-center justify-center min-h-screen px-6 pb-6 pt-8 bg-black/60 backdrop-blur-2xl animated-bg">
+                <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-black/60 backdrop-blur-2xl">
                     <div className="text-center mb-16">
-                        <h2 className="text-4xl font-black text-yellow-500 animate-pulse">RƏQİB TAPILDI! / OPPONENT FOUND!</h2>
-                        <p className="text-white/40 mt-2 uppercase tracking-[0.3em]">Oyun Başlayır... / Game Starting...</p>
+                        <h2 className="text-4xl font-black text-yellow-500 animate-pulse">RAKİP BULUNDU!</h2>
+                        <p className="text-white/40 mt-2 uppercase tracking-[0.3em]">Maç Başlıyor...</p>
                     </div>
 
                     <div className="flex items-center gap-4 sm:gap-12 w-full max-w-2xl px-4">
@@ -1021,18 +961,25 @@
             );
 
             if (screen === 'game') return (
-                <div className="fixed inset-x-0 top-16 bottom-0 flex flex-col bg-[#0b241c] overflow-hidden rounded-t-lg">
+                <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden">
                     {notification && <Toast message={notification.message} type={notification.type} />}
+
+                    {/* Sunucu Mesajı Overlay (Oyun Kapalı vb.) */}
+                    {serverMessage && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
+                            <div className="bg-[#1b4d3e] border-2 border-yellow-500 rounded-2xl p-8 text-center shadow-2xl animate-bounce">
+                                <div className="text-2xl font-bold text-white whitespace-pre-line leading-relaxed">
+                                    {serverMessage.message}
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Header */}
                     <div className="h-16 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full border-2 border-white/20 overflow-hidden">
-                                {opponent?.photoUrl ? 
-                                    <img src={opponent.photoUrl} className="w-full h-full object-cover" alt="Opponent" /> 
-                                    : 
-                                    <div className="w-full h-full bg-slate-700 flex items-center justify-center">👤</div>
-                                }
+                                {opponent?.photoUrl ? <img src={opponent.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 flex items-center justify-center">👤</div>}
                             </div>
                             <div className="flex flex-col">
                                 <div className="text-white font-bold text-sm leading-none">{opponent?.name || opponent?.username || 'Rakip'}</div>
@@ -1042,9 +989,9 @@
                             </div>
                         </div>
                         <div className={`px-4 py-1 rounded-full text-[10px] font-bold ${isMyTurn ? 'bg-yellow-500 text-black animate-pulse' : 'bg-white/10 text-white/50'}`}>
-                            {isMyTurn ? 'SİZİN NÖVBƏ / YOUR TURN' : `${String(opponent?.name || opponent?.username || 'Rakip').toUpperCase()} OYNAYIR / PLAYING`}
+                            {isMyTurn ? 'SIRA SENDE' : `${String(opponent?.name || opponent?.username || 'Rakip').toUpperCase()} OYNUYOR`}
                         </div>
-                        <button onClick={leaveGameClient} className="text-red-500 font-bold text-sm">ÇIX / LEAVE</button>
+                        <button onClick={leaveGameClient} className="text-red-500 font-bold text-sm">AYRIL</button>
                     </div>
 
                     {/* Board Area */}
@@ -1070,10 +1017,6 @@
                                         values={item.tile}
                                         vertical={false}
                                         disabled={true}
-                                    />
-                                </div>
-                            ))}
-                        </div>
                                         scale={1}
                                     />
                                 </div>
@@ -1125,10 +1068,16 @@
                     {/* Controls Footer */}
                     <div className="h-48 z-30 bg-black/60 backdrop-blur-xl border-t border-white/10 p-4">
                         <div className="flex items-center justify-between mb-2">
-                            <div className="text-white/60 text-sm">Elinizdeki Taşlar / Your Tiles</div>
-                            <div className="text-white/60 text-sm">{myHand.length} taş</div>
+                            <div className="text-white/50 text-xs font-bold uppercase tracking-widest">Senin Elin ({myHand.length})</div>
+                            {isMyTurn && (
+                                marketSize > 0 ? (
+                                    <button onClick={() => sendMessage({ type: 'drawFromMarket' })} className="bg-yellow-500 text-black px-4 py-1 rounded-full text-xs font-bold shadow-glow">TAŞ ÇEK ({marketSize})</button>
+                                ) : (
+                                    <button onClick={() => sendMessage({ type: 'passTurn' })} className="bg-red-600 hover:bg-red-500 text-white px-6 py-1 rounded-full text-xs font-bold shadow-glow animate-pulse">PAS GEÇ</button>
+                                )
+                            )}
                         </div>
-                        <div className="flex gap-2 overflow-x-auto hide-scrollbar justify-center">
+                        <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar justify-center">
                             {myHand.map((tile, idx) => (
                                 <DominoTile
                                     key={idx}
@@ -1139,17 +1088,14 @@
                                 />
                             ))}
                         </div>
-                        ) : (
-                            <div className="text-white/60 italic">Taşlar sayılıyor...</div>
-                        )}
                     </div>
                 </div>
             );
 
             if (screen === 'end') return (
-                <div className="flex flex-col items-center justify-center min-h-screen px-10 pb-10 pt-12 text-center animated-bg">
+                <div className="flex flex-col items-center justify-center min-h-screen bg-black/90 p-10 text-center">
                     <div className="text-8xl mb-6">{endInfo.isWinner ? '🎉' : '💀'}</div>
-                    <h1 className="text-6xl font-black text-white mb-2">{endInfo.isWinner ? 'QAZANDINIZ! / YOU WON!' : 'MƏĞLUB OLDUNUZ / YOU LOST'}</h1>
+                    <h1 className="text-6xl font-black text-white mb-2">{endInfo.isWinner ? 'TEBRİKLER!' : 'KAYBETTİN'}</h1>
                     <p className="text-white/60 text-xl font-bold mb-8">{endInfo.winnerName} kazandı!</p>
 
                     {endInfo.isRanked && (
@@ -1158,32 +1104,32 @@
                         </div>
                     )}
 
-                    <button onClick={() => { resetGameClientState(); setScreen('lobby'); }} className="mt-12 bg-white/10 hover:bg-white/20 text-white px-8 py-3 rounded-full font-bold transition-all">LOBİYƏ QAYIT / BACK TO LOBBY</button>
+                    <div className="mt-12 text-white/30 animate-pulse">Lobiye dönülüyor...</div>
                 </div>
             );
 
             if (screen === 'searching') return (
-                <div className="flex flex-col items-center justify-center min-h-screen animated-bg pt-2">
+                <div className="flex flex-col items-center justify-center min-h-screen bg-[#0b241c]">
                     <div className="w-40 h-40 relative flex items-center justify-center">
                         <div className="absolute inset-0 border-8 border-yellow-500/20 rounded-full"></div>
                         <div className="absolute inset-0 border-8 border-t-yellow-500 rounded-full animate-spin"></div>
                         <div className="text-4xl animate-bounce">🔍</div>
                     </div>
-                    <h2 className="text-white text-3xl font-black mt-10 text-center px-4">RƏQİB AXTARILIR / SEARCHING...</h2>
-                    <p className="text-white/40 mt-2 text-center px-4">Bu biraz zaman alabilir...</p>
-                    <button onClick={() => { sendMessage({ type: 'cancelSearch' }); setScreen('lobby'); }} className="mt-12 text-red-500 font-bold border border-red-500/30 px-6 py-2 rounded-full hover:bg-red-500/10 transition-all">LƏĞV ET / CANCEL</button>
+                    <h2 className="text-white text-3xl font-black mt-10">RAKİP ARANIYOR</h2>
+                    <p className="text-white/40 mt-2">Bu biraz zaman alabilir...</p>
+                    <button onClick={() => { sendMessage({ type: 'cancelSearch' }); setScreen('lobby'); }} className="mt-12 text-red-500 font-bold border border-red-500/30 px-6 py-2 rounded-full hover:bg-red-500/10 transition-all">İPTAL ET</button>
                 </div>
             );
 
             if (screen === 'leaderboard') return (
-                <div className="flex flex-col items-center justify-start min-h-screen px-8 pb-8 pt-10 animated-bg overflow-y-auto relative">
+                <div className="flex flex-col items-center justify-start min-h-screen p-8 bg-[#0b241c] overflow-y-auto relative">
                     <button
                         onClick={() => setScreen('lobby')}
                         className="absolute top-6 left-6 w-12 h-12 flex items-center justify-center bg-white/10 rounded-2xl text-white text-2xl hover:bg-white/20 transition-all font-black"
                     >
                         ←
                     </button>
-                    <h1 className="text-4xl font-black text-white mb-8">📊 LİDERLƏR / LEADERBOARD 📊</h1>
+                    <h1 className="text-4xl font-black text-white mb-8">📊 LADERBOARD 📊</h1>
                     <div className="w-full max-w-xl space-y-3">
                         {leaderboard.map((p, i) => (
                             <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-3xl border border-white/5">
@@ -1200,7 +1146,7 @@
                             </div>
                         ))}
                     </div>
-                    <button onClick={() => setScreen('lobby')} className="mt-10 px-10 py-3 bg-white/10 text-white rounded-2xl font-bold">GERİ / BACK</button>
+                    <button onClick={() => setScreen('lobby')} className="mt-10 px-10 py-3 bg-white/10 text-white rounded-2xl font-bold">GERİ DÖN</button>
                 </div>
             );
 
@@ -1210,25 +1156,32 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<DominoGame />);
     </script>
-    
+        </script>
+
     <script>
-        // Initialize the app when the DOM is fully loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize Telegram Web App if available
-            if (window.Telegram && window.Telegram.WebApp) {
-                const tg = window.Telegram.WebApp;
-                tg.ready();
-                tg.expand();
-                
-                if (tg.requestFullscreen) {
-                    tg.requestFullscreen();
-                }
-                
-                tg.disableVerticalSwipes();
-                tg.setHeaderColor('#1b4d3e');
-            }
-        });
+        const tgApp = window.Telegram.WebApp;
+        tgApp.ready();
+        tgApp.expand();
+        if (tgApp.requestFullscreen) {
+            tgApp.requestFullscreen();
+        }
+        tgApp.disableVerticalSwipes();
+        tgApp.setHeaderColor('secondary_bg_color');
     </script>
+<script>
+    const tgApp = window.Telegram.WebApp;
+    tgApp.ready();
+    tgApp.expand();
+    if (tgApp.requestFullscreen) {
+        tgApp.requestFullscreen();
+    }
+    tgApp.disableVerticalSwipes();
+    tgApp.setHeaderColor('#1b4d3e');
+</script>
 
 </body>
+</html>
+
+</body>
+
 </html>
