@@ -610,7 +610,7 @@
                     case 'gameStart':
                     case 'gameUpdate':
                         // Check for a valid gameState object before proceeding
-                        if (data.gameState && data.gameState.players && data.gameState.board && data.gameState.playerId) {
+                        if (data.gameState && data.gameState.players && data.gameState.board && data.gameState.currentPlayer) { // currentPlayer kontrolü eklendi
                             setGameState(data.gameState); // Replace state, don't merge
                             setPlayerId(data.gameState.playerId);
 
@@ -621,7 +621,7 @@
                                 playSound('start');
                                 showNotification('Oyun Başladı!', 'success');
                                 // Save session
-                                if (data.gameState.roomCode) {
+                                if (data.gameState.roomCode && data.gameState.playerId) { // playerId kontrolü eklendi
                                     localStorage.setItem('domino_session', JSON.stringify({
                                         playerId: data.gameState.playerId,
                                         roomCode: data.gameState.roomCode
@@ -829,7 +829,7 @@
 
             // --- OYUN MANTIĞI ---
             const myPlayerId = gameState?.playerId;
-            const isMyTurn = gameState?.currentPlayer === myPlayerId;
+            const isMyTurn = gameState?.currentPlayer === myPlayerId; // currentPlayer ile playerId karşılaştırması
             const myHand = gameState?.players[myPlayerId]?.hand || [];
             const marketSize = gameState?.market?.length || 0;
             const canDrawFromMarket = marketSize > 0;
