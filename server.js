@@ -281,7 +281,8 @@ function initializeGame(roomCode, player1Id, player2Id) {
         turn: 1,
         lastMove: null,
         startingDouble: highestDouble,
-        consecutivePasses: 0
+        consecutivePasses: 0,
+        turnDeadline: null // Süre takibi için
     };
 
     rooms.set(roomCode, room);
@@ -540,6 +541,7 @@ function handleFindMatch(ws, data) {
             sendMessage(p1.ws, { type: 'session', playerId: p1.playerId, roomCode });
             sendMessage(p2.ws, { type: 'session', playerId: p2.playerId, roomCode });
             console.log(`✅ Oyun başladı: ${roomCode}`);
+            startTurnTimer(roomCode); // Zamanlayıcıyı başlat
         }, 4000); // 4 saniye
     } else {
         sendMessage(ws, { type: 'searchStatus', message: 'Rakip aranıyor...' });
@@ -633,6 +635,7 @@ function handleJoinRoom(ws, data) {
                 socket.send(JSON.stringify({ type: 'gameStart', gameState: { ...gameState, playerId: targetId } }));
             }
         });
+        startTurnTimer(code); // Zamanlayıcıyı başlat
         console.log(`✅ Özel oyun başladı: ${code}`);
     }, 4000);
 }
@@ -659,6 +662,7 @@ function handlePlayTile(ws, data) {
     player.hand.splice(data.tileIndex, 1);
     gs.moves = (gs.moves || 0) + 1;
     gs.consecutivePasses = 0; // Hamle yapıldığında pas sayacını sıfırla
+    player.afkCount = 0; // Manuel hamle yapıldı, AFK sayacını sıfırla
 
     const winner = checkWinner(gs);
     if (winner) {
@@ -667,12 +671,16 @@ function handlePlayTile(ws, data) {
         gs.turn++;
         gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
         Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+        startTurnTimer(ws.roomCode); // Sıra geçti, yeni süre başlat
     }
 }
 
 async function handleGameEnd(roomCode, winnerId, gameState) {
     const room = rooms.get(roomCode);
     if (!room) return;
+
+    // Zamanlayıcıyı durdur
+    if (room.turnTimer) clearTimeout(room.turnTimer);
 
     try {
         const playerIds = Object.keys(gameState.players);
@@ -861,6 +869,7 @@ function handlePass(ws) {
         broadcastToRoom(room.code, { type: 'turnPassed', playerName: gs.players[ws.playerId].name });
         broadcastToRoom(room.code, { type: 'playSound', sound: 'pass' });
         Object.keys(gs.players).forEach(pid => sendGameState(room.code, pid));
+        startTurnTimer(room.code); // Sıra geçti, süre başlat
     }
 }
 
@@ -886,6 +895,7 @@ function handleDrawFromMarket(ws) {
         gs.turn++;
         gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
         Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+        startTurnTimer(ws.roomCode);
         return;
     }
 
@@ -914,6 +924,7 @@ function handleDrawFromMarket(ws) {
 
             // Pas geçildiğini bildir
             broadcastToRoom(ws.roomCode, { type: 'turnPassed', playerName: player.name });
+            startTurnTimer(ws.roomCode);
 
             // Sıra geçtikten sonra oyun kilitlendi mi kontrol et
             const winner = checkWinner(gs);
@@ -993,12 +1004,15 @@ function handleDisconnect(ws) {
     if (ws.roomCode) {
         const room = rooms.get(ws.roomCode);
         if (room) {
-            console.log(`🏠 Odadan ayrıldı (Bağlantı kesildi): ${ws.roomCode}`);
-            broadcastToRoom(ws.roomCode, { type: 'playerDisconnected', playerName: ws.playerName });
-
-            // Sadece oyun BAŞLAMAMIŞSA veya oda boşsa odayı sil
-            // Oyun devam ediyorsa odayı tut ki geri dönebilsin
-            const qSize = Object.keys(room.players).length;
+            // Eğer oyun devam ediyorsa ve biri düştüyse, diğerini kazanan ilan et
+            if (room.gameState) {
+                const opponentId = Object.keys(room.players).find(id => id !== ws.playerId);
+                console.log(`🔌 Oyuncu düştü, oyun bitiriliyor. Kazanan: ${opponentId}`);
+                handleGameEnd(ws.roomCode, opponentId, room.gameState);
+            } else {
+                broadcastToRoom(ws.roomCode, { type: 'playerDisconnected', playerName: ws.playerName });
+            }
+            
             if (!room.gameState) {
                 rooms.delete(ws.roomCode);
             } else {
@@ -1010,6 +1024,102 @@ function handleDisconnect(ws) {
                 }
             }
         }
+    }
+}
+
+// --- ZAMANLAYICI VE AFK SİSTEMİ ---
+
+function startTurnTimer(roomCode) {
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState) return;
+
+    // Varsa eski sayacı temizle
+    if (room.turnTimer) clearTimeout(room.turnTimer);
+
+    const DURATION = 20000; // 20 Saniye
+    const deadline = Date.now() + DURATION;
+    room.gameState.turnDeadline = deadline;
+
+    // İstemcilere süreyi bildir
+    broadcastToRoom(roomCode, {
+        type: 'timerUpdate',
+        deadline: deadline,
+        totalTime: 20
+    });
+
+    room.turnTimer = setTimeout(() => {
+        handleTurnTimeout(roomCode);
+    }, DURATION);
+}
+
+function handleTurnTimeout(roomCode) {
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState) return;
+
+    const gs = room.gameState;
+    const currentPlayerId = gs.currentPlayer;
+    const player = gs.players[currentPlayerId];
+
+    // AFK Kontrolü
+    player.afkCount = (player.afkCount || 0) + 1;
+
+    if (player.afkCount >= 2) {
+        // 2. kez süre doldu -> Hükmen Mağlup
+        const opponentId = Object.keys(gs.players).find(id => id !== currentPlayerId);
+        broadcastToRoom(roomCode, {
+            type: 'gameMessage',
+            message: `⏳ ${player.name} çok fazla beklediği için oyunu kaybetti!`,
+            duration: 5000
+        });
+        handleGameEnd(roomCode, opponentId, gs);
+        return;
+    }
+
+    // Otomatik Hamle Mantığı (1. kez süre doldu)
+    broadcastToRoom(roomCode, {
+        type: 'gameMessage',
+        message: `⚠️ ${player.name} süresi doldu! Otomatik oynanıyor...`,
+        duration: 2000
+    });
+
+    // 1. Oynanabilir taş var mı?
+    const playableTileIndex = player.hand.findIndex(tile => canPlayTile(tile, gs.board));
+
+    if (playableTileIndex !== -1) {
+        // Taş oyna
+        const tile = player.hand[playableTileIndex];
+        // Pozisyonu bul (basit mantık, playTileOnBoard zaten hallediyor)
+        const success = playTileOnBoard(tile, gs.board, 'both');
+        if (success) {
+            player.hand.splice(playableTileIndex, 1);
+            gs.moves = (gs.moves || 0) + 1;
+            gs.consecutivePasses = 0;
+            
+            const winner = checkWinner(gs);
+            if (winner) {
+                handleGameEnd(roomCode, winner, gs);
+            } else {
+                gs.turn++;
+                gs.currentPlayer = Object.keys(gs.players).find(id => id !== currentPlayerId);
+                Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+                startTurnTimer(roomCode);
+            }
+        }
+    } else if (gs.market.length > 0) {
+        // Taş çek
+        // handleDrawFromMarket fonksiyonunu simüle etmemiz lazım ama ws objesi yok.
+        // Basitçe pas geçelim, çünkü draw mantığı karmaşık ve ws gerektiriyor.
+        // Bu durumda oyuncu bir tur kaybeder.
+        gs.turn++;
+        gs.currentPlayer = Object.keys(gs.players).find(id => id !== currentPlayerId);
+        Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+        startTurnTimer(roomCode);
+    } else {
+        // Pas geç
+        gs.turn++;
+        gs.currentPlayer = Object.keys(gs.players).find(id => id !== currentPlayerId);
+        Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+        startTurnTimer(roomCode);
     }
 }
 
