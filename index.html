@@ -364,6 +364,7 @@
             const [joinCode, setJoinCode] = useState('');
             const [gameState, setGameState] = useState(null);
             const [searchTime, setSearchTime] = useState(0);
+            const [turnTimer, setTurnTimer] = useState(20); // Tur süresi
             const [serverMessage, setServerMessage] = useState(null); // Sunucudan gelen özel mesajlar için
 
             // Oyun İçi State
@@ -403,6 +404,21 @@
                 connectToServer();
                 return () => { if (wsRef.current) wsRef.current.close(); };
             }, []);
+
+            // Timer Effect
+            useEffect(() => {
+                if (screen !== 'game' || !gameState?.turnDeadline) return;
+
+                const interval = setInterval(() => {
+                    const now = Date.now();
+                    const remaining = Math.max(0, Math.ceil((gameState.turnDeadline - now) / 1000));
+                    setTurnTimer(remaining);
+                    
+                    if (remaining <= 0) clearInterval(interval);
+                }, 1000);
+
+                return () => clearInterval(interval);
+            }, [gameState?.turnDeadline, screen]);
 
             // Telegram Auth
             const initializeTelegramAuth = async () => {
@@ -657,6 +673,10 @@
                     case 'gameMessage':
                         setServerMessage(data);
                         setTimeout(() => setServerMessage(null), data.duration || 3000);
+                        break;
+                    case 'timerUpdate':
+                        // Timer sunucudan güncelleniyor
+                        setGameState(prev => prev ? ({ ...prev, turnDeadline: data.deadline }) : null);
                         break;
                 }
             };
@@ -984,7 +1004,13 @@
                             <div className="flex flex-col">
                                 <div className="text-white font-bold text-sm leading-none">{opponent?.name || opponent?.username || 'Rakip'}</div>
                                 <div className="mt-1 scale-75 origin-left">
-                                    <LevelBadge level={opponent?.level || 1} />
+                                    <div className="flex items-center gap-2">
+                                        <LevelBadge level={opponent?.level || 1} />
+                                        {/* Timer Göstergesi */}
+                                        <div className={`px-2 py-0.5 rounded text-xs font-bold ${turnTimer <= 5 ? 'bg-red-500 animate-pulse' : 'bg-white/20'} text-white`}>
+                                            ⏱ {turnTimer}s
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
