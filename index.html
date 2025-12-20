@@ -12,6 +12,7 @@
 
     <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -368,7 +369,7 @@
             }, [startTime]);
 
             return (
-                <div className="absolute top-[25%] left-6 text-8xl font-black text-white/10 pointer-events-none select-none z-0">
+                <div className="absolute top-[15%] left-6 text-8xl font-black text-white/10 pointer-events-none select-none z-10">
                     {timeLeft}
                 </div>
             );
@@ -424,6 +425,23 @@
                 connectToServer();
                 return () => { if (wsRef.current) wsRef.current.close(); };
             }, []);
+
+            // Confetti Effect
+            useEffect(() => {
+                if (screen === 'end' && endInfo?.isWinner) {
+                    const duration = 3000;
+                    const end = Date.now() + duration;
+
+                    const frame = () => {
+                        if (window.confetti) {
+                            window.confetti({ particleCount: 2, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#fbbf24', '#ef4444', '#ffffff'] });
+                            window.confetti({ particleCount: 2, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#fbbf24', '#ef4444', '#ffffff'] });
+                        }
+                        if (Date.now() < end) requestAnimationFrame(frame);
+                    };
+                    frame();
+                }
+            }, [screen, endInfo]);
 
             // Telegram Auth
             const initializeTelegramAuth = async () => {
@@ -1000,7 +1018,7 @@
                     )}
 
                     {/* Header */}
-                    <div className="h-16 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30">
+                    <div className="h-24 pt-8 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full border-2 border-white/20 overflow-hidden">
                                 {opponent?.photoUrl ? <img src={opponent.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 flex items-center justify-center">👤</div>}
@@ -1115,8 +1133,7 @@
             if (screen === 'end') return (
                 <div className="flex flex-col items-center justify-center min-h-screen bg-black/90 p-10 text-center">
                     <div className="text-8xl mb-6">{endInfo.isWinner ? '🎉' : '💀'}</div>
-                    <h1 className="text-6xl font-black text-white mb-2">{endInfo.isWinner ? 'TEBRİKLER!' : 'KAYBETTİN'}</h1>
-                    <p className="text-white/60 text-xl font-bold mb-8">{endInfo.winnerName} kazandı!</p>
+                    <h1 className="text-6xl font-black text-white mb-2">{endInfo.winnerName}</h1>
 
                     {endInfo.isRanked && (
                         <div className={`text-4xl font-black ${endInfo.eloChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
