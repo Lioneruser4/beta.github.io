@@ -88,7 +88,6 @@
             -webkit-tap-highlight-color: transparent;
             user-select: none;
             -webkit-user-select: none;
-            position: relative; /* absolute pozisyonlu oyun ekranı için */
             padding-top: 40px; /* Siteyi biraz aşağı indir */
         }
 
@@ -293,7 +292,7 @@
             const baseClasses = `
                 relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
                 transition-all duration-300 select-none
-                ${vertical ? 'flex-col w-10 h-20' : 'flex-row w-20 h-10'}
+                ${vertical ? 'flex-col w-[40px] h-[80px]' : 'flex-row w-[80px] h-[40px]'}
                 ${isGhost ? 'opacity-0 pointer-events-none' : 'shadow-3d'}
                 ${isSelected ? '-translate-y-4 shadow-3d-active ring-2 ring-yellow-500 z-10 animate-celebrate' : ''}
                 ${animateIn ? 'animate-slide-in' : ''}
@@ -982,7 +981,7 @@
             );
 
             if (screen === 'game') return (
-                <div className="absolute inset-0 flex flex-col bg-[#0b241c] overflow-hidden">
+                <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden">
                     {notification && <Toast message={notification.message} type={notification.type} />}
 
                     {/* Sunucu Mesajı Overlay (Oyun Kapalı vb.) */}
@@ -1005,6 +1004,7 @@
                             <div className="flex flex-col">
                                 <div className="text-white font-bold text-sm leading-none">{opponent?.name || opponent?.username || 'Rakip'}</div>
                                 <div className="mt-1 scale-75 origin-left">
+                                    <LevelBadge level={opponent?.level || 1} />
                                     <div className="flex items-center gap-2">
                                         <LevelBadge level={opponent?.level || 1} />
                                         {/* Timer Göstergesi */}
