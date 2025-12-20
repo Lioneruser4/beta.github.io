@@ -362,13 +362,15 @@
                 const interval = setInterval(() => {
                     if (!startTime) return;
                     const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                    const remaining = Math.max(0, 
+                    const remaining = Math.max(0, 30 - elapsed);
+                    setTimeLeft(remaining);
                 }, 100);
                 return () => clearInterval(interval);
             }, [startTime]);
 
             return (
-                <div
+                <div className="absolute top-[15%] left-6 text-8xl font-black text-white/10 pointer-events-none select-none z-10">
+                    {timeLeft}
                 </div>
             );
         };
@@ -872,8 +874,9 @@
             };
 
             const leaveGameClient = () => {
-                if (window.confirm('Kaybedeceksin onayla oyundan cik')) {
-                    sendMessage({ type: ' 
+                if (window.confirm('Oyundan çıkmak istediğine emin misin?')) {
+                    sendMessage({ type: 'leaveGame' });
+                    localStorage.removeItem('domino_session');
                     resetGameClientState();
                     setScreen('lobby');
                 }
@@ -1015,9 +1018,10 @@
                     )}
 
                     {/* Header */}
-                    <div className="h-24 pt-[200px] pb-8 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30">
+                    <div className="h-24 pt-8 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30">
                         <div className="flex items-center gap-3">
-                            <div c" /> : <div className="w-full h-full bg-slate-700 flex items-center justify-center">👤</div>}
+                            <div className="w-10 h-10 rounded-full border-2 border-white/20 overflow-hidden">
+                                {opponent?.photoUrl ? <img src={opponent.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 flex items-center justify-center">👤</div>}
                             </div>
                             <div className="flex flex-col">
                                 <div className="text-white font-bold text-sm leading-none">{opponent?.name || opponent?.username || 'Rakip'}</div>
@@ -1026,11 +1030,6 @@
                                 </div>
                             </div>
                         </div>
-                        
-                        {/* Ayrıl Butonu */}
-                        <button onClick={leaveGameClient} className="bg-red-600/80 hover:bg-red-600 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95">
-                            AYRIL
-                        </button>
                     </div>
 
                     {/* Board Area */}
