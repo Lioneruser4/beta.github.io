@@ -1025,6 +1025,102 @@ function handleDisconnect(ws) {
     }
 }
 
+// --- TIMEOUT KONTROLÜ ---
+
+setInterval(() => {
+    rooms.forEach((room, roomCode) => {
+        if (!room.gameState || !room.gameState.turnStartTime || room.gameState.winner) return;
+        
+        // 30 saniye süre
+        const TURN_LIMIT = 30000;
+        const elapsed = Date.now() - room.gameState.turnStartTime;
+        
+        if (elapsed > TURN_LIMIT) {
+            handleTurnTimeout(roomCode);
+        }
+    });
+}, 1000);
+
+function handleTurnTimeout(roomCode) {
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState) return;
+    
+    const gs = room.gameState;
+    const currentPlayerId = gs.currentPlayer;
+    const player = gs.players[currentPlayerId];
+    
+    console.log(`⏰ ${player.name} için süre doldu! Otomatik işlem yapılıyor...`);
+
+    // 1. Oynanabilir taş var mı?
+    let validMove = null;
+    
+    // Eldeki taşları kontrol et
+    for (let i = 0; i < player.hand.length; i++) {
+        const tile = player.hand[i];
+        if (gs.board.length === 0) {
+            validMove = { tile, index: i, position: 'left' };
+            break;
+        }
+        
+        const leftEnd = gs.board[0][0];
+        const rightEnd = gs.board[gs.board.length - 1][1];
+        
+        if (tile[0] === leftEnd || tile[1] === leftEnd) {
+            validMove = { tile, index: i, position: 'left' };
+            break;
+        }
+        if (tile[0] === rightEnd || tile[1] === rightEnd) {
+            validMove = { tile, index: i, position: 'right' };
+            break;
+        }
+    }
+
+    if (validMove) {
+        // Hamle yap
+        const success = playTileOnBoard(validMove.tile, gs.board, validMove.position);
+        if (success) {
+            player.hand.splice(validMove.index, 1);
+            gs.moves = (gs.moves || 0) + 1;
+            
+            // Kazanan kontrolü
+            const winner = checkWinner(gs);
+            if (winner) {
+                handleGameEnd(roomCode, winner, gs);
+                return;
+            }
+            
+            // Sıra değiştir
+            gs.turn++;
+            gs.currentPlayer = Object.keys(gs.players).find(id => id !== currentPlayerId);
+            gs.turnStartTime = Date.now();
+            
+            Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+            return;
+        }
+    }
+
+    // 2. Oynanacak taş yoksa pazar kontrolü
+    if (gs.market && gs.market.length > 0) {
+        const drawnTile = gs.market.shift();
+        player.hand.push(drawnTile);
+        
+        // Çektikten sonra sıra geç (Hızlı oyun için)
+        gs.turn++;
+        gs.currentPlayer = Object.keys(gs.players).find(id => id !== currentPlayerId);
+        gs.turnStartTime = Date.now();
+        
+        Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+        return;
+    }
+
+    // 3. Pazar boşsa pas geç
+    gs.turn++;
+    gs.currentPlayer = Object.keys(gs.players).find(id => id !== currentPlayerId);
+    gs.turnStartTime = Date.now();
+    
+    Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+}
+
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Domino Sunucusu çalışıyor: Port ${PORT}`);
