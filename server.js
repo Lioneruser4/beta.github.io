@@ -674,6 +674,14 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
     const room = rooms.get(roomCode);
     if (!room) return;
 
+    // Oyuncuların oda bilgisini temizle (Tekrar eşleşme yapabilmeleri için)
+    if (room.players) {
+        Object.keys(room.players).forEach(pid => {
+            const playerWs = playerConnections.get(pid);
+            if (playerWs) playerWs.roomCode = null;
+        });
+    }
+
     try {
         const playerIds = Object.keys(gameState.players);
         const player1Id = playerIds[0];
@@ -1014,15 +1022,15 @@ function handleDisconnect(ws) {
             if (!room.gameState) {
                 rooms.delete(ws.roomCode);
             } else {
-                // 10 saniye sonra oyunu bitir ve diğerini kazanan ilan et
                 if (!room.cleanupTimer) {
                     room.cleanupTimer = setTimeout(() => {
                         // Diğer oyuncuyu bul (Kazanan)
                         const winnerId = Object.keys(room.players).find(id => id !== ws.playerId);
                         if (winnerId && room.gameState) {
                             handleGameEnd(ws.roomCode, winnerId, room.gameState);
+                        } else {
+                            rooms.delete(ws.roomCode);
                         }
-                        rooms.delete(ws.roomCode);
                     }, 10000); // 10 saniye
                 }
             }
@@ -1036,8 +1044,8 @@ setInterval(() => {
     rooms.forEach((room, roomCode) => {
         if (!room.gameState || !room.gameState.turnStartTime || room.gameState.winner) return;
         
-        // 25 saniye süre
-        const TURN_LIMIT = 25000;
+        // 30 saniye süre
+        const TURN_LIMIT = 30000;
         const elapsed = Date.now() - room.gameState.turnStartTime;
         
         if (elapsed > TURN_LIMIT) {
