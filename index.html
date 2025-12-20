@@ -591,8 +591,9 @@
                         break;
                     case 'gameStart':
                     case 'gameUpdate':
-                        if (data.gameState) {
-                            if (data.gameState.playerId || data.playerId) {
+                        // Check for a valid gameState object before proceeding
+                        if (data.gameState && data.gameState.players && data.gameState.board) {
+                             if (data.gameState.playerId || data.playerId) {
                                 setPlayerId(data.gameState.playerId || data.playerId);
                             }
                             setGameState(prevState => ({
@@ -613,9 +614,13 @@
                                     }));
                                 }
                             }
+                        } else {
+                            console.error("Invalid or incomplete gameState received:", data);
+                            showNotification("Oyun məlumatı alınmadı. Xəta!", "error");
+                            setScreen('lobby'); // Go back to lobby to be safe
                         }
-                        setSelectedTileIndex(null);
-                        setValidMoves([]);
+                        setSelectedTileIndex(null); // Reset selection on any update
+                        setValidMoves([]); // Reset valid moves on any update
                         break;
                     case 'error':
                         showNotification(data.message, 'error');
@@ -1168,8 +1173,8 @@
                         <div className="absolute inset-0 border-8 border-t-yellow-500 rounded-full animate-spin"></div>
                         <div className="text-4xl animate-bounce">🔍</div>
                     </div>
-                    <h2 className="text-white text-3xl font-black mt-10">RƏQİB AXTARILIR / SEARCHING...</h2>
-                    <p className="text-white/40 mt-2">Bu biraz zaman alabilir...</p>
+                    <h2 className="text-white text-3xl font-black mt-10 text-center px-4">RƏQİB AXTARILIR / SEARCHING...</h2>
+                    <p className="text-white/40 mt-2 text-center px-4">Bu biraz zaman alabilir...</p>
                     <button onClick={() => { sendMessage({ type: 'cancelSearch' }); setScreen('lobby'); }} className="mt-12 text-red-500 font-bold border border-red-500/30 px-6 py-2 rounded-full hover:bg-red-500/10 transition-all">LƏĞV ET / CANCEL</button>
                 </div>
             );
