@@ -623,13 +623,19 @@
                         break;
                     case 'gameEnd':
                         console.log('🏁 Oyun Bitti!', data);
-                        // Hesaplama ekranını göster (8 saniye)
-                        setCalculationData(data);
-                        setScreen('calculating');
                         
-                        setTimeout(() => {
+                        // Eğer oyun kilitlendiyse (blocked) hesaplama ekranını göster
+                        // Eğer biri çıktıysa (disconnect/forfeit) direkt sonuca git
+                        if (data.reason === 'blocked') {
+                            setCalculationData(data);
+                            setScreen('calculating');
+                            setTimeout(() => {
+                                processGameResult(data);
+                            }, 8000);
+                        } else {
+                            // Biri çıktıysa direkt sonuç
                             processGameResult(data);
-                        }, 8000);
+                        }
                         break;
                     case 'playerDisconnected':
                         showNotification('Rakip bağlantısı koptu, bekleniyor...', 'warning');
@@ -808,6 +814,9 @@
             const myHand = gameState?.players[myPlayerId]?.hand || [];
             const marketSize = gameState?.market?.length || 0;
             const canDrawFromMarket = marketSize > 0;
+            
+            // Elimde oynayacak taş var mı kontrolü
+            const hasValidMoves = myHand.some(tile => calculateValidMoves(tile).length > 0);
 
             const calculateValidMoves = (tile) => {
                 if (!gameState || gameState.board.length === 0) return ['start'];
@@ -822,8 +831,7 @@
             // Otomatik Pass Kontrolü
             useEffect(() => {
                 if (isMyTurn && gameState && !gameState.winner) {
-                    const hasMoves = myHand.some(tile => calculateValidMoves(tile).length > 0);
-                    if (!hasMoves && marketSize === 0) {
+                    if (!hasValidMoves && marketSize === 0) {
                         console.log("Hamle yok ve pazar boş. Otomatik pass geçiliyor...");
                         setTimeout(() => {
                             sendMessage({ type: 'passTurn' });
@@ -831,7 +839,7 @@
                         }, 1500);
                     }
                 }
-            }, [isMyTurn, myHand, gameState, marketSize]);
+            }, [isMyTurn, hasValidMoves, gameState, marketSize]);
 
             const handleTileClick = (index, tile) => {
                 if (!isMyTurn) return;
@@ -876,7 +884,7 @@
 
             if (screen === 'loading') return (
                 <div className="flex items-center justify-center min-h-screen animated-bg">
-                    <div className="text-white animate-pulse text-2xl font-bold">YÜKLENİYOR...</div>
+                    <div className="text-white animate-pulse text-2xl font-bold">YÜKLƏNİR... / LOADING...</div>
                 </div>
             );
 
@@ -909,14 +917,14 @@
 
                         <div className="flex flex-col gap-3">
                             <button onClick={() => sendMessage({ type: 'createRoom', ...playerData })} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
-                                <span>🏠</span> Otaq Yarat / Create Room
+                                <span>🏠</span> Otaq Qur / Create Room
                             </button>
 
                             <div className="flex gap-2">
                                 <input
                                     value={joinCode}
                                     onChange={e => setJoinCode(e.target.value)}
-                                    placeholder="Otaq Kodu"
+                                    placeholder="Otaq Kodu / Room Code"
                                     className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 text-white text-center font-bold focus:border-yellow-500 transition-all"
                                 />
                                 <button
@@ -926,7 +934,7 @@
                                     }}
                                     className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-black transition-all shadow-glow"
                                 >
-                                    GİR
+                                    DAXİL OL / JOIN
                                 </button>
                             </div>
                         </div>
@@ -940,14 +948,14 @@
                                 className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/40 rounded-2xl text-center cursor-pointer hover:bg-yellow-500/20 active:scale-95 transition-all group"
                             >
                                 <div className="text-yellow-400 text-xs font-bold flex items-center justify-center gap-2">
-                                    ODA KODU <span className="text-[10px] bg-yellow-500/20 px-2 py-0.5 rounded-full">KOPYALA</span>
+                                    OTAQ KODU / ROOM CODE <span className="text-[10px] bg-yellow-500/20 px-2 py-0.5 rounded-full">COPY</span>
                                 </div>
                                 <div className="text-4xl text-white font-black tracking-widest mt-1 group-hover:text-yellow-400">{roomCode}</div>
                             </div>
                         )}
 
                         <button onClick={() => { loadLeaderboard(); setScreen('leaderboard'); }} className="w-full mt-6 bg-blue-600/20 hover:bg-blue-600/40 text-blue-200 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
-                            <span>📊</span> SKOR TABLOSU
+                            <span>📊</span> LİDERLƏR / LEADERBOARD
                         </button>
                     </div>
                 </div>
@@ -956,8 +964,8 @@
             if (screen === 'matching_lobby') return (
                 <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-black/60 backdrop-blur-2xl animated-bg">
                     <div className="text-center mb-16">
-                        <h2 className="text-4xl font-black text-yellow-500 animate-pulse">RAKİP BULUNDU!</h2>
-                        <p className="text-white/40 mt-2 uppercase tracking-[0.3em]">Maç Başlıyor...</p>
+                        <h2 className="text-4xl font-black text-yellow-500 animate-pulse">RƏQİB TAPILDI! / OPPONENT FOUND!</h2>
+                        <p className="text-white/40 mt-2 uppercase tracking-[0.3em]">Oyun Başlayır... / Game Starting...</p>
                     </div>
 
                     <div className="flex items-center gap-4 sm:gap-12 w-full max-w-2xl px-4">
@@ -1013,9 +1021,9 @@
                             </div>
                         </div>
                         <div className={`px-4 py-1 rounded-full text-[10px] font-bold ${isMyTurn ? 'bg-yellow-500 text-black animate-pulse' : 'bg-white/10 text-white/50'}`}>
-                            {isMyTurn ? 'SIRA SENDE' : `${String(opponent?.name || opponent?.username || 'Rakip').toUpperCase()} OYNUYOR`}
+                            {isMyTurn ? 'SİZİN NÖVBƏ / YOUR TURN' : `${String(opponent?.name || opponent?.username || 'Rakip').toUpperCase()} OYNAYIR / PLAYING`}
                         </div>
-                        <button onClick={leaveGameClient} className="text-red-500 font-bold text-sm">AYRIL</button>
+                        <button onClick={leaveGameClient} className="text-red-500 font-bold text-sm">ÇIX / LEAVE</button>
                     </div>
 
                     {/* Board Area */}
@@ -1092,9 +1100,9 @@
                     {/* Controls Footer */}
                     <div className="h-48 z-30 bg-black/60 backdrop-blur-xl border-t border-white/10 p-4">
                         <div className="flex items-center justify-between mb-2">
-                            <div className="text-white/50 text-xs font-bold uppercase tracking-widest">Senin Elin ({myHand.length})</div>
-                            {marketSize > 0 && isMyTurn && (
-                                <button onClick={() => sendMessage({ type: 'drawFromMarket' })} className="bg-yellow-500 text-black px-4 py-1 rounded-full text-xs font-bold shadow-glow">TAŞ ÇEK ({marketSize})</button>
+                            <div className="text-white/50 text-xs font-bold uppercase tracking-widest">Sizin Daşlar / Your Tiles ({myHand.length})</div>
+                            {marketSize > 0 && isMyTurn && !hasValidMoves && (
+                                <button onClick={() => sendMessage({ type: 'drawFromMarket' })} className="bg-yellow-500 text-black px-4 py-1 rounded-full text-xs font-bold shadow-glow">DAŞ ÇƏK / DRAW ({marketSize})</button>
                             )}
                         </div>
                         <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar justify-center">
@@ -1115,8 +1123,8 @@
             if (screen === 'calculating') return (
                 <div className="flex flex-col items-center justify-center min-h-screen bg-black/90 p-10 text-center animated-bg">
                     <div className="text-6xl mb-6 animate-bounce">🧮</div>
-                    <h1 className="text-4xl font-black text-white mb-4">OYUN KAPALI</h1>
-                    <p className="text-yellow-400 text-xl font-bold mb-8 animate-pulse">Puanlar Hesaplanıyor...</p>
+                    <h1 className="text-4xl font-black text-white mb-4">OYUN BAĞLANDI / GAME CLOSED</h1>
+                    <p className="text-yellow-400 text-xl font-bold mb-8 animate-pulse">Xallar Hesablanır... / Calculating Points...</p>
                     
                     <div className="w-full max-w-md bg-white/10 rounded-2xl p-6 backdrop-blur-md">
                         <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-2">
@@ -1140,7 +1148,7 @@
             if (screen === 'end') return (
                 <div className="flex flex-col items-center justify-center min-h-screen bg-black/90 p-10 text-center animated-bg">
                     <div className="text-8xl mb-6">{endInfo.isWinner ? '🎉' : '💀'}</div>
-                    <h1 className="text-6xl font-black text-white mb-2">{endInfo.isWinner ? 'TEBRİKLER!' : 'KAYBETTİN'}</h1>
+                    <h1 className="text-6xl font-black text-white mb-2">{endInfo.isWinner ? 'QAZANDINIZ! / YOU WON!' : 'MƏĞLUB OLDUNUZ / YOU LOST'}</h1>
                     <p className="text-white/60 text-xl font-bold mb-8">{endInfo.winnerName} kazandı!</p>
 
                     {endInfo.isRanked && (
@@ -1149,7 +1157,7 @@
                         </div>
                     )}
 
-                    <button onClick={() => { resetGameClientState(); setScreen('lobby'); }} className="mt-12 bg-white/10 hover:bg-white/20 text-white px-8 py-3 rounded-full font-bold transition-all">LOBİYE DÖN</button>
+                    <button onClick={() => { resetGameClientState(); setScreen('lobby'); }} className="mt-12 bg-white/10 hover:bg-white/20 text-white px-8 py-3 rounded-full font-bold transition-all">LOBİYƏ QAYIT / BACK TO LOBBY</button>
                 </div>
             );
 
@@ -1160,9 +1168,9 @@
                         <div className="absolute inset-0 border-8 border-t-yellow-500 rounded-full animate-spin"></div>
                         <div className="text-4xl animate-bounce">🔍</div>
                     </div>
-                    <h2 className="text-white text-3xl font-black mt-10">RAKİP ARANIYOR</h2>
+                    <h2 className="text-white text-3xl font-black mt-10">RƏQİB AXTARILIR / SEARCHING...</h2>
                     <p className="text-white/40 mt-2">Bu biraz zaman alabilir...</p>
-                    <button onClick={() => { sendMessage({ type: 'cancelSearch' }); setScreen('lobby'); }} className="mt-12 text-red-500 font-bold border border-red-500/30 px-6 py-2 rounded-full hover:bg-red-500/10 transition-all">İPTAL ET</button>
+                    <button onClick={() => { sendMessage({ type: 'cancelSearch' }); setScreen('lobby'); }} className="mt-12 text-red-500 font-bold border border-red-500/30 px-6 py-2 rounded-full hover:bg-red-500/10 transition-all">LƏĞV ET / CANCEL</button>
                 </div>
             );
 
@@ -1174,7 +1182,7 @@
                     >
                         ←
                     </button>
-                    <h1 className="text-4xl font-black text-white mb-8">📊 LADERBOARD 📊</h1>
+                    <h1 className="text-4xl font-black text-white mb-8">📊 LİDERLƏR / LEADERBOARD 📊</h1>
                     <div className="w-full max-w-xl space-y-3">
                         {leaderboard.map((p, i) => (
                             <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-3xl border border-white/5">
@@ -1191,7 +1199,7 @@
                             </div>
                         ))}
                     </div>
-                    <button onClick={() => setScreen('lobby')} className="mt-10 px-10 py-3 bg-white/10 text-white rounded-2xl font-bold">GERİ DÖN</button>
+                    <button onClick={() => setScreen('lobby')} className="mt-10 px-10 py-3 bg-white/10 text-white rounded-2xl font-bold">GERİ / BACK</button>
                 </div>
             );
 
