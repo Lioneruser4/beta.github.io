@@ -88,6 +88,7 @@
             -webkit-tap-highlight-color: transparent;
             user-select: none;
             -webkit-user-select: none;
+            position: relative; /* absolute pozisyonlu oyun ekranı için */
             padding-top: 40px; /* Siteyi biraz aşağı indir */
         }
 
@@ -981,7 +982,7 @@
             );
 
             if (screen === 'game') return (
-                <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden">
+                <div className="absolute inset-0 flex flex-col bg-[#0b241c] overflow-hidden">
                     {notification && <Toast message={notification.message} type={notification.type} />}
 
                     {/* Sunucu Mesajı Overlay (Oyun Kapalı vb.) */}
