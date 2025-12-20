@@ -598,6 +598,8 @@ function handleJoinRoom(ws, data) {
     if (!ws.playerId) ws.playerId = generateRoomCode();
     if (room.host === ws.playerId) return sendMessage(ws, { type: 'error', message: 'Kendi odanıza bağlanamazsınız' });
 
+    const pid = ws.playerId || generateRoomCode();
+    ws.playerId = pid;
     const pid = ws.playerId;
     ws.playerName = data.playerName || data.username || 'Guest';
     ws.telegramId = data.telegramId || null;
@@ -800,6 +802,7 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
                 loser: eloChanges.loserChange
             } : null
         });
+        rooms.delete(roomCode);
     } catch (error) {
         console.error('❌ Game end error:', error);
         broadcastToRoom(roomCode, {
@@ -808,8 +811,6 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
             winnerName: winnerId === 'DRAW' ? 'Beraberlik' : gameState.players[winnerId].name,
             isRanked: false
         });
-    } finally {
-        // Her durumda odayı sil ki oyun askıda kalmasın
         rooms.delete(roomCode);
     }
 }
@@ -1010,15 +1011,24 @@ function handleDisconnect(ws) {
     if (ws.roomCode) {
         const room = rooms.get(ws.roomCode);
         if (room) {
-            // Eğer oyun devam ediyorsa ve biri düştüyse, diğerini kazanan ilan et ve oyunu bitir
+            // Eğer oyun devam ediyorsa ve biri düştüyse, diğerini kazanan ilan et
             if (room.gameState) {
                 const opponentId = Object.keys(room.players).find(id => id !== ws.playerId);
                 console.log(`🔌 Oyuncu düştü, oyun bitiriliyor. Kazanan: ${opponentId}`);
                 handleGameEnd(ws.roomCode, opponentId, room.gameState);
             } else {
                 broadcastToRoom(ws.roomCode, { type: 'playerDisconnected', playerName: ws.playerName });
-                // Oyun başlamamışsa odayı hemen sil (veya timer ile)
+            }
+            
+            if (!room.gameState) {
                 rooms.delete(ws.roomCode);
+            } else {
+                // Opsiyonel: 5 dakika sonra odayı temizle (Memory leak önlemek için)
+                if (!room.cleanupTimer) {
+                    room.cleanupTimer = setTimeout(() => {
+                        rooms.delete(ws.roomCode);
+                    }, 300000); // 5 dk
+                }
             }
         }
     }
