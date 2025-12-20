@@ -1228,32 +1228,21 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<DominoGame />);
     </script>
-        </script>
 
     <script>
-        const tgApp = window.Telegram.WebApp;
-        tgApp.ready();
-        tgApp.expand();
-        if (tgApp.requestFullscreen) {
-            tgApp.requestFullscreen();
+        // Safely initialize Telegram Web App features
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tgApp = window.Telegram.WebApp;
+            tgApp.ready();
+            tgApp.expand();
+            
+            if (tgApp.requestFullscreen) {
+                tgApp.requestFullscreen();
+            }
+            tgApp.disableVerticalSwipes();
+            tgApp.setHeaderColor('#1b4d3e');
         }
-        tgApp.disableVerticalSwipes();
-        tgApp.setHeaderColor('secondary_bg_color');
     </script>
-<script>
-    const tgApp = window.Telegram.WebApp;
-    tgApp.ready();
-    tgApp.expand();
-    if (tgApp.requestFullscreen) {
-        tgApp.requestFullscreen();
-    }
-    tgApp.disableVerticalSwipes();
-    tgApp.setHeaderColor('#1b4d3e');
-</script>
 
 </body>
-</html>
-
-</body>
-
 </html>
