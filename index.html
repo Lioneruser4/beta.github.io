@@ -249,6 +249,18 @@
             border-width: 2px;
             text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
         }
+
+        /* Görkemli Arka Plan Animasyonu */
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .animated-bg {
+            background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #1b4d3e);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+        }
     </style>
 </head>
 
@@ -355,7 +367,7 @@
         // --- ANA OYUN ---
 
         const DominoGame = () => {
-            const [screen, setScreen] = useState('loading'); // loading, lobby, searching, game, leaderboard, end
+            const [screen, setScreen] = useState('loading'); // loading, lobby, searching, game, leaderboard, end, calculating
             const [connected, setConnected] = useState(false);
             const [playerData, setPlayerData] = useState(null); // Telegram user data
             const [leaderboard, setLeaderboard] = useState([]);
@@ -372,6 +384,7 @@
             const [endInfo, setEndInfo] = useState(null);
             const [opponent, setOpponent] = useState(null);
             const [lastSoundIndex, setLastSoundIndex] = useState(0); // For sequential sounds 6, 7, 8
+            const [calculationData, setCalculationData] = useState(null); // Hesaplama ekranı verisi
 
             const [playerId, setPlayerId] = useState(null);
             const wsRef = useRef(null);
@@ -392,6 +405,7 @@
                 setEndInfo(null);
                 setOpponent(null);
                 setJoinCode('');
+                setCalculationData(null);
             };
 
             // Ses Efektleri (Opsiyonel - Tarayıcı izin verirse çalışır)
@@ -609,32 +623,13 @@
                         break;
                     case 'gameEnd':
                         console.log('🏁 Oyun Bitti!', data);
-                        // Get current user's ID
-                        const myId = String(playerId || gameState?.playerId || playerData?.id || '');
-                        const winnerId = String(data.winner || '');
-
-                        // Check winner by ID or Name (as fallback)
-                        let amIWinner = (winnerId !== '' && winnerId !== 'DRAW' && winnerId === myId);
-
-                        // If ID match fails, check if the winner name matches my name
-                        if (!amIWinner && winnerId !== 'DRAW' && data.winnerName === (playerData?.username || gameState?.players[myId]?.name)) {
-                            amIWinner = true;
-                        }
-
-                        setEndInfo({
-                            winnerName: data.winnerName,
-                            isRanked: data.isRanked,
-                            isWinner: amIWinner,
-                            eloChange: data.eloChanges ? (amIWinner ? data.eloChanges.winner : data.eloChanges.loser) : 0
-                        });
-                        setScreen('end');
-                        if (amIWinner) playSound('win'); else playSound('lose');
-
-                        localStorage.removeItem('domino_session');
+                        // Hesaplama ekranını göster (8 saniye)
+                        setCalculationData(data);
+                        setScreen('calculating');
+                        
                         setTimeout(() => {
-                            resetGameClientState();
-                            setScreen('lobby');
-                        }, 5000);
+                            processGameResult(data);
+                        }, 8000);
                         break;
                     case 'playerDisconnected':
                         showNotification('Rakip bağlantısı koptu, bekleniyor...', 'warning');
@@ -653,6 +648,32 @@
                         setScreen('matching_lobby');
                         break;
                 }
+            };
+
+            const processGameResult = (data) => {
+                // Get current user's ID
+                const myId = String(playerData?.telegramId || playerData?.id || playerId || '');
+                const winnerId = String(data.winner || '');
+
+                // Check winner by ID or Name (as fallback)
+                let amIWinner = (winnerId !== '' && winnerId !== 'DRAW' && winnerId === myId);
+
+                // If ID match fails, check if the winner name matches my name
+                if (!amIWinner && winnerId !== 'DRAW' && data.winnerName === (playerData?.username || gameState?.players[myId]?.name)) {
+                    amIWinner = true;
+                }
+
+                setEndInfo({
+                    winnerName: data.winnerName,
+                    isRanked: data.isRanked,
+                    isWinner: amIWinner,
+                    eloChange: data.eloChanges ? (amIWinner ? data.eloChanges.winner : data.eloChanges.loser) : 0,
+                    scores: data.scores // Puanları göster
+                });
+                setScreen('end');
+                if (amIWinner) playSound('win'); else playSound('lose');
+
+                localStorage.removeItem('domino_session');
             };
 
             // Dynamics: Snake Layout Calculation
@@ -798,6 +819,20 @@
                 return moves;
             };
 
+            // Otomatik Pass Kontrolü
+            useEffect(() => {
+                if (isMyTurn && gameState && !gameState.winner) {
+                    const hasMoves = myHand.some(tile => calculateValidMoves(tile).length > 0);
+                    if (!hasMoves && marketSize === 0) {
+                        console.log("Hamle yok ve pazar boş. Otomatik pass geçiliyor...");
+                        setTimeout(() => {
+                            sendMessage({ type: 'passTurn' });
+                            playSound('pass'); // Pass sesi
+                        }, 1500);
+                    }
+                }
+            }, [isMyTurn, myHand, gameState, marketSize]);
+
             const handleTileClick = (index, tile) => {
                 if (!isMyTurn) return;
                 if (selectedTileIndex === index) {
@@ -840,20 +875,20 @@
             // --- RENDER PARTS ---
 
             if (screen === 'loading') return (
-                <div className="flex items-center justify-center min-h-screen">
+                <div className="flex items-center justify-center min-h-screen animated-bg">
                     <div className="text-white animate-pulse text-2xl font-bold">YÜKLENİYOR...</div>
                 </div>
             );
 
             if (screen === 'lobby') return (
-                <div className="flex flex-col items-center justify-center min-h-screen p-6">
+                <div className="flex flex-col items-center justify-center min-h-screen p-6 animated-bg">
                     {notification && <Toast message={notification.message} type={notification.type} />}
                     <div className="text-center mb-10 animate-float">
                         <h1 className="text-6xl font-black text-white drop-shadow-2xl mb-2">DOMINO <span className="text-yellow-400">101</span></h1>
                         <p className="text-white/60 tracking-widest uppercase">Premium Multiplayer Experience</p>
                     </div>
 
-                    <div className="w-full max-w-sm bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10 shadow-2xl">
+                    <div className="w-full max-w-sm bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl">
                         {playerData && (
                             <div className="mb-8 text-center">
                                 {playerData.photoUrl && <img src={playerData.photoUrl} className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 p-1" />}
@@ -864,14 +899,18 @@
                                 </div>
                             </div>
                         )}
-                        <button onClick={() => {
+                        <button onClick={() => { 
                             setScreen('searching');
                             setSearching(true);
                             sendMessage({ type: 'findMatch', ...playerData });
-                        }} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl mb-4 transition-all transform active:scale-95 shadow-lg">🔍 Dərəcəli / Ranked 🔍</button>
+                        }} className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-black py-4 rounded-2xl mb-4 transition-all transform active:scale-95 shadow-lg flex items-center justify-center gap-2">
+                            <span>🏆</span> Dərəcəli / Ranked
+                        </button>
 
                         <div className="flex flex-col gap-3">
-                            <button onClick={() => sendMessage({ type: 'createRoom', ...playerData })} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all">🏠 Otaq Yarat / Create Room</button>
+                            <button onClick={() => sendMessage({ type: 'createRoom', ...playerData })} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
+                                <span>🏠</span> Otaq Yarat / Create Room
+                            </button>
 
                             <div className="flex gap-2">
                                 <input
@@ -907,13 +946,15 @@
                             </div>
                         )}
 
-                        <button onClick={() => { loadLeaderboard(); setScreen('leaderboard'); }} className="w-full mt-6 text-white/40 hover:text-white transition-colors text-sm font-bold">🏆 SKOR TABLOSU</button>
+                        <button onClick={() => { loadLeaderboard(); setScreen('leaderboard'); }} className="w-full mt-6 bg-blue-600/20 hover:bg-blue-600/40 text-blue-200 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
+                            <span>📊</span> SKOR TABLOSU
+                        </button>
                     </div>
                 </div>
             );
 
             if (screen === 'matching_lobby') return (
-                <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-black/60 backdrop-blur-2xl">
+                <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-black/60 backdrop-blur-2xl animated-bg">
                     <div className="text-center mb-16">
                         <h2 className="text-4xl font-black text-yellow-500 animate-pulse">RAKİP BULUNDU!</h2>
                         <p className="text-white/40 mt-2 uppercase tracking-[0.3em]">Maç Başlıyor...</p>
@@ -1071,8 +1112,33 @@
                 </div>
             );
 
+            if (screen === 'calculating') return (
+                <div className="flex flex-col items-center justify-center min-h-screen bg-black/90 p-10 text-center animated-bg">
+                    <div className="text-6xl mb-6 animate-bounce">🧮</div>
+                    <h1 className="text-4xl font-black text-white mb-4">OYUN KAPALI</h1>
+                    <p className="text-yellow-400 text-xl font-bold mb-8 animate-pulse">Puanlar Hesaplanıyor...</p>
+                    
+                    <div className="w-full max-w-md bg-white/10 rounded-2xl p-6 backdrop-blur-md">
+                        <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-2">
+                            <span className="text-white font-bold">Oyuncu</span>
+                            <span className="text-white font-bold">Elindeki Puan</span>
+                        </div>
+                        {calculationData?.scores ? (
+                            Object.entries(calculationData.scores).map(([pid, score]) => (
+                                <div key={pid} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                                    <span className="text-white/80">{gameState?.players?.[pid]?.name || 'Oyuncu'}</span>
+                                    <span className="text-yellow-400 font-bold">{score}</span>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-white/60 italic">Taşlar sayılıyor...</div>
+                        )}
+                    </div>
+                </div>
+            );
+
             if (screen === 'end') return (
-                <div className="flex flex-col items-center justify-center min-h-screen bg-black/90 p-10 text-center">
+                <div className="flex flex-col items-center justify-center min-h-screen bg-black/90 p-10 text-center animated-bg">
                     <div className="text-8xl mb-6">{endInfo.isWinner ? '🎉' : '💀'}</div>
                     <h1 className="text-6xl font-black text-white mb-2">{endInfo.isWinner ? 'TEBRİKLER!' : 'KAYBETTİN'}</h1>
                     <p className="text-white/60 text-xl font-bold mb-8">{endInfo.winnerName} kazandı!</p>
@@ -1083,12 +1149,12 @@
                         </div>
                     )}
 
-                    <div className="mt-12 text-white/30 animate-pulse">Lobiye dönülüyor...</div>
+                    <button onClick={() => { resetGameClientState(); setScreen('lobby'); }} className="mt-12 bg-white/10 hover:bg-white/20 text-white px-8 py-3 rounded-full font-bold transition-all">LOBİYE DÖN</button>
                 </div>
             );
 
             if (screen === 'searching') return (
-                <div className="flex flex-col items-center justify-center min-h-screen bg-[#0b241c]">
+                <div className="flex flex-col items-center justify-center min-h-screen animated-bg">
                     <div className="w-40 h-40 relative flex items-center justify-center">
                         <div className="absolute inset-0 border-8 border-yellow-500/20 rounded-full"></div>
                         <div className="absolute inset-0 border-8 border-t-yellow-500 rounded-full animate-spin"></div>
@@ -1101,7 +1167,7 @@
             );
 
             if (screen === 'leaderboard') return (
-                <div className="flex flex-col items-center justify-start min-h-screen p-8 bg-[#0b241c] overflow-y-auto relative">
+                <div className="flex flex-col items-center justify-start min-h-screen p-8 animated-bg overflow-y-auto relative">
                     <button
                         onClick={() => setScreen('lobby')}
                         className="absolute top-6 left-6 w-12 h-12 flex items-center justify-center bg-white/10 rounded-2xl text-white text-2xl hover:bg-white/20 transition-all font-black"
