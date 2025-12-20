@@ -1014,11 +1014,16 @@ function handleDisconnect(ws) {
             if (!room.gameState) {
                 rooms.delete(ws.roomCode);
             } else {
-                // Opsiyonel: 5 dakika sonra odayı temizle (Memory leak önlemek için)
+                // 10 saniye sonra oyunu bitir ve diğerini kazanan ilan et
                 if (!room.cleanupTimer) {
                     room.cleanupTimer = setTimeout(() => {
+                        // Diğer oyuncuyu bul (Kazanan)
+                        const winnerId = Object.keys(room.players).find(id => id !== ws.playerId);
+                        if (winnerId && room.gameState) {
+                            handleGameEnd(ws.roomCode, winnerId, room.gameState);
+                        }
                         rooms.delete(ws.roomCode);
-                    }, 300000); // 5 dk
+                    }, 10000); // 10 saniye
                 }
             }
         }
@@ -1031,8 +1036,8 @@ setInterval(() => {
     rooms.forEach((room, roomCode) => {
         if (!room.gameState || !room.gameState.turnStartTime || room.gameState.winner) return;
         
-        // 30 saniye süre
-        const TURN_LIMIT = 30000;
+        // 25 saniye süre
+        const TURN_LIMIT = 25000;
         const elapsed = Date.now() - room.gameState.turnStartTime;
         
         if (elapsed > TURN_LIMIT) {
