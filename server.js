@@ -729,19 +729,21 @@ function startNewRound(roomCode, startingPlayerId) {
     const gs = room.gameState;
     const playerIds = Object.keys(gs.players);
     const [p1, p2] = playerIds;
-
-    // Sadece elleri, tahtayı ve pazarı sıfırla. Skorları koru.
+ 
+    // Yeni raund için kartları dağıt ve başlangıç oyuncusunu belirle
     const { player1Hand, player2Hand, market, startingPlayer: defaultStartingPlayer } = dealCardsAndDetermineStart(p1, p2);
-
+ 
+    // Oyun durumunu sıfırla ama skorları ve raund sayısını koru
     gs.board = [];
     gs.players[p1].hand = player1Hand;
     gs.players[p2].hand = player2Hand;
     gs.market = market;
     gs.round++;
-    gs.currentPlayer = startingPlayerId || defaultStartingPlayer; // Kaybeden başlar, berabereyse veya ilk el ise çift kuralı
+    // Bir önceki raundu kaybeden başlar, berabereyse veya ilk el ise en yüksek çifti olan başlar
+    gs.currentPlayer = startingPlayerId || defaultStartingPlayer; 
     gs.turnStartTime = Date.now();
     gs.winner = null; // Önceki kazananı temizle
-
+ 
     console.log(`🔄 Yeni Raund (${gs.round}) başlıyor. Skor: ${gs.score[p1]}-${gs.score[p2]}. Başlayan: ${gs.players[gs.currentPlayer].name}`);
     Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
 }
