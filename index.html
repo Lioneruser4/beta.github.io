@@ -385,7 +385,7 @@
         // --- ANA OYUN ---
 
         const DominoGame = () => {
-            const [screen, setScreen] = useState('loading'); // loading, lobby, searching, game, calculation, end
+            const [screen, setScreen] = useState('loading'); // loading, lobby, searching, game, calculation, roundEnd, end
             const [connected, setConnected] = useState(false);
             const [playerData, setPlayerData] = useState(null); // Telegram user data
             const [leaderboard, setLeaderboard] = useState([]);
@@ -397,6 +397,7 @@
             const [language, setLanguage] = useState('az'); // 'az' veya 'en'
 
             // Oyun İçi State
+            const [roundEndInfo, setRoundEndInfo] = useState(null);
             const [selectedTileIndex, setSelectedTileIndex] = useState(null);
             const [validMoves, setValidMoves] = useState([]); // ['left', 'right', 'both']
             const [notification, setNotification] = useState(null);
@@ -532,6 +533,7 @@
                 setValidMoves([]);
                 setEndInfo(null);
                 setOpponent(null);
+                setRoundEndInfo(null);
                 setJoinCode('');
                 setCalculationLobby(null);
                 setCalculationTimer(8);
@@ -888,6 +890,14 @@
                         setCalculationTimer(8);
                         setScreen('calculation');
                         break;
+                    case 'roundEnd':
+                        setRoundEndInfo({
+                            winnerId: data.winnerId,
+                            score: data.score
+                        });
+                        setScreen('roundEnd');
+                        // Server will send gameUpdate to start next round
+                        break;
                 }
             };
 
@@ -1016,11 +1026,13 @@
             const myPlayerId = gameState?.playerId;
             const isMyTurn = gameState?.currentPlayer === myPlayerId;
             const myHand = gameState?.players[myPlayerId]?.hand || [];
+            const myScore = gameState?.score?.[myPlayerId] || 0;
             const marketSize = gameState?.market?.length || 0;
             const canDrawFromMarket = marketSize > 0;
             
             const opponentPlayerId = Object.keys(gameState?.players || {}).find(id => id !== myPlayerId);
             const opponentHand = gameState?.players[opponentPlayerId]?.hand || [];
+            const opponentScore = gameState?.score?.[opponentPlayerId] || 0;
 
             const calculateValidMoves = (tile) => {
                 if (!gameState || gameState.board.length === 0) return ['start'];
@@ -1288,6 +1300,11 @@
                                     {gameState?.players[opponentPlayerId]?.elo || 0} ELO
                                 </div>
                             </div>
+                        </div>
+
+                        <div className="absolute top-[76px] left-1/2 -translate-x-1/2 bg-black/50 px-6 py-2 rounded-b-2xl text-white font-black text-2xl shadow-lg z-20">
+                            {myScore} - {opponentScore}
+                            {myScore === 2 && opponentScore === 2 && <div className="text-yellow-400 text-xs animate-pulse">FINAL ROUND</div>}
                         </div>
                         
                         <div className="text-white text-sm font-bold bg-black/30 px-3 py-1 rounded-full">
