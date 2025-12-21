@@ -358,13 +358,13 @@
 
         // 5. Game Timer Component
         const GameTimer = ({ startTime }) => {
-            const [timeLeft, setTimeLeft] = useState(30);
+            const [timeLeft, setTimeLeft] = useState(25);
             
             useEffect(() => {
                 const interval = setInterval(() => {
                     if (!startTime) return;
                     const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                    const remaining = Math.max(0, 30 - elapsed);
+                    const remaining = Math.max(0, 25 - elapsed);
                     setTimeLeft(remaining);
                 }, 100);
                 return () => clearInterval(interval);
@@ -374,60 +374,6 @@
                 <div className="absolute top-[15%] left-6 text-8xl font-black text-white/10 pointer-events-none select-none z-10">
                     {timeLeft}
                 </div>
-            );
-        };
-
-        // 6. Exit Game Button Component
-        const ExitGameButton = ({ onExit }) => {
-            const [showConfirm, setShowConfirm] = useState(false);
-
-            const handleExitClick = () => {
-                setShowConfirm(true);
-            };
-
-            const handleConfirm = () => {
-                onExit();
-                setShowConfirm(false);
-            };
-
-            const handleCancel = () => {
-                setShowConfirm(false);
-            };
-
-            return (
-                <>
-                    <button
-                        onClick={handleExitClick}
-                        className="fixed bottom-6 right-6 w-14 h-14 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center shadow-lg z-40 transition-all duration-300"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-
-                    {showConfirm && (
-                        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                            <div className="bg-[#1b4d3e] border-2 border-red-500 rounded-2xl p-6 max-w-sm w-full">
-                                <h3 className="text-xl font-bold text-white mb-4 text-center">Oyundan Çıkmak İstiyor Musun?</h3>
-                                <p className="text-white/70 mb-6 text-center">Çıkarsan maçı kaybedeceksin.</p>
-                                <div className="flex gap-3">
-                                    <button
-                                        onClick={handleCancel}
-                                        className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-xl font-bold transition-all"
-                                    >
-                                        İPTAL
-                                    </button>
-                                    <button
-                                        onClick={handleConfirm}
-                                        className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold transition-all"
-                                    >
-                                        ÇIK
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </>
             );
         };
 
@@ -767,35 +713,37 @@
                         break;
                     case 'gameEnd':
                         console.log('🏁 Oyun Bitti!', data);
-                        // Get current user's ID
-                        const myId = String(playerId || gameState?.playerId || playerData?.id || '');
+                        const myId = String(playerId || '');
                         const winnerId = String(data.winner || '');
+                        const amIWinner = (winnerId && winnerId !== 'DRAW' && winnerId === myId);
 
-                        // Check winner by ID or Name (as fallback)
-                        let amIWinner = (winnerId !== '' && winnerId !== 'DRAW' && winnerId === myId);
-
-                        // If ID match fails, check if the winner name matches my name
-                        if (!amIWinner && winnerId !== 'DRAW' && data.winnerName === (playerData?.username || gameState?.players[myId]?.name)) {
-                            amIWinner = true;
-                        }
+                        const endReason = data.reason || null; // e.g., 'disconnect', 'afk', 'normal'
 
                         setEndInfo({
-                            winnerName: data.winnerName,
-                            winnerPhoto: data.winnerPhoto,
-                            loserName: data.loserName,
-                            loserPhoto: data.loserPhoto,
-                            isRanked: data.isRanked,
                             isWinner: amIWinner,
-                            eloChange: data.eloChanges ? (amIWinner ? data.eloChanges.winner : data.eloChanges.loser) : 0
+                            isRanked: data.isRanked,
+                            reason: endReason,
+                            winner: {
+                                name: data.winnerName,
+                                photo: data.winnerPhoto,
+                                eloChange: data.eloChanges?.winner || 0
+                            },
+                            loser: {
+                                name: data.loserName,
+                                photo: data.loserPhoto,
+                                eloChange: data.eloChanges?.loser || 0
+                            }
                         });
+
                         setScreen('end');
                         if (amIWinner) playSound('win'); else playSound('lose');
 
                         localStorage.removeItem('domino_session');
                         setTimeout(() => {
                             resetGameClientState();
+                            if (playerData) initializeTelegramAuth(); // Refresh player data (ELO etc)
                             setScreen('lobby');
-                        }, 5000);
+                        }, 8000);
                         break;
                     case 'playerDisconnected':
                         showNotification('Rakip bağlantısı koptu, bekleniyor...', 'warning');
@@ -1178,7 +1126,7 @@
                     )}
 
                     {/* Header - Rakip bilgisi aşağı kaydırıldı */}
-                    <div className="h-16 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30 mt-4">
+                    <div className="h-16 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30 mt-10">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full border-2 border-white/20 overflow-hidden">
                                 {opponent?.photoUrl ? <img src={opponent.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 flex items-center justify-center">👤</div>}
@@ -1282,30 +1230,38 @@
                         </div>
                     </div>
 
-                    {/* Oyundan çık butonu */}
-                    <ExitGameButton onExit={leaveGameClient} />
-
                     {/* Controls Footer */}
                     <div className="h-48 z-30 bg-black/60 backdrop-blur-xl border-t border-white/10 p-4">
                         <div className="flex items-center justify-between mb-2">
                             <div className="text-white/50 text-xs font-bold uppercase tracking-widest">{t.yourHand} ({myHand.length})</div>
-                            {isMyTurn && (
-                                marketSize > 0 ? (
-                                    <button onClick={() => sendMessage({ type: 'drawFromMarket' })} className="bg-yellow-500 text-black px-4 py-1 rounded-full text-xs font-bold shadow-glow flex items-center gap-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                                        </svg>
-                                        {t.drawTile} ({marketSize})
-                                    </button>
-                                ) : (
-                                    <button onClick={() => sendMessage({ type: 'passTurn' })} className="bg-red-600 hover:bg-red-500 text-white px-6 py-1 rounded-full text-xs font-bold shadow-glow animate-pulse flex items-center gap-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
-                                        </svg>
-                                        {t.passTurn}
-                                    </button>
-                                )
-                            )}
+                            <div className="flex items-center gap-2">
+                                {isMyTurn && (
+                                    marketSize > 0 ? (
+                                        <button onClick={() => sendMessage({ type: 'drawFromMarket' })} className="bg-yellow-500 text-black px-4 py-1 rounded-full text-xs font-bold shadow-glow flex items-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                                            </svg>
+                                            {t.drawTile} ({marketSize})
+                                        </button>
+                                    ) : (
+                                        <button onClick={() => sendMessage({ type: 'passTurn' })} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-1 rounded-full text-xs font-bold shadow-glow flex items-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
+                                            </svg>
+                                            {t.passTurn}
+                                        </button>
+                                    )
+                                )}
+                                <button
+                                    onClick={leaveGameClient}
+                                    title={t.leaveGame}
+                                    className="w-8 h-8 bg-red-800/80 hover:bg-red-700 rounded-full flex items-center justify-center shadow-lg transition-all"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                         
                         {/* Elindeki taşlar - 8'den fazlaysa alt satıra geç */}
@@ -1324,43 +1280,48 @@
                 </div>
             );
 
-            if (screen === 'end') return (
-                <div className="flex flex-col items-center justify-center min-h-screen bg-black/90 p-10 text-center">
-                    <div className="text-8xl mb-6">{endInfo.isWinner ? '🎉' : '💀'}</div>
+            if (screen === 'end' && endInfo) return (
+                <div className="flex flex-col items-center justify-center min-h-screen bg-black/90 p-6 text-center">
+                    <h1 className="text-5xl font-black text-white mb-2">
+                        {endInfo.isWinner ? 'QAZANDINIZ!' : 'MƏĞLUB OLDUNUZ'}
+                    </h1>
                     
-                    {/* Kazanan */}
-                    <div className="mb-8">
-                        <div className="flex items-center justify-center gap-4 mb-4">
-                            {endInfo.winnerPhoto ? (
-                                <img src={endInfo.winnerPhoto} className="w-16 h-16 rounded-full border-4 border-yellow-500" />
-                            ) : (
-                                <div className="w-16 h-16 rounded-full border-4 border-yellow-500 bg-gray-700 flex items-center justify-center">👑</div>
-                            )}
-                            <div className="text-left">
-                                <h2 className="text-2xl font-bold text-white">{endInfo.winnerName}</h2>
-                                <div className="text-green-400 text-xl font-black">{endInfo.isWinner ? t.winner : t.loser}</div>
-                            </div>
-                        </div>
-                        <div className="text-3xl font-black text-green-400">
-                            {endInfo.eloChange > 0 ? '+' : ''}{endInfo.eloChange} {t.eloChange}
-                        </div>
-                    </div>
+                    {endInfo.reason === 'disconnect' && <p className="text-yellow-400 mb-6 text-lg">Rəqib oyundan ayrıldı.</p>}
+                    {endInfo.reason === 'afk' && <p className="text-yellow-400 mb-6 text-lg">{endInfo.isWinner ? 'Rəqib AFK qaldı.' : 'AFK qaldığınız üçün məğlub oldunuz.'}</p>}
 
-                    {/* Kaybeden */}
-                    <div className="mb-8">
-                        <div className="flex items-center justify-center gap-4 mb-4">
-                            {endInfo.loserPhoto ? (
-                                <img src={endInfo.loserPhoto} className="w-16 h-16 rounded-full border-4 border-red-500" />
-                            ) : (
-                                <div className="w-16 h-16 rounded-full border-4 border-red-500 bg-gray-700 flex items-center justify-center">😞</div>
-                            )}
-                            <div className="text-left">
-                                <h2 className="text-2xl font-bold text-white">{endInfo.loserName}</h2>
-                                <div className="text-red-400 text-xl font-black">{!endInfo.isWinner ? t.winner : t.loser}</div>
+                    <div className="w-full max-w-sm space-y-4 mt-4">
+                        {/* Winner Info */}
+                        <div className="flex items-center gap-4 p-4 bg-green-900/50 rounded-2xl border-2 border-green-500/50">
+                            <div className="relative">
+                                <img src={endInfo.winner.photo || 'https://via.placeholder.com/64'} className="w-16 h-16 rounded-full border-2 border-green-400" />
+                                <div className="absolute -bottom-2 -right-2 text-2xl">👑</div>
                             </div>
+                            <div className="flex-1 text-left">
+                                <div className="text-white font-bold text-lg truncate">{endInfo.winner.name}</div>
+                                <div className="text-green-400 font-bold">Qazandı</div>
+                            </div>
+                            {endInfo.isRanked && (
+                                <div className="text-green-400 font-black text-xl">
+                                    {endInfo.winner.eloChange >= 0 ? '+' : ''}{endInfo.winner.eloChange}
+                                </div>
+                            )}
                         </div>
-                        <div className="text-3xl font-black text-red-400">
-                            {endInfo.eloChange > 0 ? '-' : '+'}{Math.abs(endInfo.eloChange)} {t.eloChange}
+
+                        {/* Loser Info */}
+                        <div className="flex items-center gap-4 p-4 bg-red-900/50 rounded-2xl border-2 border-red-500/50">
+                             <div className="relative">
+                                <img src={endInfo.loser.photo || 'https://via.placeholder.com/64'} className="w-16 h-16 rounded-full border-2 border-red-400" />
+                                <div className="absolute -bottom-2 -right-2 text-2xl">💀</div>
+                            </div>
+                            <div className="flex-1 text-left">
+                                <div className="text-white font-bold text-lg truncate">{endInfo.loser.name}</div>
+                                <div className="text-red-400 font-bold">Məğlub oldu</div>
+                            </div>
+                            {endInfo.isRanked && (
+                                <div className="text-red-400 font-black text-xl">
+                                    {endInfo.loser.eloChange}
+                                </div>
+                            )}
                         </div>
                     </div>
 
