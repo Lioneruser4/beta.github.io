@@ -925,7 +925,7 @@ function handlePass(ws) {
 
         // End the game after showing scores
         setTimeout(() => {
-            processRoundWinner(room.code, winnerId, room.gameState);
+            processRoundWinner(room.code, winnerIdForCalc, room.gameState);
         }, 8000);
         
         return;
