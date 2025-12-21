@@ -248,30 +248,14 @@ function shuffleArray(array) {
     return arr;
 }
 
-function initializeGame(roomCode, player1Id, player2Id) {
+function dealCardsAndDetermineStart(player1Id, player2Id) {
     const tiles = createDominoSet();
     const player1Hand = tiles.slice(0, 7);
     const player2Hand = tiles.slice(7, 14);
-    const market = tiles.slice(14); // Kalan taşlar pazar
+    const market = tiles.slice(14);
 
-    const room = rooms.get(roomCode);
-
-    // En yüksek çifti bul (6|6, 5|5, 4|4, ...)
     let startingPlayer = player1Id;
     let highestDouble = -1;
-
-    const getPlayerData = (id) => ({
-        hand: id === player1Id ? player1Hand : player2Hand,
-        name: room.players[id].name,
-        elo: room.players[id].elo,
-        photoUrl: room.players[id].photoUrl,
-        level: room.players[id].level,
-        timeouts: 0
-    });
-
-    // Oyuncu bilgilerini gameState'e ekle (ELO, level vb.)
-    const player1Data = getPlayerData(player1Id);
-    const player2Data = getPlayerData(player2Id);
 
     for (let player of [player1Id, player2Id]) {
         const hand = player === player1Id ? player1Hand : player2Hand;
@@ -282,12 +266,32 @@ function initializeGame(roomCode, player1Id, player2Id) {
             }
         }
     }
+    return { player1Hand, player2Hand, market, startingPlayer, highestDouble };
+}
+
+function initializeGame(roomCode, player1Id, player2Id) {
+    const { player1Hand, player2Hand, market, startingPlayer, highestDouble } = dealCardsAndDetermineStart(player1Id, player2Id);
+
+    const room = rooms.get(roomCode);
+
+    // En yüksek çifti bul (6|6, 5|5, 4|4, ...)
+    let startingPlayer = player1Id;
+    let highestDouble = -1;
+
+    const getPlayerData = (id, hand) => ({
+        hand: hand,
+        name: room.players[id].name,
+        elo: room.players[id].elo,
+        photoUrl: room.players[id].photoUrl,
+        level: room.players[id].level,
+        timeouts: 0
+    });
 
     room.gameState = {
         board: [],
         players: {
-            [player1Id]: player1Data,
-            [player2Id]: player2Data
+            [player1Id]: getPlayerData(player1Id, player1Hand),
+            [player2Id]: getPlayerData(player2Id, player2Hand)
         },
         market: market,
         currentPlayer: startingPlayer,
@@ -498,8 +502,9 @@ function handleFindMatch(ws, data) {
 
         // Aynı Telegram hesabının kendi kendisiyle eşleşmesini engelle
         if (!p1.isGuest && !p2.isGuest && p1.telegramId && p2.telegramId && p1.telegramId === p2.telegramId) {
-            // İkinci oyuncuyu kuyruğa geri koy ve bu eşleşmeyi iptal et
+            // Her iki oyuncuyu da kuyruğun başına geri koy ve bu eşleşmeyi iptal et
             matchQueue.unshift(p2);
+            matchQueue.unshift(p1);
             // Bu durumda p1 için tekrar rakip beklenir
             console.log('⚠️ Aynı Telegram hesabı kendi kendisiyle eşleşmeye çalıştı, engellendi');
             return;
@@ -589,7 +594,8 @@ function handleCreateRoom(ws, data) {
         players: { [ws.playerId]: hostData },
         type: 'private',
         host: ws.playerId,
-        startTime: Date.now()
+        startTime: Date.now(),
+        winsNeeded: 3 // EKLENDİ: Özel odalar için de kazanma şartı
     });
 
     sendMessage(ws, { type: 'roomCreated', roomCode });
@@ -721,20 +727,22 @@ function startNewRound(roomCode, startingPlayerId) {
     if (!room || !room.gameState) return;
 
     const gs = room.gameState;
-    const [p1, p2] = Object.keys(gs.players);
+    const playerIds = Object.keys(gs.players);
+    const [p1, p2] = playerIds;
 
-    // Oyunu sıfırla ama skorları ve oyuncu bilgilerini koru
-    const newGameState = initializeGame(roomCode, p1, p2);
-    gs.board = newGameState.board;
-    gs.players[p1].hand = newGameState.players[p1].hand;
-    gs.players[p2].hand = newGameState.players[p2].hand;
-    gs.market = newGameState.market;
+    // Sadece elleri, tahtayı ve pazarı sıfırla. Skorları koru.
+    const { player1Hand, player2Hand, market, startingPlayer: defaultStartingPlayer } = dealCardsAndDetermineStart(p1, p2);
+
+    gs.board = [];
+    gs.players[p1].hand = player1Hand;
+    gs.players[p2].hand = player2Hand;
+    gs.market = market;
     gs.round++;
-    gs.currentPlayer = startingPlayerId || newGameState.currentPlayer; // Kaybeden başlar, berabereyse default
+    gs.currentPlayer = startingPlayerId || defaultStartingPlayer; // Kaybeden başlar, berabereyse veya ilk el ise çift kuralı
     gs.turnStartTime = Date.now();
     gs.winner = null; // Önceki kazananı temizle
 
-    console.log(`🔄 Yeni Raund (${gs.round}) başlıyor. Başlayan: ${gs.players[gs.currentPlayer].name}`);
+    console.log(`🔄 Yeni Raund (${gs.round}) başlıyor. Skor: ${gs.score[p1]}-${gs.score[p2]}. Başlayan: ${gs.players[gs.currentPlayer].name}`);
     Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
 }
 
@@ -752,6 +760,7 @@ async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
 
     try {
         const playerIds = Object.keys(gameState.players);
+        const loserId = isDraw ? null : playerIds.find(id => id !== winnerId);
         const player1Id = playerIds[0];
         const player2Id = playerIds[1];
 
@@ -857,13 +866,12 @@ async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
             type: 'gameEnd',
             winner: String(winnerId),
             winnerName: isDraw ? 'Beraberlik' : (room.players[winnerId]?.name || 'Rakip'),
-            winnerPhoto: room.players[winnerId]?.photoUrl || null,
-            loserName: isDraw ? 'Beraberlik' : (room.players[loserId]?.name || 'Rakip'), // Assuming loserId is defined
-            loserPhoto: room.players[loserId]?.photoUrl || null, // Assuming loserId is defined
+            winnerPhoto: isDraw ? null : (room.players[winnerId]?.photoUrl || null),
+            loserName: isDraw ? 'Beraberlik' : (room.players[loserId]?.name || 'Rakip'),
+            loserPhoto: isDraw ? null : (room.players[loserId]?.photoUrl || null),
             isRanked: isRankedMatch,
             reason: reason,
             eloChanges: eloChanges ? {
-                // Ensure loserId is correctly determined for eloChanges
                 winner: eloChanges.winnerChange,
                 loser: eloChanges.loserChange
             } : null
@@ -874,8 +882,8 @@ async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
         broadcastToRoom(roomCode, {
             type: 'gameEnd',
             winner: winnerId,
-            winnerPhoto: room.players[winnerId]?.photoUrl || null,
-            loserPhoto: room.players[loserId]?.photoUrl || null, // Assuming loserId is defined
+            winnerPhoto: isDraw ? null : (room.players[winnerId]?.photoUrl || null),
+            loserPhoto: isDraw ? null : (room.players[loserId]?.photoUrl || null),
             winnerName: winnerId === 'DRAW' ? 'Beraberlik' : (gameState.players[winnerId]?.name || 'Bilinmeyen'),
             isRanked: false
         });
