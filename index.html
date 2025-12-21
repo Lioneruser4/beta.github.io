@@ -362,22 +362,25 @@
         };
 
         // 5. Game Timer Component
-        const GameTimer = ({ startTime }) => {
+        const GameTimer = ({ startTime, isMyTurn }) => {
             const [timeLeft, setTimeLeft] = useState(25);
             
             useEffect(() => {
                 const interval = setInterval(() => {
-                    if (!startTime) return;
+                    if (!startTime || !isMyTurn) {
+                        setTimeLeft(25);
+                        return;
+                    }
                     const elapsed = Math.floor((Date.now() - startTime) / 1000);
                     const remaining = Math.max(0, 25 - elapsed);
                     setTimeLeft(remaining);
                 }, 100);
                 return () => clearInterval(interval);
-            }, [startTime]);
+            }, [startTime, isMyTurn]);
 
             return (
                 <div className="absolute top-[15%] left-6 text-8xl font-black text-white/10 pointer-events-none select-none z-10">
-                    {timeLeft}
+                    {isMyTurn ? timeLeft : 25}
                 </div>
             );
         };
@@ -1266,8 +1269,8 @@
             if (screen === 'game') return (
                 <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden" style={{ paddingTop: '60px' }}>
                     {notification && <Toast message={notification.message} type={notification.type} />}
-
-                    <GameTimer startTime={gameState.turnStartTime} />
+                    {/* Timer */}
+                    <GameTimer startTime={gameState.turnStartTime} isMyTurn={isMyTurn} />
 
                     {serverMessage && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
@@ -1279,8 +1282,8 @@
                         </div>
                     )}
 
-                    {/* Header - 60px aşağıda */}
-                    <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30">
+                    {/* Header - Rakip Bilgisi */}
+                    <div className="absolute top-16 left-0 right-0 h-16 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full border-2 border-white/20 overflow-hidden">
                                 {opponent?.photoUrl ? <img src={opponent.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 flex items-center justify-center">👤</div>}
@@ -1298,7 +1301,7 @@
                         </div>
                     </div>
 
-                    <div className="h-16 flex items-center justify-center bg-black/20 z-20 mt-16">
+                    <div className="h-16 flex items-center justify-center bg-black/20 z-20">
                         <div className="opponent-hand">
                             {opponentHand.map((_, idx) => (
                                 <DominoTile 
