@@ -88,7 +88,13 @@
             -webkit-tap-highlight-color: transparent;
             user-select: none;
             -webkit-user-select: none;
-            padding-top: 40px; /* Siteyi biraz aşağı indir */
+            padding-top: 90px; /* Siteyi biraz aşağı indir */
+            animation: bg-scroll 20s linear infinite;
+        }
+
+        @keyframes bg-scroll {
+            0% { background-position: 0 0; }
+            100% { background-position: 40px 40px; }
         }
 
         .pip-grid {
@@ -1003,12 +1009,6 @@
             const handleJoinRoom = () => {
                 if (!joinCode.trim()) {
                     showNotification('Lütfən oda kodu girin', 'warning');
-                    return;
-                }
-                
-                // Kullanıcı kendi odasına katılmaya çalışıyorsa uyar
-                if (roomCode && joinCode === roomCode) {
-                    showNotification('Öz otağınıza qoşula bilməzsiniz! Fərqli otaq kodu daxil edin..', 'error');
                     return;
                 }
                 
