@@ -1092,38 +1092,9 @@
 
             // Pas butonu render fonksiyonu
             const renderPassButton = () => {
-                if (!isMyTurn) return null;
-                
-                const myHand = gameState?.players[myPlayerId]?.hand || [];
-                const marketSize = gameState?.market?.length || 0;
-                
-                let hasValidMove = false;
-                for (const tile of myHand) {
-                    const moves = calculateValidMoves(tile);
-                    if (moves.length > 0) {
-                        hasValidMove = true;
-                        break;
-                    }
-                }
-                
-                // Sadece pazarda taş varsa ve geçerli hamle yoksa pass butonu göster
-                if (marketSize > 0 && !hasValidMove) {
-                    return (
-                        <button 
-                            onClick={() => {
-                                sendMessage({ type: 'passTurn' });
-                                playSound('pass');
-                            }}
-                            className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-1 rounded-full text-xs font-bold shadow-glow flex items-center gap-1"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
-                            </svg>
-                            {t.passTurn}
-                        </button> 
-                    );
-                }
-                
+                // Kullanıcı isteği: Pass butonu tamamen kaldırıldı.
+                // Otomatik pas geçme mantığı, pazar boşken ve oynanacak taş yokken
+                // bir useEffect içinde zaten ele alınıyor.
                 return null;
             };
 
