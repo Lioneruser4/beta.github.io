@@ -244,6 +244,11 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
+
+        /* Hesaplama lobisi için yeni stiller */
+        .calculation-lobby {
+            background: linear-gradient(135deg, #0b241c 0%, #153126 100%);
+        }
     </style>
 </head>
 
@@ -380,7 +385,7 @@
         // --- ANA OYUN ---
 
         const DominoGame = () => {
-            const [screen, setScreen] = useState('loading'); // loading, lobby, searching, game, leaderboard, end
+            const [screen, setScreen] = useState('loading'); // loading, lobby, searching, game, calculation, end
             const [connected, setConnected] = useState(false);
             const [playerData, setPlayerData] = useState(null); // Telegram user data
             const [leaderboard, setLeaderboard] = useState([]);
@@ -388,7 +393,7 @@
             const [joinCode, setJoinCode] = useState('');
             const [gameState, setGameState] = useState(null);
             const [searchTime, setSearchTime] = useState(0);
-            const [serverMessage, setServerMessage] = useState(null); // Sunucudan gelen özel mesajlar için
+            const [serverMessage, setServerMessage] = useState(null);
             const [language, setLanguage] = useState('az'); // 'az' veya 'en'
 
             // Oyun İçi State
@@ -399,6 +404,8 @@
             const [endInfo, setEndInfo] = useState(null);
             const [opponent, setOpponent] = useState(null);
             const [lastSoundIndex, setLastSoundIndex] = useState(0); // For sequential sounds 6, 7, 8
+            const [calculationLobby, setCalculationLobby] = useState(null);
+            const [calculationTimer, setCalculationTimer] = useState(8);
 
             const [playerId, setPlayerId] = useState(null);
             const wsRef = useRef(null);
@@ -416,7 +423,7 @@
                     searchingOpponent: "Rəqib Axtarılır...",
                     cancel: "İMTİNA ET",
                     opponentFound: "RƏQİB TAPILDI!",
-                    matchStarting: "Oyun Başlayır...",
+                    matchStarting: "Matç Başlayır...",
                     leaveGame: "Oyundan Çıx",
                     confirmLeave: "Oyundan çıxmaq istədiyinizə əminsiniz?",
                     confirmLeaveDesc: "Çıxsanız matçı uduzacaqsınız.",
@@ -431,7 +438,13 @@
                     eloChange: "ELO Dəyişikliyi",
                     returningLobby: "Lobiya qayıdılır...",
                     waitingOpponent: "Rəqib Gözlənilir",
-                    enter: "DAXİL OL"
+                    enter: "DAXİL OL",
+                    calculationTitle: "SKOR HESAPLANIYOR",
+                    calculationSubtitle: "En az puana sahip olan kazanır!",
+                    you: "Siz",
+                    handTotal: "Elindeki Taşların Toplamı",
+                    winnerAnnouncing: "Kazanan açıklanıyor...",
+                    noValidMove: "Geçerli hamle yok, otomatik pas geçildi"
                 },
                 en: {
                     ranked: "Ranked",
@@ -458,7 +471,13 @@
                     eloChange: "ELO Change",
                     returningLobby: "Returning to lobby...",
                     waitingOpponent: "Waiting Opponent",
-                    enter: "ENTER"
+                    enter: "ENTER",
+                    calculationTitle: "SCORE CALCULATION",
+                    calculationSubtitle: "The player with lowest score wins!",
+                    you: "You",
+                    handTotal: "Total Points in Hand",
+                    winnerAnnouncing: "Winner announcing...",
+                    noValidMove: "No valid move, auto-passed"
                 }
             };
 
@@ -468,6 +487,46 @@
             useEffect(() => {
                 if (playerData?.id) setPlayerId(String(playerData.id));
             }, [playerData]);
+
+            // Hesaplama lobisi timer
+            useEffect(() => {
+                if (calculationLobby && calculationTimer > 0) {
+                    const timer = setTimeout(() => {
+                        setCalculationTimer(prev => prev - 1);
+                    }, 1000);
+                    return () => clearTimeout(timer);
+                } else if (calculationTimer === 0 && calculationLobby) {
+                    // Timer bitti, oyun sonu ekranına geç
+                    const myId = String(playerId || '');
+                    const amIWinner = calculationLobby.winner.isMe;
+                    
+                    setEndInfo({
+                        isWinner: amIWinner,
+                        isRanked: gameState?.isRanked || false,
+                        reason: 'score_calculation',
+                        winner: {
+                            name: calculationLobby.winner.name,
+                            photo: calculationLobby.winner.photo,
+                            eloChange: 0
+                        },
+                        loser: {
+                            name: calculationLobby.loser.name,
+                            photo: calculationLobby.loser.photo,
+                            eloChange: 0
+                        }
+                    });
+                    
+                    setScreen('end');
+                    setCalculationLobby(null);
+                    
+                    localStorage.removeItem('domino_session');
+                    setTimeout(() => {
+                        resetGameClientState();
+                        if (playerData) initializeTelegramAuth();
+                        setScreen('lobby');
+                    }, 8000);
+                }
+            }, [calculationLobby, calculationTimer]);
 
             // Oyun state'ini temizlemek için merkezi bir fonksiyon
             const resetGameClientState = () => {
@@ -479,6 +538,8 @@
                 setEndInfo(null);
                 setOpponent(null);
                 setJoinCode('');
+                setCalculationLobby(null);
+                setCalculationTimer(8);
             };
 
             // Ses Efektleri (Opsiyonel - Tarayıcı izin verirse çalışır)
@@ -505,6 +566,38 @@
                     frame();
                 }
             }, [screen, endInfo]);
+
+            // Pazarda taş yokken otomatik pass
+            useEffect(() => {
+                if (gameState && isMyTurn && screen === 'game') {
+                    const myHand = gameState.players[myPlayerId]?.hand || [];
+                    const marketSize = gameState.market?.length || 0;
+                    
+                    // Eğer elinde taş varsa ve pazarda taş yoksa otomatik pass kontrolü
+                    if (myHand.length > 0 && marketSize === 0) {
+                        // Valid moves kontrolü
+                        let hasValidMove = false;
+                        for (const tile of myHand) {
+                            const moves = calculateValidMoves(tile);
+                            if (moves.length > 0) {
+                                hasValidMove = true;
+                                break;
+                            }
+                        }
+                        
+                        // Geçerli hamle yoksa otomatik pass
+                        if (!hasValidMove) {
+                            const timeout = setTimeout(() => {
+                                sendMessage({ type: 'passTurn' });
+                                playSound('pass');
+                                showNotification(t.noValidMove, 'info');
+                            }, 1000);
+                            
+                            return () => clearTimeout(timeout);
+                        }
+                    }
+                }
+            }, [gameState, isMyTurn, screen]);
 
             // Telegram Auth
             const initializeTelegramAuth = async () => {
@@ -682,9 +775,6 @@
                     case 'gameStart':
                     case 'gameUpdate':
                         if (data.gameState) {
-                            if (data.gameState.playerId || data.playerId) {
-                                setPlayerId(data.gameState.playerId || data.playerId);
-                            }
                             setGameState(prevState => ({
                                 ...prevState,
                                 ...data.gameState,
@@ -717,7 +807,7 @@
                         const winnerId = String(data.winner || '');
                         const amIWinner = (winnerId && winnerId !== 'DRAW' && winnerId === myId);
 
-                        const endReason = data.reason || null; // e.g., 'disconnect', 'afk', 'normal'
+                        const endReason = data.reason || null;
 
                         setEndInfo({
                             isWinner: amIWinner,
@@ -741,7 +831,7 @@
                         localStorage.removeItem('domino_session');
                         setTimeout(() => {
                             resetGameClientState();
-                            if (playerData) initializeTelegramAuth(); // Refresh player data (ELO etc)
+                            if (playerData) initializeTelegramAuth();
                             setScreen('lobby');
                         }, 8000);
                         break;
@@ -765,6 +855,41 @@
                         setServerMessage(data);
                         setTimeout(() => setServerMessage(null), data.duration || 3000);
                         break;
+                    case 'calculationLobby':
+                        // Hesaplama lobisi göster
+                        const players = data.players || {};
+                        const myIdForCalc = String(playerId || '');
+                        
+                        // Oyuncu puanlarını hesapla
+                        const playerScores = {};
+                        for (const [pid, player] of Object.entries(players)) {
+                            const hand = player.hand || [];
+                            const score = hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
+                            playerScores[pid] = {
+                                score,
+                                name: player.username || 'Oyuncu',
+                                photo: player.photoUrl || null,
+                                isMe: pid === myIdForCalc
+                            };
+                        }
+                        
+                        // Daha az puan yapan kazanır
+                        const entries = Object.entries(playerScores);
+                        entries.sort((a, b) => a[1].score - b[1].score);
+                        
+                        const winner = entries[0][1];
+                        const loser = entries[1][1];
+                        
+                        setCalculationLobby({
+                            players: playerScores,
+                            winner,
+                            loser,
+                            myScore: playerScores[myIdForCalc]?.score || 0
+                        });
+                        
+                        setCalculationTimer(8);
+                        setScreen('calculation');
+                        break;
                 }
             };
 
@@ -774,11 +899,11 @@
                 const layout = [];
                 const T_LONG = 80;
                 const T_SHORT = 40;
-                const OVERLAP = 0; // Sıfır bindirme (tam direnme)
+                const OVERLAP = 0;
 
                 let curX = 0;
                 let curY = 0;
-                let dirX = 1; // 1: Sağa, -1: Sola
+                let dirX = 1;
                 let isVerticalTransition = false;
                 let tilesInRow = 0;
 
@@ -813,24 +938,19 @@
                         const nextIsDouble = nextTile[0] === nextTile[1];
                         const nextW = nextIsDouble ? T_SHORT : T_LONG;
 
-                        // 6 taş kuralı ve dönüş kontrolü
                         const currentIsHorizontal = !isDouble && rotation !== 90;
                         const shouldTurn = currentIsHorizontal && tilesInRow >= 6;
 
                         if (shouldTurn) {
-                            // Aşağı Dönüş Taşı (Dikey)
                             curX += (w / 2 - T_SHORT / 2) * dirX;
                             curY += (h / 2 + T_LONG / 2) - OVERLAP;
                             dirX *= -1;
                             isVerticalTransition = true;
                         } else {
-                            // Normal Adım
                             const nextRotation = nextIsDouble ? 90 : (dirX === -1 ? 180 : 0);
                             const nextStepW = (nextIsDouble || nextRotation === 90) ? T_SHORT : T_LONG;
 
                             if (rotation === 90 && !isDouble) {
-                                // Dikey geçiş taşından sonra yatay taşa geçiş
-                                // Taşın diğer ucuna doğru hizala
                                 curX += (T_SHORT / 2 - nextStepW / 2) * (dirX * -1);
                                 curY += (T_LONG / 2 + T_SHORT / 2) - OVERLAP;
                             } else {
@@ -865,7 +985,7 @@
                     const cHeight = boardContainerRef.current.clientHeight;
 
                     const scaleX = cWidth / bWidth;
-                    const scaleY = (cHeight * 0.75) / bHeight; // Leave more room
+                    const scaleY = (cHeight * 0.75) / bHeight;
                     const scale = Math.min(scaleX, scaleY, 1.2);
 
                     setBoardScale(scale);
@@ -901,7 +1021,6 @@
             const marketSize = gameState?.market?.length || 0;
             const canDrawFromMarket = marketSize > 0;
             
-            // Rakibin elini al
             const opponentPlayerId = Object.keys(gameState?.players || {}).find(id => id !== myPlayerId);
             const opponentHand = gameState?.players[opponentPlayerId]?.hand || [];
 
@@ -945,7 +1064,9 @@
             };
 
             const leaveGameClient = () => {
-                if (window.confirm('Oyundan çıkmak istediğine emin misin?')) {
+                // Telegram WebApp için özel çıkış mesajı
+                const message = 'Oyundan çıkmak istediğinize emin misiniz? Çıkarsanız maçı kaybedersiniz.';
+                if (window.confirm(message)) {
                     sendMessage({ type: 'leaveGame' });
                     localStorage.removeItem('domino_session');
                     resetGameClientState();
@@ -953,7 +1074,46 @@
                 }
             };
 
-            // Odaya katılma işlemi - kendi odana katılmayı engelle
+            // Pas butonu render fonksiyonu
+            const renderPassButton = () => {
+                if (!isMyTurn) return null;
+                
+                const myHand = gameState?.players[myPlayerId]?.hand || [];
+                const marketSize = gameState?.market?.length || 0;
+                
+                // Sadece pazarda taş varsa ve geçerli hamle yoksa pass butonu göster
+                if (marketSize > 0) {
+                    let hasValidMove = false;
+                    for (const tile of myHand) {
+                        const moves = calculateValidMoves(tile);
+                        if (moves.length > 0) {
+                            hasValidMove = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!hasValidMove) {
+                        return (
+                            <button 
+                                onClick={() => {
+                                    sendMessage({ type: 'passTurn' });
+                                    playSound('pass');
+                                }}
+                                className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-1 rounded-full text-xs font-bold shadow-glow flex items-center gap-1"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
+                                </svg>
+                                {t.passTurn}
+                            </button>
+                        );
+                    }
+                }
+                
+                return null;
+            };
+
+            // Odaya katılma işlemi
             const handleJoinRoom = () => {
                 if (!joinCode.trim()) {
                     showNotification('Lütfən oda kodu girin', 'warning');
@@ -979,7 +1139,7 @@
                 <div className="flex flex-col items-center justify-center min-h-screen p-6">
                     {notification && <Toast message={notification.message} type={notification.type} />}
                     <div className="text-center mb-10 animate-float">
-                        <h1 className="text-6xl font-black text-white drop-shadow-2xl mb-2">DOMINO 3D<span className="text-yellow-400">ONLINE</span></h1>
+                        <h1 className="text-6xl font-black text-white drop-shadow-2xl mb-2">DOMINO <span className="text-yellow-400">101</span></h1>
                         <p className="text-white/60 tracking-widest uppercase">Premium Multiplayer Experience ( BETA )</p>
                     </div>
 
@@ -995,7 +1155,6 @@
                             </div>
                         )}
                         
-                        {/* Dil değiştirme butonu */}
                         <div className="flex justify-center mb-4">
                             <button 
                                 onClick={() => setLanguage(lang => lang === 'az' ? 'en' : 'az')}
@@ -1073,7 +1232,6 @@
                     </div>
 
                     <div className="flex items-center gap-4 sm:gap-12 w-full max-w-2xl px-4">
-                        {/* Ben */}
                         <div className="flex-1 flex flex-col items-center gap-4 animate-slide-right">
                             <div className="relative">
                                 <img src={playerData?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-white/20 shadow-2xl object-cover" />
@@ -1085,10 +1243,8 @@
                             </div>
                         </div>
 
-                        {/* VS */}
                         <div className="text-white/20 text-4xl sm:text-6xl font-black italic">VS</div>
 
-                        {/* Rakip */}
                         <div className="flex-1 flex flex-col items-center gap-4 animate-slide-left">
                             <div className="relative">
                                 <img src={opponent?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-yellow-500/50 shadow-2xl object-cover" />
@@ -1108,13 +1264,11 @@
             );
 
             if (screen === 'game') return (
-                <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden">
+                <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden" style={{ paddingTop: '60px' }}>
                     {notification && <Toast message={notification.message} type={notification.type} />}
 
-                    {/* Timer */}
                     <GameTimer startTime={gameState.turnStartTime} />
 
-                    {/* Sunucu Mesajı Overlay (Oyun Kapalı vb.) */}
                     {serverMessage && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
                             <div className="bg-[#1b4d3e] border-2 border-yellow-500 rounded-2xl p-8 text-center shadow-2xl animate-bounce">
@@ -1125,28 +1279,26 @@
                         </div>
                     )}
 
-                    {/* Header - Rakip bilgisi aşağı kaydırıldı */}
-                    <div className="h-16 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30 mt-10">
+                    {/* Header - 60px aşağıda */}
+                    <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full border-2 border-white/20 overflow-hidden">
                                 {opponent?.photoUrl ? <img src={opponent.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 flex items-center justify-center">👤</div>}
                             </div>
                             <div className="flex flex-col">
                                 <div className="text-white font-bold text-sm leading-none">{opponent?.name || opponent?.username || 'Rakip'}</div>
-                                <div className="mt-1 scale-75 origin-left">
-                                    <LevelBadge level={opponent?.level || 1} />
+                                <div className="text-white/60 text-xs">
+                                    {gameState?.players[opponentPlayerId]?.elo || 0} ELO
                                 </div>
                             </div>
                         </div>
                         
-                        {/* Rakibin taş sayısı */}
-                        <div className="text-white text-sm font-bold">
+                        <div className="text-white text-sm font-bold bg-black/30 px-3 py-1 rounded-full">
                             {opponentHand.length} taş
                         </div>
                     </div>
 
-                    {/* Rakibin taşları - isminin altında */}
-                    <div className="h-16 flex items-center justify-center bg-black/20 z-20">
+                    <div className="h-16 flex items-center justify-center bg-black/20 z-20 mt-16">
                         <div className="opponent-hand">
                             {opponentHand.map((_, idx) => (
                                 <DominoTile 
@@ -1243,15 +1395,11 @@
                                             </svg>
                                             {t.drawTile} ({marketSize})
                                         </button>
-                                    ) : (
-                                        <button onClick={() => sendMessage({ type: 'passTurn' })} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-1 rounded-full text-xs font-bold shadow-glow flex items-center gap-1">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
-                                            </svg>
-                                            {t.passTurn}
-                                        </button>
-                                    )
+                                    ) : null
                                 )}
+                                
+                                {renderPassButton()}
+                                
                                 <button
                                     onClick={leaveGameClient}
                                     title={t.leaveGame}
@@ -1264,7 +1412,6 @@
                             </div>
                         </div>
                         
-                        {/* Elindeki taşlar - 8'den fazlaysa alt satıra geç */}
                         <div className={`hand-container ${myHand.length > 8 ? '' : 'single-row'}`}>
                             {myHand.map((tile, idx) => (
                                 <DominoTile
@@ -1280,6 +1427,59 @@
                 </div>
             );
 
+            if (screen === 'calculation') {
+                return (
+                    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-[#0b241c] to-black p-6">
+                        <h1 className="text-4xl font-black text-yellow-400 mb-2">{t.calculationTitle}</h1>
+                        <p className="text-white/60 mb-8">{t.calculationSubtitle}</p>
+                        
+                        <div className="w-full max-w-md space-y-6">
+                            {calculationLobby && Object.entries(calculationLobby.players).map(([pid, player]) => (
+                                <div 
+                                    key={pid}
+                                    className={`flex items-center gap-4 p-4 rounded-2xl border-2 ${
+                                        player.isMe 
+                                            ? 'bg-blue-900/30 border-blue-500/50' 
+                                            : 'bg-white/5 border-white/10'
+                                    }`}
+                                >
+                                    <div className="relative">
+                                        <img 
+                                            src={player.photo || 'https://via.placeholder.com/64'} 
+                                            className="w-16 h-16 rounded-full border-2 border-white/20"
+                                        />
+                                        {player.isMe && (
+                                            <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                                {t.you}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="text-white font-bold text-lg">{player.name}</div>
+                                        <div className="text-white/60 text-sm">{t.handTotal}</div>
+                                    </div>
+                                    <div className="text-3xl font-black text-yellow-400">
+                                        {player.score}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        
+                        <div className="mt-10 text-center">
+                            <div className="text-white/40 text-sm mb-2">
+                                {t.winnerAnnouncing} {calculationTimer}s
+                            </div>
+                            <div className="w-64 h-2 bg-white/10 rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-yellow-500 transition-all duration-1000"
+                                    style={{ width: `${(8 - calculationTimer) * 12.5}%` }}
+                                ></div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
             if (screen === 'end' && endInfo) return (
                 <div className="flex flex-col items-center justify-center min-h-screen bg-black/90 p-6 text-center">
                     <h1 className="text-5xl font-black text-white mb-2">
@@ -1288,38 +1488,37 @@
                     
                     {endInfo.reason === 'disconnect' && <p className="text-yellow-400 mb-6 text-lg">Rəqib oyundan ayrıldı.</p>}
                     {endInfo.reason === 'afk' && <p className="text-yellow-400 mb-6 text-lg">{endInfo.isWinner ? 'Rəqib AFK qaldı.' : 'AFK qaldığınız üçün məğlub oldunuz.'}</p>}
+                    {endInfo.reason === 'score_calculation' && <p className="text-yellow-400 mb-6 text-lg">En az puanı olan kazandı!</p>}
 
                     <div className="w-full max-w-sm space-y-4 mt-4">
                         {/* Winner Info */}
                         <div className="flex items-center gap-4 p-4 bg-green-900/50 rounded-2xl border-2 border-green-500/50">
                             <div className="relative">
                                 <img src={endInfo.winner.photo || 'https://via.placeholder.com/64'} className="w-16 h-16 rounded-full border-2 border-green-400" />
-                                <div className="absolute -bottom-2 -right-2 text-2xl">👑</div>
                             </div>
                             <div className="flex-1 text-left">
                                 <div className="text-white font-bold text-lg truncate">{endInfo.winner.name}</div>
-                                <div className="text-green-400 font-bold">Qazandı</div>
+                                <div className="text-green-400 font-bold">{t.winner}</div>
                             </div>
-                            {endInfo.isRanked && (
-                                <div className="text-green-400 font-black text-xl">
-                                    {endInfo.winner.eloChange >= 0 ? '+' : ''}{endInfo.winner.eloChange}
+                            {endInfo.isRanked && endInfo.winner.eloChange !== 0 && (
+                                <div className={`font-black text-xl ${endInfo.winner.eloChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    {endInfo.winner.eloChange > 0 ? '+' : ''}{endInfo.winner.eloChange}
                                 </div>
                             )}
                         </div>
 
                         {/* Loser Info */}
                         <div className="flex items-center gap-4 p-4 bg-red-900/50 rounded-2xl border-2 border-red-500/50">
-                             <div className="relative">
+                            <div className="relative">
                                 <img src={endInfo.loser.photo || 'https://via.placeholder.com/64'} className="w-16 h-16 rounded-full border-2 border-red-400" />
-                                <div className="absolute -bottom-2 -right-2 text-2xl">💀</div>
                             </div>
                             <div className="flex-1 text-left">
                                 <div className="text-white font-bold text-lg truncate">{endInfo.loser.name}</div>
-                                <div className="text-red-400 font-bold">Məğlub oldu</div>
+                                <div className="text-red-400 font-bold">{t.loser}</div>
                             </div>
-                            {endInfo.isRanked && (
-                                <div className="text-red-400 font-black text-xl">
-                                    {endInfo.loser.eloChange}
+                            {endInfo.isRanked && endInfo.loser.eloChange !== 0 && (
+                                <div className={`font-black text-xl ${endInfo.loser.eloChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    {endInfo.loser.eloChange > 0 ? '+' : ''}{endInfo.loser.eloChange}
                                 </div>
                             )}
                         </div>
@@ -1396,6 +1595,16 @@
         }
         tgApp.disableVerticalSwipes();
         tgApp.setHeaderColor('#1b4d3e');
+        
+        // Telegram WebApp çıkış işlemi için özel düzenleme
+        const originalConfirm = window.confirm;
+        window.confirm = function(message) {
+            // Site ismini gizle
+            if (message.includes('site') || message.includes('Site')) {
+                return originalConfirm('Oyundan çıkmak istediğinize emin misiniz?');
+            }
+            return originalConfirm(message);
+        };
     </script>
 
 </body>
