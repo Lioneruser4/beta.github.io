@@ -785,7 +785,7 @@ async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
                 const loser = winnerId === player1Id ? player2 : player1;
 
                 eloChanges = calculateElo(winner.elo, loser.elo, winner.level);
-
+                
                 winner.elo = eloChanges.winnerElo;
                 winner.level = calculateLevel(winner.elo);
                 winner.wins += 1;
@@ -801,7 +801,7 @@ async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
                 loser.totalGames += 1;
                 loser.lastPlayed = new Date();
 
-                await winner.save();
+                await winner.save(); 
                 await loser.save();
 
                 const match = new Match({
@@ -856,10 +856,14 @@ async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
         broadcastToRoom(roomCode, {
             type: 'gameEnd',
             winner: String(winnerId),
-            winnerName: isDraw ? 'Beraberlik' : (gameState.players[winnerId]?.name || 'Rakip'),
+            winnerName: isDraw ? 'Beraberlik' : (room.players[winnerId]?.name || 'Rakip'),
+            winnerPhoto: room.players[winnerId]?.photoUrl || null,
+            loserName: isDraw ? 'Beraberlik' : (room.players[loserId]?.name || 'Rakip'), // Assuming loserId is defined
+            loserPhoto: room.players[loserId]?.photoUrl || null, // Assuming loserId is defined
             isRanked: isRankedMatch,
             reason: reason,
             eloChanges: eloChanges ? {
+                // Ensure loserId is correctly determined for eloChanges
                 winner: eloChanges.winnerChange,
                 loser: eloChanges.loserChange
             } : null
@@ -870,6 +874,8 @@ async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
         broadcastToRoom(roomCode, {
             type: 'gameEnd',
             winner: winnerId,
+            winnerPhoto: room.players[winnerId]?.photoUrl || null,
+            loserPhoto: room.players[loserId]?.photoUrl || null, // Assuming loserId is defined
             winnerName: winnerId === 'DRAW' ? 'Beraberlik' : (gameState.players[winnerId]?.name || 'Bilinmeyen'),
             isRanked: false
         });
@@ -894,23 +900,26 @@ function handlePass(ws) {
     );
 
     // If market is empty and no valid moves, end the game
-    if (room.gameState.market.length === 0 && !canPlayAnyTile) {
+    if (!canPlayAnyTile && room.gameState.market.length === 0) {
         // Calculate scores
         const opponentId = Object.keys(room.gameState.players).find(id => id !== ws.playerId);
         const playerScore = playerHand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
         const opponentHand = room.gameState.players[opponentId].hand;
         const opponentScore = opponentHand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
         
-        // Determine winner (player with lower score wins)
-        const winnerId = playerScore <= opponentScore ? ws.playerId : opponentId;
-        
-        // Show scores to players for 8 seconds before ending game
+        let winnerIdForCalc = null;
+        if (playerScore < opponentScore) winnerIdForCalc = ws.playerId;
+        else if (opponentScore < playerScore) winnerIdForCalc = opponentId;
+        else winnerIdForCalc = 'DRAW'; // Beraberlik
+
+        // Send calculation lobby message
         broadcastToRoom(room.code, {
-            type: 'gameMessage',
-            message: `Oyun Kapalı! Puanlar hesaplanıyor...\n\n` +
-                    `Senin puanın: ${playerScore}\n` +
-                    `Rakibin puanı: ${opponentScore}\n\n` +
-                    `${winnerId === ws.playerId ? 'Kazandın!' : 'Kaybettin!'}`,
+            type: 'calculationLobby', // Yeni mesaj tipi
+            players: {
+                [ws.playerId]: { hand: playerHand, name: room.players[ws.playerId].name, photoUrl: room.players[ws.playerId].photoUrl, score: playerScore },
+                [opponentId]: { hand: opponentHand, name: room.players[opponentId].name, photoUrl: room.players[opponentId].photoUrl, score: opponentScore }
+            },
+            winnerId: winnerIdForCalc, // Hesaplama sonucunda belirlenen kazanan
             duration: 8000
         });
 
@@ -965,8 +974,8 @@ function handleDrawFromMarket(ws) {
     player.timeouts = 0; // İşlem yapınca timeout sıfırla
 
     // Elinde oynanacak taş var mı kontrol et
-    const canPlay = player.hand.some(tile => canPlayTile(tile, gs.board));
-    if (canPlay && gs.board.length > 0) {
+    const canPlay = player.hand.some(tile => canPlayTile(tile, gs.board)); // Tahta boş olsa bile oynanabilir taş varsa çekemez
+    if (canPlay) {
         return sendMessage(ws, { type: 'error', message: 'Elinizde oynanabilir taş var, pazardan çekemezsiniz!' });
     }
 
@@ -1147,7 +1156,8 @@ function handleTurnTimeout(roomCode) {
 
     broadcastToRoom(roomCode, {
         type: 'gameMessage',
-        message: `⚠️ ${player.name} süre aşımı! (${player.timeouts}/2)\nTekrar ederse hükmen mağlup sayılacak.`,
+        messageKey: 'afkWarning', // Mesaj anahtarı gönder
+        params: { name: player.name, timeouts: player.timeouts }, // Parametreler gönder
         duration: 4000
     });
 
