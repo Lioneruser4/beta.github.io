@@ -1062,8 +1062,88 @@ function handleTurnTimeout(roomCode) {
     const currentPlayerId = gs.currentPlayer;
     const player = gs.players[currentPlayerId];
     
-    console.log(`⏰ ${player.name} için süre doldu! Otomatik işlem yapılıyor...`);
+    // Initialize AFK counts if not exists
+    if (!room.afkCounts) {
+        room.afkCounts = {};
+        Object.keys(gs.players).forEach(pid => {
+            room.afkCounts[pid] = 0;
+        });
+    }
+    
+    // Increment AFK counter for current player
+    room.afkCounts[currentPlayerId] = (room.afkCounts[currentPlayerId] || 0) + 1;
+    
+    console.log(`⏰ ${player.name} için süre doldu! (AFK Sayısı: ${room.afkCounts[currentPlayerId]})`);
+    
+    // Check if player is AFK for the second time
+    if (room.afkCounts[currentPlayerId] >= 2) {
+        const opponentId = Object.keys(gs.players).find(id => id !== currentPlayerId);
+        const opponent = gs.players[opponentId];
+        
+        console.log(`🛑 ${player.name} 2 kez AFK kaldı, oyun bitiriliyor...`);
+        
+        // Send game end to both players
+        const endData = {
+            type: 'gameEnd',
+            winner: opponentId,
+            winnerName: opponent?.name || 'Rakip',
+            reason: 'afk',
+            isRanked: room.type === 'ranked',
+            endInfo: {
+                isWinner: false,
+                reason: 'afk',
+                winner: {
+                    name: opponent?.name || 'Rakip',
+                    photoUrl: opponent?.photoUrl || null,
+                    elo: opponent?.elo || 0
+                },
+                loser: {
+                    name: player.name,
+                    photoUrl: player.photoUrl || null,
+                    elo: player.elo || 0
+                }
+            }
+        };
+        
+        // Send to both players with proper winner/loser info
+        const currentPlayerWs = playerConnections.get(currentPlayerId);
+        const opponentWs = playerConnections.get(opponentId);
+        
+        if (currentPlayerWs) {
+            currentPlayerWs.send(JSON.stringify({
+                ...endData,
+                isWinner: false,
+                endInfo: {
+                    ...endData.endInfo,
+                    isWinner: false
+                }
+            }));
+            currentPlayerWs.roomCode = null;
+        }
+        
+        if (opponentWs) {
+            opponentWs.send(JSON.stringify({
+                ...endData,
+                isWinner: true,
+                endInfo: {
+                    ...endData.endInfo,
+                    isWinner: true
+                }
+            }));
+            opponentWs.roomCode = null;
+        }
+        
+        // Cleanup
+        rooms.delete(roomCode);
+        return;
+    }
 
+    // Reset AFK counter for the other player
+    const opponentId = Object.keys(gs.players).find(id => id !== currentPlayerId);
+    if (opponentId && room.afkCounts) {
+        room.afkCounts[opponentId] = 0;
+    }
+    
     // 1. Oynanabilir taş var mı?
     let validMove = null;
     
@@ -1131,7 +1211,20 @@ function handleTurnTimeout(roomCode) {
     gs.currentPlayer = Object.keys(gs.players).find(id => id !== currentPlayerId);
     gs.turnStartTime = Date.now();
     
+    // Update game state for both players
     Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+    
+    // Send AFK warning to player if it's their first time
+    if (room.afkCounts && room.afkCounts[currentPlayerId] === 1) {
+        const ws = playerConnections.get(currentPlayerId);
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: 'gameMessage',
+                message: '⏳ UYARI: Bir daha zaman aşımına uğrarsanız oyunu kaybedersiniz!',
+                duration: 3000
+            }));
+        }
+    }
 }
 
 const PORT = process.env.PORT || 10000;
