@@ -260,6 +260,19 @@ function initializeGame(roomCode, player1Id, player2Id) {
     let startingPlayer = player1Id;
     let highestDouble = -1;
 
+    const getPlayerData = (id) => ({
+        hand: id === player1Id ? player1Hand : player2Hand,
+        name: room.players[id].name,
+        elo: room.players[id].elo,
+        photoUrl: room.players[id].photoUrl,
+        level: room.players[id].level,
+        timeouts: 0
+    });
+
+    // Oyuncu bilgilerini gameState'e ekle (ELO, level vb.)
+    const player1Data = getPlayerData(player1Id);
+    const player2Data = getPlayerData(player2Id);
+
     for (let player of [player1Id, player2Id]) {
         const hand = player === player1Id ? player1Hand : player2Hand;
         for (let tile of hand) {
@@ -273,14 +286,12 @@ function initializeGame(roomCode, player1Id, player2Id) {
     room.gameState = {
         board: [],
         players: {
-            [player1Id]: { hand: player1Hand, name: room.players[player1Id].name },
-            [player2Id]: { hand: player2Hand, name: room.players[player2Id].name }
+            [player1Id]: player1Data,
+            [player2Id]: player2Data
         },
         market: market,
         currentPlayer: startingPlayer,
         turn: 1,
-        lastMove: null,
-        startingDouble: highestDouble,
         turnStartTime: Date.now()
     };
 
@@ -449,7 +460,7 @@ function handleFindMatch(ws, data) {
 
     const playerId = ws.playerId || generateRoomCode();
     ws.playerId = playerId;
-    ws.playerName = data.playerName || data.username || 'Guest';
+    ws.playerName = data.firstName || data.username || 'Guest';
     ws.telegramId = data.telegramId || null; // null ise guest
     ws.photoUrl = data.photoUrl || null;
     ws.level = data.level || 0; // 0 = guest
@@ -557,7 +568,7 @@ function handleCancelSearch(ws) {
 
 function handleCreateRoom(ws, data) {
     const roomCode = generateRoomCode(); // generateRoomCode already returns uppercase
-    ws.playerName = data.playerName || data.username || 'Guest';
+    ws.playerName = data.firstName || data.username || 'Guest';
     ws.roomCode = roomCode;
 
     // Host data with full profile
@@ -592,7 +603,7 @@ function handleJoinRoom(ws, data) {
 
     const pid = ws.playerId || generateRoomCode();
     ws.playerId = pid;
-    ws.playerName = data.playerName || data.username || 'Guest';
+    ws.playerName = data.firstName || data.username || 'Guest';
     ws.telegramId = data.telegramId || null;
     ws.photoUrl = data.photoUrl || null;
     ws.level = data.level || 0;
@@ -657,7 +668,11 @@ function handlePlayTile(ws, data) {
     }
 
     player.hand.splice(data.tileIndex, 1);
+    player.timeouts = 0; // Hamle yapınca timeout sıfırla
     gs.moves = (gs.moves || 0) + 1;
+
+    // Taş oynama sesini herkese gönder
+    broadcastToRoom(ws.roomCode, { type: 'playSound', sound: 'place' });
 
     const winner = checkWinner(gs);
     if (winner) {
@@ -670,7 +685,7 @@ function handlePlayTile(ws, data) {
     }
 }
 
-async function handleGameEnd(roomCode, winnerId, gameState) {
+async function handleGameEnd(roomCode, winnerId, gameState, reason = null) {
     const room = rooms.get(roomCode);
     if (!room) return;
 
@@ -790,6 +805,7 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
             winner: String(winnerId),
             winnerName: isDraw ? 'Beraberlik' : (gameState.players[winnerId]?.name || 'Rakip'),
             isRanked: isRankedMatch,
+            reason: reason,
             eloChanges: eloChanges ? {
                 winner: eloChanges.winnerChange,
                 loser: eloChanges.loserChange
@@ -814,6 +830,9 @@ function handlePass(ws) {
 
     const room = rooms.get(ws.roomCode);
     if (!room || room.gameState.currentPlayer !== ws.playerId) return;
+
+    // Reset timeouts
+    room.gameState.players[ws.playerId].timeouts = 0;
 
     // Check if player can actually pass (no valid moves)
     const playerHand = room.gameState.players[ws.playerId].hand;
@@ -868,8 +887,8 @@ function handlePass(ws) {
                 sound: 'pass'
             });
         }
-        
-        sendGameState(room.code);
+
+        Object.keys(room.gameState.players).forEach(pid => sendGameState(room.code, pid));
         return;
     }
 
@@ -890,6 +909,7 @@ function handleDrawFromMarket(ws) {
     if (gs.currentPlayer !== ws.playerId) return sendMessage(ws, { type: 'error', message: 'Sıra sizde değil' });
 
     const player = gs.players[ws.playerId];
+    player.timeouts = 0; // İşlem yapınca timeout sıfırla
 
     // Elinde oynanacak taş var mı kontrol et
     const canPlay = player.hand.some(tile => canPlayTile(tile, gs.board));
@@ -1062,6 +1082,22 @@ function handleTurnTimeout(roomCode) {
     const currentPlayerId = gs.currentPlayer;
     const player = gs.players[currentPlayerId];
     
+    // Timeout kontrolü
+    player.timeouts = (player.timeouts || 0) + 1;
+    if (player.timeouts >= 2) {
+        console.log(`⏰ ${player.name} 2. kez AFK kaldı. Oyun bitiriliyor.`);
+        const winnerId = Object.keys(gs.players).find(id => id !== currentPlayerId);
+        gs.winner = winnerId; // Döngüyü durdurmak için
+        handleGameEnd(roomCode, winnerId, gs, 'afk');
+        return;
+    }
+
+    broadcastToRoom(roomCode, {
+        type: 'gameMessage',
+        message: `⚠️ ${player.name} süre aşımı! (${player.timeouts}/2)\nTekrar ederse hükmen mağlup sayılacak.`,
+        duration: 4000
+    });
+
     console.log(`⏰ ${player.name} için süre doldu! Otomatik işlem yapılıyor...`);
 
     // 1. Oynanabilir taş var mı?
