@@ -455,12 +455,12 @@
             // Dil çevirileri
             const translations = {
                 az: {
-                    ranked: "Dərəcəli / Ranked",
+                    ranked: "Dərəcəli",
                     createRoom: "Otaq Yarat",
                     joinRoom: "Otağa Qoşul",
                     roomCode: "Otaq Kodu",
                     copy: "KOPYALA",
-                    leaderboard: "SKOR TABLOSU",
+                    leaderboard: "Liderlər Lövhəsi",
                     searchingOpponent: "Rəqib Axtarılır...",
                     cancel: "İMTİNA ET",
                     opponentFound: "RƏQİB TAPILDI!",
@@ -973,7 +973,7 @@
                     setSelectedTileIndex(index);
                     setValidMoves(moves);
                 } else {
-                    showNotification('Bu taş uygun değil', 'warning');
+                    showNotification('Bu daş uyğun deyil', 'warning');
                 }
             };
 
@@ -1002,13 +1002,13 @@
             // Odaya katılma işlemi - kendi odana katılmayı engelle
             const handleJoinRoom = () => {
                 if (!joinCode.trim()) {
-                    showNotification('Lütfen oda kodu girin', 'warning');
+                    showNotification('Lütfən oda kodu girin', 'warning');
                     return;
                 }
                 
                 // Kullanıcı kendi odasına katılmaya çalışıyorsa uyar
                 if (roomCode && joinCode === roomCode) {
-                    showNotification('Kendi odana katılamazsın! Başka bir oda kodu gir.', 'error');
+                    showNotification('Öz otağınıza qoşula bilməzsiniz! Fərqli otaq kodu daxil edin..', 'error');
                     return;
                 }
                 
@@ -1023,7 +1023,7 @@
 
             if (screen === 'loading') return (
                 <div className="flex items-center justify-center min-h-screen">
-                    <div className="text-white animate-pulse text-2xl font-bold">YÜKLENİYOR...</div>
+                    <div className="text-white animate-pulse text-2xl font-bold">YÜKLENİR...</div>
                 </div>
             );
 
@@ -1032,7 +1032,7 @@
                     {notification && <Toast message={notification.message} type={notification.type} />}
                     <div className="text-center mb-10 animate-float">
                         <h1 className="text-6xl font-black text-white drop-shadow-2xl mb-2">DOMINO <span className="text-yellow-400">101</span></h1>
-                        <p className="text-white/60 tracking-widest uppercase">Premium Multiplayer Experience</p>
+                        <p className="text-white/60 tracking-widest uppercase">Premium Multiplayer Experience ( BETA )</p>
                     </div>
 
                     <div className="w-full max-w-sm bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10 shadow-2xl">
