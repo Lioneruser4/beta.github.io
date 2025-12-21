@@ -253,7 +253,21 @@
 </head>
 
 <body>
-    <div id="root"></div>
+    <div id="root">
+        <!-- Sayfa yüklenirken JavaScript'in derlenmesini beklerken gösterilecek statik yükleyici -->
+        <!-- This static loader will be shown while waiting for JavaScript to compile, preventing the flash of unstyled text -->
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background-color: #0b241c; color: white; font-family: sans-serif; position: fixed; inset: 0; z-index: 9999;">
+            <style>
+                .initial-loader-spinner { width: 50px; height: 50px; border: 5px solid rgba(255, 255, 255, 0.2); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; }
+                @keyframes spin { to { transform: rotate(360deg); } }
+                @keyframes pulse-opacity { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+            </style>
+            <div class="initial-loader-spinner"></div>
+            <p style="margin-top: 20px; font-size: 1.2rem; font-weight: bold; animation: pulse-opacity 2s ease-in-out infinite;">
+                YÜKLƏNİR...
+            </p>
+        </div>
+    </div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
