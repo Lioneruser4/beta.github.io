@@ -274,10 +274,6 @@ function initializeGame(roomCode, player1Id, player2Id) {
 
     const room = rooms.get(roomCode);
 
-    // En yüksek çifti bul (6|6, 5|5, 4|4, ...)
-    let startingPlayer = player1Id;
-    let highestDouble = -1;
-
     const getPlayerData = (id, hand) => ({
         hand: hand,
         name: room.players[id].name,
@@ -294,7 +290,7 @@ function initializeGame(roomCode, player1Id, player2Id) {
             [player2Id]: getPlayerData(player2Id, player2Hand)
         },
         market: market,
-        currentPlayer: startingPlayer,
+        currentPlayer: startingPlayer, // from dealCardsAndDetermineStart
         turn: 1,
         turnStartTime: Date.now(),
         score: { [player1Id]: 0, [player2Id]: 0 },
@@ -302,7 +298,7 @@ function initializeGame(roomCode, player1Id, player2Id) {
     };
 
     rooms.set(roomCode, room);
-    console.log(`🎮 Oyun başlatıldı - Başlayan: ${startingPlayer === player1Id ? room.players[player1Id].name : room.players[player2Id].name} (${highestDouble}|${highestDouble})`);
+    console.log(`🎮 Oyun başlatıldı - Başlayan: ${room.players[startingPlayer].name} (${highestDouble}|${highestDouble})`);
     return room.gameState;
 }
 
@@ -687,10 +683,7 @@ function handlePlayTile(ws, data) {
     if (winner) {
         processRoundWinner(ws.roomCode, winner, gs);
     } else {
-        gs.turn++;
-        gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
-        gs.turnStartTime = Date.now();
-        Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+        nextTurn(ws.roomCode, ws.playerId);
     }
 }
 
@@ -703,11 +696,13 @@ function processRoundWinner(roomCode, winnerId, gameState) {
     let roundLoserId = null;
 
     if (!isDraw) {
+        console.log(`📈 Scoring: Current score for ${winnerId} is ${gs.score[winnerId]}`);
         gs.score[winnerId]++;
+        console.log(`📈 Score for ${winnerId} incremented to ${gs.score[winnerId]}`);
         roundLoserId = Object.keys(gs.players).find(id => id !== winnerId);
     }
 
-    const winnerName = isDraw ? 'Beraberlik' : gs.players[winnerId].name;
+    const winnerName = isDraw ? 'Beraberlik' : (gs.players[winnerId]?.name || 'Bilinmeyen');
     console.log(`ዙ Round bitti: ${winnerName} kazandı. Skor: ${gs.score[Object.keys(gs.players)[0]]}-${gs.score[Object.keys(gs.players)[1]]}`);
 
     broadcastToRoom(roomCode, { type: 'roundEnd', winnerId, score: gs.score });
@@ -730,6 +725,8 @@ function startNewRound(roomCode, startingPlayerId) {
     const playerIds = Object.keys(gs.players);
     const [p1, p2] = playerIds;
  
+    console.log(`New round starting with scores: ${JSON.stringify(gs.score)}`);
+
     // Yeni raund için kartları dağıt ve başlangıç oyuncusunu belirle
     const { player1Hand, player2Hand, market, startingPlayer: defaultStartingPlayer } = dealCardsAndDetermineStart(p1, p2);
  
@@ -949,15 +946,8 @@ function handlePass(ws) {
         // Check if the drawn tile can be played
         if (!canPlayTile(drawnTile, room.gameState.board)) {
             // If still can't play, switch to next player
-            const opponentId = Object.keys(room.gameState.players).find(id => id !== ws.playerId);
-            room.gameState.currentPlayer = opponentId;
-            room.gameState.turnStartTime = Date.now();
-            
-            // Play pass sound
-            broadcastToRoom(room.code, {
-                type: 'playSound',
-                sound: 'pass'
-            });
+            nextTurn(room.code, ws.playerId);
+            broadcastToRoom(room.code, { type: 'playSound', sound: 'pass' }); // Play pass sound for all
         }
 
         Object.keys(room.gameState.players).forEach(pid => sendGameState(room.code, pid));
@@ -993,10 +983,7 @@ function handleDrawFromMarket(ws) {
     if (!gs.market || gs.market.length === 0) {
         // Pazar boş, otomatik sıra geç
         console.log(`🎲 ${player.name} pazardan çekemedi (boş) - Sıra geçiyor`);
-        gs.turn++;
-        gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
-        gs.turnStartTime = Date.now();
-        Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+        nextTurn(ws.roomCode, ws.playerId);
         return;
     }
 
@@ -1020,10 +1007,7 @@ function handleDrawFromMarket(ws) {
         } else if (!hasPlayable && gs.market.length === 0) {
             // Pazar bitti ve hala oynanabilir taş yok - sıra geç
             console.log(`❌ ${player.name} oynanabilir taş bulamadı - Sıra geçiyor`);
-            gs.turn++;
-            gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
-            gs.turnStartTime = Date.now();
-
+            nextTurn(ws.roomCode, ws.playerId);
             // Pas geçildiğini bildir
             broadcastToRoom(ws.roomCode, { type: 'turnPassed', playerName: player.name });
 
@@ -1212,35 +1196,24 @@ function handleTurnTimeout(roomCode) {
             }
             
             // Sıra değiştir
-            gs.turn++;
-            gs.currentPlayer = Object.keys(gs.players).find(id => id !== currentPlayerId);
-            gs.turnStartTime = Date.now();
-            
-            Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+            nextTurn(roomCode, currentPlayerId);
             return;
         }
     }
 
     // 2. Oynanacak taş yoksa pazar kontrolü
     if (gs.market && gs.market.length > 0) {
-        const drawnTile = gs.market.shift();
-        player.hand.push(drawnTile);
-        
-        // Çektikten sonra sıra geç (Hızlı oyun için)
-        gs.turn++;
-        gs.currentPlayer = Object.keys(gs.players).find(id => id !== currentPlayerId);
-        gs.turnStartTime = Date.now();
-        
-        Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+        const drawnTile = gs.market.shift(); // Pazardan bir taş çek
+        player.hand.push(drawnTile); // Oyuncunun eline ekle
+        console.log(`⏰ (Auto) ${player.name} pazardan taş çekti: [${drawnTile}]`);
+        // Çektikten sonra sıra otomatik olarak geçer (hızlı oyun için)
+        nextTurn(roomCode, currentPlayerId);
         return;
     }
 
     // 3. Pazar boşsa pas geç
-    gs.turn++;
-    gs.currentPlayer = Object.keys(gs.players).find(id => id !== currentPlayerId);
-    gs.turnStartTime = Date.now();
-    
-    Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+    console.log(`⏰ (Auto) ${player.name} pas geçti (pazar boş).`);
+    nextTurn(roomCode, currentPlayerId);
 }
 
 const PORT = process.env.PORT || 10000;
