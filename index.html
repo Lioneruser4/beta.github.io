@@ -271,7 +271,7 @@
         // --- BİLEŞENLER ---
 
         // 1. Domino Noktaları (Pips)
-        const RenderPips = ({ number }) => {
+        const RenderPips = React.memo(({ number }) => {
             const layouts = {
                 0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8],
                 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8]
@@ -284,10 +284,10 @@
                     ))}
                 </div>
             );
-        };
+        });
 
         // 2. Domino Taşı (3D Tasarım)
-        const DominoTile = ({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false, isOpponent = false }) => {
+        const DominoTile = React.memo(({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false, isOpponent = false }) => {
             const baseClasses = `
                 relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
                 transition-all duration-300 select-none
@@ -326,7 +326,7 @@
                     )}
                 </div>
             );
-        };
+        });
 
         // 3. Bildirim Toast
         const Toast = ({ message, type }) => {
@@ -371,7 +371,7 @@
                     const elapsed = Math.floor((Date.now() - startTime) / 1000);
                     const remaining = Math.max(0, 25 - elapsed);
                     setTimeLeft(remaining);
-                }, 100);
+                }, 500); // Performans için 100ms'den 500ms'ye düşürüldü
                 return () => clearInterval(interval);
             }, [startTime]);
 
@@ -756,6 +756,9 @@
                 console.log('📨 Server mesajı:', data.type, data);
 
                 switch (data.type) {
+                    case 'playSound':
+                        playSound(data.sound);
+                        break;
                     case 'session':
                         setPlayerId(data.playerId);
                         // Save session for reconnection
@@ -1055,7 +1058,6 @@
                 });
                 setSelectedTileIndex(null);
                 setValidMoves([]);
-                playSound('place');
             };
 
             const leaveGameClient = () => {
@@ -1100,7 +1102,7 @@
                                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
                                 </svg>
                                 {t.passTurn}
-                            </button>
+                            </button> 
                         );
                     }
                 }
@@ -1556,7 +1558,7 @@
                     <h1 className="text-4xl font-black text-white mb-8">📊 LADERBOARD 📊</h1>
                     <div className="w-full max-w-xl space-y-3">
                         {leaderboard.map((p, i) => (
-                            <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-3xl border border-white/5">
+                            <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-3xl border border-white/5 animate-slide-up" style={{ animationDelay: `${i * 50}ms` }}>
                                 <div className="text-2xl font-black w-8 text-center text-white/50">{i + 1}</div>
                                 <img src={p.photoUrl || 'https://via.placeholder.com/50'} className="w-12 h-12 rounded-full" />
                                 <div className="flex-1">
