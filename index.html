@@ -1,14 +1,13 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <head>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#1b4d3e">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>3D Online Ranked Domino </title>
+    <title>3D Online Ranked Domino</title>
 
     <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -110,8 +109,6 @@
             box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
         }
 
-        /* Kırmızı noktalar (bazı setlerde olur ama burada siyah klasik yaptık) */
-
         .hide-scrollbar::-webkit-scrollbar {
             display: none;
         }
@@ -146,35 +143,22 @@
         }
 
         @keyframes pulse-glow {
-
-            0%,
-            100% {
+            0%, 100% {
                 box-shadow: 0 0 20px rgba(251, 191, 36, 0.6), 0 0 40px rgba(251, 191, 36, 0.3);
             }
-
             50% {
                 box-shadow: 0 0 30px rgba(251, 191, 36, 0.9), 0 0 60px rgba(251, 191, 36, 0.5);
             }
         }
 
         @keyframes rotate {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         @keyframes progress {
-            from {
-                width: 0%;
-            }
-
-            to {
-                width: 100%;
-            }
+            from { width: 0%; }
+            to { width: 100%; }
         }
 
         .animate-progress {
@@ -182,27 +166,13 @@
         }
 
         @keyframes slide-right {
-            from {
-                transform: translateX(-50px);
-                opacity: 0;
-            }
-
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
+            from { transform: translateX(-50px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
 
         @keyframes slide-left {
-            from {
-                transform: translateX(50px);
-                opacity: 0;
-            }
-
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
+            from { transform: translateX(50px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
 
         .animate-slide-right {
@@ -214,13 +184,10 @@
         }
 
         @keyframes neon-pulse {
-
-            0%,
-            100% {
+            0%, 100% {
                 box-shadow: 0 0 10px rgba(255, 0, 0, 0.8), 0 0 20px rgba(255, 0, 0, 0.4);
                 filter: brightness(1.2);
             }
-
             50% {
                 box-shadow: 0 0 20px rgba(255, 0, 0, 1), 0 0 40px rgba(255, 0, 0, 0.6);
                 filter: brightness(1.5);
@@ -228,21 +195,10 @@
         }
 
         @keyframes border-flow {
-            0% {
-                border-color: #ff0000;
-            }
-
-            33% {
-                border-color: #00ff00;
-            }
-
-            66% {
-                border-color: #0000ff;
-            }
-
-            100% {
-                border-color: #ff0000;
-            }
+            0% { border-color: #ff0000; }
+            33% { border-color: #00ff00; }
+            66% { border-color: #0000ff; }
+            100% { border-color: #ff0000; }
         }
 
         .neon-pro {
@@ -250,6 +206,37 @@
             background: linear-gradient(135deg, #111 0%, #333 100%);
             border-width: 2px;
             text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+        }
+
+        /* Yeni eklenen stiller */
+        .hand-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 4px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .hand-container.single-row {
+            flex-wrap: nowrap;
+            overflow-x: auto;
+        }
+
+        .opponent-hand {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            margin-top: 10px;
+        }
+
+        .opponent-tile {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
     </style>
 </head>
@@ -289,7 +276,7 @@
         };
 
         // 2. Domino Taşı (3D Tasarım)
-        const DominoTile = ({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false }) => {
+        const DominoTile = ({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false, isOpponent = false }) => {
             const baseClasses = `
                 relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
                 transition-all duration-300 select-none
@@ -297,8 +284,9 @@
                 ${isGhost ? 'opacity-0 pointer-events-none' : 'shadow-3d'}
                 ${isSelected ? '-translate-y-4 shadow-3d-active ring-2 ring-yellow-500 z-10 animate-celebrate' : ''}
                 ${animateIn ? 'animate-slide-in' : ''}
-                ${!disabled && !isGhost ? 'cursor-pointer active:translate-y-1 active:shadow-3d-active hover:brightness-110' : ''}
+                ${!disabled && !isGhost && !isOpponent ? 'cursor-pointer active:translate-y-1 active:shadow-3d-active hover:brightness-110' : ''}
                 ${disabled ? 'brightness-90 cursor-default' : ''}
+                ${isOpponent ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700' : ''}
             `;
 
             return (
@@ -310,13 +298,21 @@
                         boxShadow: isGhost ? 'none' : '0 2px 4px rgba(0,0,0,0.2)'
                     }}
                 >
-                    <div className={`flex-1 flex items-center justify-center ${vertical ? 'border-b' : 'border-r'} border-gray-200`}>
-                        <RenderPips number={values[0]} />
-                    </div>
-                    <div className="flex-1 flex items-center justify-center">
-                        <RenderPips number={values[1]} />
-                    </div>
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-300 border border-gray-400 shadow-inner z-10 opacity-50"></div>
+                    {!isOpponent ? (
+                        <>
+                            <div className={`flex-1 flex items-center justify-center ${vertical ? 'border-b' : 'border-r'} border-gray-200`}>
+                                <RenderPips number={values[0]} />
+                            </div>
+                            <div className="flex-1 flex items-center justify-center">
+                                <RenderPips number={values[1]} />
+                            </div>
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-300 border border-gray-400 shadow-inner z-10 opacity-50"></div>
+                        </>
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-gray-900 to-black border border-gray-700"></div>
+                        </div>
+                    )}
                 </div>
             );
         };
@@ -375,6 +371,60 @@
             );
         };
 
+        // 6. Exit Game Button Component
+        const ExitGameButton = ({ onExit }) => {
+            const [showConfirm, setShowConfirm] = useState(false);
+
+            const handleExitClick = () => {
+                setShowConfirm(true);
+            };
+
+            const handleConfirm = () => {
+                onExit();
+                setShowConfirm(false);
+            };
+
+            const handleCancel = () => {
+                setShowConfirm(false);
+            };
+
+            return (
+                <>
+                    <button
+                        onClick={handleExitClick}
+                        className="fixed bottom-6 right-6 w-14 h-14 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center shadow-lg z-40 transition-all duration-300"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+
+                    {showConfirm && (
+                        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                            <div className="bg-[#1b4d3e] border-2 border-red-500 rounded-2xl p-6 max-w-sm w-full">
+                                <h3 className="text-xl font-bold text-white mb-4 text-center">Oyundan Çıkmak İstiyor Musun?</h3>
+                                <p className="text-white/70 mb-6 text-center">Çıkarsan maçı kaybedeceksin.</p>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={handleCancel}
+                                        className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-xl font-bold transition-all"
+                                    >
+                                        İPTAL
+                                    </button>
+                                    <button
+                                        onClick={handleConfirm}
+                                        className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold transition-all"
+                                    >
+                                        ÇIK
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>
+            );
+        };
+
         // --- ANA OYUN ---
 
         const DominoGame = () => {
@@ -387,6 +437,7 @@
             const [gameState, setGameState] = useState(null);
             const [searchTime, setSearchTime] = useState(0);
             const [serverMessage, setServerMessage] = useState(null); // Sunucudan gelen özel mesajlar için
+            const [language, setLanguage] = useState('az'); // 'az' veya 'en'
 
             // Oyun İçi State
             const [selectedTileIndex, setSelectedTileIndex] = useState(null);
@@ -400,6 +451,66 @@
             const [playerId, setPlayerId] = useState(null);
             const wsRef = useRef(null);
             const searchTimerRef = useRef(null);
+
+            // Dil çevirileri
+            const translations = {
+                az: {
+                    ranked: "Dərəcəli / Ranked",
+                    createRoom: "Otaq Yarat",
+                    joinRoom: "Otağa Qoşul",
+                    roomCode: "Otaq Kodu",
+                    copy: "KOPYALA",
+                    leaderboard: "SKOR TABLOSU",
+                    searchingOpponent: "Rəqib Axtarılır...",
+                    cancel: "İMTİNA ET",
+                    opponentFound: "RƏQİB TAPILDI!",
+                    matchStarting: "Matç Başlayır...",
+                    leaveGame: "Oyundan Çıx",
+                    confirmLeave: "Oyundan çıxmaq istədiyinizə əminsiniz?",
+                    confirmLeaveDesc: "Çıxsanız matçı uduzacaqsınız.",
+                    cancelBtn: "İMTİNA",
+                    leaveBtn: "ÇIX",
+                    yourTurn: "Sizin Növbəniz",
+                    drawTile: "Daş Çək",
+                    passTurn: "Pas Ver",
+                    yourHand: "Əliniz",
+                    winner: "Qalib",
+                    loser: "Məğlub",
+                    eloChange: "ELO Dəyişikliyi",
+                    returningLobby: "Lobiya qayıdılır...",
+                    waitingOpponent: "Rəqib Gözlənilir",
+                    enter: "DAXİL OL"
+                },
+                en: {
+                    ranked: "Ranked",
+                    createRoom: "Create Room",
+                    joinRoom: "Join Room",
+                    roomCode: "Room Code",
+                    copy: "COPY",
+                    leaderboard: "LEADERBOARD",
+                    searchingOpponent: "Searching Opponent...",
+                    cancel: "CANCEL",
+                    opponentFound: "OPPONENT FOUND!",
+                    matchStarting: "Match Starting...",
+                    leaveGame: "Leave Game",
+                    confirmLeave: "Are you sure you want to leave?",
+                    confirmLeaveDesc: "You will lose the match if you leave.",
+                    cancelBtn: "CANCEL",
+                    leaveBtn: "LEAVE",
+                    yourTurn: "Your Turn",
+                    drawTile: "Draw Tile",
+                    passTurn: "Pass Turn",
+                    yourHand: "Your Hand",
+                    winner: "Winner",
+                    loser: "Loser",
+                    eloChange: "ELO Change",
+                    returningLobby: "Returning to lobby...",
+                    waitingOpponent: "Waiting Opponent",
+                    enter: "ENTER"
+                }
+            };
+
+            const t = translations[language];
 
             // Set playerId when playerData is loaded
             useEffect(() => {
@@ -664,6 +775,9 @@
 
                         setEndInfo({
                             winnerName: data.winnerName,
+                            winnerPhoto: data.winnerPhoto,
+                            loserName: data.loserName,
+                            loserPhoto: data.loserPhoto,
                             isRanked: data.isRanked,
                             isWinner: amIWinner,
                             eloChange: data.eloChanges ? (amIWinner ? data.eloChanges.winner : data.eloChanges.loser) : 0
@@ -832,6 +946,10 @@
             const myHand = gameState?.players[myPlayerId]?.hand || [];
             const marketSize = gameState?.market?.length || 0;
             const canDrawFromMarket = marketSize > 0;
+            
+            // Rakibin elini al
+            const opponentPlayerId = Object.keys(gameState?.players || {}).find(id => id !== myPlayerId);
+            const opponentHand = gameState?.players[opponentPlayerId]?.hand || [];
 
             const calculateValidMoves = (tile) => {
                 if (!gameState || gameState.board.length === 0) return ['start'];
@@ -854,7 +972,6 @@
                 if (moves.length > 0) {
                     setSelectedTileIndex(index);
                     setValidMoves(moves);
-                    playSound('click');
                 } else {
                     showNotification('Bu taş uygun değil', 'warning');
                 }
@@ -880,6 +997,26 @@
                     resetGameClientState();
                     setScreen('lobby');
                 }
+            };
+
+            // Odaya katılma işlemi - kendi odana katılmayı engelle
+            const handleJoinRoom = () => {
+                if (!joinCode.trim()) {
+                    showNotification('Lütfen oda kodu girin', 'warning');
+                    return;
+                }
+                
+                // Kullanıcı kendi odasına katılmaya çalışıyorsa uyar
+                if (roomCode && joinCode === roomCode) {
+                    showNotification('Kendi odana katılamazsın! Başka bir oda kodu gir.', 'error');
+                    return;
+                }
+                
+                sendMessage({ 
+                    type: 'joinRoom', 
+                    roomCode: joinCode, 
+                    ...playerData 
+                });
             };
 
             // --- RENDER PARTS ---
@@ -909,30 +1046,48 @@
                                 </div>
                             </div>
                         )}
+                        
+                        {/* Dil değiştirme butonu */}
+                        <div className="flex justify-center mb-4">
+                            <button 
+                                onClick={() => setLanguage(lang => lang === 'az' ? 'en' : 'az')}
+                                className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-sm font-bold transition-all"
+                            >
+                                {language === 'az' ? '🇦🇿 AZ' : '🇺🇸 EN'}
+                            </button>
+                        </div>
+
                         <button onClick={() => {
                             setScreen('searching');
                             setSearching(true);
                             sendMessage({ type: 'findMatch', ...playerData });
-                        }} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl mb-4 transition-all transform active:scale-95 shadow-lg">🔍 Dərəcəli / Ranked 🔍</button>
+                        }} className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-4 rounded-2xl mb-4 transition-all transform active:scale-95 shadow-lg flex items-center justify-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" />
+                            </svg>
+                            {t.ranked}
+                        </button>
 
                         <div className="flex flex-col gap-3">
-                            <button onClick={() => sendMessage({ type: 'createRoom', ...playerData })} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all">🏠 Otaq Yarat / Create Room</button>
+                            <button onClick={() => sendMessage({ type: 'createRoom', ...playerData })} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM14 11a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1v-1a1 1 0 011-1z" />
+                                </svg>
+                                {t.createRoom}
+                            </button>
 
                             <div className="flex gap-2">
                                 <input
                                     value={joinCode}
                                     onChange={e => setJoinCode(e.target.value)}
-                                    placeholder="Otaq Kodu"
+                                    placeholder={t.roomCode}
                                     className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 text-white text-center font-bold focus:border-yellow-500 transition-all"
                                 />
                                 <button
-                                    onClick={() => {
-                                        if (!joinCode) return showNotification('Lütfen oda kodu girin', 'warning');
-                                        sendMessage({ type: 'joinRoom', roomCode: joinCode, ...playerData });
-                                    }}
+                                    onClick={handleJoinRoom}
                                     className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-black transition-all shadow-glow"
                                 >
-                                    GİR
+                                    {t.enter}
                                 </button>
                             </div>
                         </div>
@@ -946,13 +1101,18 @@
                                 className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/40 rounded-2xl text-center cursor-pointer hover:bg-yellow-500/20 active:scale-95 transition-all group"
                             >
                                 <div className="text-yellow-400 text-xs font-bold flex items-center justify-center gap-2">
-                                    ODA KODU <span className="text-[10px] bg-yellow-500/20 px-2 py-0.5 rounded-full">KOPYALA</span>
+                                    ODA KODU <span className="text-[10px] bg-yellow-500/20 px-2 py-0.5 rounded-full">{t.copy}</span>
                                 </div>
                                 <div className="text-4xl text-white font-black tracking-widest mt-1 group-hover:text-yellow-400">{roomCode}</div>
                             </div>
                         )}
 
-                        <button onClick={() => { loadLeaderboard(); setScreen('leaderboard'); }} className="w-full mt-6 text-white/40 hover:text-white transition-colors text-sm font-bold">🏆 SKOR TABLOSU</button>
+                        <button onClick={() => { loadLeaderboard(); setScreen('leaderboard'); }} className="w-full mt-6 text-white/40 hover:text-white transition-colors text-sm font-bold flex items-center justify-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                            </svg>
+                            {t.leaderboard}
+                        </button>
                     </div>
                 </div>
             );
@@ -960,8 +1120,8 @@
             if (screen === 'matching_lobby') return (
                 <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-black/60 backdrop-blur-2xl">
                     <div className="text-center mb-16">
-                        <h2 className="text-4xl font-black text-yellow-500 animate-pulse">RAKİP BULUNDU!</h2>
-                        <p className="text-white/40 mt-2 uppercase tracking-[0.3em]">Maç Başlıyor...</p>
+                        <h2 className="text-4xl font-black text-yellow-500 animate-pulse">{t.opponentFound}</h2>
+                        <p className="text-white/40 mt-2 uppercase tracking-[0.3em]">{t.matchStarting}</p>
                     </div>
 
                     <div className="flex items-center gap-4 sm:gap-12 w-full max-w-2xl px-4">
@@ -1017,8 +1177,8 @@
                         </div>
                     )}
 
-                    {/* Header */}
-                    <div className="h-24 pt-8 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30">
+                    {/* Header - Rakip bilgisi aşağı kaydırıldı */}
+                    <div className="h-16 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30 mt-4">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full border-2 border-white/20 overflow-hidden">
                                 {opponent?.photoUrl ? <img src={opponent.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 flex items-center justify-center">👤</div>}
@@ -1029,6 +1189,25 @@
                                     <LevelBadge level={opponent?.level || 1} />
                                 </div>
                             </div>
+                        </div>
+                        
+                        {/* Rakibin taş sayısı */}
+                        <div className="text-white text-sm font-bold">
+                            {opponentHand.length} taş
+                        </div>
+                    </div>
+
+                    {/* Rakibin taşları - isminin altında */}
+                    <div className="h-16 flex items-center justify-center bg-black/20 z-20">
+                        <div className="opponent-hand">
+                            {opponentHand.map((_, idx) => (
+                                <DominoTile 
+                                    key={idx} 
+                                    values={[0, 0]} 
+                                    isOpponent={true}
+                                    disabled={true}
+                                />
+                            ))}
                         </div>
                     </div>
 
@@ -1103,19 +1282,34 @@
                         </div>
                     </div>
 
+                    {/* Oyundan çık butonu */}
+                    <ExitGameButton onExit={leaveGameClient} />
+
                     {/* Controls Footer */}
                     <div className="h-48 z-30 bg-black/60 backdrop-blur-xl border-t border-white/10 p-4">
                         <div className="flex items-center justify-between mb-2">
-                            <div className="text-white/50 text-xs font-bold uppercase tracking-widest">Senin Elin ({myHand.length})</div>
+                            <div className="text-white/50 text-xs font-bold uppercase tracking-widest">{t.yourHand} ({myHand.length})</div>
                             {isMyTurn && (
                                 marketSize > 0 ? (
-                                    <button onClick={() => sendMessage({ type: 'drawFromMarket' })} className="bg-yellow-500 text-black px-4 py-1 rounded-full text-xs font-bold shadow-glow">TAŞ ÇEK ({marketSize})</button>
+                                    <button onClick={() => sendMessage({ type: 'drawFromMarket' })} className="bg-yellow-500 text-black px-4 py-1 rounded-full text-xs font-bold shadow-glow flex items-center gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                                        </svg>
+                                        {t.drawTile} ({marketSize})
+                                    </button>
                                 ) : (
-                                    <button onClick={() => sendMessage({ type: 'passTurn' })} className="bg-red-600 hover:bg-red-500 text-white px-6 py-1 rounded-full text-xs font-bold shadow-glow animate-pulse">PAS GEÇ</button>
+                                    <button onClick={() => sendMessage({ type: 'passTurn' })} className="bg-red-600 hover:bg-red-500 text-white px-6 py-1 rounded-full text-xs font-bold shadow-glow animate-pulse flex items-center gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
+                                        </svg>
+                                        {t.passTurn}
+                                    </button>
                                 )
                             )}
                         </div>
-                        <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar justify-center">
+                        
+                        {/* Elindeki taşlar - 8'den fazlaysa alt satıra geç */}
+                        <div className={`hand-container ${myHand.length > 8 ? '' : 'single-row'}`}>
                             {myHand.map((tile, idx) => (
                                 <DominoTile
                                     key={idx}
@@ -1133,28 +1327,66 @@
             if (screen === 'end') return (
                 <div className="flex flex-col items-center justify-center min-h-screen bg-black/90 p-10 text-center">
                     <div className="text-8xl mb-6">{endInfo.isWinner ? '🎉' : '💀'}</div>
-                    <h1 className="text-6xl font-black text-white mb-2">{endInfo.winnerName}</h1>
-
-                    {endInfo.isRanked && (
-                        <div className={`text-4xl font-black ${endInfo.eloChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {endInfo.eloChange > 0 ? '+' : ''}{endInfo.eloChange} ELO
+                    
+                    {/* Kazanan */}
+                    <div className="mb-8">
+                        <div className="flex items-center justify-center gap-4 mb-4">
+                            {endInfo.winnerPhoto ? (
+                                <img src={endInfo.winnerPhoto} className="w-16 h-16 rounded-full border-4 border-yellow-500" />
+                            ) : (
+                                <div className="w-16 h-16 rounded-full border-4 border-yellow-500 bg-gray-700 flex items-center justify-center">👑</div>
+                            )}
+                            <div className="text-left">
+                                <h2 className="text-2xl font-bold text-white">{endInfo.winnerName}</h2>
+                                <div className="text-green-400 text-xl font-black">{endInfo.isWinner ? t.winner : t.loser}</div>
+                            </div>
                         </div>
-                    )}
+                        <div className="text-3xl font-black text-green-400">
+                            {endInfo.eloChange > 0 ? '+' : ''}{endInfo.eloChange} {t.eloChange}
+                        </div>
+                    </div>
 
-                    <div className="mt-12 text-white/30 animate-pulse">Lobiye dönülüyor...</div>
+                    {/* Kaybeden */}
+                    <div className="mb-8">
+                        <div className="flex items-center justify-center gap-4 mb-4">
+                            {endInfo.loserPhoto ? (
+                                <img src={endInfo.loserPhoto} className="w-16 h-16 rounded-full border-4 border-red-500" />
+                            ) : (
+                                <div className="w-16 h-16 rounded-full border-4 border-red-500 bg-gray-700 flex items-center justify-center">😞</div>
+                            )}
+                            <div className="text-left">
+                                <h2 className="text-2xl font-bold text-white">{endInfo.loserName}</h2>
+                                <div className="text-red-400 text-xl font-black">{!endInfo.isWinner ? t.winner : t.loser}</div>
+                            </div>
+                        </div>
+                        <div className="text-3xl font-black text-red-400">
+                            {endInfo.eloChange > 0 ? '-' : '+'}{Math.abs(endInfo.eloChange)} {t.eloChange}
+                        </div>
+                    </div>
+
+                    <div className="mt-12 text-white/30 animate-pulse">{t.returningLobby}</div>
                 </div>
             );
 
             if (screen === 'searching') return (
                 <div className="flex flex-col items-center justify-center min-h-screen bg-[#0b241c]">
                     <div className="w-40 h-40 relative flex items-center justify-center">
-                        <div className="absolute inset-0 border-8 border-yellow-500/20 rounded-full"></div>
-                        <div className="absolute inset-0 border-8 border-t-yellow-500 rounded-full animate-spin"></div>
-                        <div className="text-4xl animate-bounce">🔍</div>
+                        <div className="absolute inset-0 border-8 border-red-500/20 rounded-full"></div>
+                        <div className="absolute inset-0 border-8 border-t-red-500 rounded-full animate-spin"></div>
+                        <div className="text-4xl animate-bounce">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" />
+                            </svg>
+                        </div>
                     </div>
-                    <h2 className="text-white text-3xl font-black mt-10">RAKİP ARANIYOR</h2>
-                    <p className="text-white/40 mt-2">Bu biraz zaman alabilir...</p>
-                    <button onClick={() => { sendMessage({ type: 'cancelSearch' }); setScreen('lobby'); }} className="mt-12 text-red-500 font-bold border border-red-500/30 px-6 py-2 rounded-full hover:bg-red-500/10 transition-all">İPTAL ET</button>
+                    <h2 className="text-white text-3xl font-black mt-10">{t.searchingOpponent}</h2>
+                    <p className="text-white/40 mt-2">{t.waitingOpponent}</p>
+                    <button onClick={() => { sendMessage({ type: 'cancelSearch' }); setScreen('lobby'); }} className="mt-12 text-red-500 font-bold border border-red-500/30 px-6 py-2 rounded-full hover:bg-red-500/10 transition-all flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                        {t.cancel}
+                    </button>
                 </div>
             );
 
@@ -1193,7 +1425,6 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<DominoGame />);
     </script>
-        </script>
 
     <script>
         const tgApp = window.Telegram.WebApp;
@@ -1203,22 +1434,8 @@
             tgApp.requestFullscreen();
         }
         tgApp.disableVerticalSwipes();
-        tgApp.setHeaderColor('secondary_bg_color');
+        tgApp.setHeaderColor('#1b4d3e');
     </script>
-<script>
-    const tgApp = window.Telegram.WebApp;
-    tgApp.ready();
-    tgApp.expand();
-    if (tgApp.requestFullscreen) {
-        tgApp.requestFullscreen();
-    }
-    tgApp.disableVerticalSwipes();
-    tgApp.setHeaderColor('#1b4d3e');
-</script>
 
 </body>
-</html>
-
-</body>
-
 </html>
