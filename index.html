@@ -483,11 +483,6 @@
 
             const t = translations[language];
 
-            // Set playerId when playerData is loaded
-            useEffect(() => {
-                if (playerData?.id) setPlayerId(String(playerData.id));
-            }, [playerData]);
-
             // Hesaplama lobisi timer
             useEffect(() => {
                 if (calculationLobby && calculationTimer > 0) {
@@ -1264,7 +1259,7 @@
             );
 
             if (screen === 'game') return (
-                <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden" style={{ paddingTop: '60px' }}>
+                <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden">
                     {notification && <Toast message={notification.message} type={notification.type} />}
 
                     <GameTimer startTime={gameState.turnStartTime} />
@@ -1280,7 +1275,7 @@
                     )}
 
                     {/* Header - 60px aşağıda */}
-                    <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30">
+                    <div className="absolute top-[60px] left-0 right-0 h-16 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full border-2 border-white/20 overflow-hidden">
                                 {opponent?.photoUrl ? <img src={opponent.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 flex items-center justify-center">👤</div>}
@@ -1298,7 +1293,7 @@
                         </div>
                     </div>
 
-                    <div className="h-16 flex items-center justify-center bg-black/20 z-20 mt-16">
+                    <div className="h-16 flex items-center justify-center bg-black/20 z-20" style={{ marginTop: '124px' /* 60px top offset + 64px header */ }}>
                         <div className="opponent-hand">
                             {opponentHand.map((_, idx) => (
                                 <DominoTile 
@@ -1562,7 +1557,7 @@
                     <div className="w-full max-w-xl space-y-3">
                         {leaderboard.map((p, i) => (
                             <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-3xl border border-white/5">
-                                <div className="text-2xl font-black w-8 text-center">{i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</div>
+                                <div className="text-2xl font-black w-8 text-center text-white/50">{i + 1}</div>
                                 <img src={p.photoUrl || 'https://via.placeholder.com/50'} className="w-12 h-12 rounded-full" />
                                 <div className="flex-1">
                                     <div className="text-white font-bold">{p.username}</div>
