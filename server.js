@@ -292,7 +292,9 @@ function initializeGame(roomCode, player1Id, player2Id) {
         market: market,
         currentPlayer: startingPlayer,
         turn: 1,
-        turnStartTime: Date.now()
+        turnStartTime: Date.now(),
+        score: { [player1Id]: 0, [player2Id]: 0 },
+        round: 1
     };
 
     rooms.set(roomCode, room);
@@ -528,7 +530,8 @@ function handleFindMatch(ws, data) {
                 }
             },
             type: gameType,
-            startTime: Date.now()
+            startTime: Date.now(),
+            winsNeeded: 3, // Best of 5
         };
 
         rooms.set(roomCode, room);
@@ -676,7 +679,7 @@ function handlePlayTile(ws, data) {
 
     const winner = checkWinner(gs);
     if (winner) {
-        handleGameEnd(ws.roomCode, winner, gs);
+        processRoundWinner(ws.roomCode, winner, gs);
     } else {
         gs.turn++;
         gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
@@ -685,7 +688,57 @@ function handlePlayTile(ws, data) {
     }
 }
 
-async function handleGameEnd(roomCode, winnerId, gameState, reason = null) {
+function processRoundWinner(roomCode, winnerId, gameState) {
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState) return;
+
+    const gs = room.gameState;
+    const isDraw = winnerId === 'DRAW';
+    let roundLoserId = null;
+
+    if (!isDraw) {
+        gs.score[winnerId]++;
+        roundLoserId = Object.keys(gs.players).find(id => id !== winnerId);
+    }
+
+    const winnerName = isDraw ? 'Beraberlik' : gs.players[winnerId].name;
+    console.log(`ዙ Round bitti: ${winnerName} kazandı. Skor: ${gs.score[Object.keys(gs.players)[0]]}-${gs.score[Object.keys(gs.players)[1]]}`);
+
+    broadcastToRoom(roomCode, { type: 'roundEnd', winnerId, score: gs.score });
+
+    // Maç bitiş kontrolü
+    if (!isDraw && gs.score[winnerId] >= room.winsNeeded) {
+        console.log(`🏆 Maç bitti! Kazanan: ${winnerName}`);
+        setTimeout(() => handleMatchEnd(roomCode, winnerId, gs, 'score'), 5000); // 5 saniye sonra maç sonu ekranı
+    } else {
+        // Yeni raund başlat
+        setTimeout(() => startNewRound(roomCode, roundLoserId), 5000); // 5 saniye sonra yeni raund
+    }
+}
+
+function startNewRound(roomCode, startingPlayerId) {
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState) return;
+
+    const gs = room.gameState;
+    const [p1, p2] = Object.keys(gs.players);
+
+    // Oyunu sıfırla ama skorları ve oyuncu bilgilerini koru
+    const newGameState = initializeGame(roomCode, p1, p2);
+    gs.board = newGameState.board;
+    gs.players[p1].hand = newGameState.players[p1].hand;
+    gs.players[p2].hand = newGameState.players[p2].hand;
+    gs.market = newGameState.market;
+    gs.round++;
+    gs.currentPlayer = startingPlayerId || newGameState.currentPlayer; // Kaybeden başlar, berabereyse default
+    gs.turnStartTime = Date.now();
+    gs.winner = null; // Önceki kazananı temizle
+
+    console.log(`🔄 Yeni Raund (${gs.round}) başlıyor. Başlayan: ${gs.players[gs.currentPlayer].name}`);
+    Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+}
+
+async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
     const room = rooms.get(roomCode);
     if (!room) return;
 
@@ -720,7 +773,7 @@ async function handleGameEnd(roomCode, winnerId, gameState, reason = null) {
                 broadcastToRoom(roomCode, {
                     type: 'gameEnd',
                     winner: winnerId,
-                    winnerName: isDraw ? 'Beraberlik' : gameState.players[winnerId].name,
+                    winnerName: isDraw ? 'Beraberlik' : (gameState.players[winnerId]?.name || 'Bilinmeyen'),
                     isRanked: false
                 });
                 rooms.delete(roomCode);
@@ -817,7 +870,7 @@ async function handleGameEnd(roomCode, winnerId, gameState, reason = null) {
         broadcastToRoom(roomCode, {
             type: 'gameEnd',
             winner: winnerId,
-            winnerName: winnerId === 'DRAW' ? 'Beraberlik' : gameState.players[winnerId].name,
+            winnerName: winnerId === 'DRAW' ? 'Beraberlik' : (gameState.players[winnerId]?.name || 'Bilinmeyen'),
             isRanked: false
         });
         rooms.delete(roomCode);
@@ -863,7 +916,7 @@ function handlePass(ws) {
 
         // End the game after showing scores
         setTimeout(() => {
-            handleGameEnd(room.code, winnerId, room.gameState);
+            processRoundWinner(room.code, winnerId, room.gameState);
         }, 8000);
         
         return;
@@ -958,7 +1011,7 @@ function handleDrawFromMarket(ws) {
             // Sıra geçtikten sonra oyun kilitlendi mi kontrol et
             const winner = checkWinner(gs);
             if (winner) {
-                handleGameEnd(ws.roomCode, winner, gs);
+                processRoundWinner(ws.roomCode, winner, gs);
                 return;
             }
         }
@@ -1012,7 +1065,7 @@ function handleLeaveGame(ws) {
     const leaverId = String(ws.playerId);
     const winnerId = playerIds.find(id => String(id) !== leaverId);
 
-    handleGameEnd(ws.roomCode, winnerId, gs);
+    handleMatchEnd(ws.roomCode, winnerId, gs, 'disconnect');
 
     // Oyun bitti, bu soketin oda bilgisini temizle ki tekrar eşleşme arayabilsin
     ws.roomCode = null;
@@ -1047,7 +1100,7 @@ function handleDisconnect(ws) {
                         // Diğer oyuncuyu bul (Kazanan)
                         const winnerId = Object.keys(room.players).find(id => id !== ws.playerId);
                         if (winnerId && room.gameState) {
-                            handleGameEnd(ws.roomCode, winnerId, room.gameState);
+                            handleMatchEnd(ws.roomCode, winnerId, room.gameState, 'disconnect');
                         } else {
                             rooms.delete(ws.roomCode);
                         }
@@ -1088,7 +1141,7 @@ function handleTurnTimeout(roomCode) {
         console.log(`⏰ ${player.name} 2. kez AFK kaldı. Oyun bitiriliyor.`);
         const winnerId = Object.keys(gs.players).find(id => id !== currentPlayerId);
         gs.winner = winnerId; // Döngüyü durdurmak için
-        handleGameEnd(roomCode, winnerId, gs, 'afk');
+        handleMatchEnd(roomCode, winnerId, gs, 'afk');
         return;
     }
 
@@ -1134,7 +1187,7 @@ function handleTurnTimeout(roomCode) {
             // Kazanan kontrolü
             const winner = checkWinner(gs);
             if (winner) {
-                handleGameEnd(roomCode, winner, gs);
+                processRoundWinner(roomCode, winner, gs);
                 return;
             }
             
