@@ -457,10 +457,28 @@ function sendGameState(roomCode, playerId) {
     const ws = playerConnections.get(playerId);
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
+    // OPTİMİZASYON: Rakibin elini gizle (Veri tasarrufu ve güvenlik)
+    const sanitizedGameState = { ...room.gameState, playerId: playerId };
+    const players = {};
+    
+    for (const pid in room.gameState.players) {
+        const p = room.gameState.players[pid];
+        if (pid === playerId) {
+            players[pid] = p; // Kendi verisi tam gider
+        } else {
+            // Rakip verisi: Elindeki taşların değerlerini sil, sadece sayısını gönder
+            players[pid] = {
+                ...p,
+                hand: p.hand.map(() => [-1, -1]) // Değerleri gizle
+            };
+        }
+    }
+    sanitizedGameState.players = players;
+
     try {
         ws.send(JSON.stringify({
             type: 'gameUpdate',
-            gameState: { ...room.gameState, playerId: playerId },
+            gameState: sanitizedGameState,
             serverTime: Date.now() // Timer senkronizasyonu için sunucu saati
         }));
     } catch (error) { console.error(error); }
@@ -1185,6 +1203,12 @@ function handleRejoin(ws, data) {
     ws.playerName = room.players[playerId].name;
     playerConnections.set(playerId, ws);
 
+    // Eğer oyuncu geri döndüyse ve cleanup timer varsa iptal et
+    if (room.cleanupTimer) {
+        clearTimeout(room.cleanupTimer);
+        room.cleanupTimer = null;
+    }
+
     console.log(`🔄 Oyuncu geri döndü: ${ws.playerName} (Oda: ${roomCode})`);
 
     // Send full state to rejoining player
@@ -1267,8 +1291,8 @@ setInterval(() => {
     rooms.forEach((room, roomCode) => {
         if (!room.gameState || !room.gameState.turnStartTime || room.gameState.winner) return;
         
-        // 30 saniye süre
-        const TURN_LIMIT = 30000;
+        // 25 saniye süre (İstek üzerine düşürüldü)
+        const TURN_LIMIT = 25000;
         const elapsed = Date.now() - room.gameState.turnStartTime;
         
         if (elapsed > TURN_LIMIT) {
@@ -1284,6 +1308,14 @@ function handleTurnTimeout(roomCode) {
     const gs = room.gameState;
     const currentPlayerId = gs.currentPlayer;
     const player = gs.players[currentPlayerId];
+
+    // Bağlantı kontrolü: Eğer oyuncu bağlı değilse ve süresi dolduysa oyunu bitir
+    if (!playerConnections.has(currentPlayerId)) {
+        console.log(`⏰ ${player.name} bağlı değil ve süresi doldu. Oyun bitiriliyor.`);
+        const winnerId = Object.keys(gs.players).find(id => id !== currentPlayerId);
+        handleMatchEnd(roomCode, winnerId, gs, 'disconnect');
+        return;
+    }
     
     // Timeout kontrolü
     player.timeouts = (player.timeouts || 0) + 1;
