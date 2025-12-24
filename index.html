@@ -260,6 +260,62 @@
             box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
         }
         @keyframes gradient-shine { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+        /* --- SKINS & PLATES CSS --- */
+        /* Skins */
+        .skin-gold { background: linear-gradient(135deg, #FFD700, #FDB931); border-color: #B8860B; }
+        .skin-gold .pip { background-color: #000; }
+        
+        .skin-neon { background: #111; border-color: #0ff; box-shadow: 0 0 5px #0ff; }
+        .skin-neon .pip { background-color: #0ff; box-shadow: 0 0 2px #0ff; }
+        
+        .skin-wood { background: #8B4513; background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h20v20H0V0zm10 10h10v10H10V10zM0 10h10v10H0V10zM10 0h10v10H10V0z' fill='%23A0522D' fill-opacity='0.4'/%3E%3C/svg%3E"); border-color: #5D4037; }
+        .skin-wood .pip { background-color: #3E2723; }
+
+        .skin-ice { background: linear-gradient(135deg, #E0F7FA, #80DEEA); border-color: #00BCD4; }
+        .skin-ice .pip { background-color: #006064; }
+
+        .skin-matrix { background: #000; border-color: #0f0; font-family: monospace; }
+        .skin-matrix .pip { background-color: #0f0; border-radius: 0; width: 4px; height: 4px; }
+
+        .skin-royal { background: linear-gradient(135deg, #4B0082, #800080); border-color: #FFD700; }
+        .skin-royal .pip { background-color: #FFD700; }
+
+        /* Nameplates */
+        .plate-fire {
+            box-shadow: 0 0 10px #ff4500, 0 0 20px #ff8c00;
+            border: 2px solid #ff4500;
+            animation: fire-pulse 1.5s infinite alternate;
+        }
+        @keyframes fire-pulse { from { box-shadow: 0 0 10px #ff4500; } to { box-shadow: 0 0 25px #ff8c00; } }
+
+        .plate-rainbow {
+            border: 2px solid transparent;
+            background-image: linear-gradient(#000, #000), linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet);
+            background-origin: border-box;
+            background-clip: content-box, border-box;
+            animation: rainbow-spin 3s linear infinite;
+        }
+        
+        .plate-ghost {
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+            opacity: 0.8;
+            animation: ghost-float 3s ease-in-out infinite;
+        }
+        @keyframes ghost-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+
+        .plate-electric {
+            box-shadow: 0 0 5px #00f, 0 0 10px #0ff;
+            border: 2px solid #0ff;
+            animation: electric-flicker 0.2s infinite;
+        }
+        @keyframes electric-flicker { 0% { opacity: 1; } 50% { opacity: 0.8; } 100% { opacity: 1; } }
+
+        .plate-king {
+            border: 2px solid #FFD700;
+            box-shadow: 0 0 15px #FFD700;
+        }
+        .plate-king::after { content: '👑'; position: absolute; top: -15px; left: 50%; transform: translateX(-50%); font-size: 16px; }
     </style>
 </head>
 
@@ -298,10 +354,11 @@
         };
 
         // 2. Domino Taşı (3D Tasarım)
-        const DominoTile = ({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false, isOpponent = false }) => {
+        const DominoTile = ({ values, onClick, disabled, isSelected, vertical = true, scale = 1, isGhost = false, animateIn = false, isOpponent = false, skin = 'skin_default' }) => {
             const baseClasses = `
                 relative flex overflow-hidden bg-bone-face border border-gray-300 rounded-md
                 transition-all duration-300 select-none
+                ${skin !== 'skin_default' ? skin : ''}
                 ${vertical ? 'flex-col w-[40px] h-[80px]' : 'flex-row w-[80px] h-[40px]'}
                 ${isGhost ? 'opacity-0 pointer-events-none' : 'shadow-3d'}
                 ${isSelected ? '-translate-y-4 shadow-3d-active ring-2 ring-yellow-500 z-10 animate-celebrate' : ''}
@@ -467,6 +524,96 @@
             );
         };
 
+        // 7. Shop Component
+        const ShopModal = ({ onClose, playerData, onUpdatePlayer }) => {
+            const [activeTab, setActiveTab] = useState('skins'); // skins, plates
+            
+            const ITEMS = {
+                skins: [
+                    { id: 'skin_default', name: 'Klasik', price: 0, class: '' },
+                    { id: 'skin_gold', name: 'Altın', price: 500, class: 'skin-gold' },
+                    { id: 'skin_neon', name: 'Neon', price: 1000, class: 'skin-neon' },
+                    { id: 'skin_wood', name: 'Ahşap', price: 750, class: 'skin-wood' },
+                    { id: 'skin_ice', name: 'Buz', price: 1200, class: 'skin-ice' },
+                    { id: 'skin_matrix', name: 'Matrix', price: 2000, class: 'skin-matrix' },
+                    { id: 'skin_royal', name: 'Kraliyet', price: 5000, class: 'skin-royal' }
+                ],
+                plates: [
+                    { id: 'plate_default', name: 'Standart', price: 0, class: '' },
+                    { id: 'plate_fire', name: 'Alev', price: 1500, class: 'plate-fire' },
+                    { id: 'plate_ghost', name: 'Hayalet', price: 2000, class: 'plate-ghost' },
+                    { id: 'plate_electric', name: 'Elektrik', price: 2500, class: 'plate-electric' },
+                    { id: 'plate_rainbow', name: 'Gökkuşağı', price: 3000, class: 'plate-rainbow' },
+                    { id: 'plate_king', name: 'Kral', price: 5000, class: 'plate-king' }
+                ]
+            };
+
+            const handleBuy = (item) => {
+                fetch(`${API_URL}/api/shop/buy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telegramId: playerData.telegramId, itemId: item.id })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.success) {
+                        onUpdatePlayer({ ...playerData, gold: data.gold, inventory: data.inventory });
+                    } else {
+                        alert(data.error);
+                    }
+                });
+            };
+
+            const handleEquip = (item, type) => {
+                const typeKey = type === 'skins' ? 'tileSkin' : 'nameplate';
+                fetch(`${API_URL}/api/shop/equip`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telegramId: playerData.telegramId, type: typeKey, itemId: item.id })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.success) {
+                        onUpdatePlayer({ ...playerData, equipped: data.equipped });
+                    }
+                });
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black/95 z-[100] overflow-y-auto p-4 animate-slide-up">
+                    <div className="max-w-4xl mx-auto">
+                        <div className="flex justify-between items-center mb-6 sticky top-0 bg-black/95 py-4 z-10 border-b border-white/10">
+                            <h2 className="text-2xl font-black text-yellow-500">MARKET 🛒 <span className="text-white text-sm ml-2">Bakiye: {playerData.gold} G</span></h2>
+                            <button onClick={onClose} className="bg-red-600 text-white px-4 py-2 rounded-xl font-bold">KAPAT</button>
+                        </div>
+                        
+                        <div className="flex gap-4 mb-6">
+                            <button onClick={() => setActiveTab('skins')} className={`flex-1 py-3 rounded-xl font-bold ${activeTab === 'skins' ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white'}`}>TAŞ DESENLERİ</button>
+                            <button onClick={() => setActiveTab('plates')} className={`flex-1 py-3 rounded-xl font-bold ${activeTab === 'plates' ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white'}`}>İSİMLİKLER</button>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                            {ITEMS[activeTab].map(item => {
+                                const owned = playerData.inventory?.includes(item.id) || item.price === 0;
+                                const equipped = (activeTab === 'skins' ? playerData.equipped?.tileSkin : playerData.equipped?.nameplate) === item.id;
+                                return (
+                                    <div key={item.id} className={`bg-white/5 p-4 rounded-xl border ${equipped ? 'border-green-500' : 'border-white/10'} flex flex-col items-center gap-3`}>
+                                        <div className={`w-16 h-16 flex items-center justify-center rounded-lg ${activeTab === 'plates' ? item.class : ''}`}>
+                                            {activeTab === 'skins' ? <div className={`w-8 h-16 border rounded ${item.class}`}></div> : <span className="text-white font-bold">ABC</span>}
+                                        </div>
+                                        <div className="text-white font-bold">{item.name}</div>
+                                        {equipped ? <span className="text-green-500 font-bold text-sm">SEÇİLİ</span> : 
+                                            owned ? <button onClick={() => handleEquip(item, activeTab)} className="bg-blue-600 text-white px-4 py-1 rounded-lg text-sm font-bold w-full">SEÇ</button> :
+                                            <button onClick={() => handleBuy(item)} className="bg-yellow-500 text-black px-4 py-1 rounded-lg text-sm font-bold w-full">{item.price} G</button>}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         // --- ANA OYUN ---
 
         const DominoGame = () => {
@@ -492,6 +639,8 @@
             const [calculationLobby, setCalculationLobby] = useState(null);
             const [calculationTimer, setCalculationTimer] = useState(8);
             const [showAdmin, setShowAdmin] = useState(false);
+            const [showShop, setShowShop] = useState(false);
+            const [betAmount, setBetAmount] = useState(0);
 
             const [playerId, setPlayerId] = useState(null);
             const wsRef = useRef(null);
@@ -696,7 +845,9 @@
                             username: user.username || user.first_name || 'User',
                             firstName: user.first_name || '',
                             lastName: user.last_name || '',
-                            photoUrl: user.photo_url || null
+                            photoUrl: user.photo_url || null,
+                            inventory: ['skin_default', 'plate_default'],
+                            equipped: { tileSkin: 'skin_default', nameplate: 'plate_default' }
                         };
 
                         console.log('📡 Telegram kullanıcısı:', telegramData);
@@ -1230,6 +1381,7 @@
                         <button onClick={() => setShowAdmin(true)} className="absolute top-4 right-4 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl font-black shadow-lg z-50 text-xs tracking-widest border border-purple-400">ADMIN PANEL</button>
                     )}
                     {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} adminId={playerData.telegramId} />}
+                    {showShop && <ShopModal onClose={() => setShowShop(false)} playerData={playerData} onUpdatePlayer={setPlayerData} />}
 
                     <div className="text-center mb-10 animate-float">
                         <h1 className="text-6xl font-black text-white drop-shadow-2xl mb-2">DOMINO <span className="text-yellow-400">101</span></h1>
@@ -1252,19 +1404,39 @@
                             </div>
                         )}
                         
-                        <div className="flex justify-center mb-4">
+                        <div className="flex justify-center mb-4 gap-2">
                             <button 
                                 onClick={() => setLanguage(lang => lang === 'az' ? 'en' : 'az')}
                                 className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-sm font-bold transition-all"
                             >
                                 {language === 'az' ? '🇦🇿 AZ' : '🇺🇸 EN'}
                             </button>
+                            <button onClick={() => setShowShop(true)} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-1">
+                                🛒 MARKET
+                            </button>
+                        </div>
+
+                        {/* Bet Selector */}
+                        <div className="flex justify-center mb-4 bg-black/30 p-2 rounded-xl">
+                            {[0, 100, 500, 1000].map(amt => (
+                                <button 
+                                    key={amt}
+                                    onClick={() => setBetAmount(amt)}
+                                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${betAmount === amt ? 'bg-yellow-500 text-black' : 'text-white/50 hover:text-white'}`}
+                                >
+                                    {amt === 0 ? 'EĞLENCE' : `${amt} G`}
+                                </button>
+                            ))}
                         </div>
 
                         <button onClick={() => {
+                            if (playerData.gold < betAmount) {
+                                showNotification('Yetersiz Gold!', 'error');
+                                return;
+                            }
                             setScreen('searching');
                             setSearching(true);
-                            sendMessage({ type: 'findMatch', ...playerData });
+                            sendMessage({ type: 'findMatch', ...playerData, bet: betAmount });
                         }} className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-4 rounded-2xl mb-4 transition-all transform active:scale-95 shadow-lg flex items-center justify-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" />
@@ -1331,7 +1503,7 @@
                     <div className="flex items-center gap-4 sm:gap-12 w-full max-w-2xl px-4">
                         <div className="flex-1 flex flex-col items-center gap-4 animate-slide-right">
                             <div className="relative">
-                                <img src={playerData?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-white/20 shadow-2xl object-cover" />
+                                <img src={playerData?.photoUrl || 'https://via.placeholder.com/100'} className={`w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-white/20 shadow-2xl object-cover ${playerData?.equipped?.nameplate}`} />
                                 <div className="absolute -bottom-2 -right-2"><LevelBadge level={playerData?.level || 1} /></div>
                             </div>
                             <div className="text-center">
@@ -1345,7 +1517,7 @@
 
                         <div className="flex-1 flex flex-col items-center gap-4 animate-slide-left">
                             <div className="relative">
-                                <img src={opponent?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-yellow-500/50 shadow-2xl object-cover" />
+                                <img src={opponent?.photoUrl || 'https://via.placeholder.com/100'} className={`w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-yellow-500/50 shadow-2xl object-cover ${opponent?.equipped?.nameplate}`} />
                                 <div className="absolute -bottom-2 -right-2"><LevelBadge level={opponent?.level || 1} /></div>
                             </div>
                             <div className="text-center">
@@ -1381,7 +1553,7 @@
                     {/* Header - 60px aşağıda */}
                     <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full border-2 border-white/20 overflow-hidden">
+                            <div className={`w-10 h-10 rounded-full border-2 border-white/20 overflow-hidden ${opponent?.equipped?.nameplate}`}>
                                 {opponent?.photoUrl ? <img src={opponent.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 flex items-center justify-center">👤</div>}
                             </div>
                             <div className="flex flex-col">
@@ -1435,6 +1607,7 @@
                                         vertical={false}
                                         disabled={true}
                                         scale={1}
+                                        skin={gameState?.players[myPlayerId]?.equipped?.tileSkin}
                                     />
                                 </div>
                             ))}
@@ -1520,6 +1693,7 @@
                                     onClick={() => handleTileClick(idx, tile)}
                                     isSelected={selectedTileIndex === idx}
                                     disabled={!isMyTurn}
+                                    skin={gameState?.players[myPlayerId]?.equipped?.tileSkin}
                                 />
                             ))}
                         </div>
@@ -1589,6 +1763,13 @@
                     {endInfo.reason === 'disconnect' && <p className="text-yellow-400 mb-6 text-lg">Rəqib oyundan ayrıldı.</p>}
                     {endInfo.reason === 'afk' && <p className="text-yellow-400 mb-6 text-lg">{endInfo.isWinner ? 'Rəqib AFK qaldı.' : 'AFK qaldığınız üçün məğlub oldunuz.'}</p>}
                     {endInfo.reason === 'score_calculation' && <p className="text-yellow-400 mb-6 text-lg">En az puanı olan kazandı!</p>}
+                    
+                    {/* Gold Change Display */}
+                    {endInfo.goldChanges && (
+                        <div className="mb-6 text-2xl font-black text-yellow-400 animate-pulse">
+                            {endInfo.isWinner ? `+${endInfo.goldChanges.winner} GOLD` : `${endInfo.goldChanges.loser} GOLD`}
+                        </div>
+                    )}
 
                     <div className="w-full max-w-sm space-y-4 mt-4">
                         {/* Winner Info */}
