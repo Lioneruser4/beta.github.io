@@ -31,12 +31,6 @@ const playerSchema = new mongoose.Schema({
     totalGames: { type: Number, default: 0 },
     winStreak: { type: Number, default: 0 },
     bestWinStreak: { type: Number, default: 0 },
-    gold: { type: Number, default: 500 }, // Başlangıç parası
-    inventory: { type: [String], default: ['skin_default', 'plate_default'] },
-    equipped: {
-        tileSkin: { type: String, default: 'skin_default' },
-        nameplate: { type: String, default: 'plate_default' }
-    },
     isVisibleInLeaderboard: { type: Boolean, default: true },
     createdAt: { type: Date, default: Date.now },
     lastPlayed: { type: Date, default: Date.now }
@@ -54,7 +48,6 @@ const matchSchema = new mongoose.Schema({
     duration: { type: Number },
     isDraw: { type: Boolean, default: false },
     gameType: { type: String, enum: ['ranked', 'private'], default: 'ranked' },
-    betAmount: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now }
 });
 
@@ -68,21 +61,6 @@ const rooms = new Map();
 const matchQueue = [];
 const playerConnections = new Map();
 const playerSessions = new Map(); // telegramId -> player data
-
-// --- SHOP ITEMS CONFIGURATION ---
-const SHOP_ITEMS = {
-    'skin_gold': 500,
-    'skin_neon': 1000,
-    'skin_wood': 750,
-    'skin_ice': 1200,
-    'skin_matrix': 2000,
-    'skin_royal': 5000,
-    'plate_fire': 1500,
-    'plate_rainbow': 3000,
-    'plate_ghost': 2000,
-    'plate_electric': 2500,
-    'plate_king': 5000
-};
 
 // ELO Calculation - Win-based system
 function calculateElo(winnerElo, loserElo, winnerLevel) {
@@ -161,10 +139,7 @@ app.post('/api/auth/telegram', async (req, res) => {
                 draws: player.draws,
                 totalGames: player.totalGames,
                 winStreak: player.winStreak,
-                bestWinStreak: player.bestWinStreak,
-                gold: player.gold,
-                inventory: player.inventory,
-                equipped: player.equipped
+                bestWinStreak: player.bestWinStreak
             }
         });
     } catch (error) {
@@ -178,7 +153,7 @@ app.get('/api/leaderboard', async (req, res) => {
         const players = await Player.find({ elo: { $gt: 0 }, isVisibleInLeaderboard: { $ne: false } }) // Guest/Yeni oyuncular gözükmesin
             .sort({ elo: -1 })
             .limit(10) // Top 10
-            .select('telegramId username firstName lastName photoUrl elo level wins losses draws totalGames winStreak gold equipped');
+            .select('telegramId username firstName lastName photoUrl elo level wins losses draws totalGames winStreak');
 
         res.json({ success: true, leaderboard: players });
     } catch (error) {
@@ -268,57 +243,10 @@ app.post('/api/admin/update', async (req, res) => {
             player.elo = parseInt(updates.elo);
             player.level = calculateLevel(player.elo);
         }
-        if (updates.gold !== undefined) player.gold = parseInt(updates.gold);
         if (updates.isVisibleInLeaderboard !== undefined) player.isVisibleInLeaderboard = updates.isVisibleInLeaderboard;
 
         await player.save();
         res.json({ success: true, player });
-    } catch (error) {
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
-
-// --- SHOP API ---
-app.post('/api/shop/buy', async (req, res) => {
-    try {
-        const { telegramId, itemId } = req.body;
-        const player = await Player.findOne({ telegramId });
-        if (!player) return res.status(404).json({ error: 'Oyuncu bulunamadı' });
-
-        if (player.inventory.includes(itemId)) return res.status(400).json({ error: 'Zaten sahipsiniz' });
-        
-        const cost = SHOP_ITEMS[itemId];
-        if (!cost) return res.status(400).json({ error: 'Geçersiz ürün' });
-        if (player.gold < cost) return res.status(400).json({ error: 'Yetersiz bakiye' });
-
-        player.gold -= cost;
-        player.inventory.push(itemId);
-        await player.save();
-
-        res.json({ success: true, gold: player.gold, inventory: player.inventory });
-    } catch (error) {
-        res.status(500).json({ error: 'Sunucu hatası' });
-    }
-});
-
-app.post('/api/shop/equip', async (req, res) => {
-    try {
-        const { telegramId, type, itemId } = req.body; // type: 'tileSkin' or 'nameplate'
-        const player = await Player.findOne({ telegramId });
-        if (!player) return res.status(404).json({ error: 'Oyuncu bulunamadı' });
-
-        if (!player.inventory.includes(itemId)) return res.status(400).json({ error: 'Bu eşyaya sahip değilsiniz' });
-
-        if (type === 'tileSkin') player.equipped.tileSkin = itemId;
-        else if (type === 'nameplate') player.equipped.nameplate = itemId;
-        else return res.status(400).json({ error: 'Geçersiz tip' });
-
-        await player.save();
-        
-        // Update session
-        playerSessions.set(telegramId, player);
-
-        res.json({ success: true, equipped: player.equipped });
     } catch (error) {
         res.status(500).json({ error: 'Sunucu hatası' });
     }
@@ -388,7 +316,6 @@ function initializeGame(roomCode, player1Id, player2Id) {
         elo: room.players[id].elo,
         photoUrl: room.players[id].photoUrl,
         level: room.players[id].level,
-        equipped: room.players[id].equipped,
         timeouts: 0
     });
 
@@ -590,15 +517,7 @@ function handleFindMatch(ws, data) {
     ws.photoUrl = data.photoUrl || null;
     ws.level = data.level || 0; // 0 = guest
     ws.elo = data.elo || 0; // 0 = guest
-    ws.gold = data.gold || 0;
-    ws.bet = data.bet || 0; // Bahis miktarı
-    ws.equipped = data.equipped || { tileSkin: 'skin_default', nameplate: 'plate_default' };
     ws.isGuest = !data.telegramId; // Telegram yoksa guest
-
-    // Bakiye kontrolü (Bahisli oyun için)
-    if (ws.bet > 0 && ws.gold < ws.bet) {
-        return sendMessage(ws, { type: 'error', message: 'Yetersiz Gold bakiyesi!' });
-    }
 
     // Aynı Telegram hesabının ikinci kez kuyruğa girmesini engelle
     if (!ws.isGuest && ws.telegramId) {
@@ -617,17 +536,14 @@ function handleFindMatch(ws, data) {
         photoUrl: ws.photoUrl,
         level: ws.level,
         elo: ws.elo,
-        gold: ws.gold,
-        bet: ws.bet,
-        equipped: ws.equipped,
         isGuest: ws.isGuest
     });
 
     const playerType = ws.isGuest ? 'GUEST' : `LVL ${ws.level}, ELO ${ws.elo}`;
-    console.log(`✅ ${ws.playerName} (${playerType}) kuyrukta (Bahis: ${ws.bet})`);
+    console.log(`✅ ${ws.playerName} (${playerType}) kuyrukta`);
 
-    // Uygun rakip bul (Aynı bahis miktarı)
-    const opponentIndex = matchQueue.findIndex(p => p.playerId !== playerId && p.bet === ws.bet);
+    // Uygun rakip bul
+    const opponentIndex = matchQueue.findIndex(p => p.playerId !== playerId);
 
     if (opponentIndex !== -1) {
         const p1 = matchQueue.splice(opponentIndex, 1)[0]; // Rakibi kuyruktan al
@@ -656,8 +572,6 @@ function handleFindMatch(ws, data) {
                     photoUrl: p1.photoUrl,
                     level: p1.level,
                     elo: p1.elo,
-                    gold: p1.gold,
-                    equipped: p1.equipped,
                     isGuest: p1.isGuest
                 },
                 [p2.playerId]: {
@@ -666,15 +580,12 @@ function handleFindMatch(ws, data) {
                     photoUrl: p2.photoUrl,
                     level: p2.level,
                     elo: p2.elo,
-                    gold: p2.gold,
-                    equipped: p2.equipped,
                     isGuest: p2.isGuest
                 }
             },
             type: gameType,
             startTime: Date.now(),
             winsNeeded: 3, // Best of 5
-            betAmount: p1.bet // Bahis miktarı
         };
 
         rooms.set(roomCode, room);
@@ -724,8 +635,6 @@ function handleCreateRoom(ws, data) {
         photoUrl: data.photoUrl || null,
         level: data.level || 0,
         elo: data.elo || 0,
-        gold: data.gold || 0,
-        equipped: data.equipped || { tileSkin: 'skin_default', nameplate: 'plate_default' },
         isGuest: !data.telegramId
     };
 
@@ -757,8 +666,6 @@ function handleJoinRoom(ws, data) {
     ws.photoUrl = data.photoUrl || null;
     ws.level = data.level || 0;
     ws.elo = data.elo || 0;
-    ws.gold = data.gold || 0;
-    ws.equipped = data.equipped || { tileSkin: 'skin_default', nameplate: 'plate_default' };
     ws.isGuest = !data.telegramId;
     ws.roomCode = code;
     playerConnections.set(pid, ws);
@@ -770,8 +677,6 @@ function handleJoinRoom(ws, data) {
         photoUrl: ws.photoUrl,
         level: ws.level,
         elo: ws.elo,
-        gold: ws.gold,
-        equipped: ws.equipped,
         isGuest: ws.isGuest
     };
 
@@ -913,7 +818,6 @@ async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
 
         const isDraw = winnerId === 'DRAW';
         let eloChanges = null;
-        let goldChanges = { winner: 0, loser: 0 };
 
         // Guest kontrolu - Guest varsa ELO guncellemesi yapma
         const player1IsGuest = room.players[player1Id].isGuest;
@@ -941,17 +845,6 @@ async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
                 const winner = winnerId === player1Id ? player1 : player2;
                 const loser = winnerId === player1Id ? player2 : player1;
 
-                // GOLD HESAPLAMA
-                const betAmount = room.betAmount || 0;
-                const winReward = 50; // Standart galibiyet ödülü
-                
-                // Kazanan: Ortadaki bahis (2x) + Ödül
-                // Kaybeden: Bahis miktarını zaten girişte kaybetmiş sayılır (veya burada düşülür)
-                // Basit mantık: Kazanan +Bet +Reward, Kaybeden -Bet
-                const totalPot = betAmount * 2;
-                const winnerGoldGain = betAmount + winReward; // Kendi bahsi geri + Rakibin bahsi + Ödül
-                const loserGoldLoss = betAmount;
-
                 eloChanges = calculateElo(winner.elo, loser.elo, winner.level);
                 
                 winner.elo = eloChanges.winnerElo;
@@ -961,7 +854,6 @@ async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
                 winner.bestWinStreak = Math.max(winner.bestWinStreak, winner.winStreak);
                 winner.totalGames += 1;
                 winner.lastPlayed = new Date();
-                winner.gold += winnerGoldGain;
 
                 loser.elo = eloChanges.loserElo;
                 loser.level = calculateLevel(loser.elo);
@@ -969,9 +861,6 @@ async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
                 loser.winStreak = 0;
                 loser.totalGames += 1;
                 loser.lastPlayed = new Date();
-                loser.gold = Math.max(0, loser.gold - loserGoldLoss);
-
-                goldChanges = { winner: winnerGoldGain, loser: -loserGoldLoss };
 
                 await winner.save(); 
                 await loser.save();
@@ -987,7 +876,6 @@ async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
                     moves: gameState.moves || 0,
                     duration: Math.floor((Date.now() - room.startTime) / 1000),
                     gameType: 'ranked',
-                    betAmount: betAmount,
                     isDraw: false
                 });
                 await match.save();
@@ -1038,8 +926,7 @@ async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
             eloChanges: eloChanges ? {
                 winner: eloChanges.winnerChange,
                 loser: eloChanges.loserChange
-            } : null,
-            goldChanges: goldChanges
+            } : null
         });
         rooms.delete(roomCode);
     } catch (error) {
@@ -1223,7 +1110,7 @@ function handleRejoin(ws, data) {
     }, 500);
 }
 
-function handleLeaveGame(ws) {
+async function handleLeaveGame(ws) {
     const room = rooms.get(ws.roomCode);
     if (!room || !room.gameState || !ws.playerId) {
         return;
@@ -1240,7 +1127,7 @@ function handleLeaveGame(ws) {
     const leaverId = String(ws.playerId);
     const winnerId = playerIds.find(id => String(id) !== leaverId);
 
-    handleMatchEnd(ws.roomCode, winnerId, gs, 'disconnect');
+    await handleMatchEnd(ws.roomCode, winnerId, gs, 'disconnect');
 
     // Oyun bitti, bu soketin oda bilgisini temizle ki tekrar eşleşme arayabilsin
     ws.roomCode = null;
