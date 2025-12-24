@@ -231,8 +231,45 @@ app.post('/api/admin/action', async (req, res) => {
         if (!player) return res.status(404).json({ error: 'Oyuncu bulunamadı' });
 
         if (action === 'updateElo') {
-            player.elo = parseInt(payload.elo);
+            const newElo = parseInt(payload.elo);
+            player.elo = newElo;
             player.level = calculateLevel(player.elo);
+
+            // İSTEK: ELO 0 olduğunda tüm istatistikleri sıfırla
+            if (newElo === 0) {
+                player.wins = 0;
+                player.losses = 0;
+                player.draws = 0;
+                player.totalGames = 0;
+                player.winStreak = 0;
+                player.bestWinStreak = 0;
+            }
+
+            // Bellekteki verileri güncelle (Anlık yansıması için)
+            for (const [pid, ws] of playerConnections) {
+                if (ws.telegramId === targetTelegramId) {
+                    ws.elo = player.elo;
+                    ws.level = player.level;
+                    // İstatistikleri bellekte de sıfırla
+                    if (newElo === 0) {
+                        ws.wins = 0;
+                        ws.losses = 0;
+                    }
+                    
+                    if (ws.roomCode && rooms.has(ws.roomCode)) {
+                        const room = rooms.get(ws.roomCode);
+                        if (room.players[pid]) {
+                            room.players[pid].elo = player.elo;
+                            room.players[pid].level = player.level;
+                        }
+                        if (room.gameState && room.gameState.players[pid]) {
+                            room.gameState.players[pid].elo = player.elo;
+                            room.gameState.players[pid].level = player.level;
+                            sendGameState(ws.roomCode, pid);
+                        }
+                    }
+                }
+            }
         }
         if (action === 'toggleVisibility') player.isVisible = payload.isVisible;
         
@@ -423,7 +460,8 @@ function sendGameState(roomCode, playerId) {
     try {
         ws.send(JSON.stringify({
             type: 'gameUpdate',
-            gameState: { ...room.gameState, playerId: playerId }
+            gameState: { ...room.gameState, playerId: playerId },
+            serverTime: Date.now() // Timer senkronizasyonu için sunucu saati
         }));
     } catch (error) { console.error(error); }
 }
@@ -450,6 +488,8 @@ function nextTurn(roomCode, previousPlayerId) {
         if (gs.players[nextPlayerId]) gs.players[nextPlayerId].timeouts = 0;
 
         Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+        
+        checkAutoPass(roomCode, nextPlayerId);
     }
 }
 
@@ -708,10 +748,10 @@ function handlePlayTile(ws, data) {
     const player = gs.players[ws.playerId];
     const tile = player.hand[data.tileIndex];
 
-    if (!tile) return;
+    if (!tile) return sendMessage(ws, { type: 'error', message: 'Taş bulunamadı' });
 
-    const boardCopy = JSON.parse(JSON.stringify(gs.board));
-    const success = playTileOnBoard(tile, gs.board, data.position);
+    const position = data.position || 'both';
+    const success = playTileOnBoard(tile, gs.board, position);
 
     if (!success) {
         return sendMessage(ws, { type: 'error', message: 'Bu hamle geçersiz (Pozisyon uyuşmuyor)' });
@@ -937,6 +977,81 @@ async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
     }
 }
 
+function checkAutoPass(roomCode, playerId) {
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState) return;
+    const gs = room.gameState;
+    const player = gs.players[playerId];
+
+    // 1. Oynanabilir taş var mı?
+    const canPlay = player.hand.some(tile => canPlayTile(tile, gs.board));
+    if (canPlay) return; 
+
+    // 2. Pazar kontrolü (Pazar doluysa oyuncu çekmeli)
+    if (gs.market && gs.market.length > 0) return;
+
+    // 3. Pazar boş ve hamle yok -> 2 saniye sonra otomatik pas
+    setTimeout(() => {
+        const r = rooms.get(roomCode);
+        if (!r || !r.gameState) return;
+        if (r.gameState.currentPlayer !== playerId) return;
+        
+        // Tekrar kontrol (State değişmiş olabilir)
+        const p = r.gameState.players[playerId];
+        const cp = p.hand.some(tile => canPlayTile(tile, r.gameState.board));
+        if (cp) return;
+
+        executeAutoPass(roomCode, playerId);
+    }, 2000);
+}
+
+function executeAutoPass(roomCode, playerId) {
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState) return;
+    const gs = room.gameState;
+
+    gs.consecutivePasses = (gs.consecutivePasses || 0) + 1;
+
+    if (gs.consecutivePasses >= 2) {
+        handleBlockedGame(roomCode, playerId);
+    } else {
+        broadcastToRoom(roomCode, { type: 'turnPassed', playerName: gs.players[playerId].name });
+        broadcastToRoom(roomCode, { type: 'playSound', sound: 'pass' });
+        nextTurn(roomCode, playerId);
+    }
+}
+
+function handleBlockedGame(roomCode, triggeringPlayerId) {
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState) return;
+    
+    console.log(`🔒 Oyun Kapalı (Blocked) - Hesaplama yapılıyor...`);
+    
+    const opponentId = Object.keys(room.gameState.players).find(id => id !== triggeringPlayerId);
+    const playerScore = room.gameState.players[triggeringPlayerId].hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
+    const opponentHand = room.gameState.players[opponentId].hand;
+    const opponentScore = opponentHand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
+    
+    let winnerIdForCalc = null;
+    if (playerScore < opponentScore) winnerIdForCalc = triggeringPlayerId;
+    else if (opponentScore < playerScore) winnerIdForCalc = opponentId;
+    else winnerIdForCalc = 'DRAW'; 
+
+    broadcastToRoom(roomCode, {
+        type: 'calculationLobby',
+        players: {
+            [triggeringPlayerId]: { hand: room.gameState.players[triggeringPlayerId].hand, name: room.players[triggeringPlayerId].name, photoUrl: room.players[triggeringPlayerId].photoUrl, score: playerScore },
+            [opponentId]: { hand: opponentHand, name: room.players[opponentId].name, photoUrl: room.players[opponentId].photoUrl, score: opponentScore }
+        },
+        winnerId: winnerIdForCalc,
+        duration: 7000
+    });
+
+    setTimeout(() => {
+        processRoundWinner(roomCode, winnerIdForCalc, room.gameState);
+    }, 8000);
+}
+
 function handlePass(ws) {
     // ws nesnesi zaten oyuncu bilgilerini taşıyor
     if (!ws || !ws.roomCode) return;
@@ -958,37 +1073,8 @@ function handlePass(ws) {
 
     // If market is empty and no valid moves, end the game
     // OYUN KAPALI KONTROLÜ: Eğer 2 kez üst üste pas geçildiyse (her iki oyuncu da oynayamıyor)
-    // Veya pazar boşsa ve oyuncu oynayamıyorsa (Domino kurallarına göre oyun kilitlenmiş olabilir)
-    if ((!canPlayAnyTile && room.gameState.market.length === 0) || room.gameState.consecutivePasses >= 2) {
-        console.log(`🔒 Oyun Kapalı (Blocked) - Hesaplama yapılıyor...`);
-        
-        // Calculate scores
-        const opponentId = Object.keys(room.gameState.players).find(id => id !== ws.playerId);
-        const playerScore = room.gameState.players[ws.playerId].hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
-        const opponentHand = room.gameState.players[opponentId].hand;
-        const opponentScore = opponentHand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
-        
-        let winnerIdForCalc = null;
-        if (playerScore < opponentScore) winnerIdForCalc = ws.playerId;
-        else if (opponentScore < playerScore) winnerIdForCalc = opponentId;
-        else winnerIdForCalc = 'DRAW'; // Beraberlik
-
-        // Send calculation lobby message
-        broadcastToRoom(room.code, {
-            type: 'calculationLobby',
-            players: {
-                [ws.playerId]: { hand: room.gameState.players[ws.playerId].hand, name: room.players[ws.playerId].name, photoUrl: room.players[ws.playerId].photoUrl, score: playerScore },
-                [opponentId]: { hand: opponentHand, name: room.players[opponentId].name, photoUrl: room.players[opponentId].photoUrl, score: opponentScore }
-            },
-            winnerId: winnerIdForCalc, // Hesaplama sonucunda belirlenen kazanan
-            duration: 7000
-        });
-
-        // End the game after showing scores
-        setTimeout(() => {
-            processRoundWinner(room.code, winnerIdForCalc, room.gameState);
-        }, 8000);
-        
+    if (room.gameState.consecutivePasses >= 2) {
+        handleBlockedGame(ws.roomCode, ws.playerId);
         return;
     }
 
@@ -1063,6 +1149,7 @@ function handleDrawFromMarket(ws) {
         } else if (!hasPlayable && gs.market.length === 0) {
             // Pazar bitti ve hala oynanabilir taş yok - sıra geç
             console.log(`❌ ${player.name} oynanabilir taş bulamadı - Sıra geçiyor`);
+            gs.consecutivePasses = 1; // Pas sayılır
             nextTurn(ws.roomCode, ws.playerId);
             // Pas geçildiğini bildir
             broadcastToRoom(ws.roomCode, { type: 'turnPassed', playerName: player.name });
@@ -1146,7 +1233,11 @@ function handleDisconnect(ws) {
         const room = rooms.get(ws.roomCode);
         if (room) {
             console.log(`🏠 Odadan ayrıldı (Bağlantı kesildi): ${ws.roomCode}`);
-            broadcastToRoom(ws.roomCode, { type: 'playerDisconnected', playerName: ws.playerName });
+            broadcastToRoom(ws.roomCode, { 
+                type: 'playerDisconnected', 
+                playerName: ws.playerName,
+                playerId: ws.playerId // Frontend kimin düştüğünü bilsin
+            });
 
             // Sadece oyun BAŞLAMAMIŞSA veya oda boşsa odayı sil
             // Oyun devam ediyorsa odayı tut ki geri dönebilsin
