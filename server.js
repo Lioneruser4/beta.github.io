@@ -1203,12 +1203,6 @@ function handleRejoin(ws, data) {
     ws.playerName = room.players[playerId].name;
     playerConnections.set(playerId, ws);
 
-    // Eğer oyuncu geri döndüyse ve cleanup timer varsa iptal et
-    if (room.cleanupTimer) {
-        clearTimeout(room.cleanupTimer);
-        room.cleanupTimer = null;
-    }
-
     console.log(`🔄 Oyuncu geri döndü: ${ws.playerName} (Oda: ${roomCode})`);
 
     // Send full state to rejoining player
@@ -1291,8 +1285,8 @@ setInterval(() => {
     rooms.forEach((room, roomCode) => {
         if (!room.gameState || !room.gameState.turnStartTime || room.gameState.winner) return;
         
-        // 25 saniye süre (İstek üzerine düşürüldü)
-        const TURN_LIMIT = 25000;
+        // 30 saniye süre
+        const TURN_LIMIT = 30000;
         const elapsed = Date.now() - room.gameState.turnStartTime;
         
         if (elapsed > TURN_LIMIT) {
@@ -1308,14 +1302,6 @@ function handleTurnTimeout(roomCode) {
     const gs = room.gameState;
     const currentPlayerId = gs.currentPlayer;
     const player = gs.players[currentPlayerId];
-
-    // Bağlantı kontrolü: Eğer oyuncu bağlı değilse ve süresi dolduysa oyunu bitir
-    if (!playerConnections.has(currentPlayerId)) {
-        console.log(`⏰ ${player.name} bağlı değil ve süresi doldu. Oyun bitiriliyor.`);
-        const winnerId = Object.keys(gs.players).find(id => id !== currentPlayerId);
-        handleMatchEnd(roomCode, winnerId, gs, 'disconnect');
-        return;
-    }
     
     // Timeout kontrolü
     player.timeouts = (player.timeouts || 0) + 1;
