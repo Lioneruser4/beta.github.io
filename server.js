@@ -31,6 +31,8 @@ const playerSchema = new mongoose.Schema({
     totalGames: { type: Number, default: 0 },
     winStreak: { type: Number, default: 0 },
     bestWinStreak: { type: Number, default: 0 },
+    gold: { type: Number, default: 0 },
+    isVisibleInLeaderboard: { type: Boolean, default: true },
     createdAt: { type: Date, default: Date.now },
     lastPlayed: { type: Date, default: Date.now }
 });
@@ -138,7 +140,8 @@ app.post('/api/auth/telegram', async (req, res) => {
                 draws: player.draws,
                 totalGames: player.totalGames,
                 winStreak: player.winStreak,
-                bestWinStreak: player.bestWinStreak
+                bestWinStreak: player.bestWinStreak,
+                gold: player.gold
             }
         });
     } catch (error) {
@@ -149,10 +152,10 @@ app.post('/api/auth/telegram', async (req, res) => {
 
 app.get('/api/leaderboard', async (req, res) => {
     try {
-        const players = await Player.find({ elo: { $gt: 0 } }) // Guest/Yeni oyuncular gözükmesin
+        const players = await Player.find({ elo: { $gt: 0 }, isVisibleInLeaderboard: { $ne: false } }) // Guest/Yeni oyuncular gözükmesin
             .sort({ elo: -1 })
             .limit(10) // Top 10
-            .select('telegramId username firstName lastName photoUrl elo level wins losses draws totalGames winStreak');
+            .select('telegramId username firstName lastName photoUrl elo level wins losses draws totalGames winStreak gold');
 
         res.json({ success: true, leaderboard: players });
     } catch (error) {
@@ -214,6 +217,42 @@ app.get('/', (req, res) => {
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
+});
+
+// --- ADMIN API ---
+app.post('/api/admin/players', async (req, res) => {
+    try {
+        const { adminId } = req.body;
+        if (adminId !== '976640409') return res.status(403).json({ error: 'Yetkisiz işlem' });
+        
+        const players = await Player.find().sort({ createdAt: -1 });
+        res.json({ success: true, players });
+    } catch (error) {
+        console.error('Admin error:', error);
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+app.post('/api/admin/update', async (req, res) => {
+    try {
+        const { adminId, targetId, updates } = req.body;
+        if (adminId !== '976640409') return res.status(403).json({ error: 'Yetkisiz işlem' });
+
+        const player = await Player.findById(targetId);
+        if (!player) return res.status(404).json({ error: 'Oyuncu bulunamadı' });
+
+        if (updates.elo !== undefined) {
+            player.elo = parseInt(updates.elo);
+            player.level = calculateLevel(player.elo);
+        }
+        if (updates.gold !== undefined) player.gold = parseInt(updates.gold);
+        if (updates.isVisibleInLeaderboard !== undefined) player.isVisibleInLeaderboard = updates.isVisibleInLeaderboard;
+
+        await player.save();
+        res.json({ success: true, player });
+    } catch (error) {
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
 });
 
 const server = http.createServer(app);
@@ -467,6 +506,7 @@ function handleFindMatch(ws, data) {
     ws.photoUrl = data.photoUrl || null;
     ws.level = data.level || 0; // 0 = guest
     ws.elo = data.elo || 0; // 0 = guest
+    ws.gold = data.gold || 0;
     ws.isGuest = !data.telegramId; // Telegram yoksa guest
 
     // Aynı Telegram hesabının ikinci kez kuyruğa girmesini engelle
@@ -486,6 +526,7 @@ function handleFindMatch(ws, data) {
         photoUrl: ws.photoUrl,
         level: ws.level,
         elo: ws.elo,
+        gold: ws.gold,
         isGuest: ws.isGuest
     });
 
@@ -519,6 +560,7 @@ function handleFindMatch(ws, data) {
                     photoUrl: p1.photoUrl,
                     level: p1.level,
                     elo: p1.elo,
+                    gold: p1.gold,
                     isGuest: p1.isGuest
                 },
                 [p2.playerId]: {
@@ -527,6 +569,7 @@ function handleFindMatch(ws, data) {
                     photoUrl: p2.photoUrl,
                     level: p2.level,
                     elo: p2.elo,
+                    gold: p2.gold,
                     isGuest: p2.isGuest
                 }
             },
@@ -582,6 +625,7 @@ function handleCreateRoom(ws, data) {
         photoUrl: data.photoUrl || null,
         level: data.level || 0,
         elo: data.elo || 0,
+        gold: data.gold || 0,
         isGuest: !data.telegramId
     };
 
@@ -613,6 +657,7 @@ function handleJoinRoom(ws, data) {
     ws.photoUrl = data.photoUrl || null;
     ws.level = data.level || 0;
     ws.elo = data.elo || 0;
+    ws.gold = data.gold || 0;
     ws.isGuest = !data.telegramId;
     ws.roomCode = code;
     playerConnections.set(pid, ws);
@@ -624,6 +669,7 @@ function handleJoinRoom(ws, data) {
         photoUrl: ws.photoUrl,
         level: ws.level,
         elo: ws.elo,
+        gold: ws.gold,
         isGuest: ws.isGuest
     };
 
