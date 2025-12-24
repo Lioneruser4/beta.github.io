@@ -1070,7 +1070,7 @@
                             resetGameClientState();
                             if (playerData) initializeTelegramAuth();
                             setScreen('lobby');
-                        }, 8000);
+                        }, 5000);
                         break;
                     case 'playerDisconnected':
                         showNotification('Rakip bağlantısı koptu, bekleniyor...', 'warning');
@@ -1763,6 +1763,7 @@
                     {endInfo.reason === 'disconnect' && <p className="text-yellow-400 mb-6 text-lg">Rəqib oyundan ayrıldı.</p>}
                     {endInfo.reason === 'afk' && <p className="text-yellow-400 mb-6 text-lg">{endInfo.isWinner ? 'Rəqib AFK qaldı.' : 'AFK qaldığınız üçün məğlub oldunuz.'}</p>}
                     {endInfo.reason === 'score_calculation' && <p className="text-yellow-400 mb-6 text-lg">En az puanı olan kazandı!</p>}
+                    {endInfo.reason === 'timeout' && <p className="text-yellow-400 mb-6 text-lg">{endInfo.isWinner ? 'Rəqibin vaxtı bitdi.' : 'Vaxtınız bitdi.'}</p>}
                     
                     {/* Gold Change Display */}
                     {endInfo.goldChanges && (
