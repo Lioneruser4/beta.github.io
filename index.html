@@ -838,6 +838,7 @@
                     case 'resetClient':
                         // Sunucu oyunun bittiğini veya olmadığını söylüyor, temizle ve lobiye dön
                         localStorage.removeItem('domino_session');
+                        window._lastSession = null; // Bellekteki oturumu da temizle
                         resetGameClientState();
                         setScreen('lobby');
                         break;
