@@ -88,7 +88,7 @@
             -webkit-tap-highlight-color: transparent;
             user-select: none;
             -webkit-user-select: none;
-            padding-top: 0;
+            padding-top: 90px; /* Siteyi biraz aşağı indir */
             animation: bg-scroll 20s linear infinite;
         }
 
@@ -249,10 +249,6 @@
         .calculation-lobby {
             background: linear-gradient(135deg, #0b241c 0%, #153126 100%);
         }
-
-        .safe-area-top {
-            padding-top: max(10px, env(safe-area-inset-top));
-        }
     </style>
 </head>
 
@@ -386,25 +382,6 @@
             );
         };
 
-        // 6. Scoreboard Component
-        const ScoreBoard = ({ score, players, myId }) => {
-            if (!score || !players) return null;
-            const p1 = Object.keys(players)[0];
-            const p2 = Object.keys(players)[1];
-            // Skorları doğru eşleştir
-            const myScore = score[myId] || 0;
-            const oppId = p1 === myId ? p2 : p1;
-            const oppScore = score[oppId] || 0;
-
-            return (
-                <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-md px-6 py-2 rounded-b-xl border-x border-b border-white/10 z-20 flex items-center gap-4 shadow-xl">
-                    <div className="text-2xl font-black text-green-400">{myScore}</div>
-                    <div className="text-white/40 text-xs font-bold uppercase tracking-widest">SKOR</div>
-                    <div className="text-2xl font-black text-red-400">{oppScore}</div>
-                </div>
-            );
-        };
-
         // --- ANA OYUN ---
 
         const DominoGame = () => {
@@ -429,7 +406,6 @@
             const [lastSoundIndex, setLastSoundIndex] = useState(0); // For sequential sounds 6, 7, 8
             const [calculationLobby, setCalculationLobby] = useState(null);
             const [calculationTimer, setCalculationTimer] = useState(8);
-            const [showAdmin, setShowAdmin] = useState(false);
 
             const [playerId, setPlayerId] = useState(null);
             const wsRef = useRef(null);
@@ -524,7 +500,7 @@
                     const myId = String(playerId || '');
                     const amIWinner = calculationLobby.winner.isMe;
                     
-                    /* Oyun bitişi burada değil, processRoundWinner ile serverdan gelecek
+                    setEndInfo({
                         isWinner: amIWinner,
                         isRanked: gameState?.isRanked || false,
                         reason: 'score_calculation',
@@ -538,17 +514,17 @@
                             photo: calculationLobby.loser.photo,
                             eloChange: 0
                         }
-                    */
+                    });
                     
-                    // Sadece lobiyi temizle, serverdan roundEnd veya gameEnd bekleniyor
+                    setScreen('end');
                     setCalculationLobby(null);
                     
-                    // localStorage.removeItem('domino_session'); // Maç bitmediyse silme
-                    /* setTimeout(() => {
+                    localStorage.removeItem('domino_session');
+                    setTimeout(() => {
                         resetGameClientState();
                         if (playerData) initializeTelegramAuth();
                         setScreen('lobby');
-                    }, 8000); */
+                    }, 8000);
                 }
             }, [calculationLobby, calculationTimer]);
 
@@ -611,13 +587,13 @@
                         
                         // Geçerli hamle yoksa otomatik pass
                         if (!hasValidMove) {
-                            // const timeout = setTimeout(() => {
+                            const timeout = setTimeout(() => {
                                 sendMessage({ type: 'passTurn' });
                                 playSound('pass');
                                 showNotification(t.noValidMove, 'info');
-                            // }, 1000);
+                            }, 1000);
                             
-                            // return () => clearTimeout(timeout);
+                            return () => clearTimeout(timeout);
                         }
                     }
                 }
@@ -793,10 +769,6 @@
                             roomCode: data.roomCode
                         }));
                         break;
-                    case 'roundEnd':
-                        // Ara skor güncellemesi veya animasyon eklenebilir
-                        showNotification(`Round Bitti! Kazanan: ${data.winnerId === 'DRAW' ? 'Beraberlik' : 'Kazanan Var'}`, 'success');
-                        break;
                     case 'roomCreated':
                         setRoomCode(data.roomCode);
                         break;
@@ -915,7 +887,7 @@
                             myScore: playerScores[myIdForCalc]?.score || 0
                         });
                         
-                        setCalculationTimer(7);
+                        setCalculationTimer(8);
                         setScreen('calculation');
                         break;
                 }
@@ -1155,46 +1127,6 @@
                 });
             };
 
-            // Admin Panel Component
-            const AdminPanel = () => {
-                const [targetId, setTargetId] = useState('');
-                const [newElo, setNewElo] = useState('');
-                
-                const handleUpdate = (action, payload) => {
-                    fetch(`${API_URL}/api/admin/action`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            adminId: playerData.telegramId,
-                            action,
-                            targetTelegramId: targetId,
-                            payload
-                        })
-                    }).then(r => r.json()).then(d => {
-                        if(d.success) showNotification('İşlem Başarılı', 'success');
-                        else showNotification(d.error, 'error');
-                    });
-                };
-
-                return (
-                    <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-6">
-                        <div className="bg-gray-800 p-6 rounded-xl w-full max-w-sm space-y-4">
-                            <h3 className="text-white font-bold text-xl">Admin Panel</h3>
-                            <input value={targetId} onChange={e=>setTargetId(e.target.value)} placeholder="Target Telegram ID" className="w-full bg-black/50 p-3 rounded text-white" />
-                            <div className="flex gap-2">
-                                <input value={newElo} onChange={e=>setNewElo(e.target.value)} placeholder="New ELO" className="flex-1 bg-black/50 p-3 rounded text-white" />
-                                <button onClick={()=>handleUpdate('updateElo', {elo: newElo})} className="bg-blue-600 text-white px-4 rounded">Set ELO</button>
-                            </div>
-                            <div className="flex gap-2">
-                                <button onClick={()=>handleUpdate('toggleVisibility', {isVisible: false})} className="flex-1 bg-red-600 text-white p-3 rounded">Gizle</button>
-                                <button onClick={()=>handleUpdate('toggleVisibility', {isVisible: true})} className="flex-1 bg-green-600 text-white p-3 rounded">Göster</button>
-                            </div>
-                            <button onClick={()=>setShowAdmin(false)} className="w-full bg-gray-600 text-white p-3 rounded">Kapat</button>
-                        </div>
-                    </div>
-                );
-            };
-
             // --- RENDER PARTS ---
 
             if (screen === 'loading') return (
@@ -1212,14 +1144,6 @@
                     </div>
 
                     <div className="w-full max-w-sm bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10 shadow-2xl">
-                        {/* Admin Button */}
-                        {playerData && String(playerData.telegramId) === '976640409' && (
-                            <button onClick={() => setShowAdmin(true)} className="absolute top-4 right-4 bg-red-500/20 text-red-500 p-2 rounded-full text-xs font-bold border border-red-500/50">
-                                ADMIN
-                            </button>
-                        )}
-                        {showAdmin && <AdminPanel />}
-
                         {playerData && (
                             <div className="mb-8 text-center">
                                 {playerData.photoUrl && <img src={playerData.photoUrl} className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 p-1" />}
@@ -1340,12 +1264,10 @@
             );
 
             if (screen === 'game') return (
-                <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden safe-area-top">
+                <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden" style={{ paddingTop: '60px' }}>
                     {notification && <Toast message={notification.message} type={notification.type} />}
 
                     <GameTimer startTime={gameState.turnStartTime} />
-                    
-                    <ScoreBoard score={gameState.score} players={gameState.players} myId={myPlayerId} />
 
                     {serverMessage && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
@@ -1358,7 +1280,7 @@
                     )}
 
                     {/* Header - 60px aşağıda */}
-                    <div className="absolute top-10 left-0 right-0 h-16 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30 rounded-b-2xl mx-4 border border-white/5">
+                    <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full border-2 border-white/20 overflow-hidden">
                                 {opponent?.photoUrl ? <img src={opponent.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 flex items-center justify-center">👤</div>}
@@ -1376,7 +1298,7 @@
                         </div>
                     </div>
 
-                    <div className="h-16 flex items-center justify-center bg-black/20 z-20 mt-24">
+                    <div className="h-16 flex items-center justify-center bg-black/20 z-20 mt-16">
                         <div className="opponent-hand">
                             {opponentHand.map((_, idx) => (
                                 <DominoTile 
