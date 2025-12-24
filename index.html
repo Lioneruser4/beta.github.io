@@ -249,6 +249,17 @@
         .calculation-lobby {
             background: linear-gradient(135deg, #0b241c 0%, #153126 100%);
         }
+
+        /* Owner Badge & Admin Styles */
+        .owner-badge {
+            background: linear-gradient(45deg, #FFD700, #FFA500, #FFD700);
+            background-size: 200% 200%;
+            animation: gradient-shine 2s ease infinite;
+            color: #000;
+            border: 1px solid #fff;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+        }
+        @keyframes gradient-shine { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
     </style>
 </head>
 
@@ -382,6 +393,80 @@
             );
         };
 
+        // 6. Admin Panel Component
+        const AdminPanel = ({ onClose, adminId }) => {
+            const [players, setPlayers] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [searchTerm, setSearchTerm] = useState('');
+
+            useEffect(() => {
+                fetch(`${API_URL}/api/admin/players`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.success) setPlayers(data.players);
+                    setLoading(false);
+                })
+                .catch(() => setLoading(false));
+            }, [adminId]);
+
+            const updatePlayer = (id, updates) => {
+                fetch(`${API_URL}/api/admin/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId, targetId: id, updates })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.success) {
+                        setPlayers(players.map(p => p._id === id ? { ...p, ...updates } : p));
+                    }
+                });
+            };
+
+            const filteredPlayers = players.filter(p => p.username.toLowerCase().includes(searchTerm.toLowerCase()));
+
+            return (
+                <div className="fixed inset-0 bg-black/95 z-[100] overflow-y-auto p-4 animate-slide-up">
+                    <div className="max-w-4xl mx-auto">
+                        <div className="flex justify-between items-center mb-6 sticky top-0 bg-black/95 py-4 z-10 border-b border-white/10">
+                            <h2 className="text-2xl font-black text-yellow-500">ADMIN PANEL</h2>
+                            <button onClick={onClose} className="bg-red-600 text-white px-4 py-2 rounded-xl font-bold">KAPAT</button>
+                        </div>
+                        <input 
+                            type="text" 
+                            placeholder="Kullanıcı ara..." 
+                            className="w-full bg-white/10 text-white p-3 rounded-xl mb-4 border border-white/10 focus:border-yellow-500 outline-none"
+                            onChange={e => setSearchTerm(e.target.value)}
+                        />
+                        {loading ? <div className="text-white text-center">Yükleniyor...</div> : (
+                            <div className="space-y-3">
+                                {filteredPlayers.map(p => (
+                                    <div key={p._id} className="bg-white/5 p-4 rounded-xl border border-white/5 flex flex-col sm:flex-row items-center gap-4">
+                                        <div className="flex items-center gap-3 flex-1 w-full">
+                                            <img src={p.photoUrl || 'https://via.placeholder.com/40'} className="w-10 h-10 rounded-full"/>
+                                            <div className="flex flex-col">
+                                                <span className="text-white font-bold">{p.username}</span>
+                                                <span className="text-white/40 text-xs">{p.telegramId}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                                            <div className="flex flex-col"><label className="text-[10px] text-white/50">ELO</label><input type="number" defaultValue={p.elo} className="bg-black/50 text-white p-2 rounded w-20 text-center" onBlur={(e) => updatePlayer(p._id, { elo: e.target.value })} /></div>
+                                            <div className="flex flex-col"><label className="text-[10px] text-white/50">GOLD</label><input type="number" defaultValue={p.gold || 0} className="bg-black/50 text-yellow-400 p-2 rounded w-20 text-center font-bold" onBlur={(e) => updatePlayer(p._id, { gold: e.target.value })} /></div>
+                                            <button onClick={() => updatePlayer(p._id, { isVisibleInLeaderboard: !p.isVisibleInLeaderboard })} className={`px-4 py-3 rounded-xl text-xs font-bold w-24 ${p.isVisibleInLeaderboard !== false ? 'bg-green-600/20 text-green-400 border border-green-600/50' : 'bg-red-600/20 text-red-400 border border-red-600/50'}`}>{p.isVisibleInLeaderboard !== false ? 'GÖRÜNÜR' : 'GİZLİ'}</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
         // --- ANA OYUN ---
 
         const DominoGame = () => {
@@ -406,6 +491,7 @@
             const [lastSoundIndex, setLastSoundIndex] = useState(0); // For sequential sounds 6, 7, 8
             const [calculationLobby, setCalculationLobby] = useState(null);
             const [calculationTimer, setCalculationTimer] = useState(8);
+            const [showAdmin, setShowAdmin] = useState(false);
 
             const [playerId, setPlayerId] = useState(null);
             const wsRef = useRef(null);
@@ -1138,6 +1224,13 @@
             if (screen === 'lobby') return (
                 <div className="flex flex-col items-center justify-center min-h-screen p-6">
                     {notification && <Toast message={notification.message} type={notification.type} />}
+                    
+                    {/* Admin Button */}
+                    {playerData?.telegramId === '976640409' && (
+                        <button onClick={() => setShowAdmin(true)} className="absolute top-4 right-4 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl font-black shadow-lg z-50 text-xs tracking-widest border border-purple-400">ADMIN PANEL</button>
+                    )}
+                    {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} adminId={playerData.telegramId} />}
+
                     <div className="text-center mb-10 animate-float">
                         <h1 className="text-6xl font-black text-white drop-shadow-2xl mb-2">DOMINO <span className="text-yellow-400">101</span></h1>
                         <p className="text-white/60 tracking-widest uppercase">Premium Multiplayer Experience ( BETA )</p>
@@ -1148,9 +1241,13 @@
                             <div className="mb-8 text-center">
                                 {playerData.photoUrl && <img src={playerData.photoUrl} className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 p-1" />}
                                 <div className="text-white text-2xl font-bold">{playerData.username}</div>
-                                <div className="flex justify-center gap-2 mt-2">
+                                <div className="flex justify-center gap-2 mt-2 items-center flex-wrap">
                                     <LevelBadge level={playerData.level} />
                                     <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold">{playerData.elo} ELO</span>
+                                    {playerData.gold !== undefined && (
+                                        <span className="bg-yellow-500 text-black px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-glow"><span>💰</span> {playerData.gold}</span>
+                                    )}
+                                    {playerData.telegramId === '976640409' && <span className="owner-badge px-2 py-1 rounded text-[10px] font-black tracking-wider">OWNER</span>}
                                 </div>
                             </div>
                         )}
@@ -1240,6 +1337,7 @@
                             <div className="text-center">
                                 <div className="text-white font-black text-xl truncate max-w-[120px]">{playerData?.username}</div>
                                 <div className="text-yellow-500 font-bold text-sm tracking-widest">{playerData?.elo} ELO</div>
+                                {playerData?.telegramId === '976640409' && <div className="mt-1"><span className="owner-badge px-2 py-0.5 rounded text-[8px] font-black">OWNER</span></div>}
                             </div>
                         </div>
 
@@ -1253,6 +1351,7 @@
                             <div className="text-center">
                                 <div className="text-white font-black text-xl truncate max-w-[120px]">{opponent?.name || opponent?.username || 'Rakip'}</div>
                                 <div className="text-yellow-500 font-bold text-sm tracking-widest">{opponent?.elo || 0} ELO</div>
+                                {opponent?.telegramId === '976640409' && <div className="mt-1"><span className="owner-badge px-2 py-0.5 rounded text-[8px] font-black">OWNER</span></div>}
                             </div>
                         </div>
                     </div>
@@ -1287,8 +1386,9 @@
                             </div>
                             <div className="flex flex-col">
                                 <div className="text-white font-bold text-sm leading-none">{opponent?.name || opponent?.username || 'Rakip'}</div>
-                                <div className="text-white/60 text-xs">
-                                    {gameState?.players[opponentPlayerId]?.elo || 0} ELO
+                                <div className="text-white/60 text-xs flex items-center gap-1">
+                                    <span>{gameState?.players[opponentPlayerId]?.elo || 0} ELO</span>
+                                    {opponent?.telegramId === '976640409' && <span className="owner-badge px-1 rounded text-[8px] font-black">OWNER</span>}
                                 </div>
                             </div>
                         </div>
