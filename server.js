@@ -752,13 +752,13 @@ function handleJoinRoom(ws, data) {
     };
 
     // Odaya katılan herkese bilgi ver
-    const currentPlayers = Object.values(room.players);
     const playerIds = Object.keys(room.players);
 
     playerIds.forEach(targetId => {
         const socket = playerConnections.get(targetId);
         if (socket) {
-            const opponents = currentPlayers.filter(p => p.telegramId !== room.players[targetId].telegramId && p.name !== room.players[targetId].name);
+            // FIX: Rakipleri playerId üzerinden filtrele (Guest sorunu çözüldü)
+            const opponents = playerIds.filter(pid => pid !== targetId).map(pid => room.players[pid]);
             sendMessage(socket, { type: 'matchFound', roomCode: code, opponents: opponents, gameType: 'casual', playerCount: room.playerCount });
         }
     });
@@ -1157,7 +1157,8 @@ function handleRejoin(ws, data) {
 
     const room = rooms.get(roomCode);
     if (!room || !room.gameState) {
-        return sendMessage(ws, { type: 'error', message: 'Oyun bulunamadı veya süresi dolmuş' });
+        // HATA YERİNE RESET GÖNDER: Sayfa yenilendiğinde oyun yoksa lobiye at
+        return sendMessage(ws, { type: 'resetClient', message: 'Oyun bulunamadı' });
     }
 
     if (!room.players[playerId]) {
@@ -1279,7 +1280,7 @@ function handleDisconnect(ws) {
                         } else {
                             rooms.delete(ws.roomCode);
                         }
-                    }, 15000); // HATA DÜZELTME: 15 saniye (Kullanıcı isteği üzerine kısaltıldı)
+                    }, 25000); // İSTEK: 25 saniye bekleme süresi (İnternet kopması/Kapatma için)
                 }
             }
         }
