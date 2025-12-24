@@ -230,7 +230,10 @@ app.post('/api/admin/action', async (req, res) => {
         const player = await Player.findOne({ telegramId: targetTelegramId });
         if (!player) return res.status(404).json({ error: 'Oyuncu bulunamadı' });
 
-        if (action === 'updateElo') player.elo = parseInt(payload.elo);
+        if (action === 'updateElo') {
+            player.elo = parseInt(payload.elo);
+            player.level = calculateLevel(player.elo);
+        }
         if (action === 'toggleVisibility') player.isVisible = payload.isVisible;
         
         await player.save();
@@ -428,6 +431,25 @@ function sendGameState(roomCode, playerId) {
 function sendMessage(ws, message) {
     if (ws.readyState === WebSocket.OPEN) {
         try { ws.send(JSON.stringify(message)); } catch (e) { }
+    }
+}
+
+function nextTurn(roomCode, previousPlayerId) {
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState) return;
+
+    const gs = room.gameState;
+    const playerIds = Object.keys(gs.players);
+    const nextPlayerId = playerIds.find(id => id !== previousPlayerId);
+
+    if (nextPlayerId) {
+        gs.currentPlayer = nextPlayerId;
+        gs.turnStartTime = Date.now();
+        gs.turn = (gs.turn || 0) + 1;
+        
+        if (gs.players[nextPlayerId]) gs.players[nextPlayerId].timeouts = 0;
+
+        Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
     }
 }
 
