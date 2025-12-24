@@ -1216,21 +1216,6 @@ function handleTurnTimeout(roomCode) {
     nextTurn(roomCode, currentPlayerId);
 }
 
-function nextTurn(roomCode, currentPid) {
-    const room = rooms.get(roomCode);
-    if (!room || !room.gameState) return;
-
-    const gs = room.gameState;
-    const playerIds = Object.keys(gs.players);
-    const nextPid = playerIds.find(id => id !== currentPid);
-
-    gs.currentPlayer = nextPid;
-    gs.turnStartTime = Date.now(); // Timer reset
-    gs.turn++;
-
-    Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
-}
-
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Domino Sunucusu çalışıyor: Port ${PORT}`);
