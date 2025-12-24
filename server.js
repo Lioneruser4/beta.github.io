@@ -576,7 +576,7 @@ wss.on('close', () => clearInterval(pingInterval));
 // --- OYUN MANTIKLARI ---
 
 function handleFindMatch(ws, data) {
-    const playerCount = data.playerCount || 2; // Varsayılan 2
+    const playerCount = parseInt(data.playerCount || 2); // Varsayılan 2 (Sayı olduğundan emin ol)
     const queue = matchQueues[playerCount];
 
     if (ws.playerId && playerConnections.has(ws.playerId)) {
@@ -1269,7 +1269,32 @@ function handleDisconnect(ws) {
             // Oyun devam ediyorsa odayı tut ki geri dönebilsin
             const qSize = Object.keys(room.players).length;
             if (!room.gameState) {
-                rooms.delete(ws.roomCode);
+                // LOBBY MODE (Oyun başlamamışsa)
+                delete room.players[ws.playerId]; // Sadece çıkan oyuncuyu sil
+
+                if (Object.keys(room.players).length === 0) {
+                    rooms.delete(ws.roomCode); // Oda boşaldıysa sil
+                } else {
+                    // Eğer özel oda sahibi çıktıysa odayı kapat
+                    if (room.type === 'private' && room.host === ws.playerId) {
+                        const playerIds = Object.keys(room.players);
+                        playerIds.forEach(pid => {
+                            const socket = playerConnections.get(pid);
+                            if (socket) sendMessage(socket, { type: 'resetClient', message: 'Oda sahibi ayrıldı.' });
+                        });
+                        rooms.delete(ws.roomCode);
+                    } else {
+                        // Diğer oyunculara güncel listeyi gönder (Lobi güncellemesi)
+                        const playerIds = Object.keys(room.players);
+                        playerIds.forEach(targetId => {
+                            const socket = playerConnections.get(targetId);
+                            if (socket) {
+                                const opponents = playerIds.filter(pid => pid !== targetId).map(pid => room.players[pid]);
+                                sendMessage(socket, { type: 'matchFound', roomCode: ws.roomCode, opponents: opponents, gameType: room.type, playerCount: room.playerCount });
+                            }
+                        });
+                    }
+                }
             } else {
                 if (!room.cleanupTimer) {
                     room.cleanupTimer = setTimeout(() => {
