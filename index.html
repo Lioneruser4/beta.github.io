@@ -374,13 +374,13 @@
 
         // 5. Game Timer Component
         const GameTimer = ({ startTime }) => {
-            const [timeLeft, setTimeLeft] = useState(25);
+            const [timeLeft, setTimeLeft] = useState(30);
             
             useEffect(() => {
                 const interval = setInterval(() => {
                     if (!startTime) return;
                     const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                    const remaining = Math.max(0, 25 - elapsed);
+                    const remaining = Math.max(0, 30 - elapsed);
                     setTimeLeft(remaining);
                 }, 100);
                 return () => clearInterval(interval);
