@@ -835,6 +835,12 @@
                         setSelectedTileIndex(null);
                         setValidMoves([]);
                         break;
+                    case 'resetClient':
+                        // Sunucu oyunun bittiğini veya olmadığını söylüyor, temizle ve lobiye dön
+                        localStorage.removeItem('domino_session');
+                        resetGameClientState();
+                        setScreen('lobby');
+                        break;
                     case 'error':
                         showNotification(data.message, 'error');
                         setSearching(false);
@@ -886,8 +892,8 @@
                     case 'matchFound':
                         playSound('found');
                         setSearching(false);
-                        setOpponent(data.opponent);
-                        setOpponents(data.opponents || [data.opponent]);
+                        setOpponent(data.opponent || (data.opponents && data.opponents[0]));
+                        setOpponents(data.opponents || (data.opponent ? [data.opponent] : []));
                         setScreen('matching_lobby');
                         break;
                     case 'gameMessage':
@@ -1134,7 +1140,7 @@
                 // Telegram WebApp için özel çıkış mesajı
                 const message = 'Oyundan çıkmak istediğinize emin misiniz? Çıkarsanız maçı kaybedersiniz.';
                 if (window.confirm(message)) {
-                    sendMessage({ type: 'leaveGame' });
+                    sendMessage({ type: 'leaveGame' }); // Sunucuya bildir (Anında bitirir)
                     localStorage.removeItem('domino_session');
                     resetGameClientState();
                     setScreen('lobby');
@@ -1377,14 +1383,24 @@
                         <div className="text-white/20 text-4xl sm:text-6xl font-black italic">VS</div>
 
                         <div className="flex-1 flex flex-col items-center gap-4 animate-slide-left">
-                            <div className="relative">
-                                <img src={opponent?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-yellow-500/50 shadow-2xl object-cover" />
-                                <div className="absolute -bottom-2 -right-2"><LevelBadge level={opponent?.level || 1} /></div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-white font-black text-xl truncate max-w-[120px]">{opponent?.name || opponent?.username || 'Rakip'}</div>
-                                <div className="text-yellow-500 font-bold text-sm tracking-widest">{opponent?.elo || 0} ELO</div>
-                            </div>
+                            {opponents.length > 0 ? (
+                                <div className={`grid ${opponents.length > 1 ? 'grid-cols-2 gap-4' : 'grid-cols-1'} justify-items-center`}>
+                                    {opponents.map((opp, idx) => (
+                                        <div key={idx} className="flex flex-col items-center gap-2">
+                                            <div className="relative">
+                                                <img src={opp.photoUrl || 'https://via.placeholder.com/100'} className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl border-4 border-yellow-500/50 shadow-2xl object-cover" />
+                                                <div className="absolute -bottom-2 -right-2"><LevelBadge level={opp.level || 1} /></div>
+                                            </div>
+                                            <div className="text-center">
+                                                <div className="text-white font-black text-sm sm:text-lg truncate max-w-[100px]">{opp.name || opp.username || 'Rakip'}</div>
+                                                <div className="text-yellow-500 font-bold text-xs tracking-widest">{opp.elo || 0} ELO</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-white/50 animate-pulse">Rakip Bekleniyor...</div>
+                            )}
                         </div>
                     </div>
 
