@@ -685,7 +685,7 @@ function handleFindMatch(ws, data) {
                 }
             });
             console.log(`✅ Oyun başladı: ${room.code}`);
-        }, 1000); // Kısa bir bekleme, lobi dolduğunu görsünler
+        }, 5000); // 5 saniye bekleme, lobi dolduğunu görsünler
     }
 }
 
@@ -780,7 +780,7 @@ function handleJoinRoom(ws, data) {
             }
         });
         console.log(`✅ Özel oyun başladı: ${code}`);
-    }, 4000);
+    }, 5000);
     }
 }
 
