@@ -801,6 +801,8 @@ function startNewRound(roomCode, startingPlayerId) {
 async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
     const room = rooms.get(roomCode);
     if (!room) return;
+    if (room.isEnding) return; // Çifte işlem önleme
+    room.isEnding = true;
 
     // Oyuncuların oda bilgisini temizle (Tekrar eşleşme yapabilmeleri için)
     if (room.players) {
@@ -1089,12 +1091,6 @@ function handleRejoin(ws, data) {
         return sendMessage(ws, { type: 'error', message: 'Bu oyuncu odaya ait değil' });
     }
 
-    // Bağlantı kopma zamanlayıcısını iptal et
-    if (room.cleanupTimer) {
-        clearTimeout(room.cleanupTimer);
-        room.cleanupTimer = null;
-    }
-
     // Reattach
     ws.playerId = playerId;
     ws.roomCode = roomCode;
@@ -1117,6 +1113,8 @@ async function handleLeaveGame(ws) {
     }
 
     const gs = room.gameState;
+    if (gs.winner || room.isEnding) return;
+
     const playerIds = Object.keys(gs.players);
     if (playerIds.length !== 2) {
         rooms.delete(ws.roomCode);
@@ -1151,23 +1149,15 @@ function handleDisconnect(ws) {
             console.log(`🏠 Odadan ayrıldı (Bağlantı kesildi): ${ws.roomCode}`);
             broadcastToRoom(ws.roomCode, { type: 'playerDisconnected', playerName: ws.playerName });
 
-            // Sadece oyun BAŞLAMAMIŞSA veya oda boşsa odayı sil
-            // Oyun devam ediyorsa odayı tut ki geri dönebilsin
-            const qSize = Object.keys(room.players).length;
-            if (!room.gameState) {
-                rooms.delete(ws.roomCode);
-            } else {
-                if (!room.cleanupTimer) {
-                    room.cleanupTimer = setTimeout(() => {
-                        // Diğer oyuncuyu bul (Kazanan)
-                        const winnerId = Object.keys(room.players).find(id => id !== ws.playerId);
-                        if (winnerId && room.gameState) {
-                            handleMatchEnd(ws.roomCode, winnerId, room.gameState, 'disconnect');
-                        } else {
-                            rooms.delete(ws.roomCode);
-                        }
-                    }, 1000); // 1 saniye (Hızlı tepki)
+            if (room.gameState && !room.gameState.winner && !room.isEnding) {
+                const winnerId = Object.keys(room.players).find(id => id !== ws.playerId);
+                if (winnerId) {
+                    handleMatchEnd(ws.roomCode, winnerId, room.gameState, 'disconnect');
+                } else {
+                    rooms.delete(ws.roomCode);
                 }
+            } else if (!room.gameState) {
+                rooms.delete(ws.roomCode);
             }
         }
     }
