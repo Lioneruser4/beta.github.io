@@ -578,15 +578,16 @@ wss.on('close', () => clearInterval(pingInterval));
 function handleFindMatch(ws, data) {
     const playerCount = parseInt(data.playerCount || 2); // Varsayılan 2 (Sayı olduğundan emin ol)
     const queue = matchQueues[playerCount];
+    const incomingTelegramId = data.telegramId || null;
 
     // 1. ADIM: Oyuncuyu TÜM kuyruklardan temizle (Sayfa yenileme/Hata durumları için)
     // Bu işlem "Zaten kuyru dasınız" ve "Kendi kendine eşleşme" sorunlarını çözer.
     for (const key in matchQueues) {
         const q = matchQueues[key];
-        const idx = q.findIndex(p => p.playerId === ws.playerId || (ws.telegramId && p.telegramId === ws.telegramId));
+        const idx = q.findIndex(p => p.playerId === ws.playerId || (incomingTelegramId && p.telegramId === incomingTelegramId));
         if (idx !== -1) {
             q.splice(idx, 1);
-            console.log(`🧹 ${ws.playerName} eski kuyruktan temizlendi.`);
+            console.log(`🧹 ${data.username || 'Guest'} eski kuyruktan temizlendi.`);
         }
     }
 
@@ -605,7 +606,7 @@ function handleFindMatch(ws, data) {
     const playerId = ws.playerId || generateRoomCode();
     ws.playerId = playerId;
     ws.playerName = data.firstName || data.username || 'Guest';
-    ws.telegramId = data.telegramId || null; // null ise guest
+    ws.telegramId = incomingTelegramId; // null ise guest
     ws.photoUrl = data.photoUrl || null;
     ws.level = data.level || 0; // 0 = guest
     ws.elo = data.elo || 0; // 0 = guest
