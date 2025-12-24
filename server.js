@@ -1229,11 +1229,6 @@ function handleLeaveGame(ws) {
 
     const gs = room.gameState;
     const playerIds = Object.keys(gs.players);
-    if (playerIds.length !== 2) {
-        rooms.delete(ws.roomCode);
-        ws.roomCode = null;
-        return;
-    }
 
     const leaverId = String(ws.playerId);
     const winnerId = playerIds.find(id => String(id) !== leaverId);
@@ -1272,12 +1267,16 @@ function handleDisconnect(ws) {
             if (!room.gameState) {
                 rooms.delete(ws.roomCode);
             } else {
-                // Rakip ayrıldığında oyunu hemen bitir
-                const winnerId = Object.keys(room.players).find(id => id !== ws.playerId);
-                if (winnerId && room.gameState) {
-                    handleMatchEnd(ws.roomCode, winnerId, room.gameState, 'disconnect');
-                } else {
-                    rooms.delete(ws.roomCode);
+                if (!room.cleanupTimer) {
+                    room.cleanupTimer = setTimeout(() => {
+                        // Diğer oyuncuyu bul (Kazanan)
+                        const winnerId = Object.keys(room.players).find(id => id !== ws.playerId);
+                        if (winnerId && room.gameState) {
+                            handleMatchEnd(ws.roomCode, winnerId, room.gameState, 'disconnect');
+                        } else {
+                            rooms.delete(ws.roomCode);
+                        }
+                    }, 25000); // 25 saniye bekleme süresi (İnternet kopması/Kapatma için)
                 }
             }
         }
@@ -1290,21 +1289,9 @@ setInterval(() => {
     rooms.forEach((room, roomCode) => {
         if (!room.gameState || !room.gameState.turnStartTime || room.gameState.winner) return;
         
-        // 30 saniye süre (İstek üzerine güncellendi)
-        const TURN_LIMIT = 30000;
-        const WARNING_TIME = 20000; // 20. saniyede uyarı (Son 10 saniye)
+        // 25 saniye süre (İstek üzerine düşürüldü)
+        const TURN_LIMIT = 25000;
         const elapsed = Date.now() - room.gameState.turnStartTime;
-        
-        // 10 saniye kala uyarı gönder
-        if (elapsed > WARNING_TIME && !room.gameState.warningSent) {
-            room.gameState.warningSent = true;
-            const currentPlayerId = room.gameState.currentPlayer;
-            const ws = playerConnections.get(currentPlayerId);
-            if (ws) {
-                // "Burda mısınız?" butonu için mesaj
-                sendMessage(ws, { type: 'afkWarning', timeLeft: 10, messageKey: 'areYouHere' });
-            }
-        }
 
         if (elapsed > TURN_LIMIT) {
             handleTurnTimeout(roomCode);
@@ -1340,7 +1327,7 @@ function handleTurnTimeout(roomCode) {
 
     broadcastToRoom(roomCode, {
         type: 'gameMessage',
-        messageKey: 'afkAction', // Mesaj anahtarı gönder (Otomatik oynandı bilgisi)
+        messageKey: 'afkWarning', // Mesaj anahtarı gönder
         params: { name: player.name, timeouts: player.timeouts }, // Parametreler gönder
         duration: 4000
     });
