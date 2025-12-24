@@ -405,6 +405,27 @@
             );
         };
 
+        // 7. Custom Confirmation Modal (Site ismini gizlemek için)
+        const ConfirmationModal = ({ isOpen, title, message, onConfirm, onCancel, confirmText, cancelText }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-slide-in">
+                    <div className="bg-[#1b4d3e] border-2 border-yellow-500 rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center">
+                        <h3 className="text-2xl font-black text-white mb-2">{title}</h3>
+                        <p className="text-white/70 mb-6">{message}</p>
+                        <div className="flex gap-3">
+                            <button onClick={onCancel} className="flex-1 py-3 rounded-xl font-bold bg-white/10 text-white hover:bg-white/20 transition-all">
+                                {cancelText}
+                            </button>
+                            <button onClick={onConfirm} className="flex-1 py-3 rounded-xl font-bold bg-red-600 text-white hover:bg-red-500 transition-all shadow-lg">
+                                {confirmText}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         // --- ANA OYUN ---
 
         const DominoGame = () => {
@@ -432,6 +453,7 @@
             const [calculationLobby, setCalculationLobby] = useState(null);
             const [calculationTimer, setCalculationTimer] = useState(8);
             const [showAdmin, setShowAdmin] = useState(false);
+            const [showLeaveModal, setShowLeaveModal] = useState(false); // Modal state
 
             const [playerId, setPlayerId] = useState(null);
             const wsRef = useRef(null);
@@ -1137,15 +1159,16 @@
                 playSound('place');
             };
 
+            const confirmLeaveGame = () => {
+                sendMessage({ type: 'leaveGame' });
+                localStorage.removeItem('domino_session');
+                resetGameClientState();
+                setScreen('lobby');
+                setShowLeaveModal(false);
+            };
+
             const leaveGameClient = () => {
-                // Telegram WebApp için özel çıkış mesajı
-                const message = 'Oyundan çıkmak istediğinize emin misiniz? Çıkarsanız maçı kaybedersiniz.';
-                if (window.confirm(message)) {
-                    sendMessage({ type: 'leaveGame' }); // Sunucuya bildir (Anında bitirir)
-                    localStorage.removeItem('domino_session');
-                    resetGameClientState();
-                    setScreen('lobby');
-                }
+                setShowLeaveModal(true);
             };
 
             // Pas butonu render fonksiyonu
@@ -1413,6 +1436,16 @@
 
             if (screen === 'game') return (
                 <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden safe-area-top">
+                    <ConfirmationModal 
+                        isOpen={showLeaveModal}
+                        title={t.leaveGame}
+                        message={t.confirmLeaveDesc}
+                        confirmText={t.leaveBtn}
+                        cancelText={t.cancelBtn}
+                        onConfirm={confirmLeaveGame}
+                        onCancel={() => setShowLeaveModal(false)}
+                    />
+
                     {notification && <Toast message={notification.message} type={notification.type} />}
 
                     <GameTimer startTime={gameState.turnStartTime} />
@@ -1751,16 +1784,6 @@
         }
         tgApp.disableVerticalSwipes();
         tgApp.setHeaderColor('#1b4d3e');
-        
-        // Telegram WebApp çıkış işlemi için özel düzenleme
-        const originalConfirm = window.confirm;
-        window.confirm = function(message) {
-            // Site ismini gizle
-            if (message.includes('site') || message.includes('Site')) {
-                return originalConfirm('Oyundan çıkmak istediğinize emin misiniz?');
-            }
-            return originalConfirm(message);
-        };
     </script>
 
 </body>
