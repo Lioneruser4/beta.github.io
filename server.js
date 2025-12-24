@@ -867,11 +867,10 @@ async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
 
     try {
         const playerIds = Object.keys(gameState.players);
+        const isDraw = winnerId === 'DRAW';
         const loserId = isDraw ? null : playerIds.find(id => id !== winnerId);
         const player1Id = playerIds[0];
         const player2Id = playerIds[1];
-
-        const isDraw = winnerId === 'DRAW';
         let eloChanges = null;
 
         // Guest kontrolu - Guest varsa ELO guncellemesi yapma
@@ -986,11 +985,15 @@ async function handleMatchEnd(roomCode, winnerId, gameState, reason = null) {
         rooms.delete(roomCode);
     } catch (error) {
         console.error('❌ Game end error:', error);
+        const isDrawFallback = winnerId === 'DRAW';
+        const playerIdsFallback = gameState && gameState.players ? Object.keys(gameState.players) : [];
+        const loserIdFallback = isDrawFallback ? null : playerIdsFallback.find(id => id !== winnerId);
+
         broadcastToRoom(roomCode, {
             type: 'gameEnd',
             winner: winnerId,
-            winnerPhoto: isDraw ? null : (room.players[winnerId]?.photoUrl || null),
-            loserPhoto: isDraw ? null : (room.players[loserId]?.photoUrl || null),
+            winnerPhoto: isDrawFallback ? null : (room.players[winnerId]?.photoUrl || null),
+            loserPhoto: isDrawFallback ? null : (room.players[loserIdFallback]?.photoUrl || null),
             winnerName: winnerId === 'DRAW' ? 'Beraberlik' : (gameState.players[winnerId]?.name || 'Bilinmeyen'),
             isRanked: false
         });
@@ -1268,13 +1271,15 @@ function handleDisconnect(ws) {
                 rooms.delete(ws.roomCode);
             } else {
                 if (!room.cleanupTimer) {
+                    const roomCode = ws.roomCode;
                     room.cleanupTimer = setTimeout(() => {
+                        if (!rooms.has(roomCode)) return;
                         // Diğer oyuncuyu bul (Kazanan)
                         const winnerId = Object.keys(room.players).find(id => id !== ws.playerId);
                         if (winnerId && room.gameState) {
-                            handleMatchEnd(ws.roomCode, winnerId, room.gameState, 'disconnect');
+                            handleMatchEnd(roomCode, winnerId, room.gameState, 'disconnect');
                         } else {
-                            rooms.delete(ws.roomCode);
+                            rooms.delete(roomCode);
                         }
                     }, 25000); // 25 saniye bekleme süresi (İnternet kopması/Kapatma için)
                 }
