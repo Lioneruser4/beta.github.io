@@ -365,7 +365,7 @@
                 ${animateIn ? 'animate-slide-in' : ''}
                 ${!disabled && !isGhost && !isOpponent ? 'cursor-pointer active:translate-y-1 active:shadow-3d-active hover:brightness-110' : ''}
                 ${disabled ? 'brightness-90 cursor-default' : ''}
-                ${isOpponent ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700' : ''}
+                ${isOpponent && skin === 'skin_default' ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700' : ''}
             `;
 
             return (
@@ -1391,7 +1391,7 @@
                     <div className="w-full max-w-sm bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10 shadow-2xl">
                         {playerData && (
                             <div className="mb-8 text-center">
-                                {playerData.photoUrl && <img src={playerData.photoUrl} className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 p-1" />}
+                                {playerData.photoUrl && <img src={playerData.photoUrl} className={`w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 p-1 ${playerData.equipped?.nameplate}`} />}
                                 <div className="text-white text-2xl font-bold">{playerData.username}</div>
                                 <div className="flex justify-center gap-2 mt-2 items-center flex-wrap">
                                     <LevelBadge level={playerData.level} />
@@ -1578,6 +1578,7 @@
                                     values={[0, 0]} 
                                     isOpponent={true}
                                     disabled={true}
+                                    skin={gameState?.players[opponentPlayerId]?.equipped?.tileSkin}
                                 />
                             ))}
                         </div>
@@ -1845,7 +1846,7 @@
                         {leaderboard.map((p, i) => (
                             <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-3xl border border-white/5">
                                 <div className="text-2xl font-black w-8 text-center">{i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</div>
-                                <img src={p.photoUrl || 'https://via.placeholder.com/50'} className="w-12 h-12 rounded-full" />
+                                <img src={p.photoUrl || 'https://via.placeholder.com/50'} className={`w-12 h-12 rounded-full ${p.equipped?.nameplate || ''}`} />
                                 <div className="flex-1">
                                     <div className="text-white font-bold">{p.username}</div>
                                     <div className="flex items-center gap-2 mt-1">
