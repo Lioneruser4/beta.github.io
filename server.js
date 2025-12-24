@@ -385,6 +385,20 @@ function playTileOnBoard(tile, board, position) {
     return played;
 }
 
+function nextTurn(roomCode, previousPlayerId) {
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState) return;
+
+    const gs = room.gameState;
+    const playerIds = Object.keys(gs.players);
+    const nextPlayerId = playerIds.find(id => id !== previousPlayerId);
+
+    gs.currentPlayer = nextPlayerId;
+    gs.turnStartTime = Date.now();
+
+    Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+}
+
 function checkWinner(gameState) {
     for (const playerId in gameState.players) {
         if (gameState.players[playerId].hand.length === 0) {
@@ -1082,6 +1096,12 @@ function handleRejoin(ws, data) {
         return sendMessage(ws, { type: 'error', message: 'Bu oyuncu odaya ait değil' });
     }
 
+    // Bağlantı kopma zamanlayıcısını iptal et
+    if (room.cleanupTimer) {
+        clearTimeout(room.cleanupTimer);
+        room.cleanupTimer = null;
+    }
+
     // Reattach
     ws.playerId = playerId;
     ws.roomCode = roomCode;
@@ -1153,7 +1173,7 @@ function handleDisconnect(ws) {
                         } else {
                             rooms.delete(ws.roomCode);
                         }
-                    }, 10000); // 10 saniye
+                    }, 5000); // 5 saniye (Daha hızlı tepki için düşürüldü)
                 }
             }
         }
