@@ -1161,8 +1161,8 @@ function handleRejoin(ws, data) {
         return sendMessage(ws, { type: 'resetClient', message: 'Oyun bulunamadı' });
     }
 
-    if (!room.players[playerId]) {
-        return sendMessage(ws, { type: 'error', message: 'Bu oyuncu odaya ait değil' });
+    if (!room.players || !room.players[playerId]) {
+        return sendMessage(ws, { type: 'resetClient', message: 'Oyun oturumu geçersiz' });
     }
 
     // Reattach
