@@ -579,13 +579,26 @@ function handleFindMatch(ws, data) {
     const playerCount = parseInt(data.playerCount || 2); // Varsayılan 2 (Sayı olduğundan emin ol)
     const queue = matchQueues[playerCount];
 
-    if (ws.playerId && playerConnections.has(ws.playerId)) {
-        const existingInQueue = queue.find(p => p.playerId === ws.playerId);
-        if (existingInQueue) {
-            return sendMessage(ws, { type: 'error', message: 'Zaten kuyrukta bekliyorsunuz' });
+    // 1. ADIM: Oyuncuyu TÜM kuyruklardan temizle (Sayfa yenileme/Hata durumları için)
+    // Bu işlem "Zaten kuyru dasınız" ve "Kendi kendine eşleşme" sorunlarını çözer.
+    for (const key in matchQueues) {
+        const q = matchQueues[key];
+        const idx = q.findIndex(p => p.playerId === ws.playerId || (ws.telegramId && p.telegramId === ws.telegramId));
+        if (idx !== -1) {
+            q.splice(idx, 1);
+            console.log(`🧹 ${ws.playerName} eski kuyruktan temizlendi.`);
         }
-        if (ws.roomCode) {
-            return sendMessage(ws, { type: 'error', message: 'Zaten bir oyundasınız' });
+    }
+
+    // 2. ADIM: Oyuncu zaten aktif bir oyunda mı?
+    if (ws.roomCode && rooms.has(ws.roomCode)) {
+        const room = rooms.get(ws.roomCode);
+        // Eğer oyun bitmemişse, oyuncuyu uyar veya rejoin yapmasını sağla
+        if (room.gameState && !room.gameState.winner) {
+            return sendMessage(ws, { type: 'error', message: 'Zaten aktif bir oyundasınız. Lütfen sayfayı yenileyin.' });
+        } else {
+            // Oyun bitmiş ama oda kalmışsa temizle
+            ws.roomCode = null;
         }
     }
 
@@ -597,14 +610,6 @@ function handleFindMatch(ws, data) {
     ws.level = data.level || 0; // 0 = guest
     ws.elo = data.elo || 0; // 0 = guest
     ws.isGuest = !data.telegramId; // Telegram yoksa guest
-
-    // Aynı Telegram hesabının ikinci kez kuyruğa girmesini engelle
-    if (!ws.isGuest && ws.telegramId) {
-        const sameTelegramInQueue = queue.find(p => p.telegramId === ws.telegramId);
-        if (sameTelegramInQueue) {
-            return sendMessage(ws, { type: 'error', message: 'Bu Telegram hesabı zaten eşleşme kuyruğunda' });
-        }
-    }
 
     playerConnections.set(playerId, ws);
     queue.push({
@@ -624,9 +629,16 @@ function handleFindMatch(ws, data) {
     if (queue.length >= playerCount) {
         const players = [];
         for (let i = 0; i < playerCount; i++) players.push(queue.shift());
-
-        // Aynı Telegram hesabı kontrolü (Basitçe, eğer varsa iptal et ve geri koy - Detaylısı karmaşık olabilir, şimdilik geçiyorum)
         
+        // Kendi kendine eşleşme kontrolü (Ekstra Güvenlik)
+        const uniqueIds = new Set(players.map(p => p.telegramId || p.playerId));
+        if (uniqueIds.size < players.length) {
+            console.log('⚠️ Kendi kendine eşleşme algılandı, iptal ediliyor.');
+            // Oyuncuları kuyruğun başına geri koy ve işlemi durdur
+            players.forEach(p => queue.unshift(p));
+            return;
+        }
+
         const roomCode = generateRoomCode();
         const isRanked = players.every(p => !p.isGuest);
         const gameType = isRanked ? 'ranked' : 'casual';
@@ -668,6 +680,25 @@ function handleFindMatch(ws, data) {
 
         // 4 saniye bekleme (Lobi süresi)
         setTimeout(() => {
+            // KONTROL: Oyun başlamadan önce herkes hala bağlı mı?
+            const allConnected = players.every(p => 
+                playerConnections.has(p.playerId) && 
+                playerConnections.get(p.playerId).readyState === WebSocket.OPEN
+            );
+
+            if (!allConnected) {
+                console.log(`❌ Oyun başlatılamadı (${roomCode}), bir oyuncu düştü.`);
+                rooms.delete(roomCode);
+                // Bağlı olanları tekrar kuyruğun başına ekle
+                players.forEach(p => {
+                    if (playerConnections.has(p.playerId) && playerConnections.get(p.playerId).readyState === WebSocket.OPEN) {
+                        sendMessage(p.ws, { type: 'error', message: 'Rakip bağlantısı koptu, tekrar aranıyor...' });
+                        handleFindMatch(p.ws, { playerCount, ...p }); // Tekrar kuyruğa sok
+                    }
+                });
+                return;
+            }
+
             players.forEach(p => {
                 sendMessage(p.ws, { type: 'gameStart', gameState: { ...gameState, playerId: p.playerId } });
                 sendMessage(p.ws, { type: 'session', playerId: p.playerId, roomCode });
@@ -682,7 +713,8 @@ function handleFindMatch(ws, data) {
 function handleCancelSearch(ws) {
     for (const key in matchQueues) {
         const queue = matchQueues[key];
-        const index = queue.findIndex(p => p.ws === ws);
+        // PlayerID veya TelegramID ile bul
+        const index = queue.findIndex(p => p.playerId === ws.playerId || (ws.telegramId && p.telegramId === ws.telegramId));
         if (index !== -1) {
             queue.splice(index, 1);
             console.log(`❌ ${ws.playerName} aramayı iptal etti (${key} kişilik)`);
@@ -1248,7 +1280,7 @@ function handleDisconnect(ws) {
 
     for (const key in matchQueues) {
         const queue = matchQueues[key];
-        const qIdx = queue.findIndex(p => p.ws === ws);
+        const qIdx = queue.findIndex(p => p.playerId === ws.playerId);
         if (qIdx !== -1) {
             queue.splice(qIdx, 1);
             console.log(`❌ Kuyruktan çıkarıldı (${key} kişilik)`);
