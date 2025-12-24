@@ -17,6 +17,7 @@ class DominoGame {
         this.rightEnd = null;
         this.isRanked = false;
         this.turnCount = 0;
+        this.scores = { me: 0, opponent: 0 }; // Skor takibi
     }
     
     initializeGame(playerNames, isRanked) {
@@ -33,6 +34,7 @@ class DominoGame {
         this.turnCount = 0;
         this.leftEnd = null;
         this.rightEnd = null;
+        this.scores = { me: 0, opponent: 0 };
     }
 
     getCurrentPlayer() {
@@ -201,6 +203,7 @@ let searchTime = 0;
 let searchInterval = null;
 let roomCode = null;
 let currentScreen = 'lobby';
+let turnTimerInterval = null; // Timer interval
 
 // Kullanıcı istatistikleri (demo verisi - sunucudan gelmeli)
 let userStats = {
@@ -331,9 +334,9 @@ function handleServerMessage(message) {
         case 'CONNECTION_SUCCESS':
             showToast('Sunucuya başarıyla bağlandı!', 'success');
             break;
-        case 'MATCH_FOUND':
+        case 'matchFound': // Server sends camelCase
             stopSearching();
-            startGame(message.payload);
+            startGame(message);
             break;
         case 'ROOM_CREATED':
             roomCode = message.payload.code;
@@ -346,8 +349,8 @@ function handleServerMessage(message) {
             showToast(`Odaya katılamadı: ${message.payload.reason}`, 'error');
             cancelJoin(); 
             break;
-        case 'GAME_STATE_UPDATE':
-            updateGameState(message.payload);
+        case 'gameUpdate': // Server sends gameUpdate
+            updateGameState(message.gameState);
             break;
         case 'PLAYER_JOINED':
             showToast(`${message.payload.name} odaya katıldı!`, 'info');
@@ -355,8 +358,11 @@ function handleServerMessage(message) {
         case 'PLAYER_LEFT':
             handlePlayerLeft(message.payload);
             break;
-        case 'GAME_OVER':
-            handleGameOver(message.payload);
+        case 'roundEnd': // Round bittiğinde
+            handleRoundEnd(message);
+            break;
+        case 'gameEnd': // Maç bittiğinde (3 win)
+            handleGameOver(message);
             break;
         case 'PONG': 
             break;
@@ -668,11 +674,13 @@ function closeLeaderboard() {
 // GAME FUNCTIONS
 // ============================================
 
-function startGame(payload) {
-    const playerNames = payload.players || ['Oyuncu 1', 'Oyuncu 2'];
+function startGame(message) {
+    const opponent = message.opponent || { name: 'Rakip' };
+    const playerNames = [userStats.name, opponent.name];
 
-    game.initializeGame(playerNames, payload.isRanked); 
-    myPlayerId = payload.myPlayerId; // Sunucudan gelen oyuncu ID'si
+    game.initializeGame(playerNames, message.gameType === 'ranked'); 
+    // myPlayerId sunucudan session mesajı ile veya gameUpdate ile gelir, burada varsayalım:
+    // Not: Server 'session' mesajı atıyor, onu handle etmeliyiz ama şimdilik gameUpdate halledecek.
     currentScreen = 'game';
 
     const lobbyScreen = document.getElementById('lobby-screen');
@@ -684,26 +692,60 @@ function startGame(payload) {
     showToast('Maç başladı!', 'success');
 }
 
-function updateGameState(newState) {
-    console.log("Sunucudan oyun güncellemesi geldi", newState);
+function updateGameState(serverState) {
+    // console.log("Sunucudan oyun güncellemesi geldi", serverState);
     
-    // Temel state güncellemeleri
-    if (newState.board) game.board = newState.board;
-    if (newState.players) game.players = newState.players;
-    if (newState.currentPlayerId) game.currentPlayerId = newState.currentPlayerId;
-    if (newState.leftEnd !== undefined) game.leftEnd = newState.leftEnd;
-    if (newState.rightEnd !== undefined) game.rightEnd = newState.rightEnd;
-    
-    // Kendi taşlarımızı güncelle
-    const myNewState = newState.players.find(p => p.id === myPlayerId);
-    if (myNewState && myNewState.tiles) {
-        const myPlayer = game.players.find(p => p.id === myPlayerId);
-        if (myPlayer) {
-            myPlayer.tiles = myNewState.tiles;
+    if (serverState.playerId) {
+        myPlayerId = serverState.playerId;
+    }
+
+    // Board mapping: Server sends [[1,2], [2,3]]. Client needs objects.
+    if (serverState.board) {
+        game.board = serverState.board.map(t => ({ left: t[0], right: t[1], flipped: false })); // Basit mapping
+        // Uçları güncelle
+        if (game.board.length > 0) {
+            game.leftEnd = game.board[0].left;
+            game.rightEnd = game.board[game.board.length - 1].right;
+        } else {
+            game.leftEnd = null;
+            game.rightEnd = null;
         }
     }
 
+    // Players mapping
+    if (serverState.players) {
+        // Server sends object { id: { hand: [], name: ... } }
+        // Client expects array. We need to map this carefully.
+        const playerIds = Object.keys(serverState.players);
+        game.players = playerIds.map(pid => {
+            const pData = serverState.players[pid];
+            return {
+                id: pid,
+                name: pData.name,
+                tiles: pData.hand.map((t, i) => ({ id: `${pid}-${i}`, left: t[0], right: t[1] })),
+                elo: pData.elo
+            };
+        });
+    }
+
+    if (serverState.currentPlayer) game.currentPlayerId = serverState.currentPlayer;
+    
+    // Skor güncelleme
+    if (serverState.score) {
+        const myScore = serverState.score[myPlayerId] || 0;
+        const opponentId = Object.keys(serverState.score).find(id => id !== myPlayerId);
+        const opponentScore = opponentId ? (serverState.score[opponentId] || 0) : 0;
+        game.scores = { me: myScore, opponent: opponentScore };
+        updateScoreboard();
+    }
+
+    // Timer güncelleme
+    if (serverState.turnStartTime) {
+        startTurnTimer(serverState.turnStartTime);
+    }
+
     renderGame();
+    
     if (game.getCurrentPlayer().id === myPlayerId) {
         showToast('Sıra sende!', 'info');
     }
@@ -715,6 +757,37 @@ function renderGame() {
     renderPlayerHand();
     updateTurnIndicator();
     updateBoardEnds();
+    
+    // Timer ve Skorboard elementlerini ekle (eğer yoksa)
+    let timerEl = document.getElementById('turn-timer');
+    if (!timerEl) {
+        const container = document.getElementById('game-screen');
+        timerEl = document.createElement('div');
+        timerEl.id = 'turn-timer';
+        timerEl.style.cssText = "position: absolute; top: 80px; left: 50%; transform: translateX(-50%); font-size: 24px; font-weight: bold; color: white; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 10px;";
+        container.appendChild(timerEl);
+    }
+
+    let scoreEl = document.getElementById('game-scoreboard');
+    if (!scoreEl) {
+        const container = document.getElementById('game-screen');
+        scoreEl = document.createElement('div');
+        scoreEl.id = 'game-scoreboard';
+        scoreEl.style.cssText = "position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-size: 20px; font-weight: bold; color: #ffd700; background: rgba(0,0,0,0.7); padding: 8px 20px; border-radius: 15px; border: 1px solid #ffd700; z-index: 100;";
+        container.appendChild(scoreEl);
+        updateScoreboard();
+    }
+}
+
+function updateScoreboard() {
+    const scoreEl = document.getElementById('game-scoreboard');
+    if (scoreEl) {
+        // Skorları göster (Ben - Rakip)
+        // Eğer oyun 3'te bitiyorsa
+        scoreEl.innerHTML = `
+            <span style="color: #4CAF50">Siz: ${game.scores.me}</span> - <span style="color: #FF5252">Rakip: ${game.scores.opponent}</span>
+        `;
+    }
 }
 
 function renderOpponentArea() {
@@ -965,10 +1038,31 @@ function updateBoardEnds() {
     }
 }
 
+function startTurnTimer(startTime) {
+    if (turnTimerInterval) clearInterval(turnTimerInterval);
+    
+    const timerEl = document.getElementById('turn-timer');
+    if (!timerEl) return;
+
+    const updateTimer = () => {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, 30000 - elapsed); // 30 saniye süre
+        const secs = Math.ceil(remaining / 1000);
+        
+        timerEl.textContent = secs;
+        timerEl.style.color = secs <= 10 ? '#ff4444' : 'white';
+
+        if (remaining <= 0) clearInterval(turnTimerInterval);
+    };
+
+    updateTimer();
+    turnTimerInterval = setInterval(updateTimer, 1000);
+}
+
 function handleGameOver(payload) {
-    const winner = payload.winner;
-    const isWinner = winner && winner.id === myPlayerId;
-    const eloChange = game.calculateEloChange(isWinner, false, game.turnCount > 10);
+    const winnerId = payload.winner;
+    const isWinner = winnerId === myPlayerId;
+    // const eloChange = ... (Sunucudan gelmeli, payload.eloChanges)
 
     // İstatistikleri güncelle (Sunucuya bu sonucu bildirmelisiniz)
     if (game.isRanked) {
@@ -993,8 +1087,8 @@ function handleGameOver(payload) {
         icon.textContent = '🏆';
         title.textContent = 'KAZANDIN!';
         title.className = 'result-title win';
-        if (game.isRanked) {
-            elo.textContent = `+${eloChange} ELO`;
+        if (payload.eloChanges) {
+            elo.textContent = `+${payload.eloChanges.winner} ELO`;
             elo.className = 'result-elo positive';
         } else {
             elo.textContent = '';
@@ -1003,8 +1097,8 @@ function handleGameOver(payload) {
         icon.textContent = '😔';
         title.textContent = 'KAYBETTİN';
         title.className = 'result-title lose';
-        if (game.isRanked) {
-            elo.textContent = `${eloChange} ELO`;
+        if (payload.eloChanges) {
+            elo.textContent = `${payload.eloChanges.loser} ELO`;
             elo.className = 'result-elo negative';
         } else {
             elo.textContent = '';
@@ -1012,6 +1106,14 @@ function handleGameOver(payload) {
     }
 
     modal.classList.add('active');
+}
+
+function handleRoundEnd(payload) {
+    const winnerId = payload.winnerId;
+    const isWinner = winnerId === myPlayerId;
+    const msg = isWinner ? "Bu eli KAZANDINIZ!" : "Bu eli KAYBETTİNİZ!";
+    showToast(`${msg} Yeni el başlıyor...`, isWinner ? 'success' : 'info');
+    // Skor zaten updateGameState ile güncellenecek
 }
 
 function handlePlayerLeft(payload) {
