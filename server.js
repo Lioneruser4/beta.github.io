@@ -357,7 +357,8 @@ function initializeGame(roomCode, player1Id, player2Id) {
         turnStartTime: Date.now(),
         score: { [player1Id]: 0, [player2Id]: 0 },
         round: 1,
-        consecutivePasses: 0 // Oyun kapalı kontrolü için
+        consecutivePasses: 0, // Oyun kapalı kontrolü için
+        warningSent: false
     };
 
     rooms.set(roomCode, room);
@@ -501,6 +502,7 @@ function nextTurn(roomCode, previousPlayerId) {
     if (nextPlayerId) {
         gs.currentPlayer = nextPlayerId;
         gs.turnStartTime = Date.now();
+        gs.warningSent = false;
         gs.turn = (gs.turn || 0) + 1;
         
         if (gs.players[nextPlayerId]) gs.players[nextPlayerId].timeouts = 0;
@@ -844,6 +846,7 @@ function startNewRound(roomCode, startingPlayerId) {
     gs.consecutivePasses = 0;
     gs.currentPlayer = startingPlayerId || defaultStartingPlayer; 
     gs.turnStartTime = Date.now();
+    gs.warningSent = false;
     gs.winner = null; // Önceki kazananı temizle
  
     console.log(`🔄 Yeni Raund (${gs.round}) başlıyor. Skor: ${gs.score[p1]}-${gs.score[p2]}. Başlayan: ${gs.players[gs.currentPlayer].name}`);
@@ -1269,16 +1272,12 @@ function handleDisconnect(ws) {
             if (!room.gameState) {
                 rooms.delete(ws.roomCode);
             } else {
-                if (!room.cleanupTimer) {
-                    room.cleanupTimer = setTimeout(() => {
-                        // Diğer oyuncuyu bul (Kazanan)
-                        const winnerId = Object.keys(room.players).find(id => id !== ws.playerId);
-                        if (winnerId && room.gameState) {
-                            handleMatchEnd(ws.roomCode, winnerId, room.gameState, 'disconnect');
-                        } else {
-                            rooms.delete(ws.roomCode);
-                        }
-                    }, 60000); // 60 saniye (Uygulama kapatıp açma süresi için artırıldı)
+                // Rakip ayrıldığında oyunu hemen bitir
+                const winnerId = Object.keys(room.players).find(id => id !== ws.playerId);
+                if (winnerId && room.gameState) {
+                    handleMatchEnd(ws.roomCode, winnerId, room.gameState, 'disconnect');
+                } else {
+                    rooms.delete(ws.roomCode);
                 }
             }
         }
@@ -1291,10 +1290,22 @@ setInterval(() => {
     rooms.forEach((room, roomCode) => {
         if (!room.gameState || !room.gameState.turnStartTime || room.gameState.winner) return;
         
-        // 25 saniye süre (İstek üzerine düşürüldü)
-        const TURN_LIMIT = 25000;
+        // 30 saniye süre (İstek üzerine güncellendi)
+        const TURN_LIMIT = 30000;
+        const WARNING_TIME = 20000; // 20. saniyede uyarı (Son 10 saniye)
         const elapsed = Date.now() - room.gameState.turnStartTime;
         
+        // 10 saniye kala uyarı gönder
+        if (elapsed > WARNING_TIME && !room.gameState.warningSent) {
+            room.gameState.warningSent = true;
+            const currentPlayerId = room.gameState.currentPlayer;
+            const ws = playerConnections.get(currentPlayerId);
+            if (ws) {
+                // "Burda mısınız?" butonu için mesaj
+                sendMessage(ws, { type: 'afkWarning', timeLeft: 10, messageKey: 'areYouHere' });
+            }
+        }
+
         if (elapsed > TURN_LIMIT) {
             handleTurnTimeout(roomCode);
         }
@@ -1329,7 +1340,7 @@ function handleTurnTimeout(roomCode) {
 
     broadcastToRoom(roomCode, {
         type: 'gameMessage',
-        messageKey: 'afkWarning', // Mesaj anahtarı gönder
+        messageKey: 'afkAction', // Mesaj anahtarı gönder (Otomatik oynandı bilgisi)
         params: { name: player.name, timeouts: player.timeouts }, // Parametreler gönder
         duration: 4000
     });
