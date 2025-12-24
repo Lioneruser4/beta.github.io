@@ -178,7 +178,7 @@ app.get('/api/leaderboard', async (req, res) => {
         const players = await Player.find({ elo: { $gt: 0 }, isVisibleInLeaderboard: { $ne: false } }) // Guest/Yeni oyuncular gözükmesin
             .sort({ elo: -1 })
             .limit(10) // Top 10
-            .select('telegramId username firstName lastName photoUrl elo level wins losses draws totalGames winStreak gold');
+            .select('telegramId username firstName lastName photoUrl elo level wins losses draws totalGames winStreak gold equipped');
 
         res.json({ success: true, leaderboard: players });
     } catch (error) {
@@ -388,6 +388,7 @@ function initializeGame(roomCode, player1Id, player2Id) {
         elo: room.players[id].elo,
         photoUrl: room.players[id].photoUrl,
         level: room.players[id].level,
+        equipped: room.players[id].equipped,
         timeouts: 0
     });
 
@@ -1278,7 +1279,7 @@ function handleDisconnect(ws) {
                         } else {
                             rooms.delete(ws.roomCode);
                         }
-                    }, 5000); // 5 saniye (Daha hızlı tepki için düşürüldü)
+                    }, 1000); // 1 saniye (Hızlı tepki)
                 }
             }
         }
@@ -1309,82 +1310,11 @@ function handleTurnTimeout(roomCode) {
     const currentPlayerId = gs.currentPlayer;
     const player = gs.players[currentPlayerId];
     
-    // Timeout kontrolü
-    player.timeouts = (player.timeouts || 0) + 1;
-    if (player.timeouts >= 2) {
-        console.log(`⏰ ${player.name} 2. kez AFK kaldı. Oyun bitiriliyor.`);
-        const winnerId = Object.keys(gs.players).find(id => id !== currentPlayerId);
-        gs.winner = winnerId; // Döngüyü durdurmak için
-        handleMatchEnd(roomCode, winnerId, gs, 'afk');
-        return;
-    }
-
-    broadcastToRoom(roomCode, {
-        type: 'gameMessage',
-        messageKey: 'afkWarning', // Mesaj anahtarı gönder
-        params: { name: player.name, timeouts: player.timeouts }, // Parametreler gönder
-        duration: 4000
-    });
-
-    console.log(`⏰ ${player.name} için süre doldu! Otomatik işlem yapılıyor...`);
-
-    // 1. Oynanabilir taş var mı?
-    let validMove = null;
-    
-    // Eldeki taşları kontrol et
-    for (let i = 0; i < player.hand.length; i++) {
-        const tile = player.hand[i];
-        if (gs.board.length === 0) {
-            validMove = { tile, index: i, position: 'left' };
-            break;
-        }
-        
-        const leftEnd = gs.board[0][0];
-        const rightEnd = gs.board[gs.board.length - 1][1];
-        
-        if (tile[0] === leftEnd || tile[1] === leftEnd) {
-            validMove = { tile, index: i, position: 'left' };
-            break;
-        }
-        if (tile[0] === rightEnd || tile[1] === rightEnd) {
-            validMove = { tile, index: i, position: 'right' };
-            break;
-        }
-    }
-
-    if (validMove) {
-        // Hamle yap
-        const success = playTileOnBoard(validMove.tile, gs.board, validMove.position);
-        if (success) {
-            player.hand.splice(validMove.index, 1);
-            gs.moves = (gs.moves || 0) + 1;
-            
-            // Kazanan kontrolü
-            const winner = checkWinner(gs);
-            if (winner) {
-                processRoundWinner(roomCode, winner, gs);
-                return;
-            }
-            
-            // Sıra değiştir
-            nextTurn(roomCode, currentPlayerId);
-            return;
-        }
-    }
-
-    // 2. Oynanacak taş yoksa pazar kontrolü
-    if (gs.market && gs.market.length > 0) {
-        const drawnTile = gs.market.shift(); // Pazardan bir taş çek
-        player.hand.push(drawnTile); // Oyuncunun eline ekle
-        console.log(`⏰ (Auto) ${player.name} pazardan taş çekti: [${drawnTile}]`);
-        // Çektikten sonra sıra otomatik olarak geçer (hızlı oyun için)
-        nextTurn(roomCode, currentPlayerId);
-        return;
-    }
-
-    // 3. Pazar boşsa pas geç
-    console.log(`⏰ (Auto) ${player.name} pas geçti (pazar boş).`);
-    nextTurn(roomCode, currentPlayerId);
+    // Süre dolunca direkt bitir
+    console.log(`⏰ ${player.name} süre doldu. Oyun bitiriliyor.`);
+    const winnerId = Object.keys(gs.players).find(id => id !== currentPlayerId);
+    gs.winner = winnerId; // Döngüyü durdurmak için
+    handleMatchEnd(roomCode, winnerId, gs, 'timeout');
 }
 
 const PORT = process.env.PORT || 10000;
