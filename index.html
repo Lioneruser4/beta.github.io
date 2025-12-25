@@ -352,7 +352,10 @@
 
         // 4. Level Badge (Dynamic Colors & PRO Animation)
         const LevelBadge = ({ level }) => {
-            const lvl = parseInt(level);
+            if (level === 'PRO') {
+                return <span className="neon-pro text-white border-red-500 px-3 py-1 rounded-full text-[10px] font-black tracking-tighter shadow-sm flex items-center justify-center min-w-[50px] uppercase">PRO</span>;
+            }
+            const lvl = parseInt(level) || 1;
             let colors = "bg-sky-400 text-white"; // 1-3
             let label = `LVL ${lvl}`;
 
@@ -360,9 +363,6 @@
                 colors = "bg-yellow-500 text-black";
             } else if (lvl >= 7 && lvl < 10) {
                 colors = "bg-red-600 text-white";
-            } else if (lvl >= 10) {
-                colors = "neon-pro text-white border-red-500";
-                label = "PRO";
             }
 
             return (
@@ -507,6 +507,14 @@
             const [calculationTimer, setCalculationTimer] = useState(8);
             const [showAdmin, setShowAdmin] = useState(false);
 
+            // Level Calculation Helper
+            const calculateLevel = (elo) => {
+                if (elo <= 100) return 1;
+                let lvl = Math.ceil((elo - 100) / 100) + 1;
+                if (lvl >= 10) return 'PRO';
+                return lvl;
+            };
+
             const [playerId, setPlayerId] = useState(null);
             const wsRef = useRef(null);
             const searchTimerRef = useRef(null);
@@ -544,7 +552,8 @@
                     you: "Siz",
                     handTotal: "Elindeki Taşların Toplamı",
                     winnerAnnouncing: "Kazanan açıklanıyor...",
-                    noValidMove: "Geçerli hamle yok, otomatik pas geçildi"
+                    noValidMove: "Geçerli hamle yok, otomatik pas geçildi",
+                    roundSystem: "Raund Sistemi: 3-5 (2 Farkla Qazanmaq)"
                 },
                 en: {
                     ranked: "Ranked",
@@ -577,7 +586,8 @@
                     you: "You",
                     handTotal: "Total Points in Hand",
                     winnerAnnouncing: "Winner announcing...",
-                    noValidMove: "No valid move, auto-passed"
+                    noValidMove: "No valid move, auto-passed",
+                    roundSystem: "Round System: 3-5 (Win by 2)"
                 }
             };
 
@@ -911,6 +921,19 @@
                         const amIWinner = (winnerId && winnerId !== 'DRAW' && winnerId === myId);
 
                         const endReason = data.reason || null;
+
+                        // Update Local Player Data (ELO & Level) Instantly
+                        if (playerData && !playerData.isGuest && data.isRanked) {
+                            const change = amIWinner ? (data.eloChanges?.winner || 0) : (data.eloChanges?.loser || 0);
+                            const newElo = Math.max(0, playerData.elo + change);
+                            const newLevel = calculateLevel(newElo);
+                            
+                            setPlayerData(prev => ({
+                                ...prev,
+                                elo: newElo,
+                                level: newLevel
+                            }));
+                        }
 
                         setEndInfo({
                             isWinner: amIWinner,
@@ -1347,6 +1370,10 @@
                     <div className="text-center mb-16">
                         <h2 className="text-4xl font-black text-yellow-500 animate-pulse">{t.opponentFound}</h2>
                         <p className="text-white/40 mt-2 uppercase tracking-[0.3em]">{t.matchStarting}</p>
+                    </div>
+
+                    <div className="absolute top-24 bg-white/10 px-6 py-2 rounded-full border border-white/20 backdrop-blur-md animate-pulse">
+                        <span className="text-yellow-400 font-bold text-sm tracking-wider uppercase">{t.roundSystem}</span>
                     </div>
 
                     <div className="flex items-center gap-4 sm:gap-12 w-full max-w-2xl px-4">
