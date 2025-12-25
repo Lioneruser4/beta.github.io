@@ -506,6 +506,8 @@
             const [calculationLobby, setCalculationLobby] = useState(null);
             const [calculationTimer, setCalculationTimer] = useState(8);
             const [showAdmin, setShowAdmin] = useState(false);
+            const prevBoardLength = useRef(0);
+            const isMyMove = useRef(false);
 
             // Level Calculation Helper
             const calculateLevel = (elo) => {
@@ -650,6 +652,8 @@
                 setJoinCode('');
                 setCalculationLobby(null);
                 setCalculationTimer(8);
+                prevBoardLength.current = 0;
+                isMyMove.current = false;
             };
 
             // Ses Efektleri (Opsiyonel - Tarayıcı izin verirse çalışır)
@@ -708,6 +712,22 @@
                     }
                 }
             }, [gameState, isMyTurn, screen]);
+
+            // Rakip Hamle Sesi Kontrolü
+            useEffect(() => {
+                if (!gameState) return;
+                const currentLen = gameState.board.length;
+                
+                // Tahtadaki taş sayısı arttıysa
+                if (currentLen > prevBoardLength.current) {
+                    // Ve hamleyi ben yapmadıysam (isMyMove false ise)
+                    if (!isMyMove.current) {
+                        playSound('place');
+                    }
+                    isMyMove.current = false; // Bayrağı sıfırla
+                }
+                prevBoardLength.current = currentLen;
+            }, [gameState]);
 
             // Telegram Auth
             const initializeTelegramAuth = async () => {
@@ -845,7 +865,7 @@
                     wsUrl = `ws://${window.location.hostname}:10000`;
                 }
 
-                const ws = new WebSocket(wsUrl);
+                const ws = new WebSocket(`${wsUrl}?lang=${language}`);
 
                 ws.onopen = () => {
                     setConnected(true);
@@ -895,6 +915,7 @@
                             }));
                             setScreen('game');
                             setSearching(false);
+                            prevBoardLength.current = data.gameState.board.length;
                             if (data.type === 'gameStart') {
                                 playSound('start');
                                 showNotification('Oyun Başladı!', 'success');
@@ -1179,6 +1200,7 @@
             const playTile = (position) => {
                 if (selectedTileIndex === null) return;
                 const posToSend = position === 'start' ? 'left' : position;
+                isMyMove.current = true; // Hamleyi benim yaptığımı işaretle (ses tekrar çalmasın diye)
                 sendMessage({
                     type: 'playTile',
                     tileIndex: selectedTileIndex,
@@ -1200,45 +1222,6 @@
                 }
             };
 
-            // Pas butonu render fonksiyonu
-            const renderPassButton = () => {
-                if (!isMyTurn) return null;
-                
-                const myHand = gameState?.players[myPlayerId]?.hand || [];
-                const marketSize = gameState?.market?.length || 0;
-                
-                // Sadece pazarda taş varsa ve geçerli hamle yoksa pass butonu göster
-                if (marketSize > 0) {
-                    let hasValidMove = false;
-                    for (const tile of myHand) {
-                        const moves = calculateValidMoves(tile);
-                        if (moves.length > 0) {
-                            hasValidMove = true;
-                            break;
-                        }
-                    }
-                    
-                    if (!hasValidMove) {
-                        return (
-                            <button 
-                                onClick={() => {
-                                    sendMessage({ type: 'passTurn' });
-                                    playSound('pass');
-                                }}
-                                className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-1 rounded-full text-xs font-bold shadow-glow flex items-center gap-1"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
-                                </svg>
-                                {t.passTurn}
-                            </button>
-                        );
-                    }
-                }
-                
-                return null;
-            };
-
             // Odaya katılma işlemi
             const handleJoinRoom = () => {
                 if (!joinCode.trim()) {
@@ -1249,7 +1232,8 @@
                 sendMessage({ 
                     type: 'joinRoom', 
                     roomCode: joinCode, 
-                    ...playerData 
+                    ...playerData,
+                    language
                 });
             };
 
@@ -1308,7 +1292,7 @@
                         <button onClick={() => {
                             setScreen('searching');
                             setSearching(true);
-                            sendMessage({ type: 'findMatch', ...playerData });
+                            sendMessage({ type: 'findMatch', ...playerData, language });
                         }} className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-4 rounded-2xl mb-4 transition-all transform active:scale-95 shadow-lg flex items-center justify-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" />
@@ -1317,7 +1301,7 @@
                         </button>
 
                         <div className="flex flex-col gap-3">
-                            <button onClick={() => sendMessage({ type: 'createRoom', ...playerData })} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
+                            <button onClick={() => sendMessage({ type: 'createRoom', ...playerData, language })} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                     <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM14 11a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1v-1a1 1 0 011-1z" />
                                 </svg>
@@ -1629,8 +1613,6 @@
                                         </button>
                                     ) : null
                                 )}
-                                
-                                {renderPassButton()}
                                 
                                 <button
                                     onClick={leaveGameClient}
