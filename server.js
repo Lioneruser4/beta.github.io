@@ -82,11 +82,11 @@ function calculateElo(winnerElo, loserElo, winnerLevel) {
     };
 }
 
-// Level Calculation - User requested shifts
+// Level Hesaplama - Her 100 puan için 1 seviye
 function calculateLevel(elo) {
-    if (elo < 200) return 1; // 0-199 is Level 1
-    let lvl = Math.floor(elo / 100); // 200-299 = 2, 300-399 = 3...
-    return Math.min(10, lvl); // Max Level 10
+    if (elo <= 0) return 1;
+    // 1-100 = Seviye 1, 101-200 = Seviye 2, ..., 901+ = Seviye 10
+    return Math.min(10, Math.max(1, Math.ceil(elo / 100)));
 }
 
 // API Endpoints
