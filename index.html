@@ -1359,7 +1359,7 @@
             );
 
             if (screen === 'game') return (
-                <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden" style={{ paddingTop: '60px' }}>
+                <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden">
                     {notification && <Toast message={notification.message} type={notification.type} />}
 
                     <GameTimer startTime={gameState.turnStartTime} />
@@ -1374,36 +1374,45 @@
                         </div>
                     )}
 
-                    {/* Header - 60px aşağıda */}
-                    <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-6 bg-black/40 backdrop-blur-md z-30">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full border-2 border-white/20 overflow-hidden">
-                                {opponent?.photoUrl ? <img src={opponent.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 flex items-center justify-center">👤</div>}
+                    {/* Rakip Bilgileri - Üstte sabit */}
+                    <div className="relative z-30 bg-black/60 backdrop-blur-md border-b border-white/10">
+                        <div className="flex items-center justify-between p-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full border-2 border-yellow-500/50 overflow-hidden bg-slate-800">
+                                    {opponent?.photoUrl ? (
+                                        <img src={opponent.photoUrl} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-white/70">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                                            </svg>
+                                        </div>
+                                    )}
+                                </div>
+                                <div>
+                                    <div className="text-white font-bold text-sm">{opponent?.name || opponent?.username || 'Rakip'}</div>
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-yellow-400 text-xs font-bold">Lv.{opponent?.level || 1}</span>
+                                        <span className="text-white/30">•</span>
+                                        <span className="text-white/60 text-xs">{gameState?.players[opponentPlayerId]?.elo || 0} ELO</span>
+                                        {opponent?.telegramId === '976640409' && <span className="owner-badge px-1 rounded text-[8px] font-black ml-1">OWNER</span>}
+                                    </div>
+                                </div>
                             </div>
-                            <div className="flex flex-col">
-                                <div className="text-white font-bold text-sm leading-none">{opponent?.name || opponent?.username || 'Rakip'}</div>
-                                <div className="text-white/60 text-xs flex items-center gap-1">
-                                    <span>{gameState?.players[opponentPlayerId]?.elo || 0} ELO</span>
-                                    {opponent?.telegramId === '976640409' && <span className="owner-badge px-1 rounded text-[8px] font-black">OWNER</span>}
+                            <div className="flex items-center gap-2">
+                                <div className="text-white/80 text-sm font-medium bg-black/40 px-3 py-1 rounded-full border border-white/10">
+                                    {opponentHand.length} taş
                                 </div>
                             </div>
                         </div>
                         
-                        <div className="text-white text-sm font-bold bg-black/30 px-3 py-1 rounded-full">
-                            {opponentHand.length} taş
-                        </div>
-                    </div>
-
-                    <div className="h-16 flex items-center justify-center bg-black/20 z-20 mt-16">
-                        <div className="opponent-hand">
-                            {opponentHand.map((_, idx) => (
-                                <DominoTile 
-                                    key={idx} 
-                                    values={[0, 0]} 
-                                    isOpponent={true}
-                                    disabled={true}
-                                />
-                            ))}
+                        {/* Rakip Taşları */}
+                        <div className="px-3 pb-2">
+                            <div className="flex justify-center gap-1 flex-wrap">
+                                {Array(opponentHand.length).fill(0).map((_, i) => (
+                                    <div key={i} className="w-3 h-5 bg-gray-800/80 rounded-sm border border-gray-700/50" />
+                                ))}
+                            </div>
                         </div>
                     </div>
 
