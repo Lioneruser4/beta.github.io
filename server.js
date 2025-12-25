@@ -24,7 +24,7 @@ const playerSchema = new mongoose.Schema({
     lastName: { type: String },
     photoUrl: { type: String },
     elo: { type: Number, default: 0 },
-    level: { type: Number, default: 1 },
+    level: { type: mongoose.Schema.Types.Mixed, default: 1 },
     wins: { type: Number, default: 0 },
     losses: { type: Number, default: 0 },
     draws: { type: Number, default: 0 },
@@ -61,6 +61,67 @@ const matchQueue = [];
 const playerConnections = new Map();
 const playerSessions = new Map(); // telegramId -> player data
 
+// Translations
+const translations = {
+    en: {
+        connected: 'Connected to server',
+        alreadyInQueue: 'Already in queue',
+        alreadyInGame: 'Already in a game',
+        telegramInQueue: 'This Telegram account is already in queue',
+        searchingOpponent: 'Searching for opponent...',
+        searchCancelled: 'Search cancelled',
+        roomCodeRequired: 'Room code required',
+        roomNotFound: 'Room not found',
+        roomFull: 'Room is full',
+        notYourTurn: 'Not your turn',
+        invalidMove: 'Invalid move',
+        hasPlayableTile: 'You have playable tiles, cannot draw!',
+        cantPlayDrawn: 'Drawn tile cannot be played, draw again or wait',
+        gameNotFound: 'Game not found or expired',
+        playerNotInRoom: 'Player not in room',
+        hasValidMoves: 'You have valid moves!',
+        draw: 'Draw',
+        gameClosed: 'Game Over! Calculating scores...',
+        yourScore: 'Your score',
+        opponentScore: 'Opponent score',
+        youWon: 'You Won!',
+        youLost: 'You Lost!',
+        turnPassed: 'Turn passed',
+        opponent: 'Opponent'
+    },
+    az: {
+        connected: 'Serverə qoşuldunuz',
+        alreadyInQueue: 'Artıq növbədəsiniz',
+        alreadyInGame: 'Artıq oyundasınız',
+        telegramInQueue: 'Bu Telegram hesabı artıq növbədədir',
+        searchingOpponent: 'Rəqib axtarılır...',
+        searchCancelled: 'Axtarış ləğv edildi',
+        roomCodeRequired: 'Otaq kodu tələb olunur',
+        roomNotFound: 'Otaq tapılmadı',
+        roomFull: 'Otaq doludur',
+        notYourTurn: 'Növbə sizdə deyil',
+        invalidMove: 'Bu gediş yalnışdır (Mövqe uyğun gəlmir)',
+        hasPlayableTile: 'Əlinizdə oynana bilən daş var, bazardan götürə bilməzsiniz!',
+        cantPlayDrawn: 'Daş oynana bilmir, yenidən götürün və ya gözləyin',
+        gameNotFound: 'Oyun tapılmadı və ya vaxtı bitib',
+        playerNotInRoom: 'Bu oyunçu otağa aid deyil',
+        hasValidMoves: 'Oynaya biləcəyiniz gedişlər var!',
+        draw: 'Heç-heçə',
+        gameClosed: 'Oyun Bağlandı! Xallar hesablanır...',
+        yourScore: 'Sənin xalın',
+        opponentScore: 'Rəqibin xalı',
+        youWon: 'Qazandın!',
+        youLost: 'Uduzdun!',
+        turnPassed: 'Növbə keçdi',
+        opponent: 'Rəqib'
+    }
+};
+
+function getMsg(lang, key) {
+    const l = (lang && translations[lang]) ? lang : 'en';
+    return translations[l][key] || translations['en'][key] || key;
+}
+
 // ELO Calculation - Win-based system
 function calculateElo(winnerElo, loserElo, winnerLevel) {
     // Random points between 13-20 for levels 1-5
@@ -84,9 +145,10 @@ function calculateElo(winnerElo, loserElo, winnerLevel) {
 
 // Level Calculation - User requested shifts
 function calculateLevel(elo) {
-    if (elo < 200) return 1; // 0-199 is Level 1
-    let lvl = Math.floor(elo / 100); // 200-299 = 2, 300-399 = 3...
-    return Math.min(10, lvl); // Max Level 10
+    if (elo <= 100) return 1;
+    let lvl = Math.ceil((elo - 100) / 100) + 1;
+    if (lvl >= 10) return 'PRO';
+    return lvl;
 }
 
 // API Endpoints
@@ -539,7 +601,10 @@ wss.on('connection', (ws, req) => {
     });
 
     ws.on('close', () => handleDisconnect(ws));
-    sendMessage(ws, { type: 'connected', message: 'Sunucuya bağlandınız' });
+    
+    const urlParams = new URLSearchParams(req.url.split('?')[1]);
+    ws.language = urlParams.get('lang') || 'en';
+    sendMessage(ws, { type: 'connected', message: getMsg(ws.language, 'connected') });
 });
 
 const pingInterval = setInterval(() => {
@@ -555,13 +620,14 @@ wss.on('close', () => clearInterval(pingInterval));
 // --- OYUN MANTIKLARI ---
 
 function handleFindMatch(ws, data) {
+    ws.language = data.language || ws.language || 'en';
     if (ws.playerId && playerConnections.has(ws.playerId)) {
         const existingInQueue = matchQueue.find(p => p.playerId === ws.playerId);
         if (existingInQueue) {
-            return sendMessage(ws, { type: 'error', message: 'Zaten kuyrukta bekliyorsunuz' });
+            return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'alreadyInQueue') });
         }
         if (ws.roomCode) {
-            return sendMessage(ws, { type: 'error', message: 'Zaten bir oyundasınız' });
+            return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'alreadyInGame') });
         }
     }
 
@@ -578,7 +644,7 @@ function handleFindMatch(ws, data) {
     if (!ws.isGuest && ws.telegramId) {
         const sameTelegramInQueue = matchQueue.find(p => p.telegramId === ws.telegramId);
         if (sameTelegramInQueue) {
-            return sendMessage(ws, { type: 'error', message: 'Bu Telegram hesabı zaten eşleşme kuyruğunda' });
+            return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'telegramInQueue') });
         }
     }
 
@@ -660,7 +726,7 @@ function handleFindMatch(ws, data) {
             console.log(`✅ Oyun başladı: ${roomCode}`);
         }, 4000); // 4 saniye
     } else {
-        sendMessage(ws, { type: 'searchStatus', message: 'Rakip aranıyor...' });
+        sendMessage(ws, { type: 'searchStatus', message: getMsg(ws.language, 'searchingOpponent') });
     }
 }
 
@@ -669,13 +735,14 @@ function handleCancelSearch(ws) {
     if (index !== -1) {
         matchQueue.splice(index, 1);
         console.log(`❌ ${ws.playerName} aramayı iptal etti - Kalan: ${matchQueue.length}`);
-        sendMessage(ws, { type: 'searchCancelled', message: 'Arama iptal edildi' });
+        sendMessage(ws, { type: 'searchCancelled', message: getMsg(ws.language, 'searchCancelled') });
     }
 }
 
 function handleCreateRoom(ws, data) {
     const roomCode = generateRoomCode(); // generateRoomCode already returns uppercase
     ws.playerName = data.playerName || data.username || 'Guest';
+    ws.language = data.language || ws.language || 'en';
     ws.roomCode = roomCode;
 
     // Host data with full profile
@@ -700,11 +767,12 @@ function handleCreateRoom(ws, data) {
 }
 
 function handleJoinRoom(ws, data) {
-    if (!data.roomCode) return sendMessage(ws, { type: 'error', message: 'Oda kodu gerekli' });
+    ws.language = data.language || ws.language || 'en';
+    if (!data.roomCode) return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'roomCodeRequired') });
     const code = data.roomCode.trim().toUpperCase();
     const room = rooms.get(code);
 
-    if (!room) return sendMessage(ws, { type: 'error', message: 'Oda bulunamadı' });
+    if (!room) return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'roomNotFound') });
     if (room.host === ws.playerId) {
         // If host is reconnecting or refreshing
         if (room.players[ws.playerId]) {
@@ -720,7 +788,7 @@ function handleJoinRoom(ws, data) {
         // If host trying to join as second player, allow it for testing
         // return sendMessage(ws, { type: 'error', message: 'Kendi odanıza bağlanamazsınız' });
     }
-    if (Object.keys(room.players).length >= 2) return sendMessage(ws, { type: 'error', message: 'Oda dolu' });
+    if (Object.keys(room.players).length >= 2) return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'roomFull') });
 
     const pid = ws.playerId || generateRoomCode();
     ws.playerId = pid;
@@ -774,7 +842,7 @@ function handlePlayTile(ws, data) {
     if (!room || !room.gameState) return;
 
     const gs = room.gameState;
-    if (gs.currentPlayer !== ws.playerId) return sendMessage(ws, { type: 'error', message: 'Sıra sizde değil' });
+    if (gs.currentPlayer !== ws.playerId) return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'notYourTurn') });
 
     const player = gs.players[ws.playerId];
     const tile = player.hand[data.tileIndex];
@@ -785,7 +853,7 @@ function handlePlayTile(ws, data) {
     const success = playTileOnBoard(tile, gs.board, data.position);
 
     if (!success) {
-        return sendMessage(ws, { type: 'error', message: 'Bu hamle geçersiz (Pozisyon uyuşmuyor)' });
+        return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'invalidMove') });
     }
 
     player.hand.splice(data.tileIndex, 1);
@@ -798,6 +866,24 @@ function handlePlayTile(ws, data) {
         gs.turn++;
         gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
         gs.turnStartTime = Date.now();
+
+        // AUTO PASS LOGIC
+        const nextPlayerId = gs.currentPlayer;
+        const nextPlayer = gs.players[nextPlayerId];
+        const canNextPlay = nextPlayer.hand.some(t => canPlayTile(t, gs.board));
+        
+        if (!canNextPlay && gs.market.length === 0) {
+            console.log(`⏩ ${nextPlayer.name} otomatik pas geçiliyor (Hamle yok, pazar boş)`);
+            broadcastToRoom(ws.roomCode, { type: 'turnPassed', playerName: nextPlayer.name });
+            
+            gs.turn++;
+            gs.currentPlayer = Object.keys(gs.players).find(id => id !== nextPlayerId);
+            gs.turnStartTime = Date.now();
+
+            const blockedWinner = checkWinner(gs);
+            if (blockedWinner) return handleGameEnd(ws.roomCode, blockedWinner, gs);
+        }
+
         Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
     }
 }
@@ -917,24 +1003,40 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
             console.log(`🎮 CASUAL Maç bitti: ${isDraw ? 'Beraberlik' : gameState.players[winnerId].name + ' kazandı'}`);
         }
 
-        broadcastToRoom(roomCode, {
-            type: 'gameEnd',
-            winner: String(winnerId),
-            winnerName: isDraw ? 'Beraberlik' : (gameState.players[winnerId]?.name || 'Rakip'),
-            isRanked: isRankedMatch,
-            eloChanges: eloChanges ? {
-                winner: eloChanges.winnerChange,
-                loser: eloChanges.loserChange
-            } : null
+        // Send localized game end message
+        Object.keys(room.players).forEach(pid => {
+            const pWs = playerConnections.get(pid);
+            if (pWs && pWs.readyState === WebSocket.OPEN) {
+                const lang = pWs.language || 'en';
+                const winnerName = isDraw ? getMsg(lang, 'draw') : (gameState.players[winnerId]?.name || getMsg(lang, 'opponent'));
+                
+                pWs.send(JSON.stringify({
+                    type: 'gameEnd',
+                    winner: String(winnerId),
+                    winnerName: winnerName,
+                    isRanked: isRankedMatch,
+                    eloChanges: eloChanges ? {
+                        winner: eloChanges.winnerChange,
+                        loser: eloChanges.loserChange
+                    } : null
+                }));
+            }
         });
         rooms.delete(roomCode);
     } catch (error) {
         console.error('❌ Game end error:', error);
-        broadcastToRoom(roomCode, {
-            type: 'gameEnd',
-            winner: winnerId,
-            winnerName: winnerId === 'DRAW' ? 'Beraberlik' : gameState.players[winnerId].name,
-            isRanked: false
+        // Fallback for error case
+        Object.keys(room.players).forEach(pid => {
+            const pWs = playerConnections.get(pid);
+            if (pWs && pWs.readyState === WebSocket.OPEN) {
+                const lang = pWs.language || 'en';
+                pWs.send(JSON.stringify({
+                    type: 'gameEnd',
+                    winner: winnerId,
+                    winnerName: winnerId === 'DRAW' ? getMsg(lang, 'draw') : gameState.players[winnerId].name,
+                    isRanked: false
+                }));
+            }
         });
         rooms.delete(roomCode);
     }
@@ -965,13 +1067,23 @@ function handlePass(ws) {
         const winnerId = playerScore <= opponentScore ? ws.playerId : opponentId;
         
         // Show scores to players for 8 seconds before ending game
-        broadcastToRoom(room.code, {
-            type: 'gameMessage',
-            message: `Oyun Kapalı! Puanlar hesaplanıyor...\n\n` +
-                    `Senin puanın: ${playerScore}\n` +
-                    `Rakibin puanı: ${opponentScore}\n\n` +
-                    `${winnerId === ws.playerId ? 'Kazandın!' : 'Kaybettin!'}`,
-            duration: 8000
+        Object.keys(room.players).forEach(pid => {
+            const pWs = playerConnections.get(pid);
+            if (pWs && pWs.readyState === WebSocket.OPEN) {
+                const lang = pWs.language || 'en';
+                const myScore = pid === ws.playerId ? playerScore : opponentScore;
+                const opScore = pid === ws.playerId ? opponentScore : playerScore;
+                const msgText = `${getMsg(lang, 'gameClosed')}\n\n` +
+                    `${getMsg(lang, 'yourScore')}: ${myScore}\n` +
+                    `${getMsg(lang, 'opponentScore')}: ${opScore}\n\n` +
+                    `${winnerId === pid ? getMsg(lang, 'youWon') : getMsg(lang, 'youLost')}`;
+                
+                pWs.send(JSON.stringify({
+                    type: 'gameMessage',
+                    message: msgText,
+                    duration: 8000
+                }));
+            }
         });
 
         // End the game after showing scores
@@ -1009,7 +1121,7 @@ function handlePass(ws) {
     if (canPlayAnyTile) {
         sendMessage(ws, {
             type: 'error',
-            message: 'Oynayabileceğiniz hamleler var!'
+            message: getMsg(ws.language, 'hasValidMoves')
         });
     }
 }
@@ -1019,14 +1131,14 @@ function handleDrawFromMarket(ws) {
     if (!room || !room.gameState) return;
 
     const gs = room.gameState;
-    if (gs.currentPlayer !== ws.playerId) return sendMessage(ws, { type: 'error', message: 'Sıra sizde değil' });
+    if (gs.currentPlayer !== ws.playerId) return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'notYourTurn') });
 
     const player = gs.players[ws.playerId];
 
     // Elinde oynanacak taş var mı kontrol et
     const canPlay = player.hand.some(tile => canPlayTile(tile, gs.board));
     if (canPlay && gs.board.length > 0) {
-        return sendMessage(ws, { type: 'error', message: 'Elinizde oynanabilir taş var, pazardan çekemezsiniz!' });
+        return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'hasPlayableTile') });
     }
 
     // Pazarda taş var mı?
@@ -1056,7 +1168,7 @@ function handleDrawFromMarket(ws) {
 
         if (!hasPlayable && gs.market.length > 0) {
             // Hala oynanabilir taş yok ve pazar doluysa, oyuncu tekrar çekebilir
-            sendMessage(ws, { type: 'info', message: 'Taş oynanamıyor, tekrar çekin veya bekleyin' });
+            sendMessage(ws, { type: 'info', message: getMsg(ws.language, 'cantPlayDrawn') });
         } else if (!hasPlayable && gs.market.length === 0) {
             // Pazar bitti ve hala oynanabilir taş yok - sıra geç
             console.log(`❌ ${player.name} oynanabilir taş bulamadı - Sıra geçiyor`);
@@ -1081,15 +1193,16 @@ function handleDrawFromMarket(ws) {
 
 function handleRejoin(ws, data) {
     const { playerId, roomCode } = data;
+    ws.language = data.language || ws.language || 'en';
     if (!playerId || !roomCode) return;
 
     const room = rooms.get(roomCode);
     if (!room || !room.gameState) {
-        return sendMessage(ws, { type: 'error', message: 'Oyun bulunamadı veya süresi dolmuş' });
+        return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'gameNotFound') });
     }
 
     if (!room.players[playerId]) {
-        return sendMessage(ws, { type: 'error', message: 'Bu oyuncu odaya ait değil' });
+        return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'playerNotInRoom') });
     }
 
     // Reattach
