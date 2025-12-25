@@ -640,8 +640,22 @@ function handleJoinRoom(ws, data) {
     const room = rooms.get(code);
 
     if (!room) return sendMessage(ws, { type: 'error', message: 'Oda bulunamadı' });
+    if (room.host === ws.playerId) {
+        // If host is reconnecting or refreshing
+        if (room.players[ws.playerId]) {
+            // Update existing player connection
+            room.players[ws.playerId].ws = ws;
+            return sendMessage(ws, { 
+                type: 'roomJoined', 
+                roomCode: code, 
+                isHost: true,
+                opponent: Object.values(room.players).find(p => p.telegramId !== ws.telegramId)
+            });
+        }
+        // If host trying to join as second player, allow it for testing
+        // return sendMessage(ws, { type: 'error', message: 'Kendi odanıza bağlanamazsınız' });
+    }
     if (Object.keys(room.players).length >= 2) return sendMessage(ws, { type: 'error', message: 'Oda dolu' });
-    if (room.host === ws.playerId) return sendMessage(ws, { type: 'error', message: 'Kendi odanıza bağlanamazsınız' });
 
     const pid = ws.playerId || generateRoomCode();
     ws.playerId = pid;
