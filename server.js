@@ -941,36 +941,44 @@ async function handleGameEnd(roomCode, winnerId, gameState) {
 }
 
 function handlePass(ws) {
-    // ws nesnesi zaten oyuncu bilgilerini taşıyor
     if (!ws || !ws.roomCode) return;
 
     const room = rooms.get(ws.roomCode);
     if (!room || room.gameState.currentPlayer !== ws.playerId) return;
 
-    // Check if player can actually pass (no valid moves)
     const playerHand = room.gameState.players[ws.playerId].hand;
-    const canPlayAnyTile = playerHand.some(tile => 
-        canPlayTile(tile, room.gameState.board)
-    );
-
-    // If market is empty and no valid moves, end the game
-    if (room.gameState.market.length === 0 && !canPlayAnyTile) {
-        // Calculate scores
-        const opponentId = Object.keys(room.gameState.players).find(id => id !== ws.playerId);
+    const opponentId = Object.keys(room.gameState.players).find(id => id !== ws.playerId);
+    const opponentHand = room.gameState.players[opponentId]?.hand || [];
+    
+    // Check if player has any valid moves
+    const canPlayAnyTile = playerHand.some(tile => canPlayTile(tile, room.gameState.board));
+    
+    // If market is empty and no valid moves, or if both players passed consecutively
+    if ((room.gameState.market.length === 0 && !canPlayAnyTile) || 
+        (room.gameState.lastPassedPlayer === opponentId && room.gameState.consecutivePasses >= 1)) {
+        
+        // Calculate scores (sum of all pips in hand)
         const playerScore = playerHand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
-        const opponentHand = room.gameState.players[opponentId].hand;
         const opponentScore = opponentHand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
         
-        // Determine winner (player with lower score wins)
-        const winnerId = playerScore <= opponentScore ? ws.playerId : opponentId;
+        // Player with lower score wins
+        let winnerId;
+        if (playerScore < opponentScore) {
+            winnerId = ws.playerId;
+        } else if (opponentScore < playerScore) {
+            winnerId = opponentId;
+        } else {
+            // If scores are equal, the player who made the last move wins
+            winnerId = ws.playerId;
+        }
         
-        // Show scores to players for 8 seconds before ending game
+        // Show game over message
         broadcastToRoom(room.code, {
             type: 'gameMessage',
-            message: `Oyun Kapalı! Puanlar hesaplanıyor...\n\n` +
+            message: `Oyun Bitti!\n\n` +
                     `Senin puanın: ${playerScore}\n` +
                     `Rakibin puanı: ${opponentScore}\n\n` +
-                    `${winnerId === ws.playerId ? 'Kazandın!' : 'Kaybettin!'}`,
+                    `${winnerId === ws.playerId ? 'Kazandın! 🎉' : 'Kaybettin!'}`,
             duration: 8000
         });
 
@@ -989,29 +997,28 @@ function handlePass(ws) {
         
         // Check if the drawn tile can be played
         if (!canPlayTile(drawnTile, room.gameState.board)) {
-            // If still can't play, switch to next player
-            const opponentId = Object.keys(room.gameState.players).find(id => id !== ws.playerId);
+            // If still can't play, switch to next player and increment consecutive passes
             room.gameState.currentPlayer = opponentId;
             room.gameState.turnStartTime = Date.now();
+            room.gameState.lastPassedPlayer = ws.playerId;
+            room.gameState.consecutivePasses = (room.gameState.consecutivePasses || 0) + 1;
             
             // Play pass sound
             broadcastToRoom(room.code, {
                 type: 'playSound',
                 sound: 'pass'
             });
+        } else {
+            // Reset consecutive passes if player could play the drawn tile
+            room.gameState.consecutivePasses = 0;
         }
         
         sendGameState(room.code);
         return;
     }
-
-    // If player can play but chooses to pass
-    if (canPlayAnyTile) {
-        sendMessage(ws, {
-            type: 'error',
-            message: 'Oynayabileceğiniz hamleler var!'
-        });
-    }
+    
+    // If we reach here, it means the player could have played but passed (shouldn't happen with auto-pass)
+    console.warn(`Player ${ws.playerId} tried to pass but has valid moves`);
 }
 
 function handleDrawFromMarket(ws) {
@@ -1131,54 +1138,75 @@ function handleLeaveGame(ws) {
     // playerId bağlantı için dursun ama aktif oda ilişkisi kalmasın
 }
 
-function handleDisconnect(ws) {
-    console.log(`🔌 Oyuncu ayrıldı: ${ws.playerName || 'Bilinmeyen'}`);
-
-    if (ws.playerId) playerConnections.delete(ws.playerId);
-
-    const qIdx = matchQueue.findIndex(p => p.ws === ws);
-    if (qIdx !== -1) {
-        matchQueue.splice(qIdx, 1);
-        console.log(`❌ Kuyruktan çıkarıldı - Kalan: ${matchQueue.length}`);
-    }
-
-    if (ws.roomCode) {
-        const room = rooms.get(ws.roomCode);
-        if (room) {
-            console.log(`🏠 Oyuncu odadan ayrıldı: ${ws.playerName} (${ws.roomCode})`);
-            
-            // Oyun başlamışsa ve oyuncu oyundaysa
-            if (room.gameState) {
-                // Diğer oyuncuyu bul
-                const otherPlayerId = Object.keys(room.players).find(id => id !== ws.playerId);
-                
-                // Eğer diğer oyuncu hala bağlıysa, oyunu bitir
-                if (otherPlayerId && room.players[otherPlayerId]) {
-                    console.log(`🏆 Oyun sonlandırılıyor: ${room.players[otherPlayerId].name} kazandı (rakip ayrıldı)`);
-                    handleGameEnd(ws.roomCode, otherPlayerId, room.gameState);
-                } else {
-                    // İki oyuncu da ayrılmış, odayı temizle
-                    console.log(`🗑️ Her iki oyuncu da ayrıldı, oda temizleniyor: ${ws.roomCode}`);
-                    rooms.delete(ws.roomCode);
                 }
-            } else {
-                // Oyun başlamamışsa, odayı hemen sil
-                console.log(`🚪 Oyun başlamadan oyuncu ayrıldı, oda kaldırılıyor: ${ws.roomCode}`);
-                rooms.delete(ws.roomCode);
+                
+                // 15 saniye bekle ve bağlanmazsa oyunu bitir
+                setTimeout(() => {
+                    if (room.players[ws.playerId] && !room.players[ws.playerId].ws) {
+                        // Bağlantı hala yoksa oyunu bitir
+                        const winner = Object.values(room.players).find(p => p.telegramId !== ws.telegramId);
+                        
+                        if (winner) {
+                            // Sadece sunucu güncellemesi değilse ELO değişikliği yap
+                            if (!isServerUpdating) {
+                                // ELO değişikliklerini hesapla ve uygula
+                                const winnerElo = winner.elo || 1000;
+                                const loserElo = player.elo || 1000;
+                                
+                                const { newWinnerElo, newLoserElo } = calculateElo(winnerElo, loserElo);
+                                
+                                // Veritabanını güncelle
+                                updatePlayerElo(winner.telegramId, newWinnerElo, 1, 0, 0);
+                                updatePlayerElo(ws.playerId, newLoserElo, 0, 1, 0);
+                                
+                                // Oyun sonucunu kaydet
+                                saveMatchResult(winner.telegramId, ws.playerId, newWinnerElo, newLoserElo);
+                            }
+                            
+                            // Oyunu bitir
+                            room.gameState.winner = winner.telegramId;
+                            
+                            // Diğer oyuncuya kazandığını bildir
+                            if (winner.ws) {
+                                winner.ws.send(JSON.stringify({
+                                    type: 'gameEnd',
+                                    winner: winner.telegramId,
+                                    reason: 'Rakibiniz zamanında bağlanamadığı için oyunu kazandınız.',
+                                    isServerUpdate: isServerUpdating
+                                }));
+                            }
+                            
+                            // Oyunu temizle
+                            setTimeout(() => {
+                                rooms.delete(room.roomCode);
+                            }, 10000);
+                        }
+                    }
+                }, 15000); // 15 saniye bekleme süresi
             }
         }
     }
 }
 
-// --- TIMEOUT KONTROLÜ ---
-
 setInterval(() => {
     rooms.forEach((room, roomCode) => {
         if (!room.gameState || !room.gameState.turnStartTime || room.gameState.winner) return;
         
-        // 30 saniye süre
-        const TURN_LIMIT = 30000;
+        // 25 saniye süre
+        const TURN_LIMIT = 25000; // 25 saniye
         const elapsed = Date.now() - room.gameState.turnStartTime;
+        const timeLeft = Math.max(0, Math.ceil((TURN_LIMIT - elapsed) / 1000));
+        
+        // Tüm oyunculara güncel süreyi gönder
+        Object.values(room.players).forEach(player => {
+            if (player.ws && player.ws.readyState === WebSocket.OPEN) {
+                player.ws.send(JSON.stringify({
+                    type: 'timeUpdate',
+                    timeLeft: timeLeft,
+                    isMyTurn: room.gameState.currentPlayer === player.telegramId
+                }));
+            }
+        });
         
         if (elapsed > TURN_LIMIT) {
             handleTurnTimeout(roomCode);
@@ -1186,10 +1214,27 @@ setInterval(() => {
     });
 }, 1000);
 
+// AFK ve bağlantı durumlarını yönet
+const PLAYER_STATES = {
+    ACTIVE: 'active',
+    AFK: 'afk',
+    DISCONNECTED: 'disconnected'
+};
+
+// Oyun sunucusu güncelleme kontrolü
+let isServerUpdating = false;
+
 // AFK sayacını tutmak için oda başına
 function getOrCreateAfkCounter(room, playerId) {
     if (!room.afkCounters) room.afkCounters = {};
-    if (!room.afkCounters[playerId]) room.afkCounters[playerId] = 0;
+    if (!room.afkCounters[playerId]) {
+        room.afkCounters[playerId] = {
+            count: 0,
+            state: PLAYER_STATES.ACTIVE,
+            disconnectTime: null,
+            lastActionTime: Date.now()
+        };
+    }
     return room.afkCounters[playerId];
 }
 
