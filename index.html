@@ -783,6 +783,7 @@
             const [boardOffset, setBoardOffset] = useState({ x: 0, y: 0 });
             const [touchStart, setTouchStart] = useState(null);
             const [lastTouch, setLastTouch] = useState(null);
+            const [lastDistance, setLastDistance] = useState(0);
             const boardContainerRef = useRef(null);
 
             // Reconnection & Session Management
@@ -1241,9 +1242,16 @@
                 <div className="flex flex-col items-center justify-center min-h-screen p-6">
                     {notification && <Toast message={notification.message} type={notification.type} />}
                     
-                    {/* Admin Button */}
+                    {/* Admin Button - Moved down by 5cm */}
                     {playerData?.telegramId === '976640409' && (
-                        <button onClick={() => setShowAdmin(true)} className="absolute top-4 right-4 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl font-black shadow-lg z-50 text-xs tracking-widest border border-purple-400">ADMIN PANEL</button>
+                        <div className="absolute top-[5cm] right-4 z-50">
+                            <button 
+                                onClick={() => setShowAdmin(true)} 
+                                className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white px-5 py-2.5 rounded-xl font-black shadow-lg text-xs tracking-widest border border-purple-400/50 transition-all duration-300 transform hover:scale-105"
+                            >
+                                ADMIN PANEL
+                            </button>
+                        </div>
                     )}
                     {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} adminId={playerData.telegramId} />}
 
@@ -1391,84 +1399,122 @@
                         </div>
                     )}
 
-                    {/* Rakip Bilgileri - Üstte sabit */}
-                    <div className="relative z-30 bg-gradient-to-r from-black/80 to-gray-900/80 backdrop-blur-md border-b border-yellow-500/20">
-                        <div className="flex items-center justify-between p-3">
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-full border-2 border-yellow-500/50 overflow-hidden bg-slate-800">
-                                    {opponent?.photoUrl ? (
-                                        <img src={opponent.photoUrl} className="w-full h-full object-cover" alt="Profil" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-gray-700 text-white/70">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                                            </svg>
-                                        </div>
-                                    )}
-                                </div>
-                                <div>
-                                    <div className="text-white font-bold text-lg">{opponent?.name || opponent?.username || 'Rakip'}</div>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-yellow-400 text-sm font-bold bg-black/40 px-2 py-0.5 rounded">Lv.{opponent?.level || 1}</span>
-                                        <span className="text-white/40">•</span>
-                                        <span className="text-white/80 text-sm">{gameState?.players[opponentPlayerId]?.elo || 0} ELO</span>
-                                        {opponent?.telegramId === '976640409' && (
-                                            <span className="ml-1 bg-gradient-to-r from-yellow-500 to-yellow-700 text-white text-xs font-black px-2 py-0.5 rounded-full">
-                                                OWNER
-                                            </span>
+                    {/* Opponent Info Bar - Fixed at top */}
+                    <div className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-r from-black/90 to-gray-900/90 backdrop-blur-sm border-b border-yellow-500/20 shadow-lg">
+                        <div className="container mx-auto px-2">
+                            <div className="flex items-center justify-between py-1">
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <div className="w-10 h-10 rounded-full border-2 border-yellow-500/50 overflow-hidden flex-shrink-0">
+                                        {opponent?.photoUrl ? (
+                                            <img src={opponent.photoUrl} className="w-full h-full object-cover" alt="Profil" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-gray-700 text-white/70">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                                                </svg>
+                                            </div>
                                         )}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="text-white font-bold text-sm truncate">{opponent?.name || opponent?.username || 'Rakip'}</div>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-yellow-400 text-xs font-bold bg-black/40 px-1.5 py-0.5 rounded">Lv.{opponent?.level || 1}</span>
+                                            <span className="text-yellow-500 text-xs">•</span>
+                                            <span className="text-white/80 text-xs">{gameState?.players[opponentPlayerId]?.elo || 0} ELO</span>
+                                            {opponent?.telegramId === '976640409' && (
+                                                <span className="bg-gradient-to-r from-yellow-500 to-yellow-700 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full ml-1">
+                                                    OWNER
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center">
+                                    <div className="text-white text-xs font-bold bg-yellow-600/50 px-3 py-1 rounded-full border border-yellow-500/30 whitespace-nowrap">
+                                        {opponentHand.length} TAŞ
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <div className="text-white text-sm font-bold bg-yellow-600/40 px-4 py-1.5 rounded-full border border-yellow-500/30">
-                                    {opponentHand.length} TAŞ
+                            
+                            {/* Opponent Tiles */}
+                            {opponentHand.length > 0 && (
+                                <div className="px-2 pb-1.5">
+                                    <div className="flex justify-center gap-1 flex-wrap">
+                                        {Array(opponentHand.length).fill(0).map((_, i) => (
+                                            <div key={i} className="w-3 h-5 bg-gradient-to-b from-gray-700 to-gray-800 rounded-sm border border-gray-600/50 shadow-inner" />
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                        
-                        {/* Rakip Taşları */}
-                        <div className="px-3 pb-2">
-                            <div className="flex justify-center gap-1.5 flex-wrap">
-                                {Array(opponentHand.length).fill(0).map((_, i) => (
-                                    <div key={i} className="w-3.5 h-6 bg-gradient-to-b from-gray-700 to-gray-800 rounded-sm border border-gray-600/50 shadow-inner" />
-                                ))}
-                            </div>
+                            )}
                         </div>
                     </div>
 
                     {/* Board Area */}
                     <div 
                         ref={boardContainerRef} 
-                        className="flex-1 relative cursor-grab active:cursor-grabbing overflow-hidden touch-none"
+                        className="flex-1 relative cursor-grab active:cursor-grabbing overflow-auto touch-auto"
+                        style={{ WebkitOverflowScrolling: 'touch' }}
                         onTouchStart={(e) => {
-                            const touch = e.touches[0];
-                            setTouchStart({ x: touch.clientX, y: touch.clientY });
-                            setLastTouch({ x: touch.clientX, y: touch.clientY });
-                            e.preventDefault();
+                            // Only handle single touch for panning
+                            if (e.touches.length === 1) {
+                                const touch = e.touches[0];
+                                setTouchStart({ x: touch.clientX, y: touch.clientY });
+                                setLastTouch({ x: touch.clientX, y: touch.clientY });
+                                e.stopPropagation();
+                            } else if (e.touches.length === 2) {
+                                // Handle pinch zoom
+                                const touch1 = e.touches[0];
+                                const touch2 = e.touches[1];
+                                const distance = Math.hypot(
+                                    touch2.pageX - touch1.pageX,
+                                    touch2.pageY - touch1.pageY
+                                );
+                                setLastDistance(distance);
+                            }
                         }}
                         onTouchMove={(e) => {
-                            if (!touchStart) return;
-                            const touch = e.touches[0];
-                            const deltaX = touch.clientX - lastTouch.x;
-                            const deltaY = touch.clientY - lastTouch.y;
-                            
-                            setBoardOffset(prev => ({
-                                x: prev.x + deltaX,
-                                y: prev.y + deltaY
-                            }));
-                            
-                            setLastTouch({ x: touch.clientX, y: touch.clientY });
-                            e.preventDefault();
+                            if (e.touches.length === 1 && touchStart) {
+                                // Handle panning
+                                const touch = e.touches[0];
+                                const deltaX = touch.clientX - lastTouch.x;
+                                const deltaY = touch.clientY - lastTouch.y;
+                                
+                                setBoardOffset(prev => ({
+                                    x: prev.x + deltaX,
+                                    y: prev.y + deltaY
+                                }));
+                                
+                                setLastTouch({ x: touch.clientX, y: touch.clientY });
+                                e.stopPropagation();
+                            } else if (e.touches.length === 2) {
+                                // Handle pinch zoom
+                                const touch1 = e.touches[0];
+                                const touch2 = e.touches[1];
+                                const distance = Math.hypot(
+                                    touch2.pageX - touch1.pageX,
+                                    touch2.pageY - touch1.pageY
+                                );
+                                
+                                if (lastDistance > 0) {
+                                    const scale = (distance - lastDistance) * 0.01;
+                                    setBoardScale(prev => Math.min(Math.max(0.5, prev + scale), 2));
+                                }
+                                setLastDistance(distance);
+                                e.preventDefault();
+                            }
                         }}
                         onTouchEnd={() => {
                             setTouchStart(null);
                             setLastTouch(null);
+                            setLastDistance(0);
                         }}
                         onWheel={(e) => {
-                            const delta = e.deltaY * -0.01;
-                            const newScale = Math.min(Math.max(0.5, boardScale + delta), 2);
-                            setBoardScale(newScale);
+                            // Zoom with ctrl + wheel or pinch
+                            if (e.ctrlKey || e.metaKey) {
+                                e.preventDefault();
+                                const delta = e.deltaY * -0.01;
+                                setBoardScale(prev => Math.min(Math.max(0.5, prev + delta), 2));
+                            }
                         }}
                     >
                         <div
