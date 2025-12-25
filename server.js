@@ -205,12 +205,77 @@ app.get('/api/admin/users', async (req, res) => {
 
         const users = await Player.find({})
             .sort({ elo: -1 })
-            .select('telegramId username firstName lastName elo level wins losses draws totalGames createdAt lastPlayed');
+            .select('telegramId username firstName lastName elo level wins losses draws totalGames createdAt lastPlayed isVisibleInLeaderboard');
             
         res.json({ success: true, users });
     } catch (error) {
         console.error('Admin users error:', error);
         res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+// Admin paneli için kullanıcı güncelleme
+app.post('/api/admin/update', async (req, res) => {
+    try {
+        const { adminId, targetId, updates } = req.body;
+        
+        // Yetki kontrolü
+        if (!adminId || adminId !== '976640409') {
+            return res.status(403).json({ success: false, error: 'Yetkisiz işlem' });
+        }
+
+        // Güncellenebilir alanlar
+        const allowedUpdates = ['elo', 'wins', 'losses', 'draws', 'level', 'isVisibleInLeaderboard'];
+        const updatesToApply = {};
+        
+        // Sadece izin verilen alanları güncelle
+        Object.keys(updates).forEach(key => {
+            if (allowedUpdates.includes(key)) {
+                updatesToApply[key] = updates[key];
+            }
+        });
+
+        // ELO değerini sayıya çevir
+        if (updatesToApply.elo) {
+            updatesToApply.elo = parseInt(updatesToApply.elo, 10);
+            if (isNaN(updatesToApply.elo)) {
+                return res.status(400).json({ success: false, error: 'Geçersiz ELO değeri' });
+            }
+        }
+
+        // Veritabanını güncelle
+        const updatedPlayer = await Player.findOneAndUpdate(
+            { _id: targetId },
+            { $set: updatesToApply },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedPlayer) {
+            return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
+        }
+
+        // Eğer oyuncu oyundaysa, oyun durumunu güncelle
+        const room = Array.from(rooms.values()).find(r => 
+            r.gameState && r.gameState.players && r.gameState.players[targetId]
+        );
+
+        if (room && room.gameState.players[targetId]) {
+            Object.assign(room.gameState.players[targetId], updatesToApply);
+            // Tüm oyunculara güncel durumu gönder
+            Object.keys(room.players).forEach(playerId => {
+                const playerWs = Array.from(playerConnections.values()).find(
+                    ws => ws.playerId === playerId
+                );
+                if (playerWs) {
+                    sendGameState(room.roomCode, playerId);
+                }
+            });
+        }
+
+        res.json({ success: true, player: updatedPlayer });
+    } catch (error) {
+        console.error('Admin update error:', error);
+        res.status(500).json({ success: false, error: 'Güncelleme sırasında hata oluştu' });
     }
 });
 
