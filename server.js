@@ -92,12 +92,42 @@ function calculateLevel(elo) {
 // API Endpoints
 app.post('/api/auth/telegram', async (req, res) => {
     try {
-        const { telegramId, username, firstName, lastName, photoUrl } = req.body;
+        const { telegramId, username, firstName, lastName, photoUrl, isGuest = false } = req.body;
 
         if (!telegramId || !username) {
             return res.status(400).json({ error: 'Telegram ID ve kullanıcı adı gerekli' });
         }
 
+        // Guest kullanıcılar için özel işlem
+        if (isGuest) {
+            const guestPlayer = {
+                telegramId,
+                username: `Misafir_${Math.floor(Math.random() * 10000)}`,
+                firstName: firstName || 'Misafir',
+                lastName: lastName || 'Oyuncu',
+                photoUrl: photoUrl || '',
+                isGuest: true,
+                elo: 0,
+                level: 1,
+                wins: 0,
+                losses: 0,
+                draws: 0,
+                totalGames: 0,
+                winStreak: 0,
+                bestWinStreak: 0
+            };
+            
+            // Guest kullanıcıyı sadece bellekte tut, veritabanına kaydetme
+            playerSessions.set(telegramId, guestPlayer);
+            
+            return res.json({
+                success: true,
+                isGuest: true,
+                player: guestPlayer
+            });
+        }
+
+        // Normal (kayıtlı) kullanıcı işlemleri
         let player = await Player.findOne({ telegramId });
 
         if (!player) {
@@ -106,7 +136,8 @@ app.post('/api/auth/telegram', async (req, res) => {
                 username,
                 firstName,
                 lastName,
-                photoUrl
+                photoUrl,
+                isGuest: false
             });
             await player.save();
             console.log(`🆕 Yeni oyuncu kaydedildi: ${username} (${telegramId})`);
@@ -117,6 +148,7 @@ app.post('/api/auth/telegram', async (req, res) => {
             player.lastName = lastName;
             player.photoUrl = photoUrl;
             player.lastPlayed = new Date();
+            player.isGuest = false; // Eğer guest'ten kayıtlıya geçtiyse
             await player.save();
         }
 
@@ -124,6 +156,7 @@ app.post('/api/auth/telegram', async (req, res) => {
 
         res.json({
             success: true,
+            isGuest: false,
             player: {
                 id: String(player._id),
                 telegramId: player.telegramId,
@@ -157,6 +190,26 @@ app.get('/api/leaderboard', async (req, res) => {
         res.json({ success: true, leaderboard: players });
     } catch (error) {
         console.error('Leaderboard error:', error);
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+// Admin paneli için tüm kullanıcıları listeleme
+app.get('/api/admin/users', async (req, res) => {
+    try {
+        // Basit bir güvenlik kontrolü
+        const authHeader = req.headers.authorization;
+        if (!authHeader || authHeader !== 'YOUR_ADMIN_SECRET') {
+            return res.status(403).json({ error: 'Yetkisiz erişim' });
+        }
+
+        const users = await Player.find({})
+            .sort({ elo: -1 })
+            .select('telegramId username firstName lastName elo level wins losses draws totalGames createdAt lastPlayed');
+            
+        res.json({ success: true, users });
+    } catch (error) {
+        console.error('Admin users error:', error);
         res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
@@ -1054,6 +1107,25 @@ setInterval(() => {
     });
 }, 1000);
 
+// AFK sayacını tutmak için oda başına
+function getOrCreateAfkCounter(room, playerId) {
+    if (!room.afkCounters) room.afkCounters = {};
+    if (!room.afkCounters[playerId]) room.afkCounters[playerId] = 0;
+    return room.afkCounters[playerId];
+}
+
+function incrementAfkCounter(room, playerId) {
+    if (!room.afkCounters) room.afkCounters = {};
+    room.afkCounters[playerId] = (room.afkCounters[playerId] || 0) + 1;
+    return room.afkCounters[playerId];
+}
+
+function resetAfkCounter(room, playerId) {
+    if (room.afkCounters && room.afkCounters[playerId]) {
+        room.afkCounters[playerId] = 0;
+    }
+}
+
 function handleTurnTimeout(roomCode) {
     const room = rooms.get(roomCode);
     if (!room || !room.gameState) return;
@@ -1062,7 +1134,27 @@ function handleTurnTimeout(roomCode) {
     const currentPlayerId = gs.currentPlayer;
     const player = gs.players[currentPlayerId];
     
-    console.log(`⏰ ${player.name} için süre doldu! Otomatik işlem yapılıyor...`);
+    if (!player) return;
+
+    // AFK sayacını artır
+    const afkCount = incrementAfkCounter(room, currentPlayerId);
+    console.log(`⏰ ${player.name} için süre doldu! (${afkCount}. kez)`);
+
+    // Eğer 3 kere üst üste zaman aşımına uğradıysa, oyuncu AFK kabul edilir
+    const MAX_AFK_COUNT = 3;
+    if (afkCount >= MAX_AFK_COUNT) {
+        console.log(`🚨 ${player.name} AFK kabul edildi! Oyun sonlandırılıyor...`);
+        
+        // Diğer oyuncuyu kazanan ilan et
+        const otherPlayerId = Object.keys(gs.players).find(id => id !== currentPlayerId);
+        if (otherPlayerId) {
+            handleGameEnd(roomCode, otherPlayerId, gs);
+        } else {
+            // Eğer diğer oyuncu yoksa odayı kapat
+            rooms.delete(roomCode);
+        }
+        return;
+    }
 
     // 1. Oynanabilir taş var mı?
     let validMove = null;
@@ -1102,10 +1194,13 @@ function handleTurnTimeout(roomCode) {
                 return;
             }
             
-            // Sıra değiştir
+            // Sıra değiştir ve AFK sayacını sıfırla
             gs.turn++;
             gs.currentPlayer = Object.keys(gs.players).find(id => id !== currentPlayerId);
             gs.turnStartTime = Date.now();
+            
+            // AFK sayacını sıfırla
+            resetAfkCounter(room, currentPlayerId);
             
             Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
             return;
@@ -1117,10 +1212,13 @@ function handleTurnTimeout(roomCode) {
         const drawnTile = gs.market.shift();
         player.hand.push(drawnTile);
         
-        // Çektikten sonra sıra geç (Hızlı oyun için)
+        // Çektikten sonra sıra geç ve AFK sayacını sıfırla
         gs.turn++;
         gs.currentPlayer = Object.keys(gs.players).find(id => id !== currentPlayerId);
         gs.turnStartTime = Date.now();
+        
+        // AFK sayacını sıfırla
+        resetAfkCounter(room, currentPlayerId);
         
         Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
         return;
@@ -1130,6 +1228,9 @@ function handleTurnTimeout(roomCode) {
     gs.turn++;
     gs.currentPlayer = Object.keys(gs.players).find(id => id !== currentPlayerId);
     gs.turnStartTime = Date.now();
+    
+    // AFK sayacını sıfırla
+    resetAfkCounter(room, currentPlayerId);
     
     Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
 }
