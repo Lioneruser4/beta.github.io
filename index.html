@@ -945,33 +945,69 @@
             };
 
             const connectToServer = () => {
-                // Always use Render WebSocket URL in production
+                // Clear any existing connection
+                if (wsRef.current) {
+                    wsRef.current.onclose = null; // Disable the old onclose handler
+                    wsRef.current.close();
+                }
+
+                // Always use Render WebSocket URL
                 const wsUrl = 'wss://beta-github-io.onrender.com';
-                console.log('Connecting to WebSocket server:', wsUrl);
+                console.log('🔄 Connecting to WebSocket server:', wsUrl);
+                
+                try {
+                    const ws = new WebSocket(wsUrl, ['wss']); // Specify WebSocket subprotocol
+                    
+                    ws.onopen = () => {
+                        console.log('✅ WebSocket connection established');
+                        setConnected(true);
+                        showNotification('Sunucuya bağlandı', 'success');
+                        
+                        // Rejoin if session exists
+                        const session = JSON.parse(localStorage.getItem('domino_session') || 'null');
+                        if (session) {
+                            console.log('📡 Attempting to restore previous session...');
+                            ws.send(JSON.stringify({
+                                type: 'reconnect',
+                                sessionId: session.sessionId
+                            }));
+                        }
+                    };
 
-                const ws = new WebSocket(wsUrl);
+                    ws.onclose = (event) => {
+                        console.log('❌ WebSocket connection closed:', event.code, event.reason);
+                        setConnected(false);
+                        
+                        // Don't show error if it's a normal closure
+                        if (event.code !== 1000) {
+                            showNotification('Bağlantı kesildi, yeniden bağlanılıyor...', 'error');
+                        }
+                        
+                        // Try to reconnect after a delay
+                        setTimeout(connectToServer, 3000);
+                    };
 
-                ws.onopen = () => {
-                    setConnected(true);
-                    showNotification('Sunucuya Bağlandı', 'success');
+                    ws.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        showNotification('Bağlantı hatası', 'error');
+                    };
 
-                    // Rejoin if session exists
-                    if (window._lastSession) {
-                        ws.send(JSON.stringify({
-                            type: 'rejoin',
-                            playerId: window._lastSession.playerId,
-                            roomCode: window._lastSession.roomCode
-                        }));
-                    }
-                };
-                ws.onclose = () => { setConnected(false); setTimeout(connectToServer, 3000); };
-                ws.onmessage = (e) => {
-                    try {
-                        const data = JSON.parse(e.data);
-                        handleServerMessage(data);
-                    } catch (err) { console.error(err); }
-                };
-                wsRef.current = ws;
+                    ws.onmessage = (e) => {
+                        try {
+                            const data = JSON.parse(e.data);
+                            console.log('📨 Server message:', data.type);
+                            handleServerMessage(data);
+                        } catch (err) {
+                            console.error('Error parsing message:', err, e.data);
+                        }
+                    };
+
+                    wsRef.current = ws;
+                } catch (error) {
+                    console.error('WebSocket connection error:', error);
+                    showNotification('Bağlantı hatası', 'error');
+                    setTimeout(connectToServer, 5000);
+                }
             };
 
             const handleServerMessage = (data) => {
