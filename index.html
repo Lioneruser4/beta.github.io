@@ -481,7 +481,77 @@
             );
         };
 
-        // --- ANA OYUN ---
+        // Raunt tablosu bileşeni
+            const RoundTable = () => {
+                return (
+                    <div className="fixed top-20 left-2 right-2 z-30 bg-black/80 backdrop-blur-md rounded-xl border border-yellow-500/30 p-3">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="text-yellow-400 text-xs font-black">{t.roundTable}</div>
+                            <button 
+                                onClick={() => setShowRoundTable(!showRoundTable)}
+                                className="text-white/50 hover:text-white text-xs"
+                            >
+                                {showRoundTable ? '▼' : '▲'}
+                            </button>
+                        </div>
+                        
+                        {showRoundTable && (
+                            <div className="grid grid-cols-3 gap-2 text-xs">
+                                <div className="text-center">
+                                    <div className="text-white/60">{t.round}</div>
+                                    <div className="text-white font-bold">{roundInfo.currentRound}/{roundInfo.maxRounds}</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-blue-400">{t.player}</div>
+                                    <div className="text-white font-bold">{roundInfo.playerWins}</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-red-400">{t.opponent}</div>
+                                    <div className="text-white font-bold">{roundInfo.opponentWins}</div>
+                                </div>
+                            </div>
+                        )}
+                        
+                        <div className="flex justify-center mt-2 gap-1">
+                            {Array.from({ length: roundInfo.maxRounds }, (_, i) => (
+                                <div 
+                                    key={i}
+                                    className={`w-2 h-2 rounded-full ${
+                                        i < roundInfo.currentRound - 1 
+                                            ? roundInfo.roundScores[i] === 'player' 
+                                                ? 'bg-blue-500' 
+                                                : 'bg-red-500'
+                                            : i === roundInfo.currentRound - 1
+                                                ? 'bg-yellow-400 animate-pulse'
+                                                : 'bg-white/20'
+                                    }`}
+                                />
+                            ))}
+                        </div>
+                        
+                        <div className="flex justify-center mt-2 text-xs">
+                            <div className="text-yellow-400 font-bold">{t.winsByTwo}</div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // Raunt timer bileşeni
+            const RoundTimer = ({ isPlayer }) => {
+                return (
+                    <div className={`absolute ${isPlayer ? 'bottom-20 right-4' : 'top-32 right-4'} z-30 bg-black/80 backdrop-blur-md rounded-lg border border-yellow-500/30 p-2 min-w-[60px]`}>
+                        <div className="text-center">
+                            <div className="text-yellow-400 text-xs font-black">{isPlayer ? t.player : t.opponent}</div>
+                            <div className={`text-2xl font-bold ${isPlayer ? 'text-blue-400' : 'text-red-400'}`}>
+                                {roundTimer}
+                            </div>
+                            <div className="text-white/50 text-xs">{t.timeLeft}</div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // --- ANA OYUN ---
 
         const DominoGame = () => {
             const [screen, setScreen] = useState('loading'); // loading, lobby, searching, game, calculation, end
@@ -506,6 +576,17 @@
             const [calculationLobby, setCalculationLobby] = useState(null);
             const [calculationTimer, setCalculationTimer] = useState(8);
             const [showAdmin, setShowAdmin] = useState(false);
+            
+            // Raunt sistemi için state'ler
+            const [roundInfo, setRoundInfo] = useState({
+                currentRound: 1,
+                maxRounds: 5,
+                playerWins: 0,
+                opponentWins: 0,
+                roundScores: []
+            });
+            const [roundTimer, setRoundTimer] = useState(25);
+            const [showRoundTable, setShowRoundTable] = useState(true);
 
             const [playerId, setPlayerId] = useState(null);
             const wsRef = useRef(null);
@@ -544,7 +625,19 @@
                     you: "Siz",
                     handTotal: "Elindeki Taşların Toplamı",
                     winnerAnnouncing: "Kazanan açıklanıyor...",
-                    noValidMove: "Geçerli hamle yok, otomatik pas geçildi"
+                    noValidMove: "Geçerli hamle yok, otomatik pas geçildi",
+                    round: "RAUNT",
+                    rounds: "RAUNTLAR",
+                    score: "SKOR",
+                    player: "OYUNCU",
+                    opponent: "RAKİP",
+                    roundTable: "RAUNT TABLOSU",
+                    timeLeft: "KALAN SÜRE",
+                    gameEnds: "OYUN BİTER",
+                    winsByTwo: "2 FARKLA KAZANIR",
+                    newRound: "YENİ RAUNT",
+                    roundWinner: "RAUNTI KAZANDI",
+                    gameWinner: "OYUNU KAZANDI"
                 },
                 en: {
                     ranked: "Ranked",
@@ -577,7 +670,19 @@
                     you: "You",
                     handTotal: "Total Points in Hand",
                     winnerAnnouncing: "Winner announcing...",
-                    noValidMove: "No valid move, auto-passed"
+                    noValidMove: "No valid move, auto-passed",
+                    round: "ROUND",
+                    rounds: "ROUNDS",
+                    score: "SCORE",
+                    player: "PLAYER",
+                    opponent: "OPPONENT",
+                    roundTable: "ROUND TABLE",
+                    timeLeft: "TIME LEFT",
+                    gameEnds: "GAME ENDS",
+                    winsByTwo: "WINS BY 2",
+                    newRound: "NEW ROUND",
+                    roundWinner: "WON THE ROUND",
+                    gameWinner: "WON THE GAME"
                 }
             };
 
@@ -587,6 +692,16 @@
             useEffect(() => {
                 if (playerData?.id) setPlayerId(String(playerData.id));
             }, [playerData]);
+
+            // Raunt timer'ı
+            useEffect(() => {
+                if (roundTimer > 0 && screen === 'game') {
+                    const timer = setTimeout(() => {
+                        setRoundTimer(prev => prev - 1);
+                    }, 1000);
+                    return () => clearTimeout(timer);
+                }
+            }, [roundTimer, screen]);
 
             // Hesaplama lobisi timer
             useEffect(() => {
@@ -1386,6 +1501,13 @@
             if (screen === 'game') return (
                 <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden">
                     {notification && <Toast message={notification.message} type={notification.type} />}
+
+                    {/* Raunt Tablosu */}
+                    <RoundTable />
+                    
+                    {/* Raunt Timer'ları */}
+                    <RoundTimer isPlayer={true} />
+                    <RoundTimer isPlayer={false} />
 
                     <GameTimer startTime={gameState.turnStartTime} />
 
