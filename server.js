@@ -1282,9 +1282,13 @@ function handleLeaveGame(ws) {
 
 // 15 saniye bekle ve bağlanmazsa oyunu bitir
 setTimeout(() => {
+    // Odayı bul
+    const room = rooms[ws.roomCode];
+    if (!room || !room.players) return;
+    
     if (room.players[ws.playerId] && !room.players[ws.playerId].ws) {
         // Bağlantı hala yoksa oyunu bitir
-        const winner = Object.values(room.players).find(p => p.telegramId !== ws.telegramId);
+        const winner = Object.values(room.players).find(p => p.playerId !== ws.playerId);
         
         if (winner) {
             // Sadece sunucu güncellemesi değilse ELO değişikliği yap
