@@ -520,38 +520,51 @@
             }, [startTime, duration]);
 
             return (
-                <div className={`flex flex-col items-center justify-center p-1 rounded-lg border transition-all duration-300 ${isMyTurn ? 'bg-blue-500/30 border-blue-400 shadow-lg scale-110' : 'bg-white/5 border-white/10'}`}>
-                    <span className={`text-[12px] font-black ${isMyTurn ? 'text-blue-400' : (timeLeft < 10 ? 'text-red-500' : 'text-white/60')}`}>{timeLeft}</span>
-                    <div className="w-10 h-1 bg-white/10 rounded-full mt-1 overflow-hidden">
-                        <div
-                            className={`h-full transition-all duration-300 ${timeLeft < 10 ? 'bg-red-500 animate-pulse' : 'bg-yellow-500'}`}
-                            style={{ width: `${(timeLeft / (duration / 1000 || 30)) * 100}%` }}
-                        ></div>
-                    </div>
+                <div className="fixed top-0 left-0 right-0 h-1.5 z-[110] bg-black/20 overflow-hidden">
+                    <div
+                        className={`h-full transition-all duration-300 ${isMyTurn ? 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)]' : (timeLeft < 10 ? 'bg-red-500 animate-pulse' : 'bg-yellow-500')}`}
+                        style={{ width: `${(timeLeft / (duration / 1000 || 25)) * 100}%` }}
+                    ></div>
                 </div>
             );
         };
 
         const AnnouncementPopup = ({ message, onClose }) => {
-            if (!message) return null;
+            const [isVisible, setIsVisible] = useState(false);
+
+            useEffect(() => {
+                const isClosed = localStorage.getItem('announcement_closed');
+                if (!isClosed && message) {
+                    setIsVisible(true);
+                }
+            }, [message]);
+
+            if (!isVisible || !message) return null;
+
+            const handleClose = () => {
+                localStorage.setItem('announcement_closed', 'true');
+                setIsVisible(false);
+                onClose();
+            };
+
             return (
-                <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-md animate-slide-up">
-                    <div className="bg-gradient-to-r from-purple-900/90 to-indigo-900/90 backdrop-blur-xl border-2 border-purple-500/50 rounded-2xl p-4 shadow-2xl relative overflow-hidden group">
+                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-md animate-slide-up">
+                    <div className="bg-gradient-to-r from-purple-900/90 to-indigo-900/90 backdrop-blur-xl border-2 border-purple-500/50 rounded-2xl p-5 shadow-2xl relative overflow-hidden group">
                         <div className="absolute inset-0 bg-white/5 animate-pulse"></div>
                         <div className="flex items-start gap-3 relative z-10">
-                            <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center border border-purple-500/30 flex-shrink-0">
-                                <span className="text-xl">📢</span>
+                            <div className="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center border border-purple-500/30 flex-shrink-0">
+                                <span className="text-2xl animate-bounce">📢</span>
                             </div>
                             <div className="flex-1">
                                 <div className="text-purple-300 text-[10px] font-black tracking-widest uppercase mb-1">ADMİN DUYURUSU</div>
-                                <div className="text-white text-sm font-medium leading-relaxed">{message}</div>
+                                <div className="text-white text-sm font-bold leading-relaxed">{message}</div>
                             </div>
                         </div>
                         <button
-                            onClick={onClose}
-                            className="absolute bottom-2 right-2 w-7 h-7 bg-black/40 hover:bg-red-600/80 text-white rounded-lg flex items-center justify-center transition-all border border-white/10 group-hover:scale-110"
+                            onClick={handleClose}
+                            className="bg-purple-600 hover:bg-purple-500 text-white w-full mt-4 py-2 rounded-xl font-black text-xs tracking-widest transition-all active:scale-95 shadow-lg"
                         >
-                            <span className="text-xs font-bold">X</span>
+                            ANLADIM
                         </button>
                     </div>
                 </div>
@@ -776,6 +789,22 @@
                 let lvl = Math.floor(elo / 100);
                 if (lvl >= 10) return 'PRO';
                 return lvl;
+            };
+
+            const [localMicEnabled, setLocalMicEnabled] = useState(false);
+            const [localSpeakerEnabled, setLocalSpeakerEnabled] = useState(false);
+            const speakingToastShown = useRef(new Set());
+
+            const toggleMic = () => {
+                const newState = !localMicEnabled;
+                setLocalMicEnabled(newState);
+                sendMessage({ type: 'updateAudioStatus', audioType: 'mic', enabled: newState });
+            };
+
+            const toggleSpeaker = () => {
+                const newState = !localSpeakerEnabled;
+                setLocalSpeakerEnabled(newState);
+                sendMessage({ type: 'updateAudioStatus', audioType: 'speaker', enabled: newState });
             };
 
             const [playerId, setPlayerId] = useState(null);
@@ -1230,20 +1259,17 @@
                         }
 
                         setEndInfo({
-                            title: endTitle,
+                            title: 'OYUN BİTDİ',
                             isWinner: amIWinner,
                             isRanked: data.isRanked,
                             reason: endReason,
+                            players: data.players || [], // All players from server
                             winner: {
+                                id: data.winner,
                                 name: data.winnerName,
                                 photo: data.winnerPhoto,
                                 eloChange: data.eloChanges?.winner || 0
                             },
-                            loser: {
-                                name: data.loserName,
-                                photo: data.loserPhoto,
-                                eloChange: data.eloChanges?.loser || 0
-                            }
                         });
 
                         setScreen('end');
@@ -1289,6 +1315,24 @@
                         break;
                     case 'broadcastMessage':
                         setAnnouncement(data.message);
+                        break;
+                    case 'audioStatusUpdate':
+                        setGameState(prev => {
+                            if (!prev || !prev.players) return prev;
+                            const newPlayers = { ...prev.players };
+                            if (newPlayers[data.playerId]) {
+                                newPlayers[data.playerId].micEnabled = data.micEnabled;
+                                newPlayers[data.playerId].speakerEnabled = data.speakerEnabled;
+                            }
+                            return { ...prev, players: newPlayers };
+                        });
+                        break;
+                    case 'voiceSignal':
+                        if (localSpeakerEnabled && !speakingToastShown.current.has(data.from)) {
+                            const speakerName = gameState?.players[data.from]?.username || 'Rakip';
+                            showNotification(`${speakerName} danışır...`, 'info');
+                            speakingToastShown.current.add(data.from);
+                        }
                         break;
                     case 'gameMessage':
                         setServerMessage(data);
@@ -1878,7 +1922,7 @@
                     )}
 
                     {/* Top Bar - Opponents and Turn Info */}
-                    <div className="fixed top-[85px] left-0 right-0 z-40 bg-black/80 backdrop-blur-md border-b border-yellow-500/20 shadow-lg">
+                    <div className="fixed top-1.5 left-0 right-0 z-40 bg-black/80 backdrop-blur-md border-b border-yellow-500/20 shadow-lg">
                         <div className="flex items-center justify-between px-4 py-2.5 gap-2">
                             {/* Player Profiles */}
                             <div className="flex-1 flex justify-center -space-x-4 overflow-visible items-center">
@@ -1930,23 +1974,33 @@
                                                         {(gameState?.players[p.id]?.micEnabled) ? <span className="text-[8px] bg-green-500 rounded-full w-2 h-2 border border-black animate-pulse"></span> : <span className="text-[8px] bg-red-500 rounded-full w-2 h-2 border border-black"></span>}
                                                     </div>
                                                 </div>
-                                                {!p.isMe && (
-                                                    <div className="flex gap-0.5 mt-1.5 justify-center max-w-[60px] flex-wrap">
-                                                        {Array(p.handCount).fill(0).map((_, i) => (
-                                                            <div key={i} className="w-1.5 h-2.5 bg-gray-300 rounded-[2px] border border-black/20"></div>
-                                                        ))}
-                                                    </div>
-                                                )}
                                             </div>
 
-                                            <div className="flex flex-col">
+                                            <div className="flex flex-col min-w-[80px]">
                                                 <div className="flex items-center gap-1.5">
                                                     <span className={`text-white font-black text-xs uppercase ${p.activeTurn ? 'text-yellow-400' : ''}`}>{p.isMe ? 'SİZ' : p.name}</span>
                                                     <LevelBadge level={p.level} />
                                                 </div>
-                                                <div className={`mt-1 bg-black/40 px-2 py-0.5 rounded-full flex items-center gap-1.5 border ${p.isMe ? 'border-blue-500/30' : 'border-yellow-500/30'}`}>
+                                                <div className={`mt-1 bg-black/40 px-2 py-0.5 rounded-full flex items-center gap-1.5 border ${p.isMe ? 'border-blue-500/30' : 'border-yellow-500/30'} w-max`}>
                                                     <span className={`${p.isMe ? 'text-blue-400' : 'text-yellow-400'} text-[10px] font-black`}>{p.score} / 101</span>
                                                 </div>
+
+                                                {/* Rakip Taslari - Isim Altinda ve Dinamik Boyutlu */}
+                                                {!p.isMe && (
+                                                    <div className="flex gap-0.5 mt-2 flex-wrap max-w-[120px]">
+                                                        {Array(p.handCount).fill(0).map((_, i) => {
+                                                            const dynamicW = Math.max(3, 10 - (p.handCount * 0.4));
+                                                            const dynamicH = Math.max(5, 14 - (p.handCount * 0.5));
+                                                            return (
+                                                                <div
+                                                                    key={i}
+                                                                    className="bg-gray-100 rounded-[1px] border border-black/30 shadow-sm"
+                                                                    style={{ width: `${dynamicW}px`, height: `${dynamicH}px` }}
+                                                                ></div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {/* My Voice Controls */}
@@ -2168,51 +2222,48 @@
             }
 
             if (screen === 'end' && endInfo) return (
-                <div className="flex flex-col items-center justify-center min-h-screen bg-black/90 p-6 text-center">
-                    <h1 className="text-5xl font-black text-white mb-2">
-                        {endInfo.isWinner ? 'QAZANDINIZ!' : 'MƏĞLUB OLDUNUZ'}
-                    </h1>
-
-                    {endInfo.reason === 'disconnect' && <p className="text-yellow-400 mb-6 text-lg">Rəqib oyundan ayrıldı.</p>}
-                    {endInfo.reason === 'afk' && <p className="text-yellow-400 mb-6 text-lg">{endInfo.isWinner ? 'Rəqib AFK qaldı.' : 'AFK qaldığınız üçün məğlub oldunuz.'}</p>}
-                    {endInfo.reason === 'score_calculation' && <p className="text-yellow-400 mb-6 text-lg">En az puanı olan kazandı!</p>}
-                    {endInfo.reason === 'timeout' && <p className="text-yellow-400 mb-6 text-lg">{endInfo.isWinner ? 'Rəqibin vaxtı bitdi.' : 'Vaxtınız bitdi.'}</p>}
-
-                    <div className="w-full max-w-sm space-y-4 mt-4">
-                        {/* Winner Info */}
-                        <div className="flex items-center gap-4 p-4 bg-green-900/50 rounded-2xl border-2 border-green-500/50">
-                            <div className="relative">
-                                <img src={endInfo.winner.photo || 'https://via.placeholder.com/64'} className="w-16 h-16 rounded-full border-2 border-green-400" />
-                            </div>
-                            <div className="flex-1 text-left">
-                                <div className="text-white font-bold text-lg truncate">{endInfo.winner.name}</div>
-                                <div className="text-green-400 font-bold">{t.winner}</div>
-                            </div>
-                            {endInfo.isRanked && endInfo.winner.eloChange !== 0 && (
-                                <div className={`font-black text-xl ${endInfo.winner.eloChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                    {endInfo.winner.eloChange > 0 ? '+' : ''}{endInfo.winner.eloChange}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Loser Info */}
-                        <div className="flex items-center gap-4 p-4 bg-red-900/50 rounded-2xl border-2 border-red-500/50">
-                            <div className="relative">
-                                <img src={endInfo.loser.photo || 'https://via.placeholder.com/64'} className="w-16 h-16 rounded-full border-2 border-red-400" />
-                            </div>
-                            <div className="flex-1 text-left">
-                                <div className="text-white font-bold text-lg truncate">{endInfo.loser.name}</div>
-                                <div className="text-red-400 font-bold">{t.loser}</div>
-                            </div>
-                            {endInfo.isRanked && endInfo.loser.eloChange !== 0 && (
-                                <div className={`font-black text-xl ${endInfo.loser.eloChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                    {endInfo.loser.eloChange > 0 ? '+' : ''}{endInfo.loser.eloChange}
-                                </div>
-                            )}
-                        </div>
+                <div className="flex flex-col items-center justify-center min-h-screen bg-black/95 p-6 text-center animate-fade-in">
+                    <div className="mb-10">
+                        <h1 className="text-6xl font-black text-white italic tracking-tighter drop-shadow-glow">
+                            OYUN BİTDİ
+                        </h1>
+                        <div className="mt-2 text-yellow-500 font-black tracking-[0.3em] uppercase opacity-70">MAÇ SONUÇLARI</div>
                     </div>
 
-                    <div className="mt-12 text-white/30 animate-pulse">{t.returningLobby}</div>
+                    {endInfo.reason === 'disconnect' && <div className="bg-red-500/10 border border-red-500/30 px-6 py-2 rounded-full text-red-400 font-bold mb-8 animate-pulse">Rəqib oyundan ayrıldı (Hükmen Galibiyet)</div>}
+                    {endInfo.reason === 'afk' && <div className="bg-yellow-500/10 border border-yellow-500/30 px-6 py-2 rounded-full text-yellow-400 font-bold mb-8 animate-pulse">AFK Qaldığınız üçün oyun sonlandı</div>}
+
+                    <div className="w-full max-w-md space-y-3">
+                        {endInfo.players && endInfo.players.sort((a, b) => b.isWinner - a.isWinner).map((p, idx) => (
+                            <div key={idx} className={`flex items-center gap-4 p-4 rounded-3xl border-2 transition-all transform hover:scale-[1.02] ${p.isWinner ? 'bg-green-900/40 border-green-500/50 shadow-[0_0_30px_rgba(34,197,94,0.2)]' : 'bg-white/5 border-white/10 opacity-80'}`}>
+                                <div className="relative">
+                                    <img src={p.photo || 'https://via.placeholder.com/64'} className={`w-14 h-14 rounded-2xl object-cover border-2 ${p.isWinner ? 'border-green-400' : 'border-white/20'}`} />
+                                    {p.isWinner && <div className="absolute -top-2 -left-2 text-2xl animate-bounce">👑</div>}
+                                </div>
+                                <div className="flex-1 text-left">
+                                    <div className="text-white font-black text-lg truncate flex items-center gap-2">
+                                        {p.name}
+                                        {p.id === (playerId || playerData?.id) && <span className="bg-blue-500 text-[8px] px-1.5 py-0.5 rounded-full uppercase tracking-widest text-white">SİZ</span>}
+                                    </div>
+                                    <div className={`text-[10px] font-black uppercase tracking-widest ${p.isWinner ? 'text-green-400' : 'text-white/40'}`}>
+                                        {p.isWinner ? 'QALİB' : 'MƏĞLUB'} • {p.score} PUAN
+                                    </div>
+                                </div>
+                                {endInfo.isRanked && (
+                                    <div className={`font-black text-xl italic ${p.eloChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                        {p.eloChange > 0 ? '+' : ''}{p.eloChange}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="mt-12 flex flex-col items-center gap-4">
+                        <div className="text-white/20 text-[10px] font-bold uppercase tracking-[0.4em] animate-pulse">Lobiya qayıdılır...</div>
+                        <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
+                            <div className="h-full bg-yellow-500 animate-progress"></div>
+                        </div>
+                    </div>
                 </div>
             );
 
@@ -2239,16 +2290,19 @@
             );
 
             if (screen === 'leaderboard') return (
-                <div className="flex flex-col items-center justify-start min-h-screen pt-[150px] pb-8 px-8 bg-[#0b241c] overflow-y-auto relative">
-                    <button
-                        onClick={() => setScreen('lobby')}
-                        className="absolute top-10 left-6 w-12 h-12 flex items-center justify-center bg-white/10 rounded-2xl text-white text-2xl hover:bg-white/20 transition-all font-black border border-white/20"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </button>
-                    <h1 className="text-4xl font-black text-white mb-12 drop-shadow-glow">📊 LADERBOARD 📊</h1>
+                <div className="flex flex-col min-h-screen bg-[#0b241c] p-8 pb-20 overflow-y-auto">
+                    {/* Header: Back Button + Title (Moved 5cm Down) */}
+                    <div className="mt-[5cm] flex items-center gap-6 mb-12">
+                        <button
+                            onClick={() => setScreen('lobby')}
+                            className="bg-white/10 hover:bg-white/20 text-white w-14 h-14 rounded-2xl border-2 border-white/20 transition-all active:scale-95 flex items-center justify-center shadow-lg"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                        <h1 className="text-4xl font-black text-white italic tracking-tighter uppercase drop-shadow-glow">📊 LEADERBOARD 📊</h1>
+                    </div>
                     <div className="w-full max-w-xl space-y-4">
                         {leaderboard.map((p, i) => (
                             <div key={i} className={`flex items-center gap-4 p-5 rounded-3xl border transition-all ${i < 3 ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-white/5 border-white/10'}`}>
