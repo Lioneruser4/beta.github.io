@@ -63,7 +63,6 @@ const Broadcast = mongoose.model('DominoBroadcast', broadcastSchema);
 
 const reportSchema = new mongoose.Schema({
     reporterId: { type: String, required: true },
-    reporterName: { type: String },
     reportedId: { type: String, required: true },
     reportedName: { type: String },
     reason: { type: String, required: true },
@@ -207,16 +206,11 @@ app.post('/api/auth/telegram', async (req, res) => {
         }
 
         // Ban Kontrolü
-        let banDetails = null;
         const ban = await Ban.findOne({ telegramId });
         if (ban) {
             if (!ban.expiresAt || ban.expiresAt > new Date()) {
-                // Banlı olsa bile girişe izin ver, ancak ban bilgisini döndür
-                banDetails = {
-                    reason: ban.reason || 'Belirtilmedi',
-                    expiresAt: ban.expiresAt,
-                    isBanned: true
-                };
+                const timeLeft = ban.expiresAt ? `Bitiş: ${ban.expiresAt.toLocaleString()}` : 'Süresiz';
+                return res.status(403).json({ success: false, message: `YASAKLANDINIZ! Sebep: ${ban.reason || 'Yok'}. ${timeLeft}` });
             } else {
                 await Ban.deleteOne({ _id: ban._id }); // Ban süresi dolmuş
             }
@@ -264,8 +258,7 @@ app.post('/api/auth/telegram', async (req, res) => {
                 wins: player.wins,
                 losses: player.losses,
                 totalGames: player.totalGames
-            },
-            ban: banDetails // Ban bilgisini cliente gönder
+            }
         });
     } catch (error) {
         console.error('Auth error:', error);
@@ -372,11 +365,11 @@ app.post('/api/admin/unban', async (req, res) => {
 
 app.post('/api/report', async (req, res) => {
     try {
-        const { reporterId, reporterName, reportedId, reportedName, reason } = req.body;
+        const { reporterId, reportedId, reportedName, reason } = req.body;
         if (!reporterId || !reportedId || !reason) return res.status(400).json({ success: false });
 
         const newReport = new Report({
-            reporterId, reporterName, reportedId, reportedName, reason
+            reporterId, reportedId, reportedName, reason
         });
         await newReport.save();
         res.json({ success: true });
@@ -647,8 +640,7 @@ function initializeGame(roomCode, ...playerIds) {
             score: room.players[pid].score || 0, // Önceki raundlardan gelen skoru koru
             photoUrl: room.players[pid].photoUrl,
             level: room.players[pid].level,
-            elo: room.players[pid].elo,
-            telegramId: room.players[pid].telegramId
+            elo: room.players[pid].elo
         };
         currentIndex++;
     });
@@ -698,7 +690,7 @@ function initializeGame(roomCode, ...playerIds) {
         turn: 1,
         lastMove: null,
         turnStartTime: Date.now(),
-        turnTimeLimit: 25000 // Oyun içi zaman 25 saniye
+        turnTimeLimit: 25000
     };
 
     rooms.set(roomCode, room);
@@ -777,53 +769,36 @@ function checkWinner(gameState) {
         }
 
         if (!anyoneCanPlay) {
-            // Oyun kilitlendi, 101 kuralına göre kazanan belirlenir
+            // Oyun kilitlendi, elindeki taşların toplamı en az olan kazanır (El kazandı)
             const sums = {};
+            let minSum = Infinity;
             let winnerId = null;
             let isDraw = false;
 
             gameState.playerOrder.forEach(pid => {
                 const sum = gameState.players[pid].hand.reduce((s, t) => s + t[0] + t[1], 0);
                 sums[pid] = sum;
+                if (sum < minSum) {
+                    minSum = sum;
+                    winnerId = pid;
+                    isDraw = false;
+                } else if (sum === minSum) {
+                    isDraw = true; // Birden fazla oyuncunun aynı minSum'ı varsa beraberlik
+                }
             });
 
-            // 101 kuralı: 101'e ulaşan kazanır, kimse 101'e ulaşamadıysa en az puanlı kazanır
-            const playerIds = gameState.playerOrder;
-            const p1Sum = sums[playerIds[0]];
-            const p2Sum = sums[playerIds[1]];
-
-            // İki oyuncu da 101'e ulaştıysa, daha az puanı olan kazanır
-            if (p1Sum >= 101 && p2Sum >= 101) {
-                winnerId = p1Sum <= p2Sum ? playerIds[0] : playerIds[1];
-                isDraw = false;
-            }
-            // Sadece bir oyuncu 101'e ulaştıysa, o kazanır
-            else if (p1Sum >= 101) {
-                winnerId = playerIds[0];
-                isDraw = false;
-            }
-            else if (p2Sum >= 101) {
-                winnerId = playerIds[1];
-                isDraw = false;
-            }
-            // Hiç kimse 101'e ulaşamadıysa, en az puanı olan kazanır
-            else {
-                if (p1Sum === p2Sum) {
-                    return { type: 'BLOCKED', winnerId: 'DRAW', sums };
-                } else {
-                    winnerId = p1Sum < p2Sum ? playerIds[0] : playerIds[1];
-                    isDraw = false;
+            if (isDraw || winnerId === null) {
+                return { type: 'BLOCKED', winnerId: 'DRAW', sums };
+            } else {
+                // Kazanan, diğer oyuncuların elindeki taşların toplamını alır
+                let scoreGained = 0;
+                for (const otherPlayerId in gameState.players) {
+                    if (otherPlayerId !== winnerId) {
+                        scoreGained += sums[otherPlayerId];
+                    }
                 }
+                return { type: 'BLOCKED', winnerId: winnerId, scoreGained, sums };
             }
-
-            // Kazanan, diğer oyuncuların elindeki taşların toplamını alır
-            let scoreGained = 0;
-            for (const otherPlayerId in gameState.players) {
-                if (otherPlayerId !== winnerId) {
-                    scoreGained += sums[otherPlayerId];
-                }
-            }
-            return { type: 'BLOCKED', winnerId: winnerId, scoreGained, sums };
         }
     }
 
@@ -862,8 +837,8 @@ function sendGameState(roomCode, playerId) {
         }
 
         ws.send(JSON.stringify({
-            type: 'GAME_STATE_UPDATE',
-            payload: {
+            type: 'gameUpdate',
+            gameState: {
                 ...room.gameState,
                 players: playersData,
                 playerId: playerId // Hangi oyuncuya gönderildiğini belirt
@@ -940,7 +915,7 @@ wss.on('close', () => clearInterval(pingInterval));
 
 // --- OYUN MANTIKLARI ---
 
-async function handleFindMatch(ws, data) {
+function handleFindMatch(ws, data) {
     ws.language = data.language || ws.language || 'en';
     let modeInput = String(data.mode || '2');
     const mode = (modeInput === '4' || modeInput === '4p') ? '4p' : '2p';
@@ -996,26 +971,6 @@ async function handleFindMatch(ws, data) {
             p.ws !== ws
         );
     });
-
-    // BAN KONTROLÜ (Matchmaking öncesi)
-    if (ws.telegramId) {
-        const ban = await Ban.findOne({ telegramId: ws.telegramId });
-        if (ban && (!ban.expiresAt || ban.expiresAt > new Date())) {
-            let timeMsg = "Süresiz";
-            if (ban.expiresAt) {
-                const diff = ban.expiresAt - new Date();
-                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                timeMsg = `${days} gün ${hours} saat ${minutes} dakika`;
-            }
-
-            return sendMessage(ws, {
-                type: 'error',
-                message: `YASAKLANDINIZ!\nSebep: ${ban.reason}\nKalan Süre: ${timeMsg}`
-            });
-        }
-    }
 
     const playerId = ws.playerId || `guest_${Math.random().toString(36).substr(2, 9)}`;
     ws.playerId = playerId;
@@ -1106,8 +1061,7 @@ async function handleFindMatch(ws, data) {
             console.log(`✅ Oyun başladı: ${roomCode} (${targetSize} kişi)`);
         }, 4000);
     } else {
-        const searchMsg = getMsg(ws.language, 'searchingOpponent') + ` (${matchQueues[mode].length}/${targetSize})`;
-        sendMessage(ws, { type: 'SEARCH_STATUS', payload: { message: searchMsg } });
+        sendMessage(ws, { type: 'searchStatus', message: `Rakip aranıyor... (${matchQueues[mode].length}/${targetSize})` });
     }
 }
 
@@ -1486,12 +1440,9 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
             const pWs = playerConnections.get(pid);
             if (pWs && pWs.readyState === WebSocket.OPEN) {
                 pWs.send(JSON.stringify({
-                    type: 'ROUND_OVER',
-                    payload: {
-                        players: room.gameState.players,
-                        scores: room.players, // Skorları gönder
-                        winnerId: winnerId
-                    }
+                    type: 'calculationLobby',
+                    players: room.gameState.players,
+                    eloChanges: null // Raund içi ELO değişmez
                 }));
             }
         });
@@ -1512,11 +1463,7 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
     if (room.players) {
         Object.keys(room.players).forEach(pid => {
             const playerWs = playerConnections.get(pid);
-            if (playerWs) {
-                playerWs.roomCode = null;
-                // Client'a session temizleme mesajı gönder
-                sendMessage(playerWs, { type: 'clearSession', message: 'Oyun bitti, session temizlendi' });
-            }
+            if (playerWs) playerWs.roomCode = null;
         });
     }
 
@@ -1641,18 +1588,16 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
                 const winnerName = isDraw ? getMsg(lang, 'draw') : (gameState.players[finalWinnerId]?.name || getMsg(lang, 'opponent'));
 
                 pWs.send(JSON.stringify({
-                    type: 'GAME_OVER',
-                    payload: {
-                        winner: { ...room.players[finalWinnerId], id: finalWinnerId },
-                        winnerName: winnerName,
-                        isRanked: isRankedMatch,
-                        reason: winnerReason || (isForfeit ? 'forfeit' : 'score'),
-                        players: allPlayersInfo,
-                        eloChanges: eloChanges ? {
-                            winner: eloChanges.winnerChange,
-                            loser: eloChanges.loserChange
-                        } : null
-                    }
+                    type: 'gameEnd',
+                    winner: String(finalWinnerId),
+                    winnerName: winnerName,
+                    isRanked: isRankedMatch,
+                    reason: winnerReason || (isForfeit ? 'forfeit' : 'score'),
+                    players: allPlayersInfo,
+                    eloChanges: eloChanges ? {
+                        winner: eloChanges.winnerChange,
+                        loser: eloChanges.loserChange
+                    } : null
                 }));
             }
         });
@@ -1789,15 +1734,7 @@ function handleRejoin(ws, data) {
 
     const room = rooms.get(roomCode);
     if (!room || !room.gameState) {
-        // Oyun bitmişse session'ı temizle ve lobby'e gönder
-        return sendMessage(ws, { type: 'clearSession', message: 'Oyun bulunamadı, lobiye yönlendiriliyorsunuz' });
-    }
-
-    // Oyunun aktif olduğunu kontrol et (1 dakikadan eski değilse)
-    const gameAge = Date.now() - (room.gameState.turnStartTime || room.startTime);
-    if (gameAge > 60000) { // 1 dakikadan eski oyunlara yeniden bağlanma
-        rooms.delete(roomCode);
-        return sendMessage(ws, { type: 'clearSession', message: 'Oyun zaman aşımına uğradı, lobiye yönlendiriliyorsunuz' });
+        return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'gameNotFound') });
     }
 
     // Kopma zamanlayıcısını temizle
@@ -1929,7 +1866,7 @@ function handleDisconnect(ws) {
                     pWs.send(JSON.stringify({
                         type: 'gameMessage',
                         message: getMsg(lang, 'opponentDisconnected').replace('{name}', ws.playerName),
-                        duration: 20000 // 20 saniye mesaj süresi
+                        duration: 15000
                     }));
                 }
             });
@@ -1956,7 +1893,7 @@ function handleDisconnect(ws) {
                     }
                 }
                 disconnectGraceTimers.delete(ws.playerId);
-            }, 20000); // 20 saniye bekleme süresi
+            }, 15000);
 
             disconnectGraceTimers.set(ws.playerId, timer);
         } else if (room && !room.gameState) {
@@ -2023,20 +1960,12 @@ function handleRejoin(ws, data) {
 // --- TIMEOUT KONTROLÜ ---
 
 setInterval(() => {
-    const now = Date.now();
     rooms.forEach((room, roomCode) => {
-        // OPTİMİZASYON: 1 saatten fazla işlem yapılmayan odaları sil (RAM Tasarrufu)
-        if (room.lastActivity && (now - room.lastActivity > 3600000)) {
-            rooms.delete(roomCode);
-            return;
-        }
-
         if (!room.gameState || !room.gameState.turnStartTime || room.gameState.winner) return;
-        room.lastActivity = now; // Odayı aktif olarak işaretle
 
         // 25 saniye süre (Kullanıcı 25 istedi)
         const TURN_LIMIT = 25000;
-        const elapsed = now - room.gameState.turnStartTime;
+        const elapsed = Date.now() - room.gameState.turnStartTime;
 
         if (elapsed > TURN_LIMIT) {
             handleTurnTimeout(roomCode);
@@ -2098,15 +2027,6 @@ function handleTurnTimeout(roomCode) {
     // Eldeki taşları kontrol et
     for (let i = 0; i < player.hand.length; i++) {
         const tile = player.hand[i];
-
-        // İlk hamle kısıtlaması (AFK için)
-        if (gs.moves === 0 && gs.firstMoveTile) {
-            const [d1, d2] = gs.firstMoveTile;
-            if (!((tile[0] === d1 && tile[1] === d2) || (tile[0] === d2 && tile[1] === d1))) {
-                continue;
-            }
-        }
-
         if (gs.board.length === 0) {
             validMove = { tile, index: i, position: 'left' };
             break;
