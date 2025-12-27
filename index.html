@@ -981,9 +981,25 @@
                             localStream.current = stream;
 
                             // Send offers to all peers to start the stream
-                            for (const pid of Object.keys(peerConnections.current)) {
+                            const pids = Object.keys(peerConnections.current);
+                            if (pids.length === 0) {
+                                console.log('⚠️ No peers to send voice offer to');
+                            }
+
+                            for (const pid of pids) {
                                 const pc = peerConnections.current[pid];
-                                stream.getTracks().forEach(track => pc.addTrack(track, stream));
+                                if (!pc) continue;
+
+                                // Eğer stream trackleri henüz eklenmediyse ekle
+                                const senders = pc.getSenders();
+                                const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
+
+                                if (!audioSender) {
+                                    stream.getTracks().forEach(track => pc.addTrack(track, stream));
+                                } else {
+                                    audioSender.replaceTrack(stream.getAudioTracks()[0]);
+                                }
+
                                 const offer = await pc.createOffer();
                                 await pc.setLocalDescription(offer);
                                 sendMessage({ type: 'voiceSignal', to: pid, signal: { offer } });
@@ -996,7 +1012,7 @@
                     } catch (err) {
                         console.error('Mic Error:', err);
                         setLocalMicEnabled(false);
-                        showNotification('Mikrofon icazəsi alınmadı!', 'error');
+                        showNotification('Mikrofon hatası: ' + err.message, 'error');
                         return;
                     }
                 } else {
@@ -1928,8 +1944,8 @@
                     {notification && <Toast message={notification.message} type={notification.type} />}
                     {announcement && <AnnouncementPopup message={announcement} onClose={() => setAnnouncement(null)} />}
 
-                    {/* Admin Button - Moved down by 5cm */}
-                    {playerData?.telegramId === '1840079939' && (
+                    {/* Admin Button - Moved down by 5cm - Güvenli Kontrol */}
+                    {playerData && String(playerData.telegramId) === '1840079939' && (
                         <div className="absolute top-[5cm] right-4 z-50">
                             <button
                                 onClick={() => setShowAdmin(true)}
