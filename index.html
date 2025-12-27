@@ -1338,10 +1338,10 @@
                         ))}
                     </div>
 
-                    {/* Main Loading Animation */}
+                    {/* Main Loading Animation - Only Animation */}
                     <div className="relative z-10 flex flex-col items-center">
                         {/* Falling Dominoes Animation */}
-                        <div className="relative w-64 h-32 mb-8">
+                        <div className="relative w-64 h-32">
                             {[0, 1, 2, 3, 4].map((i) => (
                                 <div
                                     key={i}
@@ -1365,21 +1365,12 @@
                             ))}
                         </div>
 
-                        {/* Logo */}
-                        <h1 className="text-5xl font-black text-white drop-shadow-2xl mb-4 animate-pulse">
-                            DOMINO <span className="text-yellow-400">101</span>
-                        </h1>
-
                         {/* Loading Spinner */}
-                        <div className="relative w-16 h-16 mt-4">
+                        <div className="relative w-16 h-16 mt-8">
                             <div className="absolute inset-0 border-4 border-yellow-500/20 rounded-full"></div>
                             <div className="absolute inset-0 border-4 border-t-yellow-500 rounded-full animate-spin"></div>
                         </div>
-
-                        {/* Loading Text */}
-                        <p className="text-white/60 mt-6 text-sm tracking-widest uppercase animate-pulse">Hazırlanıyor</p>
                     </div>
-
 
                 </div>
             );
@@ -1428,24 +1419,43 @@
                             </button>
                         </div>
 
-                        <button onClick={() => {
-                            setScreen('searching');
-                            setSearching(true);
-                            sendMessage({ type: 'findMatch', ...playerData, language });
-                        }} className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-4 rounded-2xl mb-4 transition-all transform active:scale-95 shadow-lg flex items-center justify-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" />
-                            </svg>
-                            {t.ranked}
-                        </button>
+                        {/* 2'li ve 4'lü Mod Seçimi */}
+                        <div className="grid grid-cols-2 gap-3 mb-4">
+                            <button onClick={() => {
+                                setScreen('searching');
+                                setSearching(true);
+                                sendMessage({ type: 'findMatch', mode: '2', ...playerData, language });
+                            }} className="group relative flex flex-col items-center justify-center bg-gradient-to-br from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 p-6 rounded-2xl transition-all transform active:scale-95 shadow-lg overflow-hidden">
+                                <div className="text-4xl mb-2">👤👤</div>
+                                <span className="text-black font-black text-sm">2 KİŞİLİK</span>
+                                <span className="text-black/60 text-[10px] font-bold">RANKED</span>
+                                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                            </button>
+
+                            <button onClick={() => {
+                                setScreen('searching');
+                                setSearching(true);
+                                sendMessage({ type: 'findMatch', mode: '4', ...playerData, language });
+                            }} className="group relative flex flex-col items-center justify-center bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 p-6 rounded-2xl transition-all transform active:scale-95 shadow-lg overflow-hidden">
+                                <div className="text-4xl mb-2">👥👥</div>
+                                <span className="text-white font-black text-sm">4 KİŞİLİK</span>
+                                <span className="text-white/60 text-[10px] font-bold">CASUAL</span>
+                                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                            </button>
+                        </div>
 
                         <div className="flex flex-col gap-3">
-                            <button onClick={() => sendMessage({ type: 'createRoom', ...playerData, language })} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM14 11a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1v-1a1 1 0 011-1z" />
-                                </svg>
-                                {t.createRoom}
-                            </button>
+                            {/* Oda Kurma Butonları */}
+                            <div className="grid grid-cols-2 gap-2">
+                                <button onClick={() => sendMessage({ type: 'createRoom', capacity: 2, ...playerData, language })} className="bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm">
+                                    <span>🏠</span>
+                                    <span>ODA (2)</span>
+                                </button>
+                                <button onClick={() => sendMessage({ type: 'createRoom', capacity: 4, ...playerData, language })} className="bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm">
+                                    <span>🏠</span>
+                                    <span>ODA (4)</span>
+                                </button>
+                            </div>
 
                             <div className="flex gap-2">
                                 <input
