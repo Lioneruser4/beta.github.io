@@ -147,6 +147,32 @@
             animation: rotate 3s linear infinite;
         }
 
+        .voice-pulse {
+            position: relative;
+        }
+
+        .voice-pulse::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border: 2px solid #22c55e;
+            border-radius: 50%;
+            animation: voice-pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            z-index: 10;
+        }
+
+        @keyframes voice-pulse-ring {
+            0% {
+                transform: scale(0.9);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1.4);
+                opacity: 0;
+            }
+        }
+
         .valid-zone::after {
             content: '';
             position: absolute;
@@ -941,31 +967,44 @@
 
             const toggleMic = async () => {
                 const newState = !localMicEnabled;
-                setLocalMicEnabled(newState);
 
                 if (newState) {
                     try {
-                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                        localStream.current = stream;
-                        // Tüm aktif bağlantılara stream ekle
-                        Object.keys(peerConnections.current).forEach(async (pid) => {
-                            const pc = peerConnections.current[pid];
-                            stream.getTracks().forEach(track => pc.addTrack(track, stream));
-                            const offer = await pc.createOffer();
-                            await pc.setLocalDescription(offer);
-                            sendMessage({ type: 'voiceSignal', to: pid, signal: { offer } });
-                        });
+                        if (!localStream.current) {
+                            const stream = await navigator.mediaDevices.getUserMedia({
+                                audio: {
+                                    echoCancellation: true,
+                                    noiseSuppression: true,
+                                    autoGainControl: true
+                                }
+                            });
+                            localStream.current = stream;
+
+                            // Send offers to all peers to start the stream
+                            for (const pid of Object.keys(peerConnections.current)) {
+                                const pc = peerConnections.current[pid];
+                                stream.getTracks().forEach(track => pc.addTrack(track, stream));
+                                const offer = await pc.createOffer();
+                                await pc.setLocalDescription(offer);
+                                sendMessage({ type: 'voiceSignal', to: pid, signal: { offer } });
+                            }
+                        } else {
+                            localStream.current.getTracks().forEach(t => t.enabled = true);
+                        }
+                        setLocalMicEnabled(true);
                         showNotification('Mikrofon açıldı', 'success');
                     } catch (err) {
+                        console.error('Mic Error:', err);
                         setLocalMicEnabled(false);
                         showNotification('Mikrofon icazəsi alınmadı!', 'error');
+                        return;
                     }
                 } else {
                     if (localStream.current) {
-                        localStream.current.getTracks().forEach(t => t.stop());
-                        localStream.current = null;
-                        showNotification('Mikrofon qapadıldı', 'info');
+                        localStream.current.getTracks().forEach(t => t.enabled = false);
                     }
+                    setLocalMicEnabled(false);
+                    showNotification('Mikrofon qapadıldı', 'info');
                 }
                 sendMessage({ type: 'updateAudioStatus', audioType: 'mic', enabled: newState });
             };
@@ -2213,10 +2252,10 @@
                                     return (
                                         <div key={idx} className={`relative flex items-center gap-2 px-3 py-1.5 rounded-2xl transition-all duration-300 ${activeTurn ? 'bg-yellow-500/20 scale-105 z-10 border border-yellow-500/50 shadow-glow' : 'bg-black/40 opacity-70 border border-white/10'}`}>
                                             <div className="flex flex-col items-center">
-                                                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative`}>
+                                                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative ${p.micEnabled ? 'voice-pulse' : ''}`}>
                                                     <img src={p.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" alt={p.name} />
-                                                    <div className="absolute top-0 right-0 p-0.5">
-                                                        {p.micEnabled ? <span className="block w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> : <span className="block w-2 h-2 bg-red-500 rounded-full"></span>}
+                                                    <div className="absolute top-0 right-0 p-0.5 z-20">
+                                                        {p.micEnabled ? <span className="block w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse border border-black shadow-lg"></span> : <span className="block w-2.5 h-2.5 bg-red-500 rounded-full border border-black"></span>}
                                                     </div>
                                                 </div>
                                             </div>
@@ -2370,8 +2409,13 @@
                                 const activeTurn = gameState?.currentPlayer === myPlayerId;
                                 return (
                                     <div className={`flex items-center gap-3 px-4 py-2 rounded-2xl border-2 transition-all duration-300 ${activeTurn ? 'bg-blue-500/20 border-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.5)] scale-105' : 'bg-black/60 border-white/10 opacity-90'}`}>
-                                        <div className={`w-12 h-12 rounded-full border-2 ${activeTurn ? 'border-blue-400 animate-pulse' : 'border-white/20'} overflow-hidden shadow-xl`}>
+                                        <div className={`w-12 h-12 rounded-full border-2 ${activeTurn ? 'border-blue-400 animate-pulse' : 'border-white/20'} overflow-hidden shadow-xl relative ${localMicEnabled ? 'voice-pulse' : ''}`}>
                                             <img src={me.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" />
+                                            {localMicEnabled && (
+                                                <div className="absolute top-0 right-0 p-1 z-20">
+                                                    <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-lg border border-white/20"></div>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex flex-col">
                                             <div className="flex items-center gap-1.5">
