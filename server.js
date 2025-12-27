@@ -419,12 +419,12 @@ function handleUpdateAudioStatus(ws, data) {
     const room = rooms.get(ws.roomCode);
     if (!room || !room.gameState) return;
 
-    const { type, enabled } = data; // type: 'mic' or 'speaker'
+    const { audioType, enabled } = data; // audioType: 'mic' or 'speaker'
     const player = room.gameState.players[ws.playerId];
     if (!player) return;
 
-    if (type === 'mic') player.micEnabled = enabled;
-    if (type === 'speaker') player.speakerEnabled = enabled;
+    if (audioType === 'mic') player.micEnabled = enabled;
+    if (audioType === 'speaker') player.speakerEnabled = enabled;
 
     // Odadakilere bildir
     broadcastToRoom(ws.roomCode, {
@@ -1344,17 +1344,28 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
         }
 
         // Send localized game end message
+        const allPlayersInfo = playerIds.map(pid => ({
+            id: pid,
+            name: room.players[pid].name,
+            photo: room.players[pid].photoUrl,
+            score: room.players[pid].score || 0,
+            eloChange: eloChanges ? (pid === winnerId ? eloChanges.winnerChange : eloChanges.loserChange) : 0,
+            isWinner: pid === finalWinnerId
+        }));
+
         Object.keys(room.players).forEach(pid => {
             const pWs = playerConnections.get(pid);
             if (pWs && pWs.readyState === WebSocket.OPEN) {
                 const lang = pWs.language || 'en';
-                const winnerName = isDraw ? getMsg(lang, 'draw') : (gameState.players[winnerId]?.name || getMsg(lang, 'opponent'));
+                const winnerName = isDraw ? getMsg(lang, 'draw') : (gameState.players[finalWinnerId]?.name || getMsg(lang, 'opponent'));
 
                 pWs.send(JSON.stringify({
                     type: 'gameEnd',
-                    winner: String(winnerId),
+                    winner: String(finalWinnerId),
                     winnerName: winnerName,
                     isRanked: isRankedMatch,
+                    reason: winnerReason || (isForfeit ? 'forfeit' : 'score'),
+                    players: allPlayersInfo,
                     eloChanges: eloChanges ? {
                         winner: eloChanges.winnerChange,
                         loser: eloChanges.loserChange
@@ -1691,8 +1702,8 @@ setInterval(() => {
     rooms.forEach((room, roomCode) => {
         if (!room.gameState || !room.gameState.turnStartTime || room.gameState.winner) return;
 
-        // 30 saniye süre
-        const TURN_LIMIT = 30000;
+        // 25 saniye süre (Kullanıcı 25 istedi)
+        const TURN_LIMIT = 25000;
         const elapsed = Date.now() - room.gameState.turnStartTime;
 
         if (elapsed > TURN_LIMIT) {
