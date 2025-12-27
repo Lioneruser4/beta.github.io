@@ -940,6 +940,16 @@
                     }
                     audio.srcObject = remoteStream;
                     audio.muted = !localSpeakerEnabled;
+                    audio.play().catch(e => console.log("Audio play error:", e));
+                };
+
+                // Otomatik teklif oluşturma (Negotiation Needed)
+                pc.onnegotiationneeded = async () => {
+                    try {
+                        const offer = await pc.createOffer();
+                        await pc.setLocalDescription(offer);
+                        sendMessage({ type: 'voiceSignal', to: targetPid, signal: { offer } });
+                    } catch (err) { console.error("Negotiation error:", err); }
                 };
 
                 if (localStream.current) {
@@ -954,14 +964,24 @@
                 const pc = createPeerConnection(fromPid);
                 try {
                     if (signal.offer) {
+                        // Çakışma kontrolü (Glare handling)
+                        if (pc.signalingState !== "stable") {
+                            const amIPolite = (playerId || "").localeCompare(fromPid) < 0;
+                            if (!amIPolite) return; // İmpolite isek teklifi yoksay
+                            await pc.setLocalDescription({ type: "rollback" });
+                        }
                         await pc.setRemoteDescription(new RTCSessionDescription(signal.offer));
                         const answer = await pc.createAnswer();
                         await pc.setLocalDescription(answer);
                         sendMessage({ type: 'voiceSignal', to: fromPid, signal: { answer } });
                     } else if (signal.answer) {
-                        await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
+                        if (pc.signalingState === "have-local-offer") {
+                            await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
+                        }
                     } else if (signal.candidate) {
-                        await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                        try {
+                            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                        } catch (e) { }
                     }
                 } catch (e) { console.error('Signal Error:', e); }
             };
@@ -990,6 +1010,8 @@
 
                 if (newState) {
                     try {
+                        showNotification('Mikrofon açıldı. Ses 5-10 saniye içinde gelecek...', 'success');
+
                         if (!localStream.current) {
                             const stream = await navigator.mediaDevices.getUserMedia({
                                 audio: {
@@ -999,36 +1021,28 @@
                                 }
                             });
                             localStream.current = stream;
-
-                            // Send offers to all peers to start the stream
-                            const pids = Object.keys(peerConnections.current);
-                            if (pids.length === 0) {
-                                console.log('⚠️ No peers to send voice offer to');
-                            }
-
-                            for (const pid of pids) {
-                                const pc = peerConnections.current[pid];
-                                if (!pc) continue;
-
-                                // Eğer stream trackleri henüz eklenmediyse ekle
-                                const senders = pc.getSenders();
-                                const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
-
-                                if (!audioSender) {
-                                    stream.getTracks().forEach(track => pc.addTrack(track, stream));
-                                } else {
-                                    audioSender.replaceTrack(stream.getAudioTracks()[0]);
-                                }
-
-                                const offer = await pc.createOffer();
-                                await pc.setLocalDescription(offer);
-                                sendMessage({ type: 'voiceSignal', to: pid, signal: { offer } });
-                            }
-                        } else {
-                            localStream.current.getTracks().forEach(t => t.enabled = true);
                         }
+
+                        // Trackleri aktif et
+                        localStream.current.getTracks().forEach(t => t.enabled = true);
+
+                        // Mevcut bağlantılara track ekle (NegotiationNeeded tetiklenir)
+                        const pids = Object.keys(peerConnections.current);
+                        for (const pid of pids) {
+                            const pc = peerConnections.current[pid];
+                            if (!pc) continue;
+
+                            const senders = pc.getSenders();
+                            const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
+
+                            if (!audioSender) {
+                                localStream.current.getTracks().forEach(track => pc.addTrack(track, localStream.current));
+                            } else {
+                                audioSender.replaceTrack(localStream.current.getAudioTracks()[0]);
+                            }
+                        }
+
                         setLocalMicEnabled(true);
-                        showNotification('Mikrofon açıldı', 'success');
                     } catch (err) {
                         console.error('Mic Error:', err);
                         setLocalMicEnabled(false);
@@ -1091,7 +1105,7 @@
                     waitingOpponent: "Rəqib Gözlənilir",
                     enter: "DAXİL OL",
                     calculationTitle: "SKOR HESAPLANIYOR",
-                    calculationSubtitle: "En az puana sahip olan kazanır!",
+                    calculationSubtitle: "101 puana ulaşan kazanır!",
                     you: "Siz",
                     handTotal: "Elindeki Taşların Toplamı",
                     winnerAnnouncing: "Kazanan açıklanıyor...",
@@ -1122,6 +1136,24 @@
                     leaveBtn: "LEAVE",
                     yourTurn: "Your Turn",
                     drawTile: "Draw Tile",
+                    bannedTitle: "HESABINIZ YASAKLANDI",
+                    banReason: "Sebep",
+                    banExpires: "Bitiş",
+                    banRemaining: "Kalan Süre",
+                    indefinite: "Süresiz",
+                    days: "gün",
+                    hours: "saat",
+                    minutes: "dakika"
+                },
+                az: {
+                    bannedTitle: "HESABINIZ BANLANDI",
+                    banReason: "Səbəb",
+                    banExpires: "Bitmə vaxtı",
+                    banRemaining: "Qalan vaxt",
+                    indefinite: "Müddətsiz",
+                    days: "gün",
+                    hours: "saat",
+                    minutes: "dəqiqə",
                     passTurn: "Pass Turn",
                     yourHand: "Your Hand",
                     winner: "Winner",
@@ -1131,7 +1163,7 @@
                     waitingOpponent: "Waiting Opponent",
                     enter: "ENTER",
                     calculationTitle: "SCORE CALCULATION",
-                    calculationSubtitle: "The player with lowest score wins!",
+                    calculationSubtitle: "First to 101 points wins!",
                     you: "You",
                     handTotal: "Total Points in Hand",
                     winnerAnnouncing: "Winner announcing...",
@@ -1268,6 +1300,23 @@
                 }
             }, [gameState, isMyTurn, screen]);
 
+            // Ban süresi hesaplama yardımcısı
+            const getBanRemainingText = (expiresAt) => {
+                if (!expiresAt) return t.indefinite;
+                const now = new Date();
+                const end = new Date(expiresAt);
+                const diff = end - now;
+
+                if (diff <= 0) return "0 " + t.minutes;
+
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+                if (days > 0) return `${days} ${t.days} ${hours} ${t.hours}`;
+                return `${hours} ${t.hours} ${minutes} ${t.minutes}`;
+            };
+
             // Rakip Hamle Sesi Kontrolü
             useEffect(() => {
                 if (!gameState) return;
@@ -1312,7 +1361,8 @@
                             setPlayerData({
                                 ...data.player,
                                 isGuest: false,
-                                photoUrl: telegramData.photoUrl || data.player.photoUrl
+                                photoUrl: telegramData.photoUrl || data.player.photoUrl,
+                                ban: data.ban // Ban bilgisini kaydet
                             });
                             console.log('✅ Telegram Auth başarılı:', data.player);
                         } else {
@@ -1578,6 +1628,7 @@
                         break;
                     case 'playerReconnected':
                         showNotification(`${data.playerName} geri döndü!`, 'success');
+                        setServerMessage(null); // Bekleme mesajını anında kaldır
                         break;
                     case 'turnPassed':
                         showNotification(`${data.playerName} pas geçti`, 'info');
@@ -1659,18 +1710,18 @@
 
                         const isMatchEnd = Object.values(players).some(p => p.score >= 101);
 
-                        // Daha az puan yapan kazanır
-                        const entries = Object.entries(playerScores);
-                        entries.sort((a, b) => a[1].score - b[1].score);
+                        // Daha çok puan yapan kazanır (101 hedefi)
+                        const entries = Object.entries(players);
+                        entries.sort((a, b) => b[1].score - a[1].score);
 
                         const winner = entries[0][1];
                         const loser = entries[1][1];
 
                         setCalculationLobby({
-                            players: playerScores,
+                            players: players,
                             winner,
                             loser,
-                            myScore: playerScores[myIdForCalc]?.score || 0
+                            myScore: players[myIdForCalc]?.score || 0
                         });
 
                         setCalculationTimer(8);
@@ -2023,6 +2074,21 @@
                             </div>
                         )}
 
+                        {/* BAN UYARISI (LOBBY) */}
+                        {playerData?.ban && (
+                            <div className="mb-6 bg-red-900/60 border border-red-500 rounded-2xl p-4 animate-pulse">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <span className="text-2xl">🚫</span>
+                                    <h3 className="text-red-400 font-black uppercase tracking-widest">{t.bannedTitle}</h3>
+                                </div>
+                                <div className="space-y-1 text-sm">
+                                    <p className="text-white"><span className="text-red-400 font-bold">{t.banReason}:</span> {playerData.ban.reason}</p>
+                                    <p className="text-white"><span className="text-red-400 font-bold">{t.banRemaining}:</span> {getBanRemainingText(playerData.ban.expiresAt)}</p>
+                                    <p className="text-white/50 text-xs mt-2 italic">Ranked oyunlara girişiniz məhdudlaşdırılıb.</p>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="flex justify-center mb-4 gap-2">
                             <button
                                 onClick={() => setLanguage(lang => lang === 'az' ? 'en' : 'az')}
@@ -2041,6 +2107,10 @@
                         {/* 2'li ve 4'lü Mod Seçimi */}
                         <div className="grid grid-cols-2 gap-3 mb-4">
                             <button onClick={() => {
+                                if (playerData?.ban) {
+                                    showNotification(`${t.bannedTitle}: ${getBanRemainingText(playerData.ban.expiresAt)}`, 'error');
+                                    return;
+                                }
                                 setScreen('searching');
                                 setSearching(true);
                                 sendMessage({ type: 'findMatch', mode: '2', ...playerData, language });
@@ -2056,6 +2126,10 @@
                             </button>
 
                             <button onClick={() => {
+                                if (playerData?.ban) {
+                                    showNotification(`${t.bannedTitle}: ${getBanRemainingText(playerData.ban.expiresAt)}`, 'error');
+                                    return;
+                                }
                                 setScreen('searching');
                                 setSearching(true);
                                 sendMessage({ type: 'findMatch', mode: '4', ...playerData, language });
