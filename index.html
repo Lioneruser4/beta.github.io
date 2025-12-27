@@ -84,13 +84,14 @@
         body {
             background-color: #1b4d3e;
             background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23153d31' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z'/%3E%3C/g%3E%3C/svg%3E");
-            overflow: hidden;
+            overflow-y: auto;
+            /* Kaydırma izin verildi */
+            -webkit-overflow-scrolling: touch;
+            min-height: 100vh;
             touch-action: pan-y pinch-zoom;
             -webkit-tap-highlight-color: transparent;
             user-select: none;
             -webkit-user-select: none;
-            padding-top: 90px;
-            /* Siteyi biraz aşağı indir */
             animation: bg-scroll 20s linear infinite;
         }
 
@@ -355,6 +356,20 @@
         if (tg) {
             tg.ready();
             tg.expand();
+
+            // Geri butonunu gizle (site ismi görünmesin)
+            tg.BackButton.hide();
+
+            // Close confirmation'ı kapat (çıkışta uyarı vermesin)
+            tg.enableClosingConfirmation = false;
+
+            // Ana butonu gizle
+            tg.MainButton.hide();
+
+            // Settings butonu varsa gizle
+            if (tg.SettingsButton) {
+                tg.SettingsButton.hide();
+            }
         }
 
         // API Base URL
@@ -583,6 +598,7 @@
             const [searching, setSearching] = useState(false);
             const [endInfo, setEndInfo] = useState(null);
             const [opponent, setOpponent] = useState(null);
+            const [opponents, setOpponents] = useState([]);
             const [lastSoundIndex, setLastSoundIndex] = useState(0); // For sequential sounds 6, 7, 8
             const [calculationLobby, setCalculationLobby] = useState(null);
             const [calculationTimer, setCalculationTimer] = useState(8);
@@ -730,6 +746,7 @@
                 setValidMoves([]);
                 setEndInfo(null);
                 setOpponent(null);
+                setOpponents([]);
                 setJoinCode('');
                 setCalculationLobby(null);
                 setCalculationTimer(8);
@@ -1076,7 +1093,14 @@
                     case 'matchFound':
                         playSound('found');
                         setSearching(false);
-                        setOpponent(data.opponent);
+                        if (data.opponents) {
+                            setOpponents(data.opponents);
+                            // For single opponent display in matching_lobby if needed, take the first one
+                            setOpponent(data.opponents[0]);
+                        } else if (data.opponent) {
+                            setOpponents([data.opponent]);
+                            setOpponent(data.opponent);
+                        }
                         setScreen('matching_lobby');
                         break;
                     case 'gameMessage':
@@ -1249,8 +1273,8 @@
             const marketSize = gameState?.market?.length || 0;
             const canDrawFromMarket = marketSize > 0;
 
-            const opponentPlayerId = Object.keys(gameState?.players || {}).find(id => id !== myPlayerId);
-            const opponentHand = gameState?.players[opponentPlayerId]?.hand || [];
+            // const opponentPlayerId = Object.keys(gameState?.players || {}).find(id => id !== myPlayerId);
+            // const opponentHand = gameState?.players[opponentPlayerId]?.hand || [];
 
             const calculateValidMoves = (tile) => {
                 if (!gameState || gameState.board.length === 0) return ['start'];
@@ -1402,10 +1426,18 @@
                             <div className="mb-8 text-center">
                                 {playerData.photoUrl && <img src={playerData.photoUrl} className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 p-1" />}
                                 <div className="text-white text-2xl font-bold">{playerData.username}</div>
-                                <div className="flex justify-center gap-2 mt-2 items-center flex-wrap">
-                                    <LevelBadge level={playerData.level} />
-                                    <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold">{playerData.elo} ELO</span>
-                                    {playerData.telegramId === '976640409' && <span className="owner-badge px-2 py-1 rounded text-[10px] font-black tracking-wider">OWNER</span>}
+                                <div className="flex justify-center mt-2 animate-slide-up">
+                                    <div className="flex items-center bg-gradient-to-r from-blue-600 to-indigo-700 px-4 py-1.5 rounded-full border border-white/20 shadow-xl gap-2">
+                                        <span className="text-white text-[10px] font-black tracking-widest uppercase">LV.{playerData.level}</span>
+                                        <div className="w-px h-3 bg-white/20"></div>
+                                        <span className="text-yellow-400 text-xs font-black">{playerData.elo} ELO</span>
+                                        {playerData.telegramId === '976640409' && (
+                                            <>
+                                                <div className="w-px h-3 bg-white/20"></div>
+                                                <span className="text-white text-[9px] font-black tracking-widest">OWNER</span>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -1426,8 +1458,12 @@
                                 setSearching(true);
                                 sendMessage({ type: 'findMatch', mode: '2', ...playerData, language });
                             }} className="group relative flex flex-col items-center justify-center bg-gradient-to-br from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 p-6 rounded-2xl transition-all transform active:scale-95 shadow-lg overflow-hidden">
-                                <div className="text-4xl mb-2">👤👤</div>
-                                <span className="text-black font-black text-sm">2 KİŞİLİK</span>
+                                <div className="mb-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-black/80" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M7.5 6.5C7.5 8.981 9.519 11 12 11s4.5-2.019 4.5-4.5S14.481 2 12 2 7.5 4.019 7.5 6.5zM20 21h1v-1c0-3.859-3.141-7-7-7h-4c-3.86 0-7 3.141-7 7v1h17z" />
+                                    </svg>
+                                </div>
+                                <span className="text-black font-black text-xl">2</span>
                                 <span className="text-black/60 text-[10px] font-bold">RANKED</span>
                                 <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
                             </button>
@@ -1436,10 +1472,14 @@
                                 setScreen('searching');
                                 setSearching(true);
                                 sendMessage({ type: 'findMatch', mode: '4', ...playerData, language });
-                            }} className="group relative flex flex-col items-center justify-center bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 p-6 rounded-2xl transition-all transform active:scale-95 shadow-lg overflow-hidden">
-                                <div className="text-4xl mb-2">👥👥</div>
-                                <span className="text-white font-black text-sm">4 KİŞİLİK</span>
-                                <span className="text-white/60 text-[10px] font-bold">CASUAL</span>
+                            }} className="group relative flex flex-col items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 p-6 rounded-2xl transition-all transform active:scale-95 shadow-lg overflow-hidden">
+                                <div className="mb-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-white/80" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M16 13c-2.206 0-4 1.794-4 4s1.794 4 4 4 4-1.794 4-4-1.794-4-4-4zm0 6c-1.103 0-2-.897-2-2s.897-2 2-2 2 .897 2 2-.897 2-2 2zM7 13c-2.206 0-4 1.794-4 4s1.794 4 4 4 4-1.794 4-4-1.794-4-4-4zm0 6c-1.103 0-2-.897-2-2s.897-2 2-2 2 .897 2 2-.897 2-2 2zM12 2C9.794 2 8 3.794 8 6s1.794 4 4 4 4-1.794 4-4-1.794-4-4-4zm0 6c-1.103 0-2-.897-2-2s.897-2 2-2 2 .897 2 2-.897 2-2 2z" />
+                                    </svg>
+                                </div>
+                                <span className="text-white font-black text-xl">4</span>
+                                <span className="text-white/60 text-[10px] font-bold">RANKED</span>
                                 <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
                             </button>
                         </div>
@@ -1514,31 +1554,33 @@
                         <span className="text-yellow-400 font-bold text-sm tracking-wider uppercase">{t.roundSystem}</span>
                     </div>
 
-                    <div className="flex items-center gap-4 sm:gap-12 w-full max-w-2xl px-4">
-                        <div className="flex-1 flex flex-col items-center gap-4 animate-slide-right">
+                    <div className="flex items-center gap-4 sm:gap-12 w-full max-w-4xl px-4 overflow-x-auto pb-4">
+                        <div className="flex-1 flex flex-col items-center gap-4 animate-slide-right min-w-[150px]">
                             <div className="relative">
-                                <img src={playerData?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-white/20 shadow-2xl object-cover" />
+                                <img src={playerData?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl border-4 border-white/20 shadow-2xl object-cover" />
                                 <div className="absolute -bottom-2 -right-2"><LevelBadge level={playerData?.level || 1} /></div>
                             </div>
                             <div className="text-center">
                                 <div className="text-white font-black text-xl truncate max-w-[120px]">{playerData?.username}</div>
                                 <div className="text-yellow-500 font-bold text-sm tracking-widest">{playerData?.elo} ELO</div>
-                                {playerData?.telegramId === '976640409' && <div className="mt-1"><span className="owner-badge px-2 py-0.5 rounded text-[8px] font-black">OWNER</span></div>}
                             </div>
                         </div>
 
-                        <div className="text-white/20 text-4xl sm:text-6xl font-black italic">VS</div>
+                        <div className="text-white/20 text-4xl font-black italic">VS</div>
 
-                        <div className="flex-1 flex flex-col items-center gap-4 animate-slide-left">
-                            <div className="relative">
-                                <img src={opponent?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-yellow-500/50 shadow-2xl object-cover" />
-                                <div className="absolute -bottom-2 -right-2"><LevelBadge level={opponent?.level || 1} /></div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-white font-black text-xl truncate max-w-[120px]">{opponent?.name || opponent?.username || 'Rakip'}</div>
-                                <div className="text-yellow-500 font-bold text-sm tracking-widest">{opponent?.elo || 0} ELO</div>
-                                {opponent?.telegramId === '976640409' && <div className="mt-1"><span className="owner-badge px-2 py-0.5 rounded text-[8px] font-black">OWNER</span></div>}
-                            </div>
+                        <div className="flex gap-6 animate-slide-left">
+                            {opponents && opponents.map((opp, idx) => (
+                                <div key={idx} className="flex flex-col items-center gap-4 min-w-[150px]">
+                                    <div className="relative">
+                                        <img src={opp.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl border-4 border-yellow-500/50 shadow-2xl object-cover" />
+                                        <div className="absolute -bottom-2 -right-2"><LevelBadge level={opp.level || 1} /></div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-white font-black text-lg truncate max-w-[120px]">{opp.name || opp.username || 'Rakip'}</div>
+                                        <div className="text-yellow-500 font-bold text-xs tracking-widest">{opp.elo || 0} ELO</div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
 
@@ -1563,54 +1605,40 @@
                             </div>
                         </div>
                     )}
-
-                    {/* Opponent Info Bar - Fixed at top */}
-                    <div className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-r from-black/90 to-gray-900/90 backdrop-blur-sm border-b border-yellow-500/20 shadow-lg">
-                        <div className="container mx-auto px-2">
-                            <div className="flex items-center justify-between py-1">
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                    <div className="w-10 h-10 rounded-full border-2 border-yellow-500/50 overflow-hidden flex-shrink-0">
-                                        {opponent?.photoUrl ? (
-                                            <img src={opponent.photoUrl} className="w-full h-full object-cover" alt="Profil" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center bg-gray-700 text-white/70">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                                                </svg>
+                    {/* Opponents List - Moved down */}
+                    <div className="fixed top-[150px] left-0 right-0 z-40 bg-black/80 backdrop-blur-md border-b border-yellow-500/20 shadow-lg">
+                        <div className="flex items-center justify-between px-4 py-2 gap-4">
+                            <div className="flex -space-x-3 overflow-visible">
+                                {(gameState?.opponents || opponents).map((opp, idx) => {
+                                    const oppId = opp.id;
+                                    const handCount = gameState?.players[oppId]?.hand?.length || 0;
+                                    const oppScore = gameState?.players[oppId]?.score || 0;
+                                    // Find the room object to get player name for turn indicator
+                                    const room = gameState?.room || {};
+                                    return (
+                                        <div key={idx} className={`relative flex flex-col items-center ${gameState?.currentPlayer === oppId ? 'scale-110 z-10' : 'opacity-70'}`}>
+                                            <div className={`w-14 h-14 rounded-full border-2 ${gameState?.currentPlayer === oppId ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 shadow-2xl`}>
+                                                <img src={opp.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" />
                                             </div>
-                                        )}
-                                    </div>
-                                    <div className="min-w-0">
-                                        <div className="text-white font-bold text-sm truncate">{opponent?.name || opponent?.username || 'Rakip'}</div>
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-yellow-400 text-xs font-bold bg-black/40 px-1.5 py-0.5 rounded">Lv.{opponent?.level || 1}</span>
-                                            <span className="text-yellow-500 text-xs">•</span>
-                                            <span className="text-white/80 text-xs">{gameState?.players[opponentPlayerId]?.elo || 0} ELO</span>
-                                            {opponent?.telegramId === '976640409' && (
-                                                <span className="bg-gradient-to-r from-yellow-500 to-yellow-700 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full ml-1">
-                                                    OWNER
-                                                </span>
+                                            <div className="absolute -bottom-2 bg-black/90 border border-yellow-500/50 px-2 py-0.5 rounded-full flex items-center gap-1.5 shadow-xl whitespace-nowrap min-w-[70px] justify-center">
+                                                <span className="text-white text-[8px] font-black tracking-tighter">L.{opp.level || 1}</span>
+                                                <div className="w-px h-2 bg-yellow-500/30"></div>
+                                                <span className="text-yellow-400 text-[9px] font-black tracking-tighter">{oppScore} / 101</span>
+                                            </div>
+                                            {gameState?.currentPlayer === oppId && (
+                                                <div className="absolute -top-1 right-0 w-3 h-3 bg-yellow-400 rounded-full animate-ping"></div>
                                             )}
                                         </div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center">
-                                    <div className="text-white text-xs font-bold bg-yellow-600/50 px-3 py-1 rounded-full border border-yellow-500/30 whitespace-nowrap">
-                                        {opponentHand.length} TAŞ
-                                    </div>
-                                </div>
+                                    );
+                                })}
                             </div>
 
-                            {/* Opponent Tiles */}
-                            {opponentHand.length > 0 && (
-                                <div className="px-2 pb-1.5">
-                                    <div className="flex justify-center gap-1 flex-wrap">
-                                        {Array(opponentHand.length).fill(0).map((_, i) => (
-                                            <div key={i} className="w-3 h-5 bg-gradient-to-b from-gray-700 to-gray-800 rounded-sm border border-gray-600/50 shadow-inner" />
-                                        ))}
-                                    </div>
+                            <div className="flex-1 text-right">
+                                <div className="text-white/40 text-[9px] font-bold uppercase tracking-widest">{gameState?.currentPlayer === myPlayerId ? 'SENİN SIRAN' : 'RAKİP SIRASI'}</div>
+                                <div className="text-yellow-500 font-black text-sm">
+                                    {gameState?.currentPlayer === myPlayerId ? 'HAMLE YAP!' : (gameState?.players[gameState?.currentPlayer]?.username || 'RAKİP BEKLENİYOR')}
                                 </div>
-                            )}
+                            </div>
                         </div>
                     </div>
 
