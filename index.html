@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="tr">
-
 <head>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <meta charset="UTF-8">
@@ -84,25 +83,18 @@
         body {
             background-color: #1b4d3e;
             background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23153d31' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z'/%3E%3C/g%3E%3C/svg%3E");
-            overflow-y: auto;
-            /* Kaydırma izin verildi */
-            -webkit-overflow-scrolling: touch;
-            min-height: 100vh;
+            overflow: hidden;
             touch-action: pan-y pinch-zoom;
             -webkit-tap-highlight-color: transparent;
             user-select: none;
             -webkit-user-select: none;
+            padding-top: 90px; /* Siteyi biraz aşağı indir */
             animation: bg-scroll 20s linear infinite;
         }
 
         @keyframes bg-scroll {
-            0% {
-                background-position: 0 0;
-            }
-
-            100% {
-                background-position: 40px 40px;
-            }
+            0% { background-position: 0 0; }
+            100% { background-position: 40px 40px; }
         }
 
         .pip-grid {
@@ -147,32 +139,6 @@
             animation: rotate 3s linear infinite;
         }
 
-        .voice-pulse {
-            position: relative;
-        }
-
-        .voice-pulse::before {
-            content: '';
-            position: absolute;
-            inset: -4px;
-            border: 2px solid #22c55e;
-            border-radius: 50%;
-            animation: voice-pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-            z-index: 10;
-        }
-
-        @keyframes voice-pulse-ring {
-            0% {
-                transform: scale(0.9);
-                opacity: 1;
-            }
-
-            100% {
-                transform: scale(1.4);
-                opacity: 0;
-            }
-        }
-
         .valid-zone::after {
             content: '';
             position: absolute;
@@ -183,35 +149,22 @@
         }
 
         @keyframes pulse-glow {
-
-            0%,
-            100% {
+            0%, 100% {
                 box-shadow: 0 0 20px rgba(251, 191, 36, 0.6), 0 0 40px rgba(251, 191, 36, 0.3);
             }
-
             50% {
                 box-shadow: 0 0 30px rgba(251, 191, 36, 0.9), 0 0 60px rgba(251, 191, 36, 0.5);
             }
         }
 
         @keyframes rotate {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         @keyframes progress {
-            from {
-                width: 0%;
-            }
-
-            to {
-                width: 100%;
-            }
+            from { width: 0%; }
+            to { width: 100%; }
         }
 
         .animate-progress {
@@ -219,27 +172,13 @@
         }
 
         @keyframes slide-right {
-            from {
-                transform: translateX(-50px);
-                opacity: 0;
-            }
-
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
+            from { transform: translateX(-50px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
 
         @keyframes slide-left {
-            from {
-                transform: translateX(50px);
-                opacity: 0;
-            }
-
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
+            from { transform: translateX(50px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
 
         .animate-slide-right {
@@ -251,93 +190,28 @@
         }
 
         @keyframes neon-pulse {
-
-            0%,
-            100% {
-                box-shadow: 0 0 15px rgba(255, 215, 0, 0.8), 0 0 30px rgba(255, 100, 0, 0.4);
+            0%, 100% {
+                box-shadow: 0 0 10px rgba(255, 0, 0, 0.8), 0 0 20px rgba(255, 0, 0, 0.4);
                 filter: brightness(1.2);
             }
-
-            33% {
-                box-shadow: 0 0 20px rgba(255, 0, 255, 0.8), 0 0 40px rgba(255, 0, 255, 0.4);
-                filter: brightness(1.4);
-            }
-
-            66% {
-                box-shadow: 0 0 20px rgba(0, 255, 255, 0.8), 0 0 40px rgba(0, 255, 255, 0.4);
-                filter: brightness(1.4);
-            }
-
             50% {
-                box-shadow: 0 0 25px rgba(251, 191, 36, 1), 0 0 50px rgba(251, 191, 36, 0.6);
-                filter: brightness(1.6);
+                box-shadow: 0 0 20px rgba(255, 0, 0, 1), 0 0 40px rgba(255, 0, 0, 0.6);
+                filter: brightness(1.5);
             }
         }
 
         @keyframes border-flow {
-            0% {
-                border-color: #ff0000;
-            }
-
-            20% {
-                border-color: #ff8800;
-            }
-
-            40% {
-                border-color: #ffff00;
-            }
-
-            60% {
-                border-color: #00ff00;
-            }
-
-            80% {
-                border-color: #0088ff;
-            }
-
-            100% {
-                border-color: #ff0000;
-            }
-        }
-
-        @keyframes shimmer {
-            0% {
-                background-position: -200% 0;
-            }
-
-            100% {
-                background-position: 200% 0;
-            }
-        }
-
-        @keyframes dominoFall {
-
-            0%,
-            100% {
-                transform: rotate(0deg) translateY(0);
-            }
-
-            25% {
-                transform: rotate(-15deg) translateY(-10px);
-            }
-
-            50% {
-                transform: rotate(0deg) translateY(0);
-            }
-
-            75% {
-                transform: rotate(15deg) translateY(-10px);
-            }
+            0% { border-color: #ff0000; }
+            33% { border-color: #00ff00; }
+            66% { border-color: #0000ff; }
+            100% { border-color: #ff0000; }
         }
 
         .neon-pro {
-            animation: neon-pulse 2s infinite ease-in-out, border-flow 4s infinite linear, shimmer 3s infinite linear;
-            background: linear-gradient(90deg, #111 0%, #333 45%, #666 50%, #333 55%, #111 100%);
-            background-size: 200% 100%;
+            animation: neon-pulse 1.5s infinite ease-in-out, border-flow 3s infinite linear;
+            background: linear-gradient(135deg, #111 0%, #333 100%);
             border-width: 2px;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 1), 0 0 20px rgba(251, 191, 36, 0.8);
-            font-weight: 900;
-            letter-spacing: 0.1em;
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
         }
 
         /* Yeni eklenen stiller */
@@ -368,7 +242,7 @@
             background: linear-gradient(135deg, #2c3e50, #34495e);
             border: 2px solid rgba(255, 255, 255, 0.1);
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
 
         /* Hesaplama lobisi için yeni stiller */
@@ -385,25 +259,17 @@
             border: 1px solid #fff;
             box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
         }
-
-        @keyframes gradient-shine {
-            0% {
-                background-position: 0% 50%;
-            }
-
-            50% {
-                background-position: 100% 50%;
-            }
-
-            100% {
-                background-position: 0% 50%;
-            }
-        }
+        @keyframes gradient-shine { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
     </style>
 </head>
 
 <body>
-    <div id="root"></div>
+    <div id="root">
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #0b241c; color: white; font-family: Arial, sans-serif;">
+            <h1>DOMINO 101</h1>
+            <p>Yükleniyor, lütfen bekleyin...</p>
+        </div>
+    </div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
@@ -413,20 +279,6 @@
         if (tg) {
             tg.ready();
             tg.expand();
-
-            // Geri butonunu gizle (site ismi görünmesin)
-            tg.BackButton.hide();
-
-            // Close confirmation'ı kapat (çıkışta uyarı vermesin)
-            tg.enableClosingConfirmation = false;
-
-            // Ana butonu gizle
-            tg.MainButton.hide();
-
-            // Settings butonu varsa gizle
-            if (tg.SettingsButton) {
-                tg.SettingsButton.hide();
-            }
         }
 
         // API Base URL
@@ -461,7 +313,7 @@
                 ${animateIn ? 'animate-slide-in' : ''}
                 ${!disabled && !isGhost && !isOpponent ? 'cursor-pointer active:translate-y-1 active:shadow-3d-active hover:brightness-110' : ''}
                 ${disabled ? 'brightness-90 cursor-default' : ''}
-                ${isOpponent ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 w-[70px] h-[35px]' : ''}
+                ${isOpponent ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700' : ''}
             `;
 
             return (
@@ -526,363 +378,113 @@
         };
 
         // 5. Game Timer Component
-        const GameTimer = ({ startTime, duration, isMyTurn }) => {
+        const GameTimer = ({ startTime }) => {
             const [timeLeft, setTimeLeft] = useState(30);
-
+            
             useEffect(() => {
-                const totalDuration = duration || 30000;
-                const calculate = () => {
-                    if (!startTime) return 30;
-                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                    return Math.max(0, Math.floor(totalDuration / 1000) - elapsed);
-                };
-
-                setTimeLeft(calculate()); // Immediate update
-
                 const interval = setInterval(() => {
-                    setTimeLeft(calculate());
-                }, 200);
+                    if (!startTime) return;
+                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                    const remaining = Math.max(0, 30 - elapsed);
+                    setTimeLeft(remaining);
+                }, 100);
                 return () => clearInterval(interval);
-            }, [startTime, duration]);
+            }, [startTime]);
 
             return (
-                <div className="fixed bottom-0 left-0 right-0 h-1.5 z-[110] bg-black/20 overflow-hidden">
-                    <div
-                        className={`h-full transition-all duration-300 ${isMyTurn ? 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)]' : (timeLeft < 10 ? 'bg-red-500 animate-pulse' : 'bg-yellow-500')}`}
-                        style={{ width: `${(timeLeft / (duration / 1000 || 25)) * 100}%` }}
-                    ></div>
-                </div>
-            );
-        };
-
-        const AnnouncementPopup = ({ message, onClose }) => {
-            if (!message) return null;
-
-            const messageKey = `announcement_read_${btoa(message.substring(0, 20))}`;
-            const [isVisible, setIsVisible] = useState(false);
-
-            useEffect(() => {
-                const isRead = localStorage.getItem(messageKey);
-                if (!isRead) setIsVisible(true);
-            }, [message]);
-
-            const handleClose = (e) => {
-                if (e) e.stopPropagation();
-                localStorage.setItem(messageKey, 'true');
-                setIsVisible(false);
-                onClose();
-            };
-
-            if (!isVisible) return null;
-
-            return (
-                <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-gradient-to-br from-purple-900/90 to-indigo-900/90 border-2 border-purple-500/50 rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-scale-up text-center">
-                        <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-purple-500/30">
-                            <span className="text-4xl animate-bounce">📢</span>
-                        </div>
-                        <h3 className="text-purple-300 text-xs font-black tracking-widest uppercase mb-2">ADMİN DUYURUSU</h3>
-                        <p className="text-white text-lg font-bold leading-relaxed mb-8">{message}</p>
-                        <button
-                            onClick={handleClose}
-                            className="w-full bg-purple-600 hover:bg-purple-500 text-white font-black py-4 rounded-2xl shadow-xl transition-all active:scale-95 border border-white/10"
-                        >
-                            ANLADIM
-                        </button>
-                    </div>
+                <div className="absolute top-[15%] left-6 text-8xl font-black text-white/10 pointer-events-none select-none z-10">
+                    {timeLeft}
                 </div>
             );
         };
 
         // 6. Admin Panel Component
         const AdminPanel = ({ onClose, adminId }) => {
-            const [activeTab, setActiveTab] = useState('players'); // players, bans, reports, bugs
-            const [data, setData] = useState({ users: [], bans: [], reports: [], bugs: [] });
+            const [players, setPlayers] = useState([]);
             const [loading, setLoading] = useState(true);
             const [searchTerm, setSearchTerm] = useState('');
 
             useEffect(() => {
-                fetchData();
-            }, []);
-
-            const fetchData = () => {
-                setLoading(true);
                 fetch(`${API_URL}/api/admin/users`, {
-                    headers: { 'Authorization': 'YOUR_ADMIN_SECRET' }
+                    method: 'GET',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': 'YOUR_ADMIN_SECRET'  // Replace with your actual admin secret
+                    }
                 })
-                    .then(res => res.json())
-                    .then(d => {
-                        if (d.success) setData(d);
-                        setLoading(false);
-                    })
-                    .catch(() => setLoading(false));
-            };
-
-            const banPlayer = (targetId) => {
-                const reason = prompt("Ban səbəbi:");
-                const days = prompt("Neçə günlük? (Süresiz üçün boş bırak):");
-                if (reason === null) return;
-
-                fetch(`${API_URL}/api/admin/ban`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminId, targetId, reason, durationDays: days })
-                }).then(() => fetchData());
-            };
-
-            const unbanPlayer = (targetId) => {
-                if (!confirm("Banı açmaq istəyirsiniz?")) return;
-                fetch(`${API_URL}/api/admin/unban`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminId, targetId })
-                }).then(() => fetchData());
-            };
+                .then(res => {
+                    if (!res.ok) throw new Error('Failed to fetch users');
+                    return res.json();
+                })
+                .then(data => {
+                    if (data.success && data.users) {
+                        setPlayers(data.users);
+                    }
+                    setLoading(false);
+                })
+                .catch(error => {
+                    console.error('Error fetching users:', error);
+                    setLoading(false);
+                    alert('Kullanıcılar yüklenirken hata oluştu: ' + error.message);
+                });
+            }, [adminId]);
 
             const updatePlayer = (id, updates) => {
                 fetch(`${API_URL}/api/admin/update`, {
                     method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': 'YOUR_ADMIN_SECRET'  // Replace with your actual admin secret
+                    },
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ adminId, targetId: id, updates })
-                }).then(() => fetchData());
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.success) {
+                        setPlayers(players.map(p => p._id === id ? { ...p, ...updates } : p));
+                    }
+                });
             };
 
-            const filteredUsers = data.users.filter(u =>
-                (u.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (u.telegramId || '').includes(searchTerm)
-            );
+            const filteredPlayers = players.filter(p => p.username.toLowerCase().includes(searchTerm.toLowerCase()));
 
             return (
-                <div className="fixed inset-0 bg-black/95 z-[5000] overflow-y-auto animate-slide-up">
-                    <div className="max-w-5xl mx-auto p-4 md:p-8">
-                        {/* Header */}
-                        <div className="flex justify-between items-center mb-8 border-b border-white/10 pb-4 sticky top-0 bg-black/95 z-10">
-                            <div>
-                                <h2 className="text-3xl font-black text-yellow-500">ADMİN PANEL</h2>
-                                <p className="text-white/40 text-xs">Yönetici: {adminId}</p>
-                            </div>
-                            <button onClick={onClose} className="bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-lg active:scale-95">PANELİ KAPAT</button>
+                <div className="fixed inset-0 bg-black/95 z-[100] overflow-y-auto p-4 animate-slide-up">
+                    <div className="max-w-4xl mx-auto">
+                        <div className="flex justify-between items-center mb-6 sticky top-0 bg-black/95 py-4 z-10 border-b border-white/10">
+                            <h2 className="text-2xl font-black text-yellow-500">ADMIN PANEL</h2>
+                            <button onClick={onClose} className="bg-red-600 text-white px-4 py-2 rounded-xl font-bold">KAPAT</button>
                         </div>
-
-                        {/* Tabs */}
-                        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
-                            {[
-                                { id: 'players', label: 'OYUNCULAR', icon: '👥' },
-                                { id: 'bans', label: 'YASAKLAR', icon: '🚫' },
-                                { id: 'reports', label: 'RAPORLAR', icon: '🚩' },
-                                { id: 'bugs', label: 'HATALAR', icon: '🐞' }
-                            ].map(tab => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center gap-2 px-6 py-4 rounded-2xl font-bold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-yellow-500 text-black scale-105 shadow-xl' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
-                                >
-                                    <span>{tab.icon}</span>
-                                    {tab.label}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Search */}
-                        {activeTab === 'players' && (
-                            <input
-                                type="text"
-                                placeholder="İsim veya ID ile ara..."
-                                className="w-full bg-white/5 border border-white/10 text-white p-4 rounded-2xl mb-6 outline-none focus:border-yellow-500 focus:bg-white/10 transition-all font-bold"
-                                value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
-                            />
-                        )}
-
-                        {loading ? (
-                            <div className="flex flex-col items-center justify-center py-20 text-white/40">
-                                <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                                <p className="font-bold animate-pulse">VERİLER YÜKLENİYOR...</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {activeTab === 'players' && filteredUsers.map(u => (
-                                    <div key={u._id} className="bg-white/5 border border-white/5 p-5 rounded-2xl flex flex-col md:flex-row md:items-center gap-4 hover:bg-white/10 transition-all group">
-                                        <div className="flex items-center gap-4 flex-1">
-                                            <div className="relative">
-                                                <img src={u.photoUrl || 'https://via.placeholder.com/50'} className="w-12 h-12 rounded-2xl border-2 border-white/10 group-hover:border-yellow-500/50 transition-all" />
-                                                <span className="absolute -bottom-1 -right-1 bg-yellow-500 text-black text-[10px] font-black px-1.5 rounded-md">Lvl {u.level}</span>
-                                            </div>
+                        <input 
+                            type="text" 
+                            placeholder="Kullanıcı ara..." 
+                            className="w-full bg-white/10 text-white p-3 rounded-xl mb-4 border border-white/10 focus:border-yellow-500 outline-none"
+                            onChange={e => setSearchTerm(e.target.value)}
+                        />
+                        {loading ? <div className="text-white text-center">Yükleniyor...</div> : (
+                            <div className="space-y-3">
+                                {filteredPlayers.map(p => (
+                                    <div key={p._id} className="bg-white/5 p-4 rounded-xl border border-white/5 flex flex-col sm:flex-row items-center gap-4">
+                                        <div className="flex items-center gap-3 flex-1 w-full">
+                                            <img src={p.photoUrl || 'https://via.placeholder.com/40'} className="w-10 h-10 rounded-full"/>
                                             <div className="flex flex-col">
-                                                <span className="text-white font-black text-lg">{u.username}</span>
-                                                <span className="text-white/30 text-[10px] font-mono">{u.telegramId}</span>
+                                                <span className="text-white font-bold">{p.username}</span>
+                                                <span className="text-white/40 text-xs">{p.telegramId}</span>
                                             </div>
                                         </div>
-
-                                        <div className="flex flex-wrap items-center gap-3">
-                                            <div className="flex flex-col">
-                                                <label className="text-[10px] text-white/40 font-bold ml-1 mb-1">ELO</label>
-                                                <input
-                                                    type="number"
-                                                    value={u.elo}
-                                                    onChange={e => updatePlayer(u._id, { elo: e.target.value })}
-                                                    className="bg-black/40 text-yellow-500 font-bold p-2.5 rounded-xl w-24 text-center border border-white/5 outline-none focus:border-yellow-500"
-                                                />
-                                            </div>
-                                            <button
-                                                onClick={() => banPlayer(u.telegramId)}
-                                                className="bg-red-600/20 text-red-400 border border-red-600/30 px-5 py-3 rounded-2xl font-black text-xs hover:bg-red-600 hover:text-white transition-all"
-                                            >
-                                                YASAKLA
-                                            </button>
-                                            <button
-                                                onClick={() => updatePlayer(u._id, { isVisibleInLeaderboard: !u.isVisibleInLeaderboard })}
-                                                className={`px-5 py-3 rounded-2xl font-black text-xs transition-all ${u.isVisibleInLeaderboard !== false ? 'bg-green-600/20 text-green-400 border border-green-600/30' : 'bg-gray-600/20 text-gray-400 border border-gray-600/30'}`}
-                                            >
-                                                {u.isVisibleInLeaderboard !== false ? 'GÖRÜNÜR' : 'GİZLİ'}
-                                            </button>
+                                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                                            <div className="flex flex-col"><label className="text-[10px] text-white/50">ELO</label><input type="number" defaultValue={p.elo} className="bg-black/50 text-white p-2 rounded w-20 text-center" onBlur={(e) => updatePlayer(p._id, { elo: e.target.value })} /></div>
+                                            <button onClick={() => updatePlayer(p._id, { isVisibleInLeaderboard: !p.isVisibleInLeaderboard })} className={`px-4 py-3 rounded-xl text-xs font-bold w-24 ${p.isVisibleInLeaderboard !== false ? 'bg-green-600/20 text-green-400 border border-green-600/50' : 'bg-red-600/20 text-red-400 border border-red-600/50'}`}>{p.isVisibleInLeaderboard !== false ? 'GÖRÜNÜR' : 'GİZLİ'}</button>
                                         </div>
                                     </div>
                                 ))}
-
-                                {activeTab === 'bans' && data.bans.map(b => (
-                                    <div key={b._id} className="bg-red-950/20 border border-red-500/20 p-5 rounded-3xl flex items-center justify-between">
-                                        <div className="flex flex-col">
-                                            <span className="text-red-400 font-black text-lg">{b.telegramId}</span>
-                                            <p className="text-white/60 text-sm mt-1">Səbəb: <span className="text-white">{b.reason || 'Yoxdur'}</span></p>
-                                            <p className="text-white/30 text-xs mt-1">Bitiş: {b.expiresAt ? new Date(b.expiresAt).toLocaleString() : 'Süresiz'}</p>
-                                        </div>
-                                        <button onClick={() => unbanPlayer(b.telegramId)} className="bg-green-600 text-white px-6 py-3 rounded-2xl font-black text-xs shadow-lg active:scale-95 transition-all">YASAĞI KALDIR</button>
-                                    </div>
-                                ))}
-
-                                {activeTab === 'reports' && data.reports.map(r => (
-                                    <div key={r._id} className="bg-white/5 border border-white/5 p-5 rounded-3xl group">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div className="flex flex-col">
-                                                <span className="text-red-400 text-[10px] font-black uppercase tracking-widest">Şİkayet Edİlen</span>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-white font-black text-lg">{r.reportedName}</span>
-                                                    <span 
-                                                        onClick={() => { navigator.clipboard.writeText(r.reportedId); alert('ID Kopyalandı: ' + r.reportedId); }}
-                                                        className="text-white/40 text-xs font-mono cursor-pointer hover:text-yellow-500 transition-colors bg-black/20 px-2 py-1 rounded-lg"
-                                                        title="Kopyalamak için tıkla"
-                                                    >
-                                                        ({r.reportedId}) 📋
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <span className="bg-white/5 text-white/40 px-3 py-1 rounded-full text-[10px]">{new Date(r.createdAt).toLocaleString()}</span>
-                                        </div>
-                                        <div className="bg-black/30 p-4 rounded-2xl mb-3">
-                                            <p className="text-white/80 text-sm leading-relaxed"><span className="text-yellow-500 font-bold">SEBEP:</span> {r.reason}</p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-white/20 text-[10px] font-bold uppercase">Raporlayan:</span>
-                                            <span className="text-white font-bold text-xs">{r.reporterName || 'Bilinmiyor'}</span>
-                                            <span 
-                                                onClick={() => { navigator.clipboard.writeText(r.reporterId); alert('ID Kopyalandı: ' + r.reporterId); }}
-                                                className="text-white/40 text-[10px] font-mono cursor-pointer hover:text-yellow-500 transition-colors bg-black/20 px-2 py-1 rounded-lg"
-                                                title="Kopyalamak için tıkla"
-                                            >
-                                                {r.reporterId} 📋
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))}
-
-                                {activeTab === 'bugs' && data.bugs.map(bug => (
-                                    <div key={bug._id} className="bg-blue-900/10 border border-blue-500/20 p-5 rounded-3xl hover:bg-blue-900/20 transition-all">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center text-xl">🐞</div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-white font-black">{bug.username}</span>
-                                                    <span className="text-white/30 text-[10px] font-mono">{bug.userId}</span>
-                                                </div>
-                                            </div>
-                                            <span className="text-white/20 text-[10px] px-2 py-1 bg-white/5 rounded-lg">{bug.language.toUpperCase()}</span>
-                                        </div>
-                                        <p className="text-white/90 text-sm bg-black/40 p-4 rounded-2xl leading-relaxed italic border-l-4 border-blue-500/50">"{bug.message}"</p>
-                                        <p className="text-white/20 text-[10px] mt-3 text-right">{new Date(bug.createdAt).toLocaleString()}</p>
-                                    </div>
-                                ))}
-
-                                {activeTab === 'players' && filteredUsers.length === 0 && (
-                                    <div className="text-center py-20 text-white/20">
-                                        <span className="text-6xl mb-4 block">🔍</span>
-                                        <p className="font-black">ARANAN OYUNCU BULUNAMADI</p>
-                                    </div>
-                                )}
                             </div>
                         )}
                     </div>
                 </div>
             );
         };
-
-        // --- SES MOTORU (WEB AUDIO API) ---
-        // Bu motor, seslerin arka plan uygulamalarını (YouTube, Spotify vb.) durdurmasını engeller.
-        const AudioEngine = (() => {
-            const context = new (window.AudioContext || window.webkitAudioContext)({
-                latencyHint: 'interactive'
-            });
-            const buffers = {};
-            const sounds = {
-                found: 'sound1found.mp3',
-                start: 'sound2oyunbasladi.mp3',
-                lose: 'sound3lose.mp3',
-                win: 'sound4win.mp3',
-                pass: 'sound5bel.mp3',
-                place6: 'sound6.mp3',
-                place7: 'sound7.mp3',
-                place8: 'sound8.mp3'
-            };
-
-            const load = async (url) => {
-                if (buffers[url]) return;
-                try {
-                    const response = await fetch(url);
-                    const arrayBuffer = await response.arrayBuffer();
-                    buffers[url] = await context.decodeAudioData(arrayBuffer);
-                } catch (e) { console.warn('Ses yüklenemedi (Muhtemelen dosya yok):', url); }
-            };
-
-            const activeSources = {};
-
-            const play = (type, lastIndex = 0) => {
-                if (context.state === 'suspended') context.resume();
-
-                // Win/Lose gibi seslerin üst üste gelmesini engelle
-                if ((type === 'win' || type === 'lose' || type === 'found' || type === 'start') && activeSources[type]) {
-                    try { activeSources[type].stop(); } catch (e) { }
-                }
-
-                let soundFile = '';
-                if (type === 'place') {
-                    const nextIdx = (lastIndex % 3) + 6;
-                    soundFile = sounds[`place${nextIdx}`];
-                } else {
-                    soundFile = sounds[type];
-                }
-
-                if (!soundFile || !buffers[soundFile]) return;
-
-                const source = context.createBufferSource();
-                source.buffer = buffers[soundFile];
-                source.connect(context.destination);
-                source.start(0);
-
-                if (type === 'win' || type === 'lose' || type === 'found' || type === 'start') {
-                    activeSources[type] = source;
-                }
-            };
-
-            // Ön yükleme başlat
-            Object.values(sounds).forEach(url => load(url));
-
-            return { play, context };
-        })();
-
-        // Mobil etkileşim için AudioContext'i aktifleştir
-        window.addEventListener('touchstart', () => {
-            if (AudioEngine.context.state === 'suspended') AudioEngine.context.resume();
-        }, { once: true });
 
         // --- ANA OYUN ---
 
@@ -905,187 +507,19 @@
             const [searching, setSearching] = useState(false);
             const [endInfo, setEndInfo] = useState(null);
             const [opponent, setOpponent] = useState(null);
-            const [opponents, setOpponents] = useState([]);
             const [lastSoundIndex, setLastSoundIndex] = useState(0); // For sequential sounds 6, 7, 8
             const [calculationLobby, setCalculationLobby] = useState(null);
             const [calculationTimer, setCalculationTimer] = useState(8);
             const [showAdmin, setShowAdmin] = useState(false);
-            const [isHost, setIsHost] = useState(false);
-            const [announcement, setAnnouncement] = useState(null);
-            const [roomCapacity, setRoomCapacity] = useState(2);
             const prevBoardLength = useRef(0);
             const isMyMove = useRef(false);
 
             // Level Calculation Helper
             const calculateLevel = (elo) => {
-                if (elo < 200) return 1;
-                let lvl = Math.floor(elo / 100);
+                if (elo <= 100) return 1;
+                let lvl = Math.ceil((elo - 100) / 100) + 1;
                 if (lvl >= 10) return 'PRO';
                 return lvl;
-            };
-
-            const [localMicEnabled, setLocalMicEnabled] = useState(false);
-            const [localSpeakerEnabled, setLocalSpeakerEnabled] = useState(false);
-            const speakingToastShown = useRef(new Set());
-            const localStream = useRef(null);
-            const peerConnections = useRef({}); // pid -> RTCPeerConnection
-
-            // WebRTC Signaling Helpers
-            const createPeerConnection = (targetPid) => {
-                if (peerConnections.current[targetPid]) return peerConnections.current[targetPid];
-
-                const pc = new RTCPeerConnection({
-                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-                });
-
-                pc.onicecandidate = (event) => {
-                    if (event.candidate) {
-                        sendMessage({ type: 'voiceSignal', to: targetPid, signal: { candidate: event.candidate } });
-                    }
-                };
-
-                pc.ontrack = (event) => {
-                    const remoteStream = event.streams[0];
-                    let audio = document.getElementById(`audio-${targetPid}`);
-                    if (!audio) {
-                        audio = document.createElement('audio');
-                        audio.id = `audio-${targetPid}`;
-                        audio.autoplay = true;
-                        audio.playsInline = true; // Mobile fix
-                        document.body.appendChild(audio);
-                    }
-                    audio.srcObject = remoteStream;
-                    audio.muted = !localSpeakerEnabled;
-                    audio.play().catch(e => console.log("Audio play error:", e));
-                };
-
-                // Otomatik teklif oluşturma (Negotiation Needed)
-                pc.onnegotiationneeded = async () => {
-                    try {
-                        const offer = await pc.createOffer();
-                        await pc.setLocalDescription(offer);
-                        sendMessage({ type: 'voiceSignal', to: targetPid, signal: { offer } });
-                    } catch (err) { console.error("Negotiation error:", err); }
-                };
-
-                if (localStream.current) {
-                    localStream.current.getTracks().forEach(track => pc.addTrack(track, localStream.current));
-                }
-
-                peerConnections.current[targetPid] = pc;
-                return pc;
-            };
-
-            const handleWebRTCSignal = async (fromPid, signal) => {
-                const pc = createPeerConnection(fromPid);
-                try {
-                    if (signal.offer) {
-                        // Çakışma kontrolü (Glare handling)
-                        if (pc.signalingState !== "stable") {
-                            const amIPolite = (playerId || "").localeCompare(fromPid) < 0;
-                            if (!amIPolite) return; // İmpolite isek teklifi yoksay
-                            await pc.setLocalDescription({ type: "rollback" });
-                        }
-                        await pc.setRemoteDescription(new RTCSessionDescription(signal.offer));
-                        const answer = await pc.createAnswer();
-                        await pc.setLocalDescription(answer);
-                        sendMessage({ type: 'voiceSignal', to: fromPid, signal: { answer } });
-                    } else if (signal.answer) {
-                        if (pc.signalingState === "have-local-offer") {
-                            await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
-                        }
-                    } else if (signal.candidate) {
-                        try {
-                            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-                        } catch (e) { }
-                    }
-                } catch (e) { console.error('Signal Error:', e); }
-            };
-
-            const cleanupVoiceChat = () => {
-                // Close all peer connections
-                Object.values(peerConnections.current).forEach(pc => pc.close());
-                peerConnections.current = {};
-
-                // Stop local stream
-                if (localStream.current) {
-                    localStream.current.getTracks().forEach(track => track.stop());
-                    localStream.current = null;
-                }
-
-                // Remove audio elements
-                document.querySelectorAll('audio').forEach(a => a.remove());
-
-                setLocalMicEnabled(false);
-                // Speaker durumunu korumak isteyebiliriz ama temizlik için resetleyelim veya koruyalım. 
-                // Speaker'ı kapatmıyoruz, sadece bağlantıları kesiyoruz.
-            };
-
-            const toggleMic = async () => {
-                const newState = !localMicEnabled;
-
-                if (newState) {
-                    try {
-                        showNotification('Mikrofon açıldı. Ses 5-10 saniye içinde gelecek...', 'success');
-
-                        if (!localStream.current) {
-                            const stream = await navigator.mediaDevices.getUserMedia({
-                                audio: {
-                                    echoCancellation: true,
-                                    noiseSuppression: true,
-                                    autoGainControl: true
-                                }
-                            });
-                            localStream.current = stream;
-                        }
-
-                        // Trackleri aktif et
-                        localStream.current.getTracks().forEach(t => t.enabled = true);
-
-                        // Mevcut bağlantılara track ekle (NegotiationNeeded tetiklenir)
-                        const pids = Object.keys(peerConnections.current);
-                        for (const pid of pids) {
-                            const pc = peerConnections.current[pid];
-                            if (!pc) continue;
-
-                            const senders = pc.getSenders();
-                            const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
-
-                            if (!audioSender) {
-                                localStream.current.getTracks().forEach(track => pc.addTrack(track, localStream.current));
-                            } else {
-                                audioSender.replaceTrack(localStream.current.getAudioTracks()[0]);
-                            }
-                        }
-
-                        setLocalMicEnabled(true);
-                    } catch (err) {
-                        console.error('Mic Error:', err);
-                        setLocalMicEnabled(false);
-                        showNotification('Mikrofon hatası: ' + err.message, 'error');
-                        return;
-                    }
-                } else {
-                    if (localStream.current) {
-                        localStream.current.getTracks().forEach(t => t.enabled = false);
-                    }
-                    setLocalMicEnabled(false);
-                    showNotification('Mikrofon qapadıldı', 'info');
-                }
-                sendMessage({ type: 'updateAudioStatus', audioType: 'mic', enabled: newState });
-            };
-
-            const toggleSpeaker = () => {
-                const newState = !localSpeakerEnabled;
-                setLocalSpeakerEnabled(newState);
-
-                // Mevcut tüm audio elementlerini güncelle
-                document.querySelectorAll('audio').forEach(a => {
-                    a.muted = !newState;
-                });
-
-                showNotification(newState ? 'Səslər açıldı' : 'Səslər qapadıldı', 'info');
-                sendMessage({ type: 'updateAudioStatus', audioType: 'speaker', enabled: newState });
             };
 
             const [playerId, setPlayerId] = useState(null);
@@ -1121,18 +555,12 @@
                     waitingOpponent: "Rəqib Gözlənilir",
                     enter: "DAXİL OL",
                     calculationTitle: "SKOR HESAPLANIYOR",
-                    calculationSubtitle: "101 puana ulaşan kazanır!",
+                    calculationSubtitle: "En az puana sahip olan kazanır!",
                     you: "Siz",
                     handTotal: "Elindeki Taşların Toplamı",
                     winnerAnnouncing: "Kazanan açıklanıyor...",
                     noValidMove: "Geçerli hamle yok, otomatik pas geçildi",
-                    roundSystem: "Raund Sistemi: 3-5 (2 Farkla Qazanmaq)",
-                    startEarly: "Oyuna Başla",
-                    confirmStart: "Oyuna başlansın?",
-                    waitingPlayers: "Oyunçular gözlənilir...",
-                    hostStarted: "Oyun sahibi oyunu başlatdı!",
-                    minPlayersRequired: "Ən azı 2 nəfər lazımdır",
-                    mustStartWithDouble: "Oyun {tile} daşı ilə başlamalıdır!"
+                    roundSystem: "Raund Sistemi: 3-5 (2 Farkla Qazanmaq)"
                 },
                 en: {
                     ranked: "Ranked",
@@ -1152,24 +580,6 @@
                     leaveBtn: "LEAVE",
                     yourTurn: "Your Turn",
                     drawTile: "Draw Tile",
-                    bannedTitle: "HESABINIZ YASAKLANDI",
-                    banReason: "Sebep",
-                    banExpires: "Bitiş",
-                    banRemaining: "Kalan Süre",
-                    indefinite: "Süresiz",
-                    days: "gün",
-                    hours: "saat",
-                    minutes: "dakika"
-                },
-                az: {
-                    bannedTitle: "HESABINIZ BANLANDI",
-                    banReason: "Səbəb",
-                    banExpires: "Bitmə vaxtı",
-                    banRemaining: "Qalan vaxt",
-                    indefinite: "Müddətsiz",
-                    days: "gün",
-                    hours: "saat",
-                    minutes: "dəqiqə",
                     passTurn: "Pass Turn",
                     yourHand: "Your Hand",
                     winner: "Winner",
@@ -1179,17 +589,12 @@
                     waitingOpponent: "Waiting Opponent",
                     enter: "ENTER",
                     calculationTitle: "SCORE CALCULATION",
-                    calculationSubtitle: "First to 101 points wins!",
+                    calculationSubtitle: "The player with lowest score wins!",
                     you: "You",
                     handTotal: "Total Points in Hand",
                     winnerAnnouncing: "Winner announcing...",
                     noValidMove: "No valid move, auto-passed",
-                    roundSystem: "Round System: 3-5 (Win by 2)",
-                    startEarly: "Start Game",
-                    confirmStart: "Start game?",
-                    waitingPlayers: "Waiting for players...",
-                    hostStarted: "Host started the game!",
-                    minPlayersRequired: "At least 2 players required"
+                    roundSystem: "Round System: 3-5 (Win by 2)"
                 }
             };
 
@@ -1211,7 +616,7 @@
                     // Timer bitti, oyun sonu ekranına geç
                     const myId = String(playerId || '');
                     const amIWinner = calculationLobby.winner.isMe;
-
+                    
                     setEndInfo({
                         isWinner: amIWinner,
                         isRanked: gameState?.isRanked || false,
@@ -1219,23 +624,22 @@
                         winner: {
                             name: calculationLobby.winner.name,
                             photo: calculationLobby.winner.photo,
-                            eloChange: calculationLobby.winner.eloChange || 0
+                            eloChange: 0
                         },
                         loser: {
                             name: calculationLobby.loser.name,
                             photo: calculationLobby.loser.photo,
-                            eloChange: calculationLobby.loser.eloChange || 0
+                            eloChange: 0
                         }
                     });
-
+                    
                     setScreen('end');
                     setCalculationLobby(null);
-
+                    
                     localStorage.removeItem('domino_session');
                     setTimeout(() => {
                         resetGameClientState();
                         if (playerData) initializeTelegramAuth();
-                        sendMessage({ type: 'cancelSearch' });
                         setScreen('lobby');
                     }, 8000);
                 }
@@ -1250,11 +654,9 @@
                 setValidMoves([]);
                 setEndInfo(null);
                 setOpponent(null);
-                setOpponents([]);
                 setJoinCode('');
                 setCalculationLobby(null);
                 setCalculationTimer(8);
-                setIsHost(false); // Reset host status
                 prevBoardLength.current = 0;
                 isMyMove.current = false;
             };
@@ -1289,7 +691,7 @@
                 if (gameState && isMyTurn && screen === 'game') {
                     const myHand = gameState.players[myPlayerId]?.hand || [];
                     const marketSize = gameState.market?.length || 0;
-
+                    
                     // Eğer elinde taş varsa ve pazarda taş yoksa otomatik pass kontrolü
                     if (myHand.length > 0 && marketSize === 0) {
                         // Valid moves kontrolü
@@ -1301,7 +703,7 @@
                                 break;
                             }
                         }
-
+                        
                         // Geçerli hamle yoksa otomatik pass
                         if (!hasValidMove) {
                             const timeout = setTimeout(() => {
@@ -1309,35 +711,18 @@
                                 playSound('pass');
                                 showNotification(t.noValidMove, 'info');
                             }, 1000);
-
+                            
                             return () => clearTimeout(timeout);
                         }
                     }
                 }
             }, [gameState, isMyTurn, screen]);
 
-            // Ban süresi hesaplama yardımcısı
-            const getBanRemainingText = (expiresAt) => {
-                if (!expiresAt) return t.indefinite;
-                const now = new Date();
-                const end = new Date(expiresAt);
-                const diff = end - now;
-
-                if (diff <= 0) return "0 " + t.minutes;
-
-                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-                if (days > 0) return `${days} ${t.days} ${hours} ${t.hours}`;
-                return `${hours} ${t.hours} ${minutes} ${t.minutes}`;
-            };
-
             // Rakip Hamle Sesi Kontrolü
             useEffect(() => {
                 if (!gameState) return;
                 const currentLen = gameState.board.length;
-
+                
                 // Tahtadaki taş sayısı arttıysa
                 if (currentLen > prevBoardLength.current) {
                     // Ve hamleyi ben yapmadıysam (isMyMove false ise)
@@ -1377,8 +762,7 @@
                             setPlayerData({
                                 ...data.player,
                                 isGuest: false,
-                                photoUrl: telegramData.photoUrl || data.player.photoUrl,
-                                ban: data.ban // Ban bilgisini kaydet
+                                photoUrl: telegramData.photoUrl || data.player.photoUrl
                             });
                             console.log('✅ Telegram Auth başarılı:', data.player);
                         } else {
@@ -1449,9 +833,34 @@
 
             // Ses Efektleri
             const playSound = (type) => {
-                AudioEngine.play(type, lastSoundIndex);
+                const sounds = {
+                    found: 'sound1found.mp3',
+                    start: 'sound2oyunbasladi.mp3',
+                    lose: 'sound3lose.mp3',
+                    win: 'sound4win.mp3',
+                    pass: 'sound5bel.mp3',
+                    place6: 'sound6.mp3',
+                    place7: 'sound7.mp3',
+                    place8: 'sound8.mp3'
+                };
+
+                let soundFile = '';
                 if (type === 'place') {
+                    // Sira ile 6, 7, 8 çal
+                    const nextIdx = (lastSoundIndex % 3) + 6; // 6, 7, 8
+                    soundFile = sounds[`place${nextIdx}`];
                     setLastSoundIndex(prev => prev + 1);
+                } else {
+                    soundFile = sounds[type];
+                }
+
+                if (!soundFile) return;
+
+                try {
+                    const audio = new Audio(soundFile);
+                    audio.play().catch(e => console.log('Ses çalınamadı (Interaksiyon gerekli):', e));
+                } catch (e) {
+                    console.error('Audio error:', e);
                 }
             };
 
@@ -1467,13 +876,20 @@
                     setConnected(true);
                     showNotification('Sunucuya Bağlandı', 'success');
 
-                    // Rejoin if session exists
+                    // Rejoin if session exists (ama 5 dakikadan eskiyse değil)
                     if (window._lastSession) {
-                        ws.send(JSON.stringify({
-                            type: 'rejoin',
-                            playerId: window._lastSession.playerId,
-                            roomCode: window._lastSession.roomCode
-                        }));
+                        const sessionAge = Date.now() - (window._lastSession.timestamp || 0);
+                        if (sessionAge < 300000) { // 5 dakika
+                            ws.send(JSON.stringify({
+                                type: 'rejoin',
+                                playerId: window._lastSession.playerId,
+                                roomCode: window._lastSession.roomCode
+                            }));
+                        } else {
+                            // Eski session'ı temizle
+                            localStorage.removeItem('domino_session');
+                            window._lastSession = null;
+                        }
                     }
                 };
                 ws.onclose = () => { setConnected(false); setTimeout(connectToServer, 3000); };
@@ -1490,49 +906,40 @@
                 console.log('📨 Server mesajı:', data.type, data);
 
                 switch (data.type) {
+                    case 'clearSession':
+                        localStorage.removeItem('domino_session');
+                        resetGameClientState();
+                        setScreen('lobby');
+                        showNotification(data.message || 'Oyun session temizlendi', 'info');
+                        break;
                     case 'session':
                         setPlayerId(data.playerId);
                         // Save session for reconnection
                         localStorage.setItem('domino_session', JSON.stringify({
                             playerId: data.playerId,
-                            roomCode: data.roomCode
+                            roomCode: data.roomCode,
+                            timestamp: Date.now()
                         }));
                         break;
                     case 'roomCreated':
                         setRoomCode(data.roomCode);
-                        setIsHost(true); // Set host status
-                        setScreen('room_lobby'); // Transition to room lobby
-                        setOpponents([]); // Clear opponents for new room
+                        showNotification(`Oda oluşturuldu: ${data.roomCode}`, 'success');
                         break;
                     case 'roomJoined':
                         setRoomCode(data.roomCode);
-                        setIsHost(false);
-                        const currentOpponents = data.players.filter(p => String(p.id) !== String(data.playerId || playerId));
-                        setOpponents(currentOpponents);
-                        setScreen('room_lobby');
-
-                        // WebRTC: Odaya girince rakiplerle bağlantı kur
-                        currentOpponents.forEach(p => {
-                            createPeerConnection(String(p.id));
-                        });
+                        setOpponent(data.opponent);
+                        showNotification(`Odaya katıldınız: ${data.roomCode}`, 'success');
                         break;
-                    case 'playerJoinedRoom':
-                        showNotification(`${data.player.username} odaya katıldı!`, 'info');
-                        setOpponents(prev => [...prev, data.player]);
-                        // WebRTC: Yeni gelen oyuncuyla bağlantı kur
-                        createPeerConnection(String(data.player.id));
-                        break;
-                    case 'playerLeftRoom':
-                        showNotification(`${data.player.username} odadan ayrıldı!`, 'info');
-                        setOpponents(prev => prev.filter(p => p.id !== data.player.id));
-                        if (data.newHostId === playerId) {
-                            setIsHost(true);
-                            showNotification('Artık odanın sahibisiniz!', 'info');
+                    case 'playerJoined':
+                        setOpponent(data.player);
+                        showNotification(`${data.player.username || 'Rakip'} odaya katıldı!`, 'success');
+                        // Start game if enough players
+                        if (data.startGame) {
+                            setTimeout(() => setScreen('matching_lobby'), 1000);
                         }
                         break;
                     case 'gameStart':
                     case 'gameUpdate':
-                    case 'gameState':
                         if (data.gameState) {
                             setGameState(prevState => ({
                                 ...prevState,
@@ -1545,22 +952,12 @@
                             if (data.type === 'gameStart') {
                                 playSound('start');
                                 showNotification('Oyun Başladı!', 'success');
-
-                                // WebRTC: Oda katılımında bağlantıları hazırla
-                                if (data.gameState.playerOrder) {
-                                    data.gameState.playerOrder.forEach(pid => {
-                                        const myCurrentId = String(data.gameState.playerId || playerId || '');
-                                        if (String(pid) !== myCurrentId) {
-                                            createPeerConnection(String(pid));
-                                        }
-                                    });
-                                }
-
                                 // Save session
                                 if (data.gameState.playerId && data.gameState.roomCode) {
                                     localStorage.setItem('domino_session', JSON.stringify({
                                         playerId: data.gameState.playerId,
-                                        roomCode: data.gameState.roomCode
+                                        roomCode: data.gameState.roomCode,
+                                        timestamp: Date.now()
                                     }));
                                 }
                             }
@@ -1571,16 +968,6 @@
                     case 'error':
                         showNotification(data.message, 'error');
                         setSearching(false);
-                        // Eğer oyundaysak lobiye dönme, sadece bildirim göster
-                        if (screen !== 'game') {
-                            sendMessage({ type: 'cancelSearch' });
-                            setScreen('lobby');
-                        } else {
-                            // Oyundaysak sadece toast gösterdik, ek bir şey yapma
-                            if (data.message === 'Elinizdə oynana bilən daş var!' || data.message.includes('Sadece')) {
-                                // Ekstra ses veya görsel eklenebilir
-                            }
-                        }
                         break;
                     case 'gameEnd':
                         console.log('🏁 Oyun Bitti!', data);
@@ -1595,7 +982,7 @@
                             const change = amIWinner ? (data.eloChanges?.winner || 0) : (data.eloChanges?.loser || 0);
                             const newElo = Math.max(0, playerData.elo + change);
                             const newLevel = calculateLevel(newElo);
-
+                            
                             setPlayerData(prev => ({
                                 ...prev,
                                 elo: newElo,
@@ -1604,17 +991,19 @@
                         }
 
                         setEndInfo({
-                            title: 'OYUN BİTDİ',
                             isWinner: amIWinner,
                             isRanked: data.isRanked,
                             reason: endReason,
-                            players: data.players || [], // All players from server
                             winner: {
-                                id: data.winner,
                                 name: data.winnerName,
                                 photo: data.winnerPhoto,
                                 eloChange: data.eloChanges?.winner || 0
                             },
+                            loser: {
+                                name: data.loserName,
+                                photo: data.loserPhoto,
+                                eloChange: data.eloChanges?.loser || 0
+                            }
                         });
 
                         setScreen('end');
@@ -1624,19 +1013,7 @@
                         setTimeout(() => {
                             resetGameClientState();
                             if (playerData) initializeTelegramAuth();
-
-                            // Redirection Logic
-                            const isRanked = data.isRanked;
-                            const isPersistent = (gameState?.playerOrder?.length === 4) || (roomCode && roomCode !== '');
-
-                            if (isRanked || !isPersistent) {
-                                sendMessage({ type: 'cancelSearch' });
-                                cleanupVoiceChat();
-                                setScreen('lobby');
-                            } else {
-                                // Özel oda veya 4p maç ise oda lobisine dön
-                                setScreen('room_lobby');
-                            }
+                            setScreen('lobby');
                         }, 5000);
                         break;
                     case 'playerDisconnected':
@@ -1644,7 +1021,6 @@
                         break;
                     case 'playerReconnected':
                         showNotification(`${data.playerName} geri döndü!`, 'success');
-                        setServerMessage(null); // Bekleme mesajını anında kaldır
                         break;
                     case 'turnPassed':
                         showNotification(`${data.playerName} pas geçti`, 'info');
@@ -1653,59 +1029,8 @@
                     case 'matchFound':
                         playSound('found');
                         setSearching(false);
-                        if (data.opponents) {
-                            setOpponents(data.opponents);
-                            // For single opponent display in matching_lobby if needed, take the first one
-                            setOpponent(data.opponents[0]);
-                        } else if (data.opponent) {
-                            setOpponents([data.opponent]);
-                            setOpponent(data.opponent);
-                        }
+                        setOpponent(data.opponent);
                         setScreen('matching_lobby');
-                        break;
-                    case 'roomUpdated':
-                        setRoomCode(data.roomCode);
-                        const otherPlayers = data.players.filter(p => String(p.id) !== String(playerId));
-                        setOpponents(otherPlayers);
-                        setIsHost(data.host === playerId);
-                        setRoomCapacity(data.capacity);
-                        setScreen('room_lobby');
-
-                        // WebRTC: Oda güncellendiğinde rakiplerle bağlantı kur
-                        otherPlayers.forEach(p => {
-                            createPeerConnection(String(p.id));
-                        });
-                        break;
-                    case 'broadcastMessage':
-                        try {
-                            if (!localStorage.getItem('announcement_closed')) {
-                                setAnnouncement(data.message);
-                            }
-                        } catch (e) {
-                            setAnnouncement(data.message);
-                        }
-                        break;
-                    case 'audioStatusUpdate':
-                        setGameState(prev => {
-                            if (!prev || !prev.players) return prev;
-                            const newPlayers = { ...prev.players };
-                            if (newPlayers[data.playerId]) {
-                                newPlayers[data.playerId].micEnabled = data.micEnabled;
-                                newPlayers[data.playerId].speakerEnabled = data.speakerEnabled;
-                            }
-                            return { ...prev, players: newPlayers };
-                        });
-                        break;
-                    case 'voiceSignal':
-                        if (data.from && data.signal) {
-                            handleWebRTCSignal(data.from, data.signal);
-                        }
-                        if (localSpeakerEnabled && !speakingToastShown.current.has(data.from)) {
-                            const speakerName = gameState?.players[data.from]?.name || 'Rəqib';
-                            showNotification(`${speakerName} danışır...`, 'info');
-                            speakingToastShown.current.add(data.from);
-                            setTimeout(() => speakingToastShown.current.delete(data.from), 3000);
-                        }
                         break;
                     case 'gameMessage':
                         setServerMessage(data);
@@ -1715,31 +1040,34 @@
                         // Hesaplama lobisi göster
                         const players = data.players || {};
                         const myIdForCalc = String(playerId || '');
-
+                        
                         // Oyuncu puanlarını hesapla
-                        // Puanı 101 olan KAYBEDER (Elimination)
-                        // Kullanıcı isteği: "101 olan kazansın" (Belki hedef puandır?)
-                        // Genelde domino/okeyde ceza puanı birikir. Kullanıcı "Rakibe yazılsın, 101 olan kazansın" dedi.
-                        // Bu çelişkili olabilir. Genellikle 101'e ulaşan ELENİR. Ama "101 olan kazansın" dediyse hedef skor olabilir.
-                        // Ancak "Rakibe yazılsın" dediği için bu CEZA puanıdır.
-                        // Biz standart "Ceza Puanı" mantığını uyguladık (Server). Client sadece gösterir.
-
-                        const isMatchEnd = Object.values(players).some(p => p.score >= 101);
-
-                        // Daha çok puan yapan kazanır (101 hedefi)
-                        const entries = Object.entries(players);
-                        entries.sort((a, b) => b[1].score - a[1].score);
-
+                        const playerScores = {};
+                        for (const [pid, player] of Object.entries(players)) {
+                            const hand = player.hand || [];
+                            const score = hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
+                            playerScores[pid] = {
+                                score,
+                                name: player.username || 'Oyuncu',
+                                photo: player.photoUrl || null,
+                                isMe: pid === myIdForCalc
+                            };
+                        }
+                        
+                        // Daha az puan yapan kazanır
+                        const entries = Object.entries(playerScores);
+                        entries.sort((a, b) => a[1].score - b[1].score);
+                        
                         const winner = entries[0][1];
                         const loser = entries[1][1];
-
+                        
                         setCalculationLobby({
-                            players: players,
+                            players: playerScores,
                             winner,
                             loser,
-                            myScore: players[myIdForCalc]?.score || 0
+                            myScore: playerScores[myIdForCalc]?.score || 0
                         });
-
+                        
                         setCalculationTimer(8);
                         setScreen('calculation');
                         break;
@@ -1868,14 +1196,14 @@
             };
 
             // --- OYUN MANTIĞI ---
-            const myPlayerId = gameState?.playerId || playerId;
+            const myPlayerId = gameState?.playerId;
             const isMyTurn = gameState?.currentPlayer === myPlayerId;
             const myHand = gameState?.players[myPlayerId]?.hand || [];
             const marketSize = gameState?.market?.length || 0;
             const canDrawFromMarket = marketSize > 0;
-
-            // const opponentPlayerId = Object.keys(gameState?.players || {}).find(id => id !== myPlayerId);
-            // const opponentHand = gameState?.players[opponentPlayerId]?.hand || [];
+            
+            const opponentPlayerId = Object.keys(gameState?.players || {}).find(id => id !== myPlayerId);
+            const opponentHand = gameState?.players[opponentPlayerId]?.hand || [];
 
             const calculateValidMoves = (tile) => {
                 if (!gameState || gameState.board.length === 0) return ['start'];
@@ -1889,16 +1217,6 @@
 
             const handleTileClick = (index, tile) => {
                 if (!isMyTurn) return;
-
-                // FIRST MOVE CHECK (Client-Side)
-                if (gameState.moves === 0 && gameState.firstMoveTile) {
-                    const [d1, d2] = gameState.firstMoveTile;
-                    if (!((tile[0] === d1 && tile[1] === d2) || (tile[0] === d2 && tile[1] === d1))) {
-                        showNotification(`Sadece ${d1}:${d2} oynayabilirsiniz!`, 'error');
-                        return;
-                    }
-                }
-
                 if (selectedTileIndex === index) {
                     setSelectedTileIndex(null);
                     setValidMoves([]);
@@ -1934,391 +1252,84 @@
                     sendMessage({ type: 'leaveGame' });
                     localStorage.removeItem('domino_session');
                     resetGameClientState();
-                    sendMessage({ type: 'cancelSearch' });
                     setScreen('lobby');
                 }
             };
 
+            // Odaya katılma işlemi
             const handleJoinRoom = () => {
                 if (!joinCode.trim()) {
                     showNotification('Lütfən oda kodu girin', 'warning');
                     return;
                 }
-                sendMessage({
-                    type: 'joinRoom',
-                    roomCode: joinCode,
+                
+                sendMessage({ 
+                    type: 'joinRoom', 
+                    roomCode: joinCode, 
                     ...playerData,
                     language
                 });
-            };
 
-            const reportBug = () => {
-                const msg = prompt(language === 'az' ? "Hatanı bildirin:" : "Report your bug:");
-                if (!msg || !msg.trim()) return;
+        const bWidth = maxX - minX;
+        const bHeight = maxY - minY;
 
-                fetch(`${API_URL}/api/report/bug`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        userId: playerId,
-                        username: playerData?.username || 'Guest',
-                        message: msg,
-                        language
-                    })
-                }).then(res => res.json()).then(data => {
-                    if (data.success) showNotification(language === 'az' ? 'Raporunuz göndərildi!' : 'Report sent!', 'success');
-                });
-            };
+        const cWidth = boardContainerRef.current.clientWidth;
+        const cHeight = boardContainerRef.current.clientHeight;
 
-            const reportUser = (targetPid, targetName, targetTelegramId) => {
-                const reason = prompt(language === 'az' ? `${targetName} haqqında şikayət səbəbi:` : `Reason for reporting ${targetName}:`);
-                if (!reason || !reason.trim()) return;
+        const scaleX = cWidth / bWidth;
+        const scaleY = (cHeight * 0.75) / bHeight;
+        const scale = Math.min(scaleX, scaleY, 1.2);
 
-                fetch(`${API_URL}/api/report`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        reporterId: playerData?.telegramId || playerId,
-                        reporterName: playerData?.username || 'Guest',
-                        reportedId: targetTelegramId || targetPid,
-                        reportedName: targetName,
-                        reason
-                    })
-                }).then(res => res.json()).then(data => {
-                    if (data.success) showNotification(language === 'az' ? 'Şikayətiniz göndərildi!' : 'Report sent!', 'success');
-                    else if (data.message) showNotification(data.message, 'warning');
-                });
-            };
+        setBoardScale(scale);
 
-            // --- RENDER PARTS ---
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
 
-            if (screen === 'loading') return (
-                <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-table-dark via-table-base to-table-light relative overflow-hidden">
-                    {/* Animated Background Dots */}
-                    <div className="absolute inset-0 opacity-20">
-                        {[...Array(20)].map((_, i) => (
-                            <div
-                                key={i}
-                                className="absolute w-2 h-2 bg-white rounded-full animate-float"
-                                style={{
-                                    left: `${Math.random() * 100}%`,
-                                    top: `${Math.random() * 100}%`,
-                                    animationDelay: `${Math.random() * 3}s`,
-                                    animationDuration: `${3 + Math.random() * 2}s`
+        setBoardOffset({
+            x: (cWidth / 2) - centerX * scale,
+            y: (cHeight / 2) - centerY * scale
+        });
+    } else if (boardContainerRef.current) {
+        setBoardOffset({ x: boardContainerRef.current.clientWidth / 2, y: boardContainerRef.current.clientHeight / 2 });
+        setBoardScale(1);
+    }
+}, [boardLayout]);
+
+const sendMessage = (msg) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify(msg));
+    }
+};
+
+const showNotification = (msg, type = 'info') => {
+    setNotification({ message: msg, type });
+    setTimeout(() => setNotification(null), 3000);
+};
+
+// --- OYUN MANTIĞI ---
+const myPlayerId = gameState?.playerId;
+const isMyTurn = gameState?.currentPlayer === myPlayerId;
+const myHand = gameState?.players[myPlayerId]?.hand || [];
+const marketSize = gameState?.market?.length || 0;
+const canDrawFromMarket = marketSize > 0;
+                                onClick={() => {
+                                    navigator.clipboard.writeText(roomCode);
+                                    showNotification('Oda kodu kopyalandı!', 'success');
                                 }}
-                            />
-                        ))}
-                    </div>
-
-                    {/* Main Loading Animation - Only Animation */}
-                    <div className="relative z-10 flex flex-col items-center">
-                        {/* Falling Dominoes Animation */}
-                        <div className="relative w-64 h-32">
-                            {[0, 1, 2, 3, 4].map((i) => (
-                                <div
-                                    key={i}
-                                    className="absolute bg-bone-face border-2 border-gray-300 rounded-lg shadow-3d"
-                                    style={{
-                                        width: '40px',
-                                        height: '80px',
-                                        left: `${i * 50}px`,
-                                        animation: `dominoFall 1.5s ease-in-out infinite`,
-                                        animationDelay: `${i * 0.15}s`,
-                                        transformOrigin: 'bottom center'
-                                    }}
-                                >
-                                    <div className="w-full h-1/2 border-b border-gray-200 flex items-center justify-center">
-                                        <div className="w-2 h-2 bg-black rounded-full"></div>
-                                    </div>
-                                    <div className="w-full h-1/2 flex items-center justify-center">
-                                        <div className="w-2 h-2 bg-black rounded-full"></div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Loading Spinner */}
-                        <div className="relative w-16 h-16 mt-8">
-                            <div className="absolute inset-0 border-4 border-yellow-500/20 rounded-full"></div>
-                            <div className="absolute inset-0 border-4 border-t-yellow-500 rounded-full animate-spin"></div>
-                        </div>
-                    </div>
-
-                </div>
-            );
-
-            if (screen === 'lobby') return (
-                <div className="flex flex-col items-center justify-center min-h-screen p-6">
-                    {notification && <Toast message={notification.message} type={notification.type} />}
-                    {announcement && <AnnouncementPopup message={announcement} onClose={() => setAnnouncement(null)} />}
-
-                    {/* Admin Button - Moved down by 5cm - Güvenli Kontrol */}
-                    {playerData && String(playerData.telegramId) === '976640409' && (
-                        <div className="absolute top-[5cm] right-4 z-50">
-                            <button
-                                onClick={() => setShowAdmin(true)}
-                                className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white px-5 py-2.5 rounded-xl font-black shadow-lg text-xs tracking-widest border border-purple-400/50 transition-all duration-300 transform hover:scale-105"
+                                className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/40 rounded-2xl text-center cursor-pointer hover:bg-yellow-500/20 active:scale-95 transition-all group"
                             >
-                                ADMIN PANEL
-                            </button>
-                        </div>
-                    )}
-                    {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} adminId={playerData.telegramId} />}
-
-                    <div className="text-center mb-10 animate-float">
-                        <h1 className="text-6xl font-black text-white drop-shadow-2xl mb-2">DOMINO <span className="text-yellow-400">101</span></h1>
-                        <p className="text-white/60 tracking-widest uppercase">Premium Multiplayer Experience ( BETA )</p>
-                    </div>
-
-                    <div className="w-full max-w-sm bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10 shadow-2xl">
-                        {playerData && (
-                            <div className="mb-8 text-center">
-                                {playerData.photoUrl && <img src={playerData.photoUrl} className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 p-1" />}
-                                <div className="text-white text-2xl font-bold">{playerData.username}</div>
-                                <div className="flex justify-center mt-2 animate-slide-up">
-                                    <div className="flex items-center bg-gradient-to-r from-blue-600 to-indigo-700 px-4 py-1.5 rounded-full border border-white/20 shadow-xl gap-2">
-                                        <span className="text-white text-[10px] font-black tracking-widest uppercase">LV.{playerData.level}</span>
-                                        <div className="w-px h-3 bg-white/20"></div>
-                                        <span className="text-yellow-400 text-xs font-black">{playerData.elo} ELO</span>
-                                        {playerData.telegramId === '1840079939' && (
-                                            <>
-                                                <div className="w-px h-3 bg-white/20"></div>
-                                                <span className="text-white text-[9px] font-black tracking-widest">OWNER</span>
-                                            </>
-                                        )}
-                                    </div>
+                                <div className="text-yellow-400 text-xs font-bold flex items-center justify-center gap-2">
+                                    ODA KODU <span className="text-[10px] bg-yellow-500/20 px-2 py-0.5 rounded-full">{t.copy}</span>
                                 </div>
+                                <div className="text-4xl text-white font-black tracking-widest mt-1 group-hover:text-yellow-400">{roomCode}</div>
                             </div>
                         )}
-
-                        {/* BAN UYARISI (LOBBY) */}
-                        {playerData?.ban && (
-                            <div className="mb-6 bg-red-900/60 border border-red-500 rounded-2xl p-4 animate-pulse">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <span className="text-2xl">🚫</span>
-                                    <h3 className="text-red-400 font-black uppercase tracking-widest">{t.bannedTitle}</h3>
-                                </div>
-                                <div className="space-y-1 text-sm">
-                                    <p className="text-white"><span className="text-red-400 font-bold">{t.banReason}:</span> {playerData.ban.reason}</p>
-                                    <p className="text-white"><span className="text-red-400 font-bold">{t.banRemaining}:</span> {getBanRemainingText(playerData.ban.expiresAt)}</p>
-                                    <p className="text-white/50 text-xs mt-2 italic">Ranked oyunlara girişiniz məhdudlaşdırılıb.</p>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="flex justify-center mb-4 gap-2">
-                            <button
-                                onClick={() => setLanguage(lang => lang === 'az' ? 'en' : 'az')}
-                                className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-sm font-bold transition-all"
-                            >
-                                {language === 'az' ? '🇦🇿 AZ' : '🇺🇸 EN'}
-                            </button>
-                            <button
-                                onClick={reportBug}
-                                className="bg-red-500/20 hover:bg-red-500/40 text-red-400 px-4 py-2 rounded-full text-xs font-black transition-all border border-red-500/30 flex items-center gap-2"
-                            >
-                                🐞 {language === 'az' ? 'HATA BİLDİR' : 'REPORT BUG'}
-                            </button>
-                        </div>
-
-                        {/* 2'li ve 4'lü Mod Seçimi */}
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                            <button onClick={() => {
-                                if (playerData?.ban) {
-                                    showNotification(`${t.bannedTitle}: ${getBanRemainingText(playerData.ban.expiresAt)}`, 'error');
-                                    return;
-                                }
-                                setScreen('searching');
-                                setSearching(true);
-                                sendMessage({ type: 'findMatch', mode: '2', ...playerData, language });
-                            }} className="group relative flex flex-col items-center justify-center bg-gradient-to-br from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 p-6 rounded-2xl transition-all transform active:scale-95 shadow-lg overflow-hidden">
-                                <div className="mb-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-black/80" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M7.5 6.5C7.5 8.981 9.519 11 12 11s4.5-2.019 4.5-4.5S14.481 2 12 2 7.5 4.019 7.5 6.5zM20 21h1v-1c0-3.859-3.141-7-7-7h-4c-3.86 0-7 3.141-7 7v1h17z" />
-                                    </svg>
-                                </div>
-                                <span className="text-black font-black text-xl">2</span>
-                                <span className="text-black/60 text-[10px] font-bold">RANKED</span>
-                                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                            </button>
-
-                            <button onClick={() => {
-                                if (playerData?.ban) {
-                                    showNotification(`${t.bannedTitle}: ${getBanRemainingText(playerData.ban.expiresAt)}`, 'error');
-                                    return;
-                                }
-                                setScreen('searching');
-                                setSearching(true);
-                                sendMessage({ type: 'findMatch', mode: '4', ...playerData, language });
-                            }} className="group relative flex flex-col items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 p-6 rounded-2xl transition-all transform active:scale-95 shadow-lg overflow-hidden">
-                                <div className="mb-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-white/90" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M12 2a5 5 0 1 0 5 5 5 5 0 0 0-5-5zm0 8a3 3 0 1 1 3-3 3 3 0 0 1-3 3zm9 11v-1a7 7 0 0 0-7-7h-4a7 7 0 0 0-7 7v1h2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5zm-2-8a2.5 2.5 0 1 0-2.5-2.5A2.5 2.5 0 0 0 19 13zm-14 0a2.5 2.5 0 1 0-2.5-2.5A2.5 2.5 0 0 0 5 13z" />
-                                    </svg>
-                                </div>
-                                <span className="text-white font-black text-xl">4</span>
-                                <span className="text-white/60 text-[10px] font-bold uppercase tracking-widest">RANKED</span>
-                                <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                            </button>
-                        </div>
-
-                        <div className="flex flex-col gap-3">
-                            {/* Oda Kurma Butonları */}
-                            <div className="grid grid-cols-2 gap-2">
-                                <button onClick={() => sendMessage({ type: 'createRoom', capacity: 2, ...playerData, language })} className="bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm">
-                                    <span>🏠</span>
-                                    <span>ODA (2)</span>
-                                </button>
-                                <button onClick={() => sendMessage({ type: 'createRoom', capacity: 4, ...playerData, language })} className="bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm">
-                                    <span>🏠</span>
-                                    <span>ODA (4)</span>
-                                </button>
-                            </div>
-
-                            <div className="flex gap-2">
-                                <input
-                                    value={joinCode}
-                                    onChange={e => setJoinCode(e.target.value.toUpperCase())}
-                                    placeholder={t.roomCode}
-                                    className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 text-white text-center font-bold focus:border-yellow-500 transition-all"
-                                />
-                                <button
-                                    onClick={() => {
-                                        if (!joinCode || joinCode.trim() === '') return showNotification('Lütfen oda kodu girin', 'warning');
-                                        const code = joinCode.toUpperCase().trim();
-                                        console.log('🚪 Odaya katılma isteği:', code);
-                                        sendMessage({ type: 'joinRoom', roomCode: code, ...playerData, language });
-                                    }}
-                                    className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 rounded-xl font-black transition-all shadow-glow active:scale-95"
-                                >
-                                    GİR
-                                </button>
-                            </div>
-                        </div>
-
-                        {
-                            roomCode && (
-                                <div
-                                    onClick={() => {
-                                        navigator.clipboard.writeText(roomCode);
-                                        showNotification('Oda kodu kopyalandı!', 'success');
-                                    }}
-                                    className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/40 rounded-2xl text-center cursor-pointer hover:bg-yellow-500/20 active:scale-95 transition-all group"
-                                >
-                                    <div className="text-yellow-400 text-xs font-bold flex items-center justify-center gap-2">
-                                        ODA KODU <span className="text-[10px] bg-yellow-500/20 px-2 py-0.5 rounded-full">{t.copy}</span>
-                                    </div>
-                                    <div className="text-4xl text-white font-black tracking-widest mt-1 group-hover:text-yellow-400">{roomCode}</div>
-                                </div>
-                            )
-                        }
 
                         <button onClick={() => { loadLeaderboard(); setScreen('leaderboard'); }} className="w-full mt-6 text-white/40 hover:text-white transition-colors text-sm font-bold flex items-center justify-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                                 <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                             </svg>
                             {t.leaderboard}
-                        </button>
-                    </div >
-                </div >
-            );
-
-            if (screen === 'room_lobby') return (
-                <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-[#0b241c] relative overflow-hidden">
-                    {/* Animated Decorative Circle */}
-                    <div className="absolute -top-24 -right-24 w-64 h-64 bg-yellow-500/10 rounded-full blur-3xl"></div>
-                    <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl"></div>
-
-                    <div className="text-center mb-12 relative z-10">
-                        <div className="text-yellow-500 text-xs font-black tracking-[0.3em] uppercase mb-2">ÖZEL ODA KATILIMCILARI</div>
-                        <h2 className="text-4xl font-black text-white">{roomCode}</h2>
-                        <div className="mt-2 inline-flex items-center bg-white/10 px-4 py-1 rounded-full border border-white/10 gap-2">
-                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                            <span className="text-white/60 text-[10px] font-bold uppercase tracking-widest">
-                                {opponents.length + 1} / {roomCapacity} OYUNCU
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 w-full max-w-sm relative z-10">
-                        {/* Me */}
-                        <div className="flex flex-col items-center p-4 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-md">
-                            <div className="relative mb-3">
-                                <img src={playerData?.photoUrl || 'https://via.placeholder.com/80'} className="w-20 h-20 rounded-2xl border-2 border-blue-400/50 shadow-xl" />
-                                <div className="absolute -bottom-2 -right-2 bg-blue-500 text-white text-[8px] font-black px-2 py-1 rounded-full shadow-lg">SİZ</div>
-                            </div>
-                            <div className="text-white font-bold text-sm truncate w-full text-center">{playerData?.username}</div>
-                            <div className="text-blue-400 font-black text-[10px] uppercase mt-1">LVL {playerData?.level} | {playerData?.elo} ELO</div>
-                        </div>
-
-                        {/* Opponents or Empty Slots */}
-                        {[...Array(roomCapacity - 1)].map((_, i) => {
-                            const opp = opponents[i];
-                            if (opp) {
-                                return (
-                                    <div key={i} className="flex flex-col items-center p-4 bg-white/5 border border-white/10 rounded-3xl animate-slide-in backdrop-blur-md">
-                                        <div className="relative mb-3">
-                                            <img src={opp.photoUrl || 'https://via.placeholder.com/80'} className="w-20 h-20 rounded-2xl border-2 border-yellow-500/50 shadow-xl" />
-                                            {roomCapacity === 4 && i === 0 && <div className="absolute -bottom-2 -right-2 bg-yellow-500 text-black text-[8px] font-black px-2 py-1 rounded-full shadow-lg">ORTAK</div>}
-                                        </div>
-                                        <div className="text-white font-bold text-sm truncate w-full text-center">{opp.name || opp.username}</div>
-                                        <div className="text-yellow-500 font-black text-[10px] uppercase mt-1">LVL {opp.level} | {opp.elo} ELO</div>
-                                    </div>
-                                );
-                            } else {
-                                return (
-                                    <div key={i} className="flex flex-col items-center justify-center p-4 bg-black/20 border border-dashed border-white/10 rounded-3xl animate-pulse backdrop-blur-sm">
-                                        <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center text-white/20 text-3xl mb-3">?</div>
-                                        <div className="text-white/20 text-[10px] font-bold uppercase tracking-widest">{t.waitingOpponent}</div>
-                                    </div>
-                                );
-                            }
-                        })}
-                    </div>
-
-                    <div className="mt-12 flex flex-col gap-3 w-full max-w-xs relative z-10">
-                        {/* Voice Buttons for Lobby */}
-                        <div className="flex gap-4 justify-center mb-6">
-                            <button
-                                onClick={toggleMic}
-                                className={`w-14 h-14 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localMicEnabled ? 'bg-green-500 border-green-400 text-white animate-glow-pulse' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
-                            >
-                                <span className="text-3xl">{localMicEnabled ? '🎙️' : '🔇'}</span>
-                            </button>
-                            <button
-                                onClick={toggleSpeaker}
-                                className={`w-14 h-14 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localSpeakerEnabled ? 'bg-blue-500 border-blue-400 text-white shadow-glow' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
-                            >
-                                <span className="text-3xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
-                            </button>
-                        </div>
-
-                        {isHost && opponents.length >= 1 && (
-                            <button
-                                onClick={() => {
-                                    if (window.confirm(t.confirmStart.replace('{count}', opponents.length + 1))) {
-                                        sendMessage({ type: 'startGameEarly' });
-                                    }
-                                }}
-                                className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black font-black py-4 rounded-2xl shadow-glow transform active:scale-95 transition-all text-sm tracking-widest"
-                            >
-                                {t.startEarly}
-                            </button>
-                        )}
-                        {!isHost && opponents.length === 0 && (
-                            <div className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em] text-center mb-2 animate-pulse">
-                                {t.waitingOpponent}
-                            </div>
-                        )}
-                        <button
-                            onClick={() => {
-                                sendMessage({ type: 'leaveGame' });
-                                cleanupVoiceChat();
-                                setScreen('lobby');
-                            }}
-                            className="w-full bg-white/5 hover:bg-white/10 text-white font-bold py-3 rounded-2xl border border-white/10 transition-all text-xs tracking-widest"
-                        >
-                            {t.cancel}
                         </button>
                     </div>
                 </div>
@@ -2331,34 +1342,34 @@
                         <p className="text-white/40 mt-2 uppercase tracking-[0.3em]">{t.matchStarting}</p>
                     </div>
 
-                    <div className="flex items-center gap-4 sm:gap-12 w-full max-w-4xl px-4 overflow-x-auto pb-4">
-                        <div className="flex-1 flex flex-col items-center gap-4 animate-slide-right min-w-[150px]">
+                    <div className="absolute top-24 bg-white/10 px-6 py-2 rounded-full border border-white/20 backdrop-blur-md animate-pulse">
+                        <span className="text-yellow-400 font-bold text-sm tracking-wider uppercase">{t.roundSystem}</span>
+                    </div>
+
+                    <div className="flex items-center gap-4 sm:gap-12 w-full max-w-2xl px-4">
+                        <div className="flex-1 flex flex-col items-center gap-4 animate-slide-right">
                             <div className="relative">
-                                <img src={playerData?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl border-4 border-white/20 shadow-2xl object-cover" />
+                                <img src={playerData?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-white/20 shadow-2xl object-cover" />
                                 <div className="absolute -bottom-2 -right-2"><LevelBadge level={playerData?.level || 1} /></div>
                             </div>
                             <div className="text-center">
                                 <div className="text-white font-black text-xl truncate max-w-[120px]">{playerData?.username}</div>
                                 <div className="text-yellow-500 font-bold text-sm tracking-widest">{playerData?.elo} ELO</div>
+                                {playerData?.telegramId === '976640409' && <div className="mt-1"><span className="owner-badge px-2 py-0.5 rounded text-[8px] font-black">OWNER</span></div>}
                             </div>
                         </div>
 
-                        {/* VS Section with 2x2 Grid for 4 Players */}
-                        <div className="flex flex-col items-center gap-4 animate-slide-left w-full">
-                            <div className="text-white/20 text-4xl font-black italic mb-2">VS</div>
-                            <div className={`grid ${opponents && opponents.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-4 w-full justify-items-center`}>
-                                {opponents && opponents.map((opp, idx) => (
-                                    <div key={idx} className="flex flex-col items-center gap-2 p-3 bg-white/5 border border-white/5 rounded-2xl w-full max-w-[140px]">
-                                        <div className="relative">
-                                            <img src={opp.photoUrl || 'https://via.placeholder.com/100'} className="w-16 h-16 rounded-2xl border-2 border-yellow-500/50 shadow-lg object-cover" />
-                                            <div className="absolute -bottom-1 -right-1 scale-75"><LevelBadge level={opp.level || 1} /></div>
-                                        </div>
-                                        <div className="text-center w-full">
-                                            <div className="text-white font-black text-xs truncate w-full">{opp.name || opp.username || 'Rakip'}</div>
-                                            <div className="text-yellow-500 font-bold text-[10px] tracking-widest">{opp.elo || 0} ELO</div>
-                                        </div>
-                                    </div>
-                                ))}
+                        <div className="text-white/20 text-4xl sm:text-6xl font-black italic">VS</div>
+
+                        <div className="flex-1 flex flex-col items-center gap-4 animate-slide-left">
+                            <div className="relative">
+                                <img src={opponent?.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl border-4 border-yellow-500/50 shadow-2xl object-cover" />
+                                <div className="absolute -bottom-2 -right-2"><LevelBadge level={opponent?.level || 1} /></div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-white font-black text-xl truncate max-w-[120px]">{opponent?.name || opponent?.username || 'Rakip'}</div>
+                                <div className="text-yellow-500 font-bold text-sm tracking-widest">{opponent?.elo || 0} ELO</div>
+                                {opponent?.telegramId === '976640409' && <div className="mt-1"><span className="owner-badge px-2 py-0.5 rounded text-[8px] font-black">OWNER</span></div>}
                             </div>
                         </div>
                     </div>
@@ -2372,9 +1383,8 @@
             if (screen === 'game') return (
                 <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden">
                     {notification && <Toast message={notification.message} type={notification.type} />}
-                    {announcement && <AnnouncementPopup message={announcement} onClose={() => setAnnouncement(null)} />}
 
-                    <GameTimer startTime={gameState?.turnStartTime} duration={gameState?.turnTimeLimit || 30000} isMyTurn={isMyTurn} />
+                    <GameTimer startTime={gameState.turnStartTime} />
 
                     {serverMessage && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
@@ -2386,100 +1396,122 @@
                         </div>
                     )}
 
-                    {/* Top Bar - ONLY Opponents */}
-                    <div className="fixed top-14 left-0 right-0 z-40">
-                        <div className="flex items-center justify-center px-4 py-2 gap-4">
-                            {(() => {
-                                const playersMap = gameState?.players || {};
-                                const playerIds = gameState?.playerOrder || [];
-                                const isFourPlayer = playerIds.length > 2;
-
-                                return playerIds.filter(pid => pid !== myPlayerId).map((pid, idx) => {
-                                    const p = playersMap[pid];
-                                    if (!p) return null;
-                                    const activeTurn = gameState?.currentPlayer === pid;
-
-                                    const isFourPlayer = playerIds.length > 2;
-
-                                    return (
-                                        <div key={idx} className={`relative flex items-center gap-2 px-2 py-1.5 rounded-2xl transition-all duration-300 ${activeTurn ? 'bg-yellow-500/20 z-10 border border-yellow-500/50 shadow-glow' : 'bg-black/40 opacity-70 border border-white/10'} ${isFourPlayer ? 'scale-90 origin-top' : ''}`}>
-                                            <div className="flex flex-col items-center">
-                                                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative ${p.micEnabled ? 'voice-pulse' : ''}`}>
-                                                    <img src={p.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" alt={p.name} />
-                                                    <div className="absolute top-0 right-0 p-0.5 z-20">
-                                                        {p.micEnabled ? <span className="block w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse border border-black shadow-lg"></span> : <span className="block w-2.5 h-2.5 bg-red-500 rounded-full border border-black"></span>}
-                                                    </div>
-                                                </div>
+                    {/* Opponent Info Bar - Fixed at top */}
+                    <div className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-r from-black/90 to-gray-900/90 backdrop-blur-sm border-b border-yellow-500/20 shadow-lg">
+                        <div className="container mx-auto px-2">
+                            <div className="flex items-center justify-between py-1">
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <div className="w-10 h-10 rounded-full border-2 border-yellow-500/50 overflow-hidden flex-shrink-0">
+                                        {opponent?.photoUrl ? (
+                                            <img src={opponent.photoUrl} className="w-full h-full object-cover" alt="Profil" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-gray-700 text-white/70">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                                                </svg>
                                             </div>
-                                            <div className="flex flex-col">
-                                                <div className="flex flex-col min-w-0">
-                                                    <div className="flex items-center gap-1">
-                                                        <span className={`text-white font-black text-[10px] sm:text-xs truncate max-w-[60px] ${activeTurn ? 'text-yellow-400' : ''}`}>{p.name || 'Oyuncu'}</span>
-                                                        <LevelBadge level={calculateLevel(p.elo || 0)} />
-                                                    </div>
-                                                    <span className="text-white/40 text-[8px] font-mono truncate max-w-[60px]">@{p.username || pid}</span>
-                                                </div>
-                                                <div className="text-yellow-500/80 text-[9px] font-black">{p.score} / 101</div>
-
-                                                {/* Küçük Rakip Taşları */}
-                                                <div className="flex gap-0.5 mt-1 flex-wrap max-w-[60px]">
-                                                    {Array(p.hand?.length || 0).fill(0).map((_, i) => (
-                                                        <div key={i} className="w-1.5 h-2.5 bg-gray-100 rounded-[1px] border border-black/20"></div>
-                                                    ))}
-                                                </div>
-                                                <button
-                                                    onClick={() => reportUser(pid, p.username || p.name)}
-                                                    className="mt-1 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white px-2 py-0.5 rounded-md text-[8px] font-black transition-all border border-red-600/30 w-full"
-                                                >
-                                                    🚩 {language === 'az' ? 'ŞİKAYƏT' : 'REPORT'}
-                                                </button>
-                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="text-white font-bold text-sm truncate">{opponent?.name || opponent?.username || 'Rakip'}</div>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-yellow-400 text-xs font-bold bg-black/40 px-1.5 py-0.5 rounded">Lv.{opponent?.level || 1}</span>
+                                            <span className="text-yellow-500 text-xs">•</span>
+                                            <span className="text-white/80 text-xs">{gameState?.players[opponentPlayerId]?.elo || 0} ELO</span>
+                                            {opponent?.telegramId === '976640409' && (
+                                                <span className="bg-gradient-to-r from-yellow-500 to-yellow-700 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full ml-1">
+                                                    OWNER
+                                                </span>
+                                            )}
                                         </div>
-                                    );
-                                });
-                            })()}
+                                    </div>
+                                </div>
+                                <div className="flex items-center">
+                                    <div className="text-white text-xs font-bold bg-yellow-600/50 px-3 py-1 rounded-full border border-yellow-500/30 whitespace-nowrap">
+                                        {opponentHand.length} TAŞ
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Opponent Tiles */}
+                            {opponentHand.length > 0 && (
+                                <div className="px-2 pb-1.5">
+                                    <div className="flex justify-center gap-1 flex-wrap">
+                                        {Array(opponentHand.length).fill(0).map((_, i) => (
+                                            <div key={i} className="w-3 h-5 bg-gradient-to-b from-gray-700 to-gray-800 rounded-sm border border-gray-600/50 shadow-inner" />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
                     {/* Board Area */}
-                    <div
-                        ref={boardContainerRef}
+                    <div 
+                        ref={boardContainerRef} 
                         className="flex-1 relative cursor-grab active:cursor-grabbing overflow-auto touch-auto"
                         style={{ WebkitOverflowScrolling: 'touch' }}
                         onTouchStart={(e) => {
+                            // Only handle single touch for panning
                             if (e.touches.length === 1) {
                                 const touch = e.touches[0];
                                 setTouchStart({ x: touch.clientX, y: touch.clientY });
                                 setLastTouch({ x: touch.clientX, y: touch.clientY });
                                 e.stopPropagation();
                             } else if (e.touches.length === 2) {
+                                // Handle pinch zoom
                                 const touch1 = e.touches[0];
                                 const touch2 = e.touches[1];
-                                setLastDistance(Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY));
+                                const distance = Math.hypot(
+                                    touch2.pageX - touch1.pageX,
+                                    touch2.pageY - touch1.pageY
+                                );
+                                setLastDistance(distance);
                             }
                         }}
                         onTouchMove={(e) => {
                             if (e.touches.length === 1 && touchStart) {
+                                // Handle panning
                                 const touch = e.touches[0];
+                                const deltaX = touch.clientX - lastTouch.x;
+                                const deltaY = touch.clientY - lastTouch.y;
+                                
                                 setBoardOffset(prev => ({
-                                    x: prev.x + (touch.clientX - lastTouch.x),
-                                    y: prev.y + (touch.clientY - lastTouch.y)
+                                    x: prev.x + deltaX,
+                                    y: prev.y + deltaY
                                 }));
+                                
                                 setLastTouch({ x: touch.clientX, y: touch.clientY });
+                                e.stopPropagation();
                             } else if (e.touches.length === 2) {
+                                // Handle pinch zoom
                                 const touch1 = e.touches[0];
                                 const touch2 = e.touches[1];
-                                const distance = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+                                const distance = Math.hypot(
+                                    touch2.pageX - touch1.pageX,
+                                    touch2.pageY - touch1.pageY
+                                );
+                                
                                 if (lastDistance > 0) {
-                                    const delta = distance / lastDistance;
-                                    setBoardScale(prev => Math.min(Math.max(prev * delta, 0.2), 3));
+                                    const scale = (distance - lastDistance) * 0.01;
+                                    setBoardScale(prev => Math.min(Math.max(0.5, prev + scale), 2));
                                 }
                                 setLastDistance(distance);
+                                e.preventDefault();
                             }
                         }}
+                        onTouchEnd={() => {
+                            setTouchStart(null);
+                            setLastTouch(null);
+                            setLastDistance(0);
+                        }}
                         onWheel={(e) => {
-                            const delta = e.deltaY > 0 ? 0.9 : 1.1;
-                            setBoardScale(prev => Math.min(Math.max(prev * delta, 0.2), 3));
+                            // Zoom with ctrl + wheel or pinch
+                            if (e.ctrlKey || e.metaKey) {
+                                e.preventDefault();
+                                const delta = e.deltaY * -0.01;
+                                setBoardScale(prev => Math.min(Math.max(0.5, prev + delta), 2));
+                            }
                         }}
                     >
                         <div
@@ -2490,26 +1522,27 @@
                                 touchAction: 'none'
                             }}
                         >
-                            {gameState?.board.map((tile, idx) => {
-                                const item = boardLayout[idx];
-                                if (!item) return null;
-                                return (
-                                    <div
-                                        key={idx}
-                                        className="absolute transition-all duration-500"
-                                        style={{
-                                            left: item.x,
-                                            top: item.y,
-                                            transform: `translate(-50%, -50%) rotate(${item.rotation}deg)`
-                                        }}
-                                    >
-                                        <DominoTile values={tile} vertical={false} disabled={true} scale={1} />
-                                    </div>
-                                );
-                            })}
+                            {boardLayout.map((item, idx) => (
+                                <div
+                                    key={idx}
+                                    className="absolute transition-all duration-500"
+                                    style={{
+                                        left: item.x,
+                                        top: item.y,
+                                        transform: `translate(-50%, -50%) rotate(${item.rotation}deg)`
+                                    }}
+                                >
+                                    <DominoTile
+                                        values={item.tile}
+                                        vertical={false}
+                                        disabled={true}
+                                        scale={1}
+                                    />
+                                </div>
+                            ))}
 
                             {/* Move Indicators */}
-                            {isMyTurn && selectedTileIndex !== null && gameState?.board.length > 0 && (
+                            {isMyTurn && selectedTileIndex !== null && boardLayout.length > 0 && (
                                 <>
                                     {validMoves.includes('left') && boardLayout[0] && (
                                         <div
@@ -2521,7 +1554,7 @@
                                                 transform: 'translate(-50%, -50%)'
                                             }}
                                         >
-                                            <span className="text-yellow-400 font-black text-[10px]">BURAYA</span>
+                                            <span className="text-yellow-400 font-black text-[10px] drop-shadow-md">BURAYA</span>
                                         </div>
                                     )}
                                     {validMoves.includes('right') && boardLayout[boardLayout.length - 1] && (
@@ -2534,12 +1567,12 @@
                                                 transform: 'translate(-50%, -50%)'
                                             }}
                                         >
-                                            <span className="text-yellow-400 font-black text-[10px]">BURAYA</span>
+                                            <span className="text-yellow-400 font-black text-[10px] drop-shadow-md">BURAYA</span>
                                         </div>
                                     )}
                                 </>
                             )}
-                            {isMyTurn && selectedTileIndex !== null && gameState?.board.length === 0 && validMoves.includes('start') && (
+                            {isMyTurn && selectedTileIndex !== null && boardLayout.length === 0 && validMoves.includes('start') && (
                                 <div
                                     className="absolute w-32 h-16 border-4 border-yellow-400 border-dashed rounded-2xl flex items-center justify-center animate-bounce cursor-pointer bg-yellow-400/10 z-50"
                                     onClick={() => playTile('start')}
@@ -2552,69 +1585,34 @@
                     </div>
 
                     {/* Controls Footer */}
-                    <div className="h-52 z-30 bg-black/60 backdrop-blur-xl border-t border-white/10 p-4 relative">
-                        {/* MY PROFILE AREA - RIGHT ABOVE HAND */}
-                        <div className="absolute -top-16 right-4 z-50">
-                            {(() => {
-                                const me = gameState?.players[myPlayerId];
-                                if (!me) return null;
-                                const activeTurn = gameState?.currentPlayer === myPlayerId;
-                                return (
-                                    <div className={`flex items-center gap-3 px-4 py-2 rounded-2xl border-2 transition-all duration-300 ${activeTurn ? 'bg-blue-500/20 border-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.5)] scale-105' : 'bg-black/60 border-white/10 opacity-90'}`}>
-                                        <div className={`w-12 h-12 rounded-full border-2 ${activeTurn ? 'border-blue-400 animate-pulse' : 'border-white/20'} overflow-hidden shadow-xl relative ${localMicEnabled ? 'voice-pulse' : ''}`}>
-                                            <img src={me.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" />
-                                            {localMicEnabled && (
-                                                <div className="absolute top-0 right-0 p-1 z-20">
-                                                    <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-lg border border-white/20"></div>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <div className="flex items-center gap-1.5">
-                                                <span className={`text-white font-black text-xs uppercase ${activeTurn ? 'text-blue-400' : ''}`}>SİZ</span>
-                                                <LevelBadge level={calculateLevel(me.elo || 0)} />
-                                            </div>
-                                            <div className="text-blue-400 text-[10px] font-black">{me.score} / 101</div>
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-                        </div>
-
-                        {/* Voice Buttons - HAND ÜSTÜNDE SOLDA */}
-                        <div className="absolute -top-14 left-4 flex gap-2 z-50">
-                            <button
-                                onClick={toggleMic}
-                                className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localMicEnabled ? 'bg-green-500 border-green-400 text-white animate-glow-pulse' : 'bg-gray-900/80 border-white/10 text-gray-400'}`}
-                            >
-                                <span className="text-2xl">{localMicEnabled ? '🎙️' : '🔇'}</span>
-                            </button>
-                            <button
-                                onClick={toggleSpeaker}
-                                className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localSpeakerEnabled ? 'bg-blue-500 border-blue-400 text-white shadow-glow' : 'bg-gray-900/80 border-white/10 text-gray-400'}`}
-                            >
-                                <span className="text-2xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
-                            </button>
-                        </div>
-
+                    <div className="h-48 z-30 bg-black/60 backdrop-blur-xl border-t border-white/10 p-4">
                         <div className="flex items-center justify-between mb-2">
-                            <div className="text-white/50 text-[10px] font-black uppercase tracking-[0.2em]">{t.yourHand} ({myHand.length})</div>
-                            <div className="flex items-center gap-3">
-                                {isMyTurn && marketSize > 0 && (
-                                    <button
-                                        onClick={() => sendMessage({ type: 'drawFromMarket' })}
-                                        className="bg-yellow-500 text-black px-6 py-2 rounded-full text-xs font-black shadow-glow flex items-center gap-2 hover:scale-105 active:scale-95 transition-all"
-                                    >
-                                        <span className="text-lg font-bold">+</span> <span>KARTI ÇEK ({marketSize})</span>
-                                    </button>
+                            <div className="text-white/50 text-xs font-bold uppercase tracking-widest">{t.yourHand} ({myHand.length})</div>
+                            <div className="flex items-center gap-2">
+                                {isMyTurn && (
+                                    marketSize > 0 ? (
+                                        <button onClick={() => sendMessage({ type: 'drawFromMarket' })} className="bg-yellow-500 text-black px-4 py-1 rounded-full text-xs font-bold shadow-glow flex items-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                                            </svg>
+                                            {t.drawTile} ({marketSize})
+                                        </button>
+                                    ) : null
                                 )}
-                                <button onClick={leaveGameClient} className="w-10 h-10 bg-red-600/20 hover:bg-red-600 border border-red-500/50 rounded-xl flex items-center justify-center transition-all group">
-                                    <span className="text-red-500 group-hover:text-white text-xl">✕</span>
+                                
+                                <button
+                                    onClick={leaveGameClient}
+                                    title={t.leaveGame}
+                                    className="w-8 h-8 bg-red-800/80 hover:bg-red-700 rounded-full flex items-center justify-center shadow-lg transition-all"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
                                 </button>
                             </div>
                         </div>
-
-                        <div className="hand-container flex items-center gap-2 overflow-x-auto whitespace-nowrap scroll-smooth py-4 px-2 no-scrollbar">
+                        
+                        <div className={`hand-container ${myHand.length > 8 ? '' : 'single-row'}`}>
                             {myHand.map((tile, idx) => (
                                 <DominoTile
                                     key={idx}
@@ -2626,95 +1624,56 @@
                             ))}
                         </div>
                     </div>
-                </div >
+                </div>
             );
-
 
             if (screen === 'calculation') {
                 return (
-                    <div className="fixed inset-0 flex flex-col items-center justify-center p-6 bg-[#0b241c] overflow-hidden">
-                        {/* Premium Background Effects */}
-                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-                        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-yellow-900/40 opacity-60"></div>
-
-                        {/* Animated Glows */}
-                        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-[120px] animate-pulse"></div>
-                        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-yellow-500/20 rounded-full blur-[120px] animate-pulse-slow"></div>
-
-                        <div className="relative z-10 w-full max-w-lg animate-scale-up">
-                            {/* Pro Header */}
-                            <div className="text-center mb-10">
-                                <div className="inline-block px-4 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 text-[10px] font-black tracking-[0.4em] uppercase mb-4 animate-bounce">
-                                    RAUNT SONLANDI
-                                </div>
-                                <h1 className="text-5xl font-black text-white italic tracking-tighter drop-shadow-2xl">
-                                    PUANLAR
-                                </h1>
-                            </div>
-
-                            {/* Pro Score Cards */}
-                            <div className="space-y-4">
-                                {calculationLobby && Object.entries(calculationLobby.players)
-                                    .sort((a, b) => a[1].score - b[1].score)
-                                    .map(([pid, player], idx) => {
-                                        const isWinner = idx === 0;
-                                        const isMe = pid === (playerId || playerData?.id);
-
-                                        return (
-                                            <div
-                                                key={pid}
-                                                className={`group relative transition-all duration-500 ${isMe ? 'scale-105 z-20' : 'scale-100 z-10 opacity-90'}`}
-                                            >
-                                                <div className={`relative flex items-center gap-5 p-5 rounded-[2.5rem] border-2 transition-all shadow-2xl backdrop-blur-xl ${isMe ? 'bg-blue-600/20 border-blue-400/50 shadow-blue-500/20' : (isWinner ? 'bg-yellow-500/20 border-yellow-400/40 shadow-yellow-500/20' : 'bg-black/60 border-white/10')
-                                                    }`}>
-                                                    {/* Rank Badge */}
-                                                    <div className={`absolute -left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center font-black italic text-[10px] border-2 shadow-xl ${isWinner ? 'bg-yellow-500 border-yellow-300 text-black' : 'bg-white/10 border-white/20 text-white'
-                                                        }`}>
-                                                        {idx + 1}
-                                                    </div>
-
-                                                    <div className="relative ml-2">
-                                                        <div className={`w-16 h-16 rounded-3xl border-2 transition-transform duration-500 overflow-hidden ${isMe ? 'border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : (isWinner ? 'border-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.5)]' : 'border-white/20')}`}>
-                                                            <img src={player.photo || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" />
-                                                        </div>
-                                                        {isWinner && <div className="absolute -top-4 -right-4 text-3xl animate-bounce">👑</div>}
-                                                    </div>
-
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className={`text-xl font-black italic truncate max-w-[120px] ${isWinner ? 'text-yellow-400' : 'text-white'}`}>{player.name}</span>
-                                                            <LevelBadge level={calculateLevel(player.elo || 0)} />
-                                                        </div>
-                                                        <div className="flex items-center gap-1.5 mt-1 text-white/40 text-[9px] font-black tracking-widest uppercase">
-                                                            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-50"></span>
-                                                            {t.handTotal}
-                                                        </div>
-                                                    </div>
-
-                                                    <div className={`flex flex-col items-center justify-center min-w-[75px] h-16 rounded-3xl border ${isWinner ? 'bg-yellow-400/10 border-yellow-400/30' : 'bg-black/40 border-white/10'
-                                                        }`}>
-                                                        <span className={`text-[9px] font-black tracking-widest ${isWinner ? 'text-yellow-400' : 'text-white/40'}`}>PUAN</span>
-                                                        <span className={`text-3xl font-black italic leading-none mt-1 ${isWinner ? 'text-yellow-400' : 'text-white'}`}>{player.score}</span>
-                                                    </div>
-                                                </div>
+                    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-[#0b241c] to-black p-6">
+                        <h1 className="text-4xl font-black text-yellow-400 mb-2">{t.calculationTitle}</h1>
+                        <p className="text-white/60 mb-8">{t.calculationSubtitle}</p>
+                        
+                        <div className="w-full max-w-md space-y-6">
+                            {calculationLobby && Object.entries(calculationLobby.players).map(([pid, player]) => (
+                                <div 
+                                    key={pid}
+                                    className={`flex items-center gap-4 p-4 rounded-2xl border-2 ${
+                                        player.isMe 
+                                            ? 'bg-blue-900/30 border-blue-500/50' 
+                                            : 'bg-white/5 border-white/10'
+                                    }`}
+                                >
+                                    <div className="relative">
+                                        <img 
+                                            src={player.photo || 'https://via.placeholder.com/64'} 
+                                            className="w-16 h-16 rounded-full border-2 border-white/20"
+                                        />
+                                        {player.isMe && (
+                                            <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                                {t.you}
                                             </div>
-                                        );
-                                    })}
-                            </div>
-
-                            {/* Circular Premium Timer */}
-                            <div className="mt-12 flex flex-col items-center">
-                                <div className="relative w-20 h-20">
-                                    <svg className="w-full h-full -rotate-90">
-                                        <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="2" fill="transparent" className="text-white/5" />
-                                        <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-yellow-500 transition-all duration-1000 shadow-glow" strokeDasharray="226" strokeDashoffset={226 - (226 * (8 - calculationTimer) / 8)} strokeLinecap="round" />
-                                    </svg>
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                        <span className="text-white font-black text-xl leading-none">{calculationTimer}</span>
-                                        <span className="text-[8px] text-white/40 font-bold uppercase tracking-tighter">SEC</span>
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="text-white font-bold text-lg">{player.name}</div>
+                                        <div className="text-white/60 text-sm">{t.handTotal}</div>
+                                    </div>
+                                    <div className="text-3xl font-black text-yellow-400">
+                                        {player.score}
                                     </div>
                                 </div>
-                                <span className="mt-4 text-white/30 text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">SONRAKİ RAUNT HAZIRLANIR</span>
+                            ))}
+                        </div>
+                        
+                        <div className="mt-10 text-center">
+                            <div className="text-white/40 text-sm mb-2">
+                                {t.winnerAnnouncing} {calculationTimer}s
+                            </div>
+                            <div className="w-64 h-2 bg-white/10 rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-yellow-500 transition-all duration-1000"
+                                    style={{ width: `${(8 - calculationTimer) * 12.5}%` }}
+                                ></div>
                             </div>
                         </div>
                     </div>
@@ -2722,77 +1681,51 @@
             }
 
             if (screen === 'end' && endInfo) return (
-                <div className="fixed inset-0 flex flex-col items-center justify-center p-6 bg-black overflow-hidden">
-                    {/* Dark Premium Background */}
-                    <div className="absolute inset-0 bg-gradient-to-tr from-[#0b241c] via-black to-[#0b241c] opacity-80"></div>
-                    <div className="absolute inset-0 backdrop-blur-3xl"></div>
+                <div className="flex flex-col items-center justify-center min-h-screen bg-black/90 p-6 text-center">
+                    <h1 className="text-5xl font-black text-white mb-2">
+                        {endInfo.isWinner ? 'QAZANDINIZ!' : 'MƏĞLUB OLDUNUZ'}
+                    </h1>
+                    
+                    {endInfo.reason === 'disconnect' && <p className="text-yellow-400 mb-6 text-lg">Rəqib oyundan ayrıldı.</p>}
+                    {endInfo.reason === 'afk' && <p className="text-yellow-400 mb-6 text-lg">{endInfo.isWinner ? 'Rəqib AFK qaldı.' : 'AFK qaldığınız üçün məğlub oldunuz.'}</p>}
+                    {endInfo.reason === 'score_calculation' && <p className="text-yellow-400 mb-6 text-lg">En az puanı olan kazandı!</p>}
+                    {endInfo.reason === 'timeout' && <p className="text-yellow-400 mb-6 text-lg">{endInfo.isWinner ? 'Rəqibin vaxtı bitdi.' : 'Vaxtınız bitdi.'}</p>}
 
-                    {/* Glowing Particles Effect (Simplified CSS) */}
-                    <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-[radial-gradient(circle,rgba(234,179,8,0.05)_0%,transparent_70%)] animate-pulse"></div>
-                    </div>
-
-                    <div className="relative z-10 w-full max-w-lg text-center animate-fade-in">
-                        {/* Status Label */}
-                        <div className="mb-6">
-                            <span className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 text-[10px] font-black tracking-[0.4em] px-5 py-2 rounded-full uppercase">
-                                MAÇ TAMAMLANDI
-                            </span>
-                        </div>
-
-                        {/* Title */}
-                        <h1 className="text-7xl font-black text-white italic tracking-tighter drop-shadow-glow mb-12">
-                            OYUN BİTDİ
-                        </h1>
-
-                        {/* Status Banners */}
-                        {endInfo.reason === 'disconnect' && <div className="mb-8 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-500 font-black text-sm uppercase tracking-widest animate-pulse">Rəqib oyundan ayrıldı • Hükmen Galibiyet</div>}
-                        {endInfo.reason === 'afk' && <div className="mb-8 p-4 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 font-black text-sm uppercase tracking-widest animate-pulse">AFK Qaldığınız üçün oyun sonlandı</div>}
-
-                        {/* Players Final Result Cards */}
-                        <div className="space-y-4 mb-20">
-                            {endInfo.players && endInfo.players.sort((a, b) => b.isWinner - a.isWinner).map((p, idx) => (
-                                <div key={idx} className={`relative group transition-all duration-700 ${p.isWinner ? 'scale-105 z-20' : 'scale-100 z-10 opacity-70'}`}>
-                                    <div className={`flex items-center gap-5 p-5 rounded-[2.5rem] border-2 transition-all backdrop-blur-xl ${p.isWinner ? 'bg-yellow-500/20 border-yellow-400 shadow-[0_0_50px_rgba(234,179,8,0.2)]' : 'bg-white/5 border-white/10 shadow-2xl'
-                                        }`}>
-                                        <div className="relative">
-                                            <div className={`w-16 h-16 rounded-3xl border-2 transition-transform duration-500 rotate-2 group-hover:rotate-0 overflow-hidden ${p.isWinner ? 'border-yellow-400' : 'border-white/20'}`}>
-                                                <img src={p.photo || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" />
-                                            </div>
-                                            {p.isWinner && <div className="absolute -top-4 -left-4 text-4xl animate-bounce">👑</div>}
-                                        </div>
-
-                                        <div className="flex-1 text-left">
-                                            <div className="flex items-center gap-2">
-                                                <span className={`text-xl font-black italic tracking-tight ${p.isWinner ? 'text-yellow-400' : 'text-white'}`}>{p.name}</span>
-                                                {p.id === (playerId || playerData?.id) && <span className="bg-blue-500 text-[8px] font-black px-2 py-0.5 rounded-full text-white shadow-glow tracking-widest">SİZ</span>}
-                                            </div>
-                                            <div className={`text-[10px] font-black uppercase tracking-widest mt-1 ${p.isWinner ? 'text-yellow-400/60' : 'text-white/40'}`}>
-                                                {p.isWinner ? 'QALİB' : 'MƏĞLUB'} • {p.score} PUAN
-                                            </div>
-                                        </div>
-
-                                        {/* Elo Change Badge */}
-                                        {endInfo.isRanked && (
-                                            <div className={`flex flex-col items-center justify-center min-w-[70px] h-16 rounded-3xl border ${p.eloChange >= 0 ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-500'
-                                                }`}>
-                                                <span className="text-[9px] font-black tracking-widest uppercase">ELO</span>
-                                                <span className="text-xl font-black italic leading-none mt-1">{p.eloChange > 0 ? '+' : ''}{p.eloChange}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Back to Lobby Timer Footer */}
-                        <div className="flex flex-col items-center gap-4">
-                            <span className="text-white/20 text-[10px] font-black uppercase tracking-[0.5em] animate-pulse">Lobiya qayıdılır...</span>
-                            <div className="w-56 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                <div className="h-full bg-gradient-to-r from-yellow-600 to-yellow-400 animate-progress"></div>
+                    <div className="w-full max-w-sm space-y-4 mt-4">
+                        {/* Winner Info */}
+                        <div className="flex items-center gap-4 p-4 bg-green-900/50 rounded-2xl border-2 border-green-500/50">
+                            <div className="relative">
+                                <img src={endInfo.winner.photo || 'https://via.placeholder.com/64'} className="w-16 h-16 rounded-full border-2 border-green-400" />
                             </div>
+                            <div className="flex-1 text-left">
+                                <div className="text-white font-bold text-lg truncate">{endInfo.winner.name}</div>
+                                <div className="text-green-400 font-bold">{t.winner}</div>
+                            </div>
+                            {endInfo.isRanked && endInfo.winner.eloChange !== 0 && (
+                                <div className={`font-black text-xl ${endInfo.winner.eloChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    {endInfo.winner.eloChange > 0 ? '+' : ''}{endInfo.winner.eloChange}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Loser Info */}
+                        <div className="flex items-center gap-4 p-4 bg-red-900/50 rounded-2xl border-2 border-red-500/50">
+                            <div className="relative">
+                                <img src={endInfo.loser.photo || 'https://via.placeholder.com/64'} className="w-16 h-16 rounded-full border-2 border-red-400" />
+                            </div>
+                            <div className="flex-1 text-left">
+                                <div className="text-white font-bold text-lg truncate">{endInfo.loser.name}</div>
+                                <div className="text-red-400 font-bold">{t.loser}</div>
+                            </div>
+                            {endInfo.isRanked && endInfo.loser.eloChange !== 0 && (
+                                <div className={`font-black text-xl ${endInfo.loser.eloChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    {endInfo.loser.eloChange > 0 ? '+' : ''}{endInfo.loser.eloChange}
+                                </div>
+                            )}
                         </div>
                     </div>
+
+                    <div className="mt-12 text-white/30 animate-pulse">{t.returningLobby}</div>
                 </div>
             );
 
@@ -2819,43 +1752,53 @@
             );
 
             if (screen === 'leaderboard') return (
-                <div className="flex flex-col min-h-screen bg-[#0b241c] p-8 pb-20 overflow-y-auto">
-                    {/* Header: Back Button + Title (Moved 5cm Down) */}
-                    <div className="mt-[5cm] flex items-center gap-6 mb-12">
-                        <button
-                            onClick={() => setScreen('lobby')}
-                            className="bg-white/10 hover:bg-white/20 text-white w-14 h-14 rounded-2xl border-2 border-white/20 transition-all active:scale-95 flex items-center justify-center shadow-lg"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M15 19l-7-7 7-7" />
-                            </svg>
-                        </button>
-                        <h1 className="text-4xl font-black text-white italic tracking-tighter uppercase drop-shadow-glow">📊 LEADERBOARD 📊</h1>
-                    </div>
-                    <div className="w-full max-w-xl space-y-4">
+                <div className="flex flex-col items-center justify-start min-h-screen p-8 bg-[#0b241c] overflow-y-auto relative">
+                    <button
+                        onClick={() => setScreen('lobby')}
+                        className="absolute top-6 left-6 w-12 h-12 flex items-center justify-center bg-white/10 rounded-2xl text-white text-2xl hover:bg-white/20 transition-all font-black"
+                    >
+                        ←
+                    </button>
+                    <h1 className="text-4xl font-black text-white mb-8">📊 LADERBOARD 📊</h1>
+                    <div className="w-full max-w-xl space-y-3">
                         {leaderboard.map((p, i) => (
-                            <div key={i} className={`flex items-center gap-4 p-5 rounded-3xl border transition-all ${i < 3 ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-white/5 border-white/10'}`}>
-                                <div className="text-2xl font-black w-10 text-center">{i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</div>
-                                <img src={p.photoUrl || 'https://via.placeholder.com/60'} className="w-14 h-14 rounded-full border-2 border-white/20 shadow-xl" />
+                            <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-3xl border border-white/5">
+                                <div className="text-2xl font-black w-8 text-center">{i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</div>
+                                <img src={p.photoUrl || 'https://via.placeholder.com/50'} className="w-12 h-12 rounded-full" />
                                 <div className="flex-1">
-                                    <div className="text-white font-black text-lg">{p.username}</div>
+                                    <div className="text-white font-bold">{p.username}</div>
                                     <div className="flex items-center gap-2 mt-1">
                                         <LevelBadge level={p.level} />
-                                        <div className="text-white/40 text-xs font-bold uppercase">{p.wins} {t.winner}</div>
+                                        <div className="text-white/40 text-xs">{p.wins} Galibiyet</div>
                                     </div>
                                 </div>
-                                <div className="text-yellow-400 font-black text-xl drop-shadow-md">{p.elo} ELO</div>
+                                <div className="text-yellow-400 font-black">{p.elo} ELO</div>
                             </div>
                         ))}
                     </div>
+                    <button onClick={() => setScreen('lobby')} className="mt-10 px-10 py-3 bg-white/10 text-white rounded-2xl font-bold">GERİ DÖN</button>
                 </div>
             );
 
             return null;
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<DominoGame />);
+        // Sayfa yüklendiğinde React uygulamasını başlat
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                const root = ReactDOM.createRoot(document.getElementById('root'));
+                root.render(<DominoGame />);
+            } catch (error) {
+                console.error('Uygulama başlatılırken hata oluştu:', error);
+                document.getElementById('root').innerHTML = `
+                    <div style="padding: 20px; color: white; background: #ff4444; margin: 20px; border-radius: 5px;">
+                        <h2>Bir hata oluştu</h2>
+                        <p>${error.message}</p>
+                        <p>Lütfen sayfayı yenileyin veya daha sonra tekrar deneyin.</p>
+                    </div>
+                `;
+            }
+        });
     </script>
 
     <script>
@@ -2864,13 +1807,13 @@
         tgApp.expand();
         if (tgApp.requestFullscreen) {
             tgApp.requestFullscreen();
-        }
+        } 
         tgApp.disableVerticalSwipes();
         tgApp.setHeaderColor('#1b4d3e');
-
+        
         // Telegram WebApp çıkış işlemi için özel düzenleme
         const originalConfirm = window.confirm;
-        window.confirm = function (message) {
+        window.confirm = function(message) {
             // Site ismini gizle
             if (message.includes('site') || message.includes('Site')) {
                 return originalConfirm('Oyundan çıkmak istediğinize emin misiniz?');
@@ -2880,5 +1823,4 @@
     </script>
 
 </body>
-
 </html>
