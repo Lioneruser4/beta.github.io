@@ -283,7 +283,7 @@ app.get('/api/admin/users', async (req, res) => {
 
         const users = await Player.find({ telegramId: { $ne: null } })
             .sort({ elo: -1 })
-            .select('telegramId username firstName lastName elo level wins losses draws totalGames createdAt lastPlayed isVisibleInLeaderboard');
+            .select('telegramId username firstName lastName photoUrl elo level wins losses draws totalGames createdAt lastPlayed isVisibleInLeaderboard');
 
         res.json({ success: true, users });
     } catch (error) {
@@ -413,6 +413,37 @@ app.get('/', (req, res) => {
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
+
+function handleUpdateAudioStatus(ws, data) {
+    if (!ws.roomCode || !ws.playerId) return;
+    const room = rooms.get(ws.roomCode);
+    if (!room || !room.gameState) return;
+
+    const { type, enabled } = data; // type: 'mic' or 'speaker'
+    const player = room.gameState.players[ws.playerId];
+    if (!player) return;
+
+    if (type === 'mic') player.micEnabled = enabled;
+    if (type === 'speaker') player.speakerEnabled = enabled;
+
+    // Odadakilere bildir
+    broadcastToRoom(ws.roomCode, {
+        type: 'audioStatusUpdate',
+        playerId: ws.playerId,
+        micEnabled: player.micEnabled,
+        speakerEnabled: player.speakerEnabled
+    });
+}
+
+function handleVoiceSignal(ws, data) {
+    if (!ws.roomCode || !ws.playerId) return;
+    // Sinyali odadaki DİĞER kişilere ilet
+    broadcastToRoom(ws.roomCode, {
+        type: 'voiceSignal',
+        from: ws.playerId,
+        signal: data.signal
+    }, ws.playerId);
+}
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({
@@ -718,6 +749,7 @@ function sendMessage(ws, message) {
 
 wss.on('connection', (ws, req) => {
     ws.isAlive = true;
+    ws.ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     ws.on('pong', () => ws.isAlive = true);
 
     ws.on('message', (message) => {
@@ -735,6 +767,8 @@ wss.on('connection', (ws, req) => {
                 case 'rejoin': handleRejoin(ws, data); break;
                 case 'playAgain': handlePlayAgain(ws); break;
                 case 'startGameEarly': handleStartGameEarly(ws); break;
+                case 'voiceSignal': handleVoiceSignal(ws, data); break;
+                case 'updateAudioStatus': handleUpdateAudioStatus(ws, data); break;
             }
         } catch (error) {
             console.error('Hata:', error);
@@ -849,9 +883,19 @@ function handleFindMatch(ws, data) {
     }
 
     playerConnections.set(playerId, ws);
+
+    // Anti-Cheat: Aynı IP ile kuyruğa girmeyi engelle (Ranked için)
+    if (mode === '2p' && !ws.isGuest) {
+        const sameIpInQueue = matchQueues[mode].find(p => p.ws.ip === ws.ip);
+        if (sameIpInQueue) {
+            return sendMessage(ws, { type: 'error', message: 'Eynı ağdan giriş yapamazsınız' });
+        }
+    }
+
     matchQueues[mode].push({
         ws, playerId, playerName: ws.playerName, telegramId: ws.telegramId,
-        photoUrl: ws.photoUrl, level: ws.level, elo: ws.elo, isGuest: ws.isGuest
+        photoUrl: ws.photoUrl, level: ws.level, elo: ws.elo, isGuest: ws.isGuest,
+        micEnabled: false, speakerEnabled: false
     });
 
     console.log(`✅ ${ws.playerName} (${mode}p) kuyrukta - Toplam: ${matchQueues[mode].length}/${mode}`);
@@ -873,6 +917,8 @@ function handleFindMatch(ws, data) {
                 level: p.level,
                 elo: p.elo,
                 isGuest: p.isGuest,
+                micEnabled: false,
+                speakerEnabled: false,
                 score: 0 // Her oyuncunun maç başı 101 puanı 0
             };
             p.ws.roomCode = roomCode;
