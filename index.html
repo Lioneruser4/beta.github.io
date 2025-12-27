@@ -266,8 +266,11 @@
 <body>
     <div id="root">
         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #0b241c; color: white; font-family: Arial, sans-serif;">
-            <h1>DOMINO 101</h1>
-            <p>Yükleniyor, lütfen bekleyin...</p>
+            <h1 className="text-6xl font-black text-yellow-500 animate-pulse mb-8">DOMINO 101</h1>
+            <div className="flex flex-col items-center gap-4">
+                <div className="w-16 h-16 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-white/60 animate-pulse">Yükleniyor, lütfen bekleyin...</p>
+            </div>
         </div>
     </div>
 
@@ -664,9 +667,23 @@
             // Ses Efektleri (Opsiyonel - Tarayıcı izin verirse çalışır)
 
             useEffect(() => {
-                initializeTelegramAuth();
-                connectToServer();
-                return () => { if (wsRef.current) wsRef.current.close(); };
+                // Yükleme başladı
+                const initApp = async () => {
+                    try {
+                        await initializeTelegramAuth();
+                        connectToServer();
+                    } catch (error) {
+                        console.error('Init error:', error);
+                        // Hata olursa bile lobby'e git
+                        setScreen('lobby');
+                    }
+                };
+                
+                initApp();
+                
+                return () => { 
+                    if (wsRef.current) wsRef.current.close(); 
+                };
             }, []);
 
             // Confetti Effect
