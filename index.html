@@ -435,7 +435,7 @@
                 ${animateIn ? 'animate-slide-in' : ''}
                 ${!disabled && !isGhost && !isOpponent ? 'cursor-pointer active:translate-y-1 active:shadow-3d-active hover:brightness-110' : ''}
                 ${disabled ? 'brightness-90 cursor-default' : ''}
-                ${isOpponent ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700' : ''}
+                ${isOpponent ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 w-[70px] h-[35px]' : ''}
             `;
 
             return (
@@ -504,19 +504,24 @@
             const [timeLeft, setTimeLeft] = useState(30);
 
             useEffect(() => {
-                const interval = setInterval(() => {
-                    if (!startTime) return;
-                    const totalDuration = duration || 30000;
+                const totalDuration = duration || 30000;
+                const calculate = () => {
+                    if (!startTime) return 30;
                     const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                    const remaining = Math.max(0, Math.floor(totalDuration / 1000) - elapsed);
-                    setTimeLeft(remaining);
+                    return Math.max(0, Math.floor(totalDuration / 1000) - elapsed);
+                };
+
+                setTimeLeft(calculate()); // Immediate update
+
+                const interval = setInterval(() => {
+                    setTimeLeft(calculate());
                 }, 200);
                 return () => clearInterval(interval);
             }, [startTime, duration]);
 
             return (
-                <div className={`flex flex-col items-center justify-center p-1 rounded-lg border ${isMyTurn ? 'bg-blue-500/20 border-blue-500/50' : 'bg-white/5 border-white/10'}`}>
-                    <span className={`text-[12px] font-black ${isMyTurn ? 'text-blue-400' : 'text-white/60'}`}>{timeLeft}</span>
+                <div className={`flex flex-col items-center justify-center p-1 rounded-lg border transition-all duration-300 ${isMyTurn ? 'bg-blue-500/30 border-blue-400 shadow-lg scale-110' : 'bg-white/5 border-white/10'}`}>
+                    <span className={`text-[12px] font-black ${isMyTurn ? 'text-blue-400' : (timeLeft < 10 ? 'text-red-500' : 'text-white/60')}`}>{timeLeft}</span>
                     <div className="w-10 h-1 bg-white/10 rounded-full mt-1 overflow-hidden">
                         <div
                             className={`h-full transition-all duration-300 ${timeLeft < 10 ? 'bg-red-500 animate-pulse' : 'bg-yellow-500'}`}
@@ -1586,6 +1591,7 @@
             if (screen === 'lobby') return (
                 <div className="flex flex-col items-center justify-center min-h-screen p-6">
                     {notification && <Toast message={notification.message} type={notification.type} />}
+                    {announcement && <AnnouncementPopup message={announcement} onClose={() => setAnnouncement(null)} />}
 
                     {/* Admin Button - Moved down by 5cm */}
                     {playerData?.telegramId === '976640409' && (
@@ -1818,10 +1824,6 @@
                         <p className="text-white/40 mt-2 uppercase tracking-[0.3em]">{t.matchStarting}</p>
                     </div>
 
-                    <div className="absolute top-24 bg-white/10 px-6 py-2 rounded-full border border-white/20 backdrop-blur-md animate-pulse">
-                        <span className="text-yellow-400 font-bold text-sm tracking-wider uppercase">{t.roundSystem}</span>
-                    </div>
-
                     <div className="flex items-center gap-4 sm:gap-12 w-full max-w-4xl px-4 overflow-x-auto pb-4">
                         <div className="flex-1 flex flex-col items-center gap-4 animate-slide-right min-w-[150px]">
                             <div className="relative">
@@ -1919,36 +1921,54 @@
                                     }
 
                                     return allProfiles.map((p, idx) => (
-                                        <div key={idx} className={`relative flex flex-col items-center px-4 transition-all duration-300 ${p.activeTurn ? 'scale-110 z-10' : 'opacity-70 scale-90'}`}>
-                                            <div className={`w-14 h-14 rounded-full border-2 ${p.activeTurn ? (p.isMe ? 'border-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.8)]' : 'border-yellow-400 shadow-glow') : 'border-white/20'} overflow-hidden bg-gray-900 shadow-2xl`}>
-                                                <img src={p.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" alt={p.name} />
+                                        <div key={idx} className={`relative flex items-center gap-3 px-4 py-2 rounded-2xl transition-all duration-300 ${p.activeTurn ? 'bg-white/10 scale-105 z-10 border border-yellow-500/30' : 'opacity-70 scale-95'}`}>
+                                            <div className="flex flex-col items-center">
+                                                <div className={`w-14 h-14 rounded-full border-2 ${p.activeTurn ? (p.isMe ? 'border-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.8)]' : 'border-yellow-400 shadow-glow') : 'border-white/20'} overflow-hidden bg-gray-900 shadow-2xl relative`}>
+                                                    <img src={p.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" alt={p.name} />
+                                                    {/* Voice Status Indicators */}
+                                                    <div className="absolute top-0 right-0 flex gap-0.5 p-0.5">
+                                                        {(gameState?.players[p.id]?.micEnabled) ? <span className="text-[8px] bg-green-500 rounded-full w-2 h-2 border border-black animate-pulse"></span> : <span className="text-[8px] bg-red-500 rounded-full w-2 h-2 border border-black"></span>}
+                                                    </div>
+                                                </div>
+                                                {!p.isMe && (
+                                                    <div className="flex gap-0.5 mt-1.5 justify-center max-w-[60px] flex-wrap">
+                                                        {Array(p.handCount).fill(0).map((_, i) => (
+                                                            <div key={i} className="w-1.5 h-2.5 bg-gray-300 rounded-[2px] border border-black/20"></div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div className={`absolute -bottom-2 bg-black/90 border ${p.isMe ? 'border-blue-500/50' : 'border-yellow-500/50'} px-2 py-0.5 rounded-full flex items-center gap-1.5 shadow-xl whitespace-nowrap min-w-[70px] justify-center`}>
-                                                <span className="text-white text-[8px] font-black tracking-tighter">{p.isMe ? 'SİZ' : (p.level === 'PRO' ? 'PRO' : `L.${p.level}`)}</span>
-                                                <div className={`w-px h-2 ${p.isMe ? 'bg-blue-500/30' : 'bg-yellow-500/30'}`}></div>
-                                                <span className={`${p.isMe ? 'text-blue-400' : 'text-yellow-400'} text-[9px] font-black tracking-tighter`}>{p.score} / 101</span>
+
+                                            <div className="flex flex-col">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className={`text-white font-black text-xs uppercase ${p.activeTurn ? 'text-yellow-400' : ''}`}>{p.isMe ? 'SİZ' : p.name}</span>
+                                                    <LevelBadge level={p.level} />
+                                                </div>
+                                                <div className={`mt-1 bg-black/40 px-2 py-0.5 rounded-full flex items-center gap-1.5 border ${p.isMe ? 'border-blue-500/30' : 'border-yellow-500/30'}`}>
+                                                    <span className={`${p.isMe ? 'text-blue-400' : 'text-yellow-400'} text-[10px] font-black`}>{p.score} / 101</span>
+                                                </div>
                                             </div>
-                                            {!p.isMe && (
-                                                <div className="flex gap-0.5 mt-3 justify-center max-w-[60px] flex-wrap">
-                                                    {Array(p.handCount).fill(0).map((_, i) => (
-                                                        <div key={i} className="w-1.5 h-2.5 bg-gray-300 rounded-[2px] border border-black/20"></div>
-                                                    ))}
+
+                                            {/* My Voice Controls */}
+                                            {p.isMe && (
+                                                <div className="flex gap-1 ml-2">
+                                                    <button
+                                                        onClick={() => toggleMic()}
+                                                        className={`w-7 h-7 rounded-lg flex items-center justify-center border transition-all ${localMicEnabled ? 'bg-green-600/20 border-green-500 text-green-400' : 'bg-red-600/20 border-red-500 text-red-400'}`}
+                                                    >
+                                                        {localMicEnabled ? '🎙️' : '🔇'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => toggleSpeaker()}
+                                                        className={`w-7 h-7 rounded-lg flex items-center justify-center border transition-all ${localSpeakerEnabled ? 'bg-blue-600/20 border-blue-500 text-blue-400' : 'bg-gray-600/20 border-gray-500 text-gray-400'}`}
+                                                    >
+                                                        {localSpeakerEnabled ? '🔊' : '🔈'}
+                                                    </button>
                                                 </div>
                                             )}
                                         </div>
                                     ));
                                 })()}
-                            </div>
-
-                            {/* Current Turn Info */}
-                            <div className="flex-1 text-right max-w-[80px]">
-                                <div className="text-white/40 text-[8px] font-bold uppercase tracking-widest">{isMyTurn ? 'SIRA SİZDE' : 'SIRADA'}</div>
-                                <div className="text-yellow-500 font-black text-[10px] break-words">
-                                    {isMyTurn ? 'HAMLE YAP!' : (gameState?.players[gameState?.currentPlayer]?.username || '...')}
-                                </div>
-                                <div className="mt-1">
-                                    <GameTimer startTime={gameState?.turnStartTime} duration={gameState?.turnTimeLimit || 30000} isMyTurn={isMyTurn} />
-                                </div>
                             </div>
                         </div>
                     </div>
