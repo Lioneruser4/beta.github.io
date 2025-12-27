@@ -935,6 +935,7 @@
                         audio = document.createElement('audio');
                         audio.id = `audio-${targetPid}`;
                         audio.autoplay = true;
+                        audio.playsInline = true; // Mobile fix
                         document.body.appendChild(audio);
                     }
                     audio.srcObject = remoteStream;
@@ -1508,6 +1509,11 @@
                         if (screen !== 'game') {
                             sendMessage({ type: 'cancelSearch' });
                             setScreen('lobby');
+                        } else {
+                            // Oyundaysak sadece toast gösterdik, ek bir şey yapma
+                            if (data.message === 'Elinizdə oynana bilən daş var!' || data.message.includes('Sadece')) {
+                                // Ekstra ses veya görsel eklenebilir
+                            }
                         }
                         break;
                     case 'gameEnd':
@@ -1644,18 +1650,14 @@
                         const myIdForCalc = String(playerId || '');
 
                         // Oyuncu puanlarını hesapla
-                        const playerScores = {};
-                        for (const [pid, player] of Object.entries(players)) {
-                            const hand = player.hand || [];
-                            const score = hand.reduce((sum, tile) => sum + tile[0] + tile[1], 0);
-                            playerScores[pid] = {
-                                score,
-                                name: player.username || 'Oyuncu',
-                                photo: player.photoUrl || null,
-                                isMe: pid === myIdForCalc,
-                                eloChange: data.eloChanges?.[pid] || 0
-                            };
-                        }
+                        // Puanı 101 olan KAYBEDER (Elimination)
+                        // Kullanıcı isteği: "101 olan kazansın" (Belki hedef puandır?)
+                        // Genelde domino/okeyde ceza puanı birikir. Kullanıcı "Rakibe yazılsın, 101 olan kazansın" dedi.
+                        // Bu çelişkili olabilir. Genellikle 101'e ulaşan ELENİR. Ama "101 olan kazansın" dediyse hedef skor olabilir.
+                        // Ancak "Rakibe yazılsın" dediği için bu CEZA puanıdır.
+                        // Biz standart "Ceza Puanı" mantığını uyguladık (Server). Client sadece gösterir.
+
+                        const isMatchEnd = Object.values(players).some(p => p.score >= 101);
 
                         // Daha az puan yapan kazanır
                         const entries = Object.entries(playerScores);
@@ -1820,6 +1822,16 @@
 
             const handleTileClick = (index, tile) => {
                 if (!isMyTurn) return;
+
+                // FIRST MOVE CHECK (Client-Side)
+                if (gameState.moves === 0 && gameState.firstMoveTile) {
+                    const [d1, d2] = gameState.firstMoveTile;
+                    if (!((tile[0] === d1 && tile[1] === d2) || (tile[0] === d2 && tile[1] === d1))) {
+                        showNotification(`Sadece ${d1}:${d2} oynayabilirsiniz!`, 'error');
+                        return;
+                    }
+                }
+
                 if (selectedTileIndex === index) {
                     setSelectedTileIndex(null);
                     setValidMoves([]);
@@ -2240,21 +2252,23 @@
                             </div>
                         </div>
 
-                        <div className="text-white/20 text-4xl font-black italic">VS</div>
-
-                        <div className="flex gap-6 animate-slide-left">
-                            {opponents && opponents.map((opp, idx) => (
-                                <div key={idx} className="flex flex-col items-center gap-4 min-w-[150px]">
-                                    <div className="relative">
-                                        <img src={opp.photoUrl || 'https://via.placeholder.com/100'} className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl border-4 border-yellow-500/50 shadow-2xl object-cover" />
-                                        <div className="absolute -bottom-2 -right-2"><LevelBadge level={opp.level || 1} /></div>
+                        {/* VS Section with 2x2 Grid for 4 Players */}
+                        <div className="flex flex-col items-center gap-4 animate-slide-left w-full">
+                            <div className="text-white/20 text-4xl font-black italic mb-2">VS</div>
+                            <div className={`grid ${opponents && opponents.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-4 w-full justify-items-center`}>
+                                {opponents && opponents.map((opp, idx) => (
+                                    <div key={idx} className="flex flex-col items-center gap-2 p-3 bg-white/5 border border-white/5 rounded-2xl w-full max-w-[140px]">
+                                        <div className="relative">
+                                            <img src={opp.photoUrl || 'https://via.placeholder.com/100'} className="w-16 h-16 rounded-2xl border-2 border-yellow-500/50 shadow-lg object-cover" />
+                                            <div className="absolute -bottom-1 -right-1 scale-75"><LevelBadge level={opp.level || 1} /></div>
+                                        </div>
+                                        <div className="text-center w-full">
+                                            <div className="text-white font-black text-xs truncate w-full">{opp.name || opp.username || 'Rakip'}</div>
+                                            <div className="text-yellow-500 font-bold text-[10px] tracking-widest">{opp.elo || 0} ELO</div>
+                                        </div>
                                     </div>
-                                    <div className="text-center">
-                                        <div className="text-white font-black text-lg truncate max-w-[120px]">{opp.name || opp.username || 'Rakip'}</div>
-                                        <div className="text-yellow-500 font-bold text-xs tracking-widest">{opp.elo || 0} ELO</div>
-                                    </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
                     </div>
 
@@ -2294,8 +2308,10 @@
                                     if (!p) return null;
                                     const activeTurn = gameState?.currentPlayer === pid;
 
+                                    const isFourPlayer = playerIds.length > 2;
+
                                     return (
-                                        <div key={idx} className={`relative flex items-center gap-2 px-3 py-1.5 rounded-2xl transition-all duration-300 ${activeTurn ? 'bg-yellow-500/20 scale-105 z-10 border border-yellow-500/50 shadow-glow' : 'bg-black/40 opacity-70 border border-white/10'}`}>
+                                        <div key={idx} className={`relative flex items-center gap-2 px-2 py-1.5 rounded-2xl transition-all duration-300 ${activeTurn ? 'bg-yellow-500/20 z-10 border border-yellow-500/50 shadow-glow' : 'bg-black/40 opacity-70 border border-white/10'} ${isFourPlayer ? 'scale-90 origin-top' : ''}`}>
                                             <div className="flex flex-col items-center">
                                                 <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative ${p.micEnabled ? 'voice-pulse' : ''}`}>
                                                     <img src={p.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" alt={p.name} />
