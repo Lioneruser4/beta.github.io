@@ -206,11 +206,16 @@ app.post('/api/auth/telegram', async (req, res) => {
         }
 
         // Ban Kontrolü
+        let banDetails = null;
         const ban = await Ban.findOne({ telegramId });
         if (ban) {
             if (!ban.expiresAt || ban.expiresAt > new Date()) {
-                const timeLeft = ban.expiresAt ? `Bitiş: ${ban.expiresAt.toLocaleString()}` : 'Süresiz';
-                return res.status(403).json({ success: false, message: `YASAKLANDINIZ! Sebep: ${ban.reason || 'Yok'}. ${timeLeft}` });
+                // Banlı olsa bile girişe izin ver, ancak ban bilgisini döndür
+                banDetails = {
+                    reason: ban.reason || 'Belirtilmedi',
+                    expiresAt: ban.expiresAt,
+                    isBanned: true
+                };
             } else {
                 await Ban.deleteOne({ _id: ban._id }); // Ban süresi dolmuş
             }
@@ -258,7 +263,8 @@ app.post('/api/auth/telegram', async (req, res) => {
                 wins: player.wins,
                 losses: player.losses,
                 totalGames: player.totalGames
-            }
+            },
+            ban: banDetails // Ban bilgisini cliente gönder
         });
     } catch (error) {
         console.error('Auth error:', error);
@@ -690,7 +696,7 @@ function initializeGame(roomCode, ...playerIds) {
         turn: 1,
         lastMove: null,
         turnStartTime: Date.now(),
-        turnTimeLimit: 25000
+        turnTimeLimit: 25000 // Oyun içi zaman 25 saniye
     };
 
     rooms.set(roomCode, room);
@@ -915,7 +921,7 @@ wss.on('close', () => clearInterval(pingInterval));
 
 // --- OYUN MANTIKLARI ---
 
-function handleFindMatch(ws, data) {
+async function handleFindMatch(ws, data) {
     ws.language = data.language || ws.language || 'en';
     let modeInput = String(data.mode || '2');
     const mode = (modeInput === '4' || modeInput === '4p') ? '4p' : '2p';
@@ -971,6 +977,26 @@ function handleFindMatch(ws, data) {
             p.ws !== ws
         );
     });
+
+    // BAN KONTROLÜ (Matchmaking öncesi)
+    if (ws.telegramId) {
+        const ban = await Ban.findOne({ telegramId: ws.telegramId });
+        if (ban && (!ban.expiresAt || ban.expiresAt > new Date())) {
+            let timeMsg = "Süresiz";
+            if (ban.expiresAt) {
+                const diff = ban.expiresAt - new Date();
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                timeMsg = `${days} gün ${hours} saat ${minutes} dakika`;
+            }
+
+            return sendMessage(ws, {
+                type: 'error',
+                message: `YASAKLANDINIZ!\nSebep: ${ban.reason}\nKalan Süre: ${timeMsg}`
+            });
+        }
+    }
 
     const playerId = ws.playerId || `guest_${Math.random().toString(36).substr(2, 9)}`;
     ws.playerId = playerId;
@@ -1866,7 +1892,7 @@ function handleDisconnect(ws) {
                     pWs.send(JSON.stringify({
                         type: 'gameMessage',
                         message: getMsg(lang, 'opponentDisconnected').replace('{name}', ws.playerName),
-                        duration: 15000
+                        duration: 20000 // 20 saniye mesaj süresi
                     }));
                 }
             });
@@ -1893,7 +1919,7 @@ function handleDisconnect(ws) {
                     }
                 }
                 disconnectGraceTimers.delete(ws.playerId);
-            }, 15000);
+            }, 20000); // 20 saniye bekleme süresi
 
             disconnectGraceTimers.set(ws.playerId, timer);
         } else if (room && !room.gameState) {
@@ -1960,12 +1986,20 @@ function handleRejoin(ws, data) {
 // --- TIMEOUT KONTROLÜ ---
 
 setInterval(() => {
+    const now = Date.now();
     rooms.forEach((room, roomCode) => {
+        // OPTİMİZASYON: 1 saatten fazla işlem yapılmayan odaları sil (RAM Tasarrufu)
+        if (room.lastActivity && (now - room.lastActivity > 3600000)) {
+            rooms.delete(roomCode);
+            return;
+        }
+
         if (!room.gameState || !room.gameState.turnStartTime || room.gameState.winner) return;
+        room.lastActivity = now; // Odayı aktif olarak işaretle
 
         // 25 saniye süre (Kullanıcı 25 istedi)
         const TURN_LIMIT = 25000;
-        const elapsed = Date.now() - room.gameState.turnStartTime;
+        const elapsed = now - room.gameState.turnStartTime;
 
         if (elapsed > TURN_LIMIT) {
             handleTurnTimeout(roomCode);
@@ -2027,6 +2061,15 @@ function handleTurnTimeout(roomCode) {
     // Eldeki taşları kontrol et
     for (let i = 0; i < player.hand.length; i++) {
         const tile = player.hand[i];
+
+        // İlk hamle kısıtlaması (AFK için)
+        if (gs.moves === 0 && gs.firstMoveTile) {
+            const [d1, d2] = gs.firstMoveTile;
+            if (!((tile[0] === d1 && tile[1] === d2) || (tile[0] === d2 && tile[1] === d1))) {
+                continue;
+            }
+        }
+
         if (gs.board.length === 0) {
             validMove = { tile, index: i, position: 'left' };
             break;
