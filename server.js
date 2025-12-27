@@ -61,6 +61,33 @@ const broadcastSchema = new mongoose.Schema({
 });
 const Broadcast = mongoose.model('DominoBroadcast', broadcastSchema);
 
+const reportSchema = new mongoose.Schema({
+    reporterId: { type: String, required: true },
+    reportedId: { type: String, required: true },
+    reportedName: { type: String },
+    reason: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now }
+});
+reportSchema.index({ reporterId: 1, reportedId: 1 }, { unique: true });
+const Report = mongoose.model('DominoReport', reportSchema);
+
+const bugReportSchema = new mongoose.Schema({
+    userId: { type: String, required: true },
+    username: { type: String },
+    message: { type: String, required: true },
+    language: { type: String, default: 'az' },
+    createdAt: { type: Date, default: Date.now }
+});
+const BugReport = mongoose.model('DominoBugReport', bugReportSchema);
+
+const banSchema = new mongoose.Schema({
+    telegramId: { type: String, required: true, unique: true },
+    reason: { type: String },
+    expiresAt: { type: Date },
+    createdAt: { type: Date, default: Date.now }
+});
+const Ban = mongoose.model('DominoBan', banSchema);
+
 app.use(cors());
 app.use(express.json());
 
@@ -174,37 +201,19 @@ app.post('/api/auth/telegram', async (req, res) => {
     try {
         const { telegramId, username, firstName, lastName, photoUrl, isGuest = false } = req.body;
 
-        if (!telegramId || !username) {
-            return res.status(400).json({ error: 'Telegram ID ve kullanıcı adı gerekli' });
+        if (isGuest || !telegramId || !username) {
+            return res.status(403).json({ success: false, message: 'Misafir girişi artık desteklenmiyor. Lütfen Telegram ile giriş yapın.' });
         }
 
-        // Guest kullanıcılar için özel işlem
-        if (isGuest) {
-            const guestPlayer = {
-                telegramId,
-                username: `Misafir_${Math.floor(Math.random() * 10000)}`,
-                firstName: firstName || 'Misafir',
-                lastName: lastName || 'Oyuncu',
-                photoUrl: photoUrl || '',
-                isGuest: true,
-                elo: 0,
-                level: 1,
-                wins: 0,
-                losses: 0,
-                draws: 0,
-                totalGames: 0,
-                winStreak: 0,
-                bestWinStreak: 0
-            };
-
-            // Guest kullanıcıyı sadece bellekte tut, veritabanına kaydetme
-            playerSessions.set(telegramId, guestPlayer);
-
-            return res.json({
-                success: true,
-                isGuest: true,
-                player: guestPlayer
-            });
+        // Ban Kontrolü
+        const ban = await Ban.findOne({ telegramId });
+        if (ban) {
+            if (!ban.expiresAt || ban.expiresAt > new Date()) {
+                const timeLeft = ban.expiresAt ? `Bitiş: ${ban.expiresAt.toLocaleString()}` : 'Süresiz';
+                return res.status(403).json({ success: false, message: `YASAKLANDINIZ! Sebep: ${ban.reason || 'Yok'}. ${timeLeft}` });
+            } else {
+                await Ban.deleteOne({ _id: ban._id }); // Ban süresi dolmuş
+            }
         }
 
         // Normal (kayıtlı) kullanıcı işlemleri
@@ -214,9 +223,9 @@ app.post('/api/auth/telegram', async (req, res) => {
             player = new Player({
                 telegramId,
                 username,
-                firstName,
-                lastName,
-                photoUrl,
+                firstName: firstName || '',
+                lastName: lastName || '',
+                photoUrl: photoUrl || '',
                 isGuest: false
             });
             await player.save();
@@ -224,11 +233,11 @@ app.post('/api/auth/telegram', async (req, res) => {
         } else {
             // Profil bilgilerini güncelle
             player.username = username;
-            player.firstName = firstName;
-            player.lastName = lastName;
-            player.photoUrl = photoUrl;
+            player.firstName = firstName || player.firstName;
+            player.lastName = lastName || player.lastName;
+            player.photoUrl = photoUrl || player.photoUrl;
             player.lastPlayed = new Date();
-            player.isGuest = false; // Eğer guest'ten kayıtlıya geçtiyse
+            player.isGuest = false;
             await player.save();
         }
 
@@ -248,10 +257,7 @@ app.post('/api/auth/telegram', async (req, res) => {
                 level: player.level,
                 wins: player.wins,
                 losses: player.losses,
-                draws: player.draws,
-                totalGames: player.totalGames,
-                winStreak: player.winStreak,
-                bestWinStreak: player.bestWinStreak
+                totalGames: player.totalGames
             }
         });
     } catch (error) {
@@ -277,7 +283,6 @@ app.get('/api/leaderboard', async (req, res) => {
 // Admin paneli için tüm kullanıcıları listeleme
 app.get('/api/admin/users', async (req, res) => {
     try {
-        // Basit bir güvenlik kontrolü
         const authHeader = req.headers.authorization;
         if (!authHeader || authHeader !== 'YOUR_ADMIN_SECRET') {
             return res.status(403).json({ error: 'Yetkisiz erişim' });
@@ -287,10 +292,90 @@ app.get('/api/admin/users', async (req, res) => {
             .sort({ elo: -1 })
             .select('telegramId username firstName lastName photoUrl elo level wins losses draws totalGames createdAt lastPlayed isVisibleInLeaderboard');
 
-        res.json({ success: true, users });
+        const bans = await Ban.find();
+        const reports = await Report.find().sort({ createdAt: -1 });
+        const bugs = await BugReport.find().sort({ createdAt: -1 });
+
+        res.json({ success: true, users, bans, reports, bugs });
     } catch (error) {
         console.error('Admin users error:', error);
         res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
+
+app.post('/api/report/bug', async (req, res) => {
+    try {
+        const { userId, username, message, language } = req.body;
+        if (!userId || !message) return res.status(400).json({ success: false });
+
+        const newBug = new BugReport({
+            userId,
+            username: username || 'Unknown',
+            message,
+            language: language || 'az'
+        });
+        await newBug.save();
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Bug report error:', err);
+        res.status(500).json({ success: false });
+    }
+});
+
+app.post('/api/admin/ban', async (req, res) => {
+    try {
+        const { adminId, targetId, reason, durationDays } = req.body;
+        if (adminId !== '1840079939') return res.status(403).json({ success: false, error: 'Yetkisiz' });
+
+        let expiresAt = null;
+        if (durationDays && durationDays > 0) {
+            expiresAt = new Date();
+            expiresAt.setDate(expiresAt.getDate() + parseInt(durationDays));
+        }
+
+        await Ban.findOneAndUpdate(
+            { telegramId: targetId },
+            { reason, expiresAt, createdAt: new Date() },
+            { upsert: true }
+        );
+
+        // Bağlantıyı kes
+        const pWs = Array.from(playerConnections.values()).find(ws => ws.telegramId === targetId);
+        if (pWs) {
+            pWs.send(JSON.stringify({ type: 'error', message: 'HESABINIZ YASAKLANDI!' }));
+            pWs.close();
+        }
+
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false });
+    }
+});
+
+app.post('/api/admin/unban', async (req, res) => {
+    try {
+        const { adminId, targetId } = req.body;
+        if (adminId !== '1840079939') return res.status(403).json({ success: false });
+        await Ban.deleteOne({ telegramId: targetId });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false });
+    }
+});
+
+app.post('/api/report', async (req, res) => {
+    try {
+        const { reporterId, reportedId, reportedName, reason } = req.body;
+        if (!reporterId || !reportedId || !reason) return res.status(400).json({ success: false });
+
+        const newReport = new Report({
+            reporterId, reportedId, reportedName, reason
+        });
+        await newReport.save();
+        res.json({ success: true });
+    } catch (err) {
+        if (err.code === 11000) return res.status(400).json({ success: false, message: 'Zaten raporladınız' });
+        res.status(500).json({ success: false });
     }
 });
 
@@ -300,7 +385,7 @@ app.post('/api/admin/update', async (req, res) => {
         const { adminId, targetId, updates } = req.body;
 
         // Yetki kontrolü
-        if (!adminId || adminId !== '976640409') {
+        if (!adminId || adminId !== '1840079939') {
             return res.status(403).json({ success: false, error: 'Yetkisiz işlem' });
         }
 
@@ -472,8 +557,8 @@ const wss = new WebSocket.Server({
 // Admin: Global Broadcast Mesajı Gönderme
 app.post('/api/admin/broadcast', async (req, res) => {
     const { adminId, message } = req.body;
-    // Basit admin kontrolü (isteğe bağlı olarak secret key eklenebilir)
-    if (adminId !== '976640409') return res.status(403).json({ success: false, message: 'Yetkisiz erişim' });
+    // Basit admin kontrolü
+    if (adminId !== '1840079939') return res.status(403).json({ success: false, message: 'Yetkisiz erişim' });
 
     try {
         // Eski mesajları pasife çek (opsiyonel)
@@ -1418,17 +1503,25 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
 
         // 4 kişilik veya Özel odalarda lobiyi koru
         if (room.capacity === 4 || room.type === 'private' || room.gameType === 'private') {
-            room.gameState = null; // Oyunu sıfırla ama odayı silme
-            console.log(`🏠 Oda ${roomCode} lobide bekliyor...`);
+            room.gameState = null;
+            room.lastActivity = Date.now();
             setTimeout(() => {
+                const currentRoom = rooms.get(roomCode);
+                if (!currentRoom) return;
                 broadcastToRoom(roomCode, {
                     type: 'roomUpdated',
                     roomCode: roomCode,
-                    players: Object.keys(room.players).map(id => ({ id, ...room.players[id] })),
-                    host: Object.keys(room.players)[0],
-                    capacity: room.capacity
+                    players: Object.keys(currentRoom.players).map(id => ({
+                        id,
+                        name: currentRoom.players[id].name,
+                        photoUrl: currentRoom.players[id].photoUrl,
+                        level: currentRoom.players[id].level,
+                        elo: currentRoom.players[id].elo
+                    })),
+                    host: Object.keys(currentRoom.players)[0],
+                    capacity: currentRoom.capacity
                 });
-            }, 5000); // 5 saniye sonuç ekranı sonrası lobiye dön
+            }, 5000);
         } else {
             rooms.delete(roomCode);
         }
