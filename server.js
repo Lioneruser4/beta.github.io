@@ -1276,6 +1276,9 @@ function handlePlayTile(ws, data) {
         }
     }
 
+    // BOARD KONTROLU (CRITICAL Fix)
+    if (!Array.isArray(gs.board)) gs.board = [];
+
     const boardCopy = JSON.parse(JSON.stringify(gs.board));
     const success = playTileOnBoard(tile, gs.board, data.position);
 
