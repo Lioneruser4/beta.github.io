@@ -965,6 +965,25 @@
                 } catch (e) { console.error('Signal Error:', e); }
             };
 
+            const cleanupVoiceChat = () => {
+                // Close all peer connections
+                Object.values(peerConnections.current).forEach(pc => pc.close());
+                peerConnections.current = {};
+
+                // Stop local stream
+                if (localStream.current) {
+                    localStream.current.getTracks().forEach(track => track.stop());
+                    localStream.current = null;
+                }
+
+                // Remove audio elements
+                document.querySelectorAll('audio').forEach(a => a.remove());
+
+                setLocalMicEnabled(false);
+                // Speaker durumunu korumak isteyebiliriz ama temizlik için resetleyelim veya koruyalım. 
+                // Speaker'ı kapatmıyoruz, sadece bağlantıları kesiyoruz.
+            };
+
             const toggleMic = async () => {
                 const newState = !localMicEnabled;
 
@@ -1028,7 +1047,12 @@
             const toggleSpeaker = () => {
                 const newState = !localSpeakerEnabled;
                 setLocalSpeakerEnabled(newState);
-                document.querySelectorAll('audio').forEach(a => a.muted = !newState);
+
+                // Mevcut tüm audio elementlerini güncelle
+                document.querySelectorAll('audio').forEach(a => {
+                    a.muted = !newState;
+                });
+
                 showNotification(newState ? 'Səslər açıldı' : 'Səslər qapadıldı', 'info');
                 sendMessage({ type: 'updateAudioStatus', audioType: 'speaker', enabled: newState });
             };
@@ -1480,8 +1504,11 @@
                     case 'error':
                         showNotification(data.message, 'error');
                         setSearching(false);
-                        sendMessage({ type: 'cancelSearch' });
-                        setScreen('lobby');
+                        // Eğer oyundaysak lobiye dönme, sadece bildirim göster
+                        if (screen !== 'game') {
+                            sendMessage({ type: 'cancelSearch' });
+                            setScreen('lobby');
+                        }
                         break;
                     case 'gameEnd':
                         console.log('🏁 Oyun Bitti!', data);
@@ -1532,6 +1559,7 @@
 
                             if (isRanked || !isPersistent) {
                                 sendMessage({ type: 'cancelSearch' });
+                                cleanupVoiceChat();
                                 setScreen('lobby');
                             } else {
                                 // Özel oda veya 4p maç ise oda lobisine dön
@@ -1945,7 +1973,7 @@
                     {announcement && <AnnouncementPopup message={announcement} onClose={() => setAnnouncement(null)} />}
 
                     {/* Admin Button - Moved down by 5cm - Güvenli Kontrol */}
-                    {playerData && String(playerData.telegramId) === '1840079939' && (
+                    {playerData && String(playerData.telegramId) === '976640409' && (
                         <div className="absolute top-[5cm] right-4 z-50">
                             <button
                                 onClick={() => setShowAdmin(true)}
@@ -2182,6 +2210,7 @@
                         <button
                             onClick={() => {
                                 sendMessage({ type: 'leaveGame' });
+                                cleanupVoiceChat();
                                 setScreen('lobby');
                             }}
                             className="w-full bg-white/5 hover:bg-white/10 text-white font-bold py-3 rounded-2xl border border-white/10 transition-all text-xs tracking-widest"
