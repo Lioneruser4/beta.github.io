@@ -1277,13 +1277,21 @@
                         break;
                     case 'roomJoined':
                         setRoomCode(data.roomCode);
-                        setIsHost(false); // Not host if joined
-                        setScreen('room_lobby'); // Transition to room lobby
-                        setOpponents(data.players.filter(p => p.id !== playerId)); // Set current players in room
+                        setIsHost(false);
+                        const currentOpponents = data.players.filter(p => String(p.id) !== String(data.playerId || playerId));
+                        setOpponents(currentOpponents);
+                        setScreen('room_lobby');
+
+                        // WebRTC: Odaya girince rakiplerle bağlantı kur
+                        currentOpponents.forEach(p => {
+                            createPeerConnection(String(p.id));
+                        });
                         break;
                     case 'playerJoinedRoom':
                         showNotification(`${data.player.username} odaya katıldı!`, 'info');
                         setOpponents(prev => [...prev, data.player]);
+                        // WebRTC: Yeni gelen oyuncuyla bağlantı kur
+                        createPeerConnection(String(data.player.id));
                         break;
                     case 'playerLeftRoom':
                         showNotification(`${data.player.username} odadan ayrıldı!`, 'info');
@@ -1312,8 +1320,9 @@
                                 // WebRTC: Oda katılımında bağlantıları hazırla
                                 if (data.gameState.playerOrder) {
                                     data.gameState.playerOrder.forEach(pid => {
-                                        if (pid !== (data.gameState.playerId || data.playerId)) {
-                                            createPeerConnection(pid);
+                                        const myCurrentId = String(data.gameState.playerId || playerId || '');
+                                        if (String(pid) !== myCurrentId) {
+                                            createPeerConnection(String(pid));
                                         }
                                     });
                                 }
@@ -1412,10 +1421,16 @@
                         break;
                     case 'roomUpdated':
                         setRoomCode(data.roomCode);
-                        setOpponents(data.players.filter(p => p.id !== playerId));
+                        const otherPlayers = data.players.filter(p => String(p.id) !== String(playerId));
+                        setOpponents(otherPlayers);
                         setIsHost(data.host === playerId);
                         setRoomCapacity(data.capacity);
                         setScreen('room_lobby');
+
+                        // WebRTC: Oda güncellendiğinde rakiplerle bağlantı kur
+                        otherPlayers.forEach(p => {
+                            createPeerConnection(String(p.id));
+                        });
                         break;
                     case 'broadcastMessage':
                         try {
@@ -1945,6 +1960,22 @@
                     </div>
 
                     <div className="mt-12 flex flex-col gap-3 w-full max-w-xs relative z-10">
+                        {/* Voice Buttons for Lobby */}
+                        <div className="flex gap-4 justify-center mb-6">
+                            <button
+                                onClick={toggleMic}
+                                className={`w-14 h-14 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localMicEnabled ? 'bg-green-500 border-green-400 text-white animate-glow-pulse' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
+                            >
+                                <span className="text-3xl">{localMicEnabled ? '🎙️' : '🔇'}</span>
+                            </button>
+                            <button
+                                onClick={toggleSpeaker}
+                                className={`w-14 h-14 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localSpeakerEnabled ? 'bg-blue-500 border-blue-400 text-white shadow-glow' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
+                            >
+                                <span className="text-3xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
+                            </button>
+                        </div>
+
                         {isHost && opponents.length >= 1 && (
                             <button
                                 onClick={() => {
@@ -1957,7 +1988,7 @@
                                 {t.startEarly}
                             </button>
                         )}
-                        {!isHost && (
+                        {!isHost && opponents.length === 0 && (
                             <div className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em] text-center mb-2 animate-pulse">
                                 {t.waitingOpponent}
                             </div>
@@ -2265,50 +2296,89 @@
 
             if (screen === 'calculation') {
                 return (
-                    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-[#0b241c] to-black p-6">
-                        <h1 className="text-4xl font-black text-yellow-400 mb-2">{t.calculationTitle}</h1>
-                        <p className="text-white/60 mb-8">{t.calculationSubtitle}</p>
+                    <div className="fixed inset-0 flex flex-col items-center justify-center p-6 bg-[#0b241c] overflow-hidden">
+                        {/* Premium Background Effects */}
+                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
+                        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-yellow-900/40 opacity-60"></div>
 
-                        <div className="w-full max-w-md space-y-6">
-                            {calculationLobby && Object.entries(calculationLobby.players).map(([pid, player]) => (
-                                <div
-                                    key={pid}
-                                    className={`flex items-center gap-4 p-4 rounded-2xl border-2 ${player.isMe
-                                        ? 'bg-blue-900/30 border-blue-500/50'
-                                        : 'bg-white/5 border-white/10'
-                                        }`}
-                                >
-                                    <div className="relative">
-                                        <img
-                                            src={player.photo || 'https://via.placeholder.com/64'}
-                                            className="w-16 h-16 rounded-full border-2 border-white/20"
-                                        />
-                                        {player.isMe && (
-                                            <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">
-                                                {t.you}
+                        {/* Animated Glows */}
+                        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-[120px] animate-pulse"></div>
+                        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-yellow-500/20 rounded-full blur-[120px] animate-pulse-slow"></div>
+
+                        <div className="relative z-10 w-full max-w-lg animate-scale-up">
+                            {/* Pro Header */}
+                            <div className="text-center mb-10">
+                                <div className="inline-block px-4 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 text-[10px] font-black tracking-[0.4em] uppercase mb-4 animate-bounce">
+                                    RAUNT SONLANDI
+                                </div>
+                                <h1 className="text-5xl font-black text-white italic tracking-tighter drop-shadow-2xl">
+                                    PUANLAR
+                                </h1>
+                            </div>
+
+                            {/* Pro Score Cards */}
+                            <div className="space-y-4">
+                                {calculationLobby && Object.entries(calculationLobby.players)
+                                    .sort((a, b) => a[1].score - b[1].score)
+                                    .map(([pid, player], idx) => {
+                                        const isWinner = idx === 0;
+                                        const isMe = pid === (playerId || playerData?.id);
+
+                                        return (
+                                            <div
+                                                key={pid}
+                                                className={`group relative transition-all duration-500 ${isMe ? 'scale-105 z-20' : 'scale-100 z-10 opacity-90'}`}
+                                            >
+                                                <div className={`relative flex items-center gap-5 p-5 rounded-[2.5rem] border-2 transition-all shadow-2xl backdrop-blur-xl ${isMe ? 'bg-blue-600/20 border-blue-400/50 shadow-blue-500/20' : (isWinner ? 'bg-yellow-500/20 border-yellow-400/40 shadow-yellow-500/20' : 'bg-black/60 border-white/10')
+                                                    }`}>
+                                                    {/* Rank Badge */}
+                                                    <div className={`absolute -left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center font-black italic text-[10px] border-2 shadow-xl ${isWinner ? 'bg-yellow-500 border-yellow-300 text-black' : 'bg-white/10 border-white/20 text-white'
+                                                        }`}>
+                                                        {idx + 1}
+                                                    </div>
+
+                                                    <div className="relative ml-2">
+                                                        <div className={`w-16 h-16 rounded-3xl border-2 transition-transform duration-500 overflow-hidden ${isMe ? 'border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : (isWinner ? 'border-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.5)]' : 'border-white/20')}`}>
+                                                            <img src={player.photo || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" />
+                                                        </div>
+                                                        {isWinner && <div className="absolute -top-4 -right-4 text-3xl animate-bounce">👑</div>}
+                                                    </div>
+
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`text-xl font-black italic truncate max-w-[120px] ${isWinner ? 'text-yellow-400' : 'text-white'}`}>{player.name}</span>
+                                                            <LevelBadge level={calculateLevel(player.elo || 0)} />
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 mt-1 text-white/40 text-[9px] font-black tracking-widest uppercase">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-50"></span>
+                                                            {t.handTotal}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className={`flex flex-col items-center justify-center min-w-[75px] h-16 rounded-3xl border ${isWinner ? 'bg-yellow-400/10 border-yellow-400/30' : 'bg-black/40 border-white/10'
+                                                        }`}>
+                                                        <span className={`text-[9px] font-black tracking-widest ${isWinner ? 'text-yellow-400' : 'text-white/40'}`}>PUAN</span>
+                                                        <span className={`text-3xl font-black italic leading-none mt-1 ${isWinner ? 'text-yellow-400' : 'text-white'}`}>{player.score}</span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        )}
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="text-white font-bold text-lg">{player.name}</div>
-                                        <div className="text-white/60 text-sm">{t.handTotal}</div>
-                                    </div>
-                                    <div className="text-3xl font-black text-yellow-400">
-                                        {player.score}
+                                        );
+                                    })}
+                            </div>
+
+                            {/* Circular Premium Timer */}
+                            <div className="mt-12 flex flex-col items-center">
+                                <div className="relative w-20 h-20">
+                                    <svg className="w-full h-full -rotate-90">
+                                        <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="2" fill="transparent" className="text-white/5" />
+                                        <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-yellow-500 transition-all duration-1000 shadow-glow" strokeDasharray="226" strokeDashoffset={226 - (226 * (8 - calculationTimer) / 8)} strokeLinecap="round" />
+                                    </svg>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                        <span className="text-white font-black text-xl leading-none">{calculationTimer}</span>
+                                        <span className="text-[8px] text-white/40 font-bold uppercase tracking-tighter">SEC</span>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-
-                        <div className="mt-10 text-center">
-                            <div className="text-white/40 text-sm mb-2">
-                                {t.winnerAnnouncing} {calculationTimer}s
-                            </div>
-                            <div className="w-64 h-2 bg-white/10 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-yellow-500 transition-all duration-1000"
-                                    style={{ width: `${(8 - calculationTimer) * 12.5}%` }}
-                                ></div>
+                                <span className="mt-4 text-white/30 text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">SONRAKİ RAUNT HAZIRLANIR</span>
                             </div>
                         </div>
                     </div>
@@ -2316,46 +2386,75 @@
             }
 
             if (screen === 'end' && endInfo) return (
-                <div className="flex flex-col items-center justify-center min-h-screen bg-black/95 p-6 text-center animate-fade-in">
-                    <div className="mb-10">
-                        <h1 className="text-6xl font-black text-white italic tracking-tighter drop-shadow-glow">
+                <div className="fixed inset-0 flex flex-col items-center justify-center p-6 bg-black overflow-hidden">
+                    {/* Dark Premium Background */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-[#0b241c] via-black to-[#0b241c] opacity-80"></div>
+                    <div className="absolute inset-0 backdrop-blur-3xl"></div>
+
+                    {/* Glowing Particles Effect (Simplified CSS) */}
+                    <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-[radial-gradient(circle,rgba(234,179,8,0.05)_0%,transparent_70%)] animate-pulse"></div>
+                    </div>
+
+                    <div className="relative z-10 w-full max-w-lg text-center animate-fade-in">
+                        {/* Status Label */}
+                        <div className="mb-6">
+                            <span className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 text-[10px] font-black tracking-[0.4em] px-5 py-2 rounded-full uppercase">
+                                MAÇ TAMAMLANDI
+                            </span>
+                        </div>
+
+                        {/* Title */}
+                        <h1 className="text-7xl font-black text-white italic tracking-tighter drop-shadow-glow mb-12">
                             OYUN BİTDİ
                         </h1>
-                        <div className="mt-2 text-yellow-500 font-black tracking-[0.3em] uppercase opacity-70">MAÇ SONUÇLARI</div>
-                    </div>
 
-                    {endInfo.reason === 'disconnect' && <div className="bg-red-500/10 border border-red-500/30 px-6 py-2 rounded-full text-red-400 font-bold mb-8 animate-pulse">Rəqib oyundan ayrıldı (Hükmen Galibiyet)</div>}
-                    {endInfo.reason === 'afk' && <div className="bg-yellow-500/10 border border-yellow-500/30 px-6 py-2 rounded-full text-yellow-400 font-bold mb-8 animate-pulse">AFK Qaldığınız üçün oyun sonlandı</div>}
+                        {/* Status Banners */}
+                        {endInfo.reason === 'disconnect' && <div className="mb-8 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-500 font-black text-sm uppercase tracking-widest animate-pulse">Rəqib oyundan ayrıldı • Hükmen Galibiyet</div>}
+                        {endInfo.reason === 'afk' && <div className="mb-8 p-4 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 font-black text-sm uppercase tracking-widest animate-pulse">AFK Qaldığınız üçün oyun sonlandı</div>}
 
-                    <div className="w-full max-w-md space-y-3">
-                        {endInfo.players && endInfo.players.sort((a, b) => b.isWinner - a.isWinner).map((p, idx) => (
-                            <div key={idx} className={`flex items-center gap-4 p-4 rounded-3xl border-2 transition-all transform hover:scale-[1.02] ${p.isWinner ? 'bg-green-900/40 border-green-500/50 shadow-[0_0_30px_rgba(34,197,94,0.2)]' : 'bg-white/5 border-white/10 opacity-80'}`}>
-                                <div className="relative">
-                                    <img src={p.photo || 'https://via.placeholder.com/64'} className={`w-14 h-14 rounded-2xl object-cover border-2 ${p.isWinner ? 'border-green-400' : 'border-white/20'}`} />
-                                    {p.isWinner && <div className="absolute -top-2 -left-2 text-2xl animate-bounce">👑</div>}
+                        {/* Players Final Result Cards */}
+                        <div className="space-y-4 mb-20">
+                            {endInfo.players && endInfo.players.sort((a, b) => b.isWinner - a.isWinner).map((p, idx) => (
+                                <div key={idx} className={`relative group transition-all duration-700 ${p.isWinner ? 'scale-105 z-20' : 'scale-100 z-10 opacity-70'}`}>
+                                    <div className={`flex items-center gap-5 p-5 rounded-[2.5rem] border-2 transition-all backdrop-blur-xl ${p.isWinner ? 'bg-yellow-500/20 border-yellow-400 shadow-[0_0_50px_rgba(234,179,8,0.2)]' : 'bg-white/5 border-white/10 shadow-2xl'
+                                        }`}>
+                                        <div className="relative">
+                                            <div className={`w-16 h-16 rounded-3xl border-2 transition-transform duration-500 rotate-2 group-hover:rotate-0 overflow-hidden ${p.isWinner ? 'border-yellow-400' : 'border-white/20'}`}>
+                                                <img src={p.photo || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" />
+                                            </div>
+                                            {p.isWinner && <div className="absolute -top-4 -left-4 text-4xl animate-bounce">👑</div>}
+                                        </div>
+
+                                        <div className="flex-1 text-left">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-xl font-black italic tracking-tight ${p.isWinner ? 'text-yellow-400' : 'text-white'}`}>{p.name}</span>
+                                                {p.id === (playerId || playerData?.id) && <span className="bg-blue-500 text-[8px] font-black px-2 py-0.5 rounded-full text-white shadow-glow tracking-widest">SİZ</span>}
+                                            </div>
+                                            <div className={`text-[10px] font-black uppercase tracking-widest mt-1 ${p.isWinner ? 'text-yellow-400/60' : 'text-white/40'}`}>
+                                                {p.isWinner ? 'QALİB' : 'MƏĞLUB'} • {p.score} PUAN
+                                            </div>
+                                        </div>
+
+                                        {/* Elo Change Badge */}
+                                        {endInfo.isRanked && (
+                                            <div className={`flex flex-col items-center justify-center min-w-[70px] h-16 rounded-3xl border ${p.eloChange >= 0 ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-500'
+                                                }`}>
+                                                <span className="text-[9px] font-black tracking-widest uppercase">ELO</span>
+                                                <span className="text-xl font-black italic leading-none mt-1">{p.eloChange > 0 ? '+' : ''}{p.eloChange}</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="flex-1 text-left">
-                                    <div className="text-white font-black text-lg truncate flex items-center gap-2">
-                                        {p.name}
-                                        {p.id === (playerId || playerData?.id) && <span className="bg-blue-500 text-[8px] px-1.5 py-0.5 rounded-full uppercase tracking-widest text-white">SİZ</span>}
-                                    </div>
-                                    <div className={`text-[10px] font-black uppercase tracking-widest ${p.isWinner ? 'text-green-400' : 'text-white/40'}`}>
-                                        {p.isWinner ? 'QALİB' : 'MƏĞLUB'} • {p.score} PUAN
-                                    </div>
-                                </div>
-                                {endInfo.isRanked && (
-                                    <div className={`font-black text-xl italic ${p.eloChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                        {p.eloChange > 0 ? '+' : ''}{p.eloChange}
-                                    </div>
-                                )}
+                            ))}
+                        </div>
+
+                        {/* Back to Lobby Timer Footer */}
+                        <div className="flex flex-col items-center gap-4">
+                            <span className="text-white/20 text-[10px] font-black uppercase tracking-[0.5em] animate-pulse">Lobiya qayıdılır...</span>
+                            <div className="w-56 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                <div className="h-full bg-gradient-to-r from-yellow-600 to-yellow-400 animate-progress"></div>
                             </div>
-                        ))}
-                    </div>
-
-                    <div className="mt-12 flex flex-col items-center gap-4">
-                        <div className="text-white/20 text-[10px] font-bold uppercase tracking-[0.4em] animate-pulse">Lobiya qayıdılır...</div>
-                        <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
-                            <div className="h-full bg-yellow-500 animate-progress"></div>
                         </div>
                     </div>
                 </div>
