@@ -429,21 +429,27 @@ app.get('/health', (req, res) => {
 function handleUpdateAudioStatus(ws, data) {
     if (!ws.roomCode || !ws.playerId) return;
     const room = rooms.get(ws.roomCode);
-    if (!room || !room.gameState) return;
+    if (!room) return;
 
-    const { audioType, enabled } = data; // audioType: 'mic' or 'speaker'
-    const player = room.gameState.players[ws.playerId];
-    if (!player) return;
+    const { audioType, enabled } = data;
 
-    if (audioType === 'mic') player.micEnabled = enabled;
-    if (audioType === 'speaker') player.speakerEnabled = enabled;
+    // Hem gameState'teki hem de room.players'taki durumu güncelle
+    if (room.gameState && room.gameState.players[ws.playerId]) {
+        if (audioType === 'mic') room.gameState.players[ws.playerId].micEnabled = enabled;
+        if (audioType === 'speaker') room.gameState.players[ws.playerId].speakerEnabled = enabled;
+    }
+
+    if (room.players[ws.playerId]) {
+        if (audioType === 'mic') room.players[ws.playerId].micEnabled = enabled;
+        if (audioType === 'speaker') room.players[ws.playerId].speakerEnabled = enabled;
+    }
 
     // Odadakilere bildir
     broadcastToRoom(ws.roomCode, {
         type: 'audioStatusUpdate',
         playerId: ws.playerId,
-        micEnabled: player.micEnabled,
-        speakerEnabled: player.speakerEnabled
+        micEnabled: enabled, // Gönderilen durumu direkt ilet
+        speakerEnabled: enabled
     });
 }
 
