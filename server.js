@@ -1334,14 +1334,88 @@ function handlePlayTile(ws, data) {
     }
 }
 
-async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = false, winnerReason = null) {
+async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = false, winnerReason = null, extraData = {}) {
     const room = rooms.get(roomCode);
     if (!room) return;
 
     const playerIds = Object.keys(room.players);
-    const winnerId = winnerResult.winnerId || winnerResult; // SCORE_WIN, HAND_WIN, BLOCKED, etc.
+    // KAZANAN VE SKOR HESAPLAMA
+    const winnerId = (winnerResult && typeof winnerResult === 'object') ? winnerResult.id : winnerResult;
 
-    // 101 PUAN HESABI
+    // 4 Kişilik Oyun - Özel Kopma Puanlaması
+    if (winnerReason === 'disconnect_4p' && extraData.points) {
+        const pointsCall = extraData.points;
+        const leaverId = extraData.leaver;
+        console.log(`🏆 4p Disconnect İşlemi Başladı: Leaver ${leaverId}, Puan ${pointsCall}`);
+
+        const updates = [];
+
+        // Kalan 3 kişiye puan ver
+        for (const pid of playerIds) {
+            const p = room.players[pid];
+            // Guest check - Eğer ranked tipindeyse ve guest değilse
+            if (p && !p.isGuest && room.type === 'ranked') {
+                const playerDoc = await Player.findOne({ telegramId: p.telegramId });
+                if (playerDoc) {
+                    if (pid !== leaverId) {
+                        playerDoc.elo += pointsCall;
+                        playerDoc.level = calculateLevel(playerDoc.elo);
+                        playerDoc.wins += 1;
+                        playerDoc.totalGames += 1;
+                        // Win streak mantığı opsiyonel
+                        await playerDoc.save();
+                        console.log(`✅ 4p Disconnect: ${p.name} +${pointsCall} ELO kazandı.`);
+                    } else {
+                        // Leaver cezası
+                        playerDoc.elo = Math.max(0, playerDoc.elo - 20);
+                        playerDoc.level = calculateLevel(playerDoc.elo);
+                        playerDoc.losses += 1;
+                        playerDoc.totalGames += 1;
+                        playerDoc.winStreak = 0;
+                        await playerDoc.save();
+                        console.log(`❌ 4p Disconnect: ${p.name} -20 ELO kaybetti.`);
+                    }
+                }
+            }
+        }
+
+        // Odayı kapat ve bildir (Normal 101 puan akışını bypass et)
+        if (room.players) {
+            Object.keys(room.players).forEach(pid => {
+                const playerWs = playerConnections.get(pid);
+                if (playerWs) playerWs.roomCode = null;
+            });
+        }
+        rooms.delete(roomCode);
+
+        // Tüm oyunculara son durumu bildir (Leaver dahil veya hariç)
+        const allPlayersData = Object.keys(room.players).map(pid => ({
+            ...room.players[pid],
+            eloChange: pid === leaverId ? -20 : pointsCall
+        }));
+
+        const broadcastData = {
+            type: 'gameEnd',
+            isRanked: true,
+            reason: 'disconnect_4p',
+            winner: '4P_DISCONNECT',
+            winnerName: 'Hükmen',
+            players: allPlayersData
+        };
+
+        // Bağlı olan clientlara gönder
+        playerIds.forEach(pid => {
+            const ws = playerConnections.get(pid);
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(broadcastData));
+            }
+        });
+        return;
+    }
+
+    // --- NORMAL / 2P / STANDART AKIŞ ---
+
+    // 101 PUAN HESABI (Sadece normal bitiş ve forfeit ise, ama 4p disconnect değilse)
     if (winnerId !== 'DRAW' && !isForfeit) {
         let handScoreGained = 0;
         playerIds.forEach(pid => {
@@ -1801,9 +1875,22 @@ function handleDisconnect(ws) {
             const timer = setTimeout(() => {
                 const refreshedRoom = rooms.get(ws.roomCode);
                 if (refreshedRoom && refreshedRoom.gameState && !refreshedRoom.gameState.winner) {
-                    const otherPlayerId = Object.keys(refreshedRoom.players).find(id => id !== ws.playerId);
-                    console.log(`🏆 15 saniye doldu, ${ws.playerName} bağlanmadı. Maç biter.`);
-                    handleGameEnd(ws.roomCode, otherPlayerId, refreshedRoom.gameState, true, 'disconnect');
+                    // 4 Kişilik Oyun Özel ELO Mantığı
+                    if (refreshedRoom.capacity === 4) {
+                        console.log(`🏆 4p maçta oyuncu düştü. Kalanlara puan dağıtılıyor.`);
+                        const totalTiles = refreshedRoom.gameState.board?.length || 0;
+                        const isLateGame = totalTiles > 15;
+                        const pointsToGive = isLateGame ? 17 : 10;
+
+                        handleGameEnd(ws.roomCode, null, refreshedRoom.gameState, true, 'disconnect_4p', {
+                            points: pointsToGive,
+                            leaver: ws.playerId
+                        });
+                    } else {
+                        // 2 Kişilik
+                        const otherPlayerId = Object.keys(refreshedRoom.players).find(id => id !== ws.playerId);
+                        handleGameEnd(ws.roomCode, otherPlayerId, refreshedRoom.gameState, true, 'disconnect');
+                    }
                 }
                 disconnectGraceTimers.delete(ws.playerId);
             }, 15000);
