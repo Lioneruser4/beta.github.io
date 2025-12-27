@@ -777,36 +777,53 @@ function checkWinner(gameState) {
         }
 
         if (!anyoneCanPlay) {
-            // Oyun kilitlendi, elindeki taşların toplamı en az olan kazanır (El kazandı)
+            // Oyun kilitlendi, 101 kuralına göre kazanan belirlenir
             const sums = {};
-            let minSum = Infinity;
             let winnerId = null;
             let isDraw = false;
 
             gameState.playerOrder.forEach(pid => {
                 const sum = gameState.players[pid].hand.reduce((s, t) => s + t[0] + t[1], 0);
                 sums[pid] = sum;
-                if (sum < minSum) {
-                    minSum = sum;
-                    winnerId = pid;
-                    isDraw = false;
-                } else if (sum === minSum) {
-                    isDraw = true; // Birden fazla oyuncunun aynı minSum'ı varsa beraberlik
-                }
             });
 
-            if (isDraw || winnerId === null) {
-                return { type: 'BLOCKED', winnerId: 'DRAW', sums };
-            } else {
-                // Kazanan, diğer oyuncuların elindeki taşların toplamını alır
-                let scoreGained = 0;
-                for (const otherPlayerId in gameState.players) {
-                    if (otherPlayerId !== winnerId) {
-                        scoreGained += sums[otherPlayerId];
-                    }
-                }
-                return { type: 'BLOCKED', winnerId: winnerId, scoreGained, sums };
+            // 101 kuralı: 101'e ulaşan kazanır, kimse 101'e ulaşamadıysa en az puanlı kazanır
+            const playerIds = gameState.playerOrder;
+            const p1Sum = sums[playerIds[0]];
+            const p2Sum = sums[playerIds[1]];
+
+            // İki oyuncu da 101'e ulaştıysa, daha az puanı olan kazanır
+            if (p1Sum >= 101 && p2Sum >= 101) {
+                winnerId = p1Sum <= p2Sum ? playerIds[0] : playerIds[1];
+                isDraw = false;
             }
+            // Sadece bir oyuncu 101'e ulaştıysa, o kazanır
+            else if (p1Sum >= 101) {
+                winnerId = playerIds[0];
+                isDraw = false;
+            }
+            else if (p2Sum >= 101) {
+                winnerId = playerIds[1];
+                isDraw = false;
+            }
+            // Hiç kimse 101'e ulaşamadıysa, en az puanı olan kazanır
+            else {
+                if (p1Sum === p2Sum) {
+                    return { type: 'BLOCKED', winnerId: 'DRAW', sums };
+                } else {
+                    winnerId = p1Sum < p2Sum ? playerIds[0] : playerIds[1];
+                    isDraw = false;
+                }
+            }
+
+            // Kazanan, diğer oyuncuların elindeki taşların toplamını alır
+            let scoreGained = 0;
+            for (const otherPlayerId in gameState.players) {
+                if (otherPlayerId !== winnerId) {
+                    scoreGained += sums[otherPlayerId];
+                }
+            }
+            return { type: 'BLOCKED', winnerId: winnerId, scoreGained, sums };
         }
     }
 
@@ -1495,7 +1512,11 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
     if (room.players) {
         Object.keys(room.players).forEach(pid => {
             const playerWs = playerConnections.get(pid);
-            if (playerWs) playerWs.roomCode = null;
+            if (playerWs) {
+                playerWs.roomCode = null;
+                // Client'a session temizleme mesajı gönder
+                sendMessage(playerWs, { type: 'clearSession', message: 'Oyun bitti, session temizlendi' });
+            }
         });
     }
 
@@ -1768,7 +1789,15 @@ function handleRejoin(ws, data) {
 
     const room = rooms.get(roomCode);
     if (!room || !room.gameState) {
-        return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'gameNotFound') });
+        // Oyun bitmişse session'ı temizle ve lobby'e gönder
+        return sendMessage(ws, { type: 'clearSession', message: 'Oyun bulunamadı, lobiye yönlendiriliyorsunuz' });
+    }
+
+    // Oyunun aktif olduğunu kontrol et (1 dakikadan eski değilse)
+    const gameAge = Date.now() - (room.gameState.turnStartTime || room.startTime);
+    if (gameAge > 60000) { // 1 dakikadan eski oyunlara yeniden bağlanma
+        rooms.delete(roomCode);
+        return sendMessage(ws, { type: 'clearSession', message: 'Oyun zaman aşımına uğradı, lobiye yönlendiriliyorsunuz' });
     }
 
     // Kopma zamanlayıcısını temizle
