@@ -228,13 +228,23 @@
 
             0%,
             100% {
-                box-shadow: 0 0 10px rgba(255, 0, 0, 0.8), 0 0 20px rgba(255, 0, 0, 0.4);
+                box-shadow: 0 0 15px rgba(255, 215, 0, 0.8), 0 0 30px rgba(255, 100, 0, 0.4);
                 filter: brightness(1.2);
             }
 
+            33% {
+                box-shadow: 0 0 20px rgba(255, 0, 255, 0.8), 0 0 40px rgba(255, 0, 255, 0.4);
+                filter: brightness(1.4);
+            }
+
+            66% {
+                box-shadow: 0 0 20px rgba(0, 255, 255, 0.8), 0 0 40px rgba(0, 255, 255, 0.4);
+                filter: brightness(1.4);
+            }
+
             50% {
-                box-shadow: 0 0 20px rgba(255, 0, 0, 1), 0 0 40px rgba(255, 0, 0, 0.6);
-                filter: brightness(1.5);
+                box-shadow: 0 0 25px rgba(251, 191, 36, 1), 0 0 50px rgba(251, 191, 36, 0.6);
+                filter: brightness(1.6);
             }
         }
 
@@ -243,16 +253,34 @@
                 border-color: #ff0000;
             }
 
-            33% {
+            20% {
+                border-color: #ff8800;
+            }
+
+            40% {
+                border-color: #ffff00;
+            }
+
+            60% {
                 border-color: #00ff00;
             }
 
-            66% {
-                border-color: #0000ff;
+            80% {
+                border-color: #0088ff;
             }
 
             100% {
                 border-color: #ff0000;
+            }
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: -200% 0;
+            }
+
+            100% {
+                background-position: 200% 0;
             }
         }
 
@@ -277,10 +305,13 @@
         }
 
         .neon-pro {
-            animation: neon-pulse 1.5s infinite ease-in-out, border-flow 3s infinite linear;
-            background: linear-gradient(135deg, #111 0%, #333 100%);
+            animation: neon-pulse 2s infinite ease-in-out, border-flow 4s infinite linear, shimmer 3s infinite linear;
+            background: linear-gradient(90deg, #111 0%, #333 45%, #666 50%, #333 55%, #111 100%);
+            background-size: 200% 100%;
             border-width: 2px;
-            text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 1), 0 0 20px rgba(251, 191, 36, 0.8);
+            font-weight: 900;
+            letter-spacing: 0.1em;
         }
 
         /* Yeni eklenen stiller */
@@ -558,17 +589,17 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': 'YOUR_ADMIN_SECRET'  // Replace with your actual admin secret
+                        'Authorization': 'YOUR_ADMIN_SECRET'
                     },
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ adminId, targetId: id, updates })
                 })
                     .then(res => res.json())
                     .then(data => {
                         if (data.success) {
-                            setPlayers(players.map(p => p._id === id ? { ...p, ...updates } : p));
+                            setPlayers(prev => prev.map(p => p._id === id ? { ...p, ...updates } : p));
                         }
-                    });
+                    })
+                    .catch(err => console.error("Update error:", err));
             };
 
             const [broadcastMsg, setBroadcastMsg] = useState('');
@@ -586,6 +617,8 @@
                     }
                 });
             };
+
+            const filteredPlayers = players.filter(p => (p.username || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
             return (
                 <div className="fixed inset-0 bg-black/95 z-[100] overflow-y-auto p-4 animate-slide-up">
@@ -643,6 +676,63 @@
             );
         };
 
+        // --- SES MOTORU (WEB AUDIO API) ---
+        // Bu motor, seslerin arka plan uygulamalarını (YouTube, Spotify vb.) durdurmasını engeller.
+        const AudioEngine = (() => {
+            const context = new (window.AudioContext || window.webkitAudioContext)({
+                latencyHint: 'interactive'
+            });
+            const buffers = {};
+            const sounds = {
+                found: 'sound1found.mp3',
+                start: 'sound2oyunbasladi.mp3',
+                lose: 'sound3lose.mp3',
+                win: 'sound4win.mp3',
+                pass: 'sound5bel.mp3',
+                place6: 'sound6.mp3',
+                place7: 'sound7.mp3',
+                place8: 'sound8.mp3'
+            };
+
+            const load = async (url) => {
+                if (buffers[url]) return;
+                try {
+                    const response = await fetch(url);
+                    const arrayBuffer = await response.arrayBuffer();
+                    buffers[url] = await context.decodeAudioData(arrayBuffer);
+                } catch (e) { console.warn('Ses yüklenemedi (Muhtemelen dosya yok):', url); }
+            };
+
+            const play = (type, lastIndex = 0) => {
+                if (context.state === 'suspended') context.resume();
+
+                let soundFile = '';
+                if (type === 'place') {
+                    const nextIdx = (lastIndex % 3) + 6;
+                    soundFile = sounds[`place${nextIdx}`];
+                } else {
+                    soundFile = sounds[type];
+                }
+
+                if (!soundFile || !buffers[soundFile]) return;
+
+                const source = context.createBufferSource();
+                source.buffer = buffers[soundFile];
+                source.connect(context.destination);
+                source.start(0);
+            };
+
+            // Ön yükleme başlat
+            Object.values(sounds).forEach(url => load(url));
+
+            return { play, context };
+        })();
+
+        // Mobil etkileşim için AudioContext'i aktifleştir
+        window.addEventListener('touchstart', () => {
+            if (AudioEngine.context.state === 'suspended') AudioEngine.context.resume();
+        }, { once: true });
+
         // --- ANA OYUN ---
 
         const DominoGame = () => {
@@ -677,8 +767,8 @@
 
             // Level Calculation Helper
             const calculateLevel = (elo) => {
-                if (elo <= 100) return 1;
-                let lvl = Math.ceil((elo - 100) / 100) + 1;
+                if (elo < 200) return 1;
+                let lvl = Math.floor(elo / 100);
                 if (lvl >= 10) return 'PRO';
                 return lvl;
             };
@@ -1007,34 +1097,9 @@
 
             // Ses Efektleri
             const playSound = (type) => {
-                const sounds = {
-                    found: 'sound1found.mp3',
-                    start: 'sound2oyunbasladi.mp3',
-                    lose: 'sound3lose.mp3',
-                    win: 'sound4win.mp3',
-                    pass: 'sound5bel.mp3',
-                    place6: 'sound6.mp3',
-                    place7: 'sound7.mp3',
-                    place8: 'sound8.mp3'
-                };
-
-                let soundFile = '';
+                AudioEngine.play(type, lastSoundIndex);
                 if (type === 'place') {
-                    // Sira ile 6, 7, 8 çal
-                    const nextIdx = (lastSoundIndex % 3) + 6; // 6, 7, 8
-                    soundFile = sounds[`place${nextIdx}`];
                     setLastSoundIndex(prev => prev + 1);
-                } else {
-                    soundFile = sounds[type];
-                }
-
-                if (!soundFile) return;
-
-                try {
-                    const audio = new Audio(soundFile);
-                    audio.play().catch(e => console.log('Ses çalınamadı (Interaksiyon gerekli):', e));
-                } catch (e) {
-                    console.error('Audio error:', e);
                 }
             };
 
@@ -1107,6 +1172,7 @@
                         break;
                     case 'gameStart':
                     case 'gameUpdate':
+                    case 'gameState':
                         if (data.gameState) {
                             setGameState(prevState => ({
                                 ...prevState,
@@ -1797,7 +1863,7 @@
                     {notification && <Toast message={notification.message} type={notification.type} />}
                     {announcement && <AnnouncementPopup message={announcement} onClose={() => setAnnouncement(null)} />}
 
-                    <GameTimer startTime={gameState.turnStartTime} />
+                    <GameTimer startTime={gameState?.turnStartTime} duration={gameState?.turnTimeLimit || 30000} isMyTurn={isMyTurn} />
 
                     {serverMessage && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
@@ -1808,65 +1874,80 @@
                             </div>
                         </div>
                     )}
-                    {/* Opponents List - Refined Position */}
+
+                    {/* Top Bar - Opponents and Turn Info */}
                     <div className="fixed top-[85px] left-0 right-0 z-40 bg-black/80 backdrop-blur-md border-b border-yellow-500/20 shadow-lg">
                         <div className="flex items-center justify-between px-4 py-2.5 gap-2">
+                            {/* Player Profiles */}
                             <div className="flex-1 flex justify-center -space-x-4 overflow-visible items-center">
-                                {/* My Profile in Game Bar */}
-                                <div className={`relative flex flex-col items-center px-4 ${gameState?.currentPlayer === myPlayerId ? 'scale-110 z-10' : 'opacity-70'}`}>
-                                    <div className={`w-14 h-14 rounded-full border-2 ${gameState?.currentPlayer === myPlayerId ? 'border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 'border-white/20'} overflow-hidden bg-gray-900 shadow-2xl`}>
-                                        <img src={playerData?.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" />
-                                    </div>
-                                    <div className="absolute -bottom-2 bg-black/90 border border-blue-500/50 px-2 py-0.5 rounded-full flex items-center gap-1.5 shadow-xl whitespace-nowrap min-w-[70px] justify-center">
-                                        <span className="text-white text-[8px] font-black tracking-tighter">SİZ</span>
-                                        <div className="w-px h-2 bg-blue-500/30"></div>
-                                        <span className="text-blue-400 text-[9px] font-black tracking-tighter">{(gameState?.players[myPlayerId]?.score || 0)} / 101</span>
-                                    </div>
-                                    {gameState?.currentPlayer === myPlayerId && (
-                                        <div className="absolute -top-1 right-0 w-3 h-3 bg-blue-400 rounded-full animate-ping"></div>
-                                    )}
-                                </div>
+                                {(() => {
+                                    const allProfiles = [];
+                                    const playersMap = gameState?.players || {};
+                                    const playerIds = gameState?.playerOrder || [];
+                                    const isFourPlayer = playerIds.length > 2;
 
-                                {/* Opponents Profiles */}
-                                {(gameState?.opponents || opponents).map((opp, idx) => {
-                                    const oppId = opp.id;
-                                    const oppScore = gameState?.players[oppId]?.score || 0;
-                                    const oppHandCount = gameState?.players[oppId]?.hand?.length || 0;
-                                    return (
-                                        <div key={idx} className={`relative flex flex-col items-center px-4 ${gameState?.currentPlayer === oppId ? 'scale-110 z-10' : 'opacity-70'}`}>
-                                            <div className={`w-14 h-14 rounded-full border-2 ${gameState?.currentPlayer === oppId ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 shadow-2xl`}>
-                                                <img src={opp.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" />
+                                    if (isFourPlayer) {
+                                        playerIds.forEach(pid => {
+                                            const p = playersMap[pid];
+                                            if (!p) return;
+                                            allProfiles.push({
+                                                id: pid,
+                                                name: p.username || p.name,
+                                                photoUrl: p.photoUrl,
+                                                level: calculateLevel(p.elo || 0),
+                                                score: p.score || 0,
+                                                handCount: p.hand?.length || 0,
+                                                activeTurn: gameState?.currentPlayer === pid,
+                                                isMe: pid === myPlayerId
+                                            });
+                                        });
+                                    } else {
+                                        playerIds.filter(id => id !== myPlayerId).forEach(pid => {
+                                            const p = playersMap[pid];
+                                            if (!p) return;
+                                            allProfiles.push({
+                                                id: pid,
+                                                name: p.username || p.name,
+                                                photoUrl: p.photoUrl,
+                                                level: calculateLevel(p.elo || 0),
+                                                score: p.score || 0,
+                                                handCount: p.hand?.length || 0,
+                                                activeTurn: gameState?.currentPlayer === pid,
+                                                isMe: false
+                                            });
+                                        });
+                                    }
+
+                                    return allProfiles.map((p, idx) => (
+                                        <div key={idx} className={`relative flex flex-col items-center px-4 transition-all duration-300 ${p.activeTurn ? 'scale-110 z-10' : 'opacity-70 scale-90'}`}>
+                                            <div className={`w-14 h-14 rounded-full border-2 ${p.activeTurn ? (p.isMe ? 'border-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.8)]' : 'border-yellow-400 shadow-glow') : 'border-white/20'} overflow-hidden bg-gray-900 shadow-2xl`}>
+                                                <img src={p.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" alt={p.name} />
                                             </div>
-                                            <div className="absolute -bottom-2 bg-black/90 border border-yellow-500/50 px-2 py-0.5 rounded-full flex items-center gap-1.5 shadow-xl whitespace-nowrap min-w-[70px] justify-center">
-                                                <span className="text-white text-[8px] font-black tracking-tighter">L.{opp.level || 1}</span>
-                                                <div className="w-px h-2 bg-yellow-500/30"></div>
-                                                <span className="text-yellow-400 text-[9px] font-black tracking-tighter">{oppScore} / 101</span>
+                                            <div className={`absolute -bottom-2 bg-black/90 border ${p.isMe ? 'border-blue-500/50' : 'border-yellow-500/50'} px-2 py-0.5 rounded-full flex items-center gap-1.5 shadow-xl whitespace-nowrap min-w-[70px] justify-center`}>
+                                                <span className="text-white text-[8px] font-black tracking-tighter">{p.isMe ? 'SİZ' : (p.level === 'PRO' ? 'PRO' : `L.${p.level}`)}</span>
+                                                <div className={`w-px h-2 ${p.isMe ? 'bg-blue-500/30' : 'bg-yellow-500/30'}`}></div>
+                                                <span className={`${p.isMe ? 'text-blue-400' : 'text-yellow-400'} text-[9px] font-black tracking-tighter`}>{p.score} / 101</span>
                                             </div>
-                                            {/* Opponent Hand Display (Tiles Back) */}
-                                            <div className="flex gap-0.5 mt-3 justify-center max-w-[60px] flex-wrap">
-                                                {Array(oppHandCount).fill(0).map((_, i) => (
-                                                    <div key={i} className="w-1.5 h-2.5 bg-gray-300 rounded-[2px] border border-black/20"></div>
-                                                ))}
-                                            </div>
-                                            {gameState?.currentPlayer === oppId && (
-                                                <div className="absolute -top-1 right-0 w-3 h-3 bg-yellow-400 rounded-full animate-ping"></div>
+                                            {!p.isMe && (
+                                                <div className="flex gap-0.5 mt-3 justify-center max-w-[60px] flex-wrap">
+                                                    {Array(p.handCount).fill(0).map((_, i) => (
+                                                        <div key={i} className="w-1.5 h-2.5 bg-gray-300 rounded-[2px] border border-black/20"></div>
+                                                    ))}
+                                                </div>
                                             )}
                                         </div>
-                                    );
-                                })}
+                                    ));
+                                })()}
                             </div>
 
+                            {/* Current Turn Info */}
                             <div className="flex-1 text-right max-w-[80px]">
-                                <div className="text-white/40 text-[8px] font-bold uppercase tracking-widest">{gameState?.currentPlayer === myPlayerId ? 'SIRA SİZDE' : 'SIRADA'}</div>
+                                <div className="text-white/40 text-[8px] font-bold uppercase tracking-widest">{isMyTurn ? 'SIRA SİZDE' : 'SIRADA'}</div>
                                 <div className="text-yellow-500 font-black text-[10px] break-words">
-                                    {gameState?.currentPlayer === myPlayerId ? 'HAMLE YAP!' : (gameState?.players[gameState?.currentPlayer]?.username || '...')}
+                                    {isMyTurn ? 'HAMLE YAP!' : (gameState?.players[gameState?.currentPlayer]?.username || '...')}
                                 </div>
                                 <div className="mt-1">
-                                    <GameTimer
-                                        startTime={gameState?.turnStartTime}
-                                        duration={gameState?.turnTimeLimit}
-                                        isMyTurn={gameState?.currentPlayer === myPlayerId}
-                                    />
+                                    <GameTimer startTime={gameState?.turnStartTime} duration={gameState?.turnTimeLimit || 30000} isMyTurn={isMyTurn} />
                                 </div>
                             </div>
                         </div>
@@ -1878,66 +1959,39 @@
                         className="flex-1 relative cursor-grab active:cursor-grabbing overflow-auto touch-auto"
                         style={{ WebkitOverflowScrolling: 'touch' }}
                         onTouchStart={(e) => {
-                            // Only handle single touch for panning
                             if (e.touches.length === 1) {
                                 const touch = e.touches[0];
                                 setTouchStart({ x: touch.clientX, y: touch.clientY });
                                 setLastTouch({ x: touch.clientX, y: touch.clientY });
                                 e.stopPropagation();
                             } else if (e.touches.length === 2) {
-                                // Handle pinch zoom
                                 const touch1 = e.touches[0];
                                 const touch2 = e.touches[1];
-                                const distance = Math.hypot(
-                                    touch2.pageX - touch1.pageX,
-                                    touch2.pageY - touch1.pageY
-                                );
-                                setLastDistance(distance);
+                                setLastDistance(Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY));
                             }
                         }}
                         onTouchMove={(e) => {
                             if (e.touches.length === 1 && touchStart) {
-                                // Handle panning
                                 const touch = e.touches[0];
-                                const deltaX = touch.clientX - lastTouch.x;
-                                const deltaY = touch.clientY - lastTouch.y;
-
                                 setBoardOffset(prev => ({
-                                    x: prev.x + deltaX,
-                                    y: prev.y + deltaY
+                                    x: prev.x + (touch.clientX - lastTouch.x),
+                                    y: prev.y + (touch.clientY - lastTouch.y)
                                 }));
-
                                 setLastTouch({ x: touch.clientX, y: touch.clientY });
-                                e.stopPropagation();
                             } else if (e.touches.length === 2) {
-                                // Handle pinch zoom
                                 const touch1 = e.touches[0];
                                 const touch2 = e.touches[1];
-                                const distance = Math.hypot(
-                                    touch2.pageX - touch1.pageX,
-                                    touch2.pageY - touch1.pageY
-                                );
-
+                                const distance = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
                                 if (lastDistance > 0) {
-                                    const scale = (distance - lastDistance) * 0.01;
-                                    setBoardScale(prev => Math.min(Math.max(0.5, prev + scale), 2));
+                                    const delta = distance / lastDistance;
+                                    setBoardScale(prev => Math.min(Math.max(prev * delta, 0.2), 3));
                                 }
                                 setLastDistance(distance);
-                                e.preventDefault();
                             }
-                        }}
-                        onTouchEnd={() => {
-                            setTouchStart(null);
-                            setLastTouch(null);
-                            setLastDistance(0);
                         }}
                         onWheel={(e) => {
-                            // Zoom with ctrl + wheel or pinch
-                            if (e.ctrlKey || e.metaKey) {
-                                e.preventDefault();
-                                const delta = e.deltaY * -0.01;
-                                setBoardScale(prev => Math.min(Math.max(0.5, prev + delta), 2));
-                            }
+                            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                            setBoardScale(prev => Math.min(Math.max(prev * delta, 0.2), 3));
                         }}
                     >
                         <div
@@ -1948,27 +2002,26 @@
                                 touchAction: 'none'
                             }}
                         >
-                            {boardLayout.map((item, idx) => (
-                                <div
-                                    key={idx}
-                                    className="absolute transition-all duration-500"
-                                    style={{
-                                        left: item.x,
-                                        top: item.y,
-                                        transform: `translate(-50%, -50%) rotate(${item.rotation}deg)`
-                                    }}
-                                >
-                                    <DominoTile
-                                        values={item.tile}
-                                        vertical={false}
-                                        disabled={true}
-                                        scale={1}
-                                    />
-                                </div>
-                            ))}
+                            {gameState?.board.map((tile, idx) => {
+                                const item = boardLayout[idx];
+                                if (!item) return null;
+                                return (
+                                    <div
+                                        key={idx}
+                                        className="absolute transition-all duration-500"
+                                        style={{
+                                            left: item.x,
+                                            top: item.y,
+                                            transform: `translate(-50%, -50%) rotate(${item.rotation}deg)`
+                                        }}
+                                    >
+                                        <DominoTile values={tile} vertical={false} disabled={true} scale={1} />
+                                    </div>
+                                );
+                            })}
 
                             {/* Move Indicators */}
-                            {isMyTurn && selectedTileIndex !== null && boardLayout.length > 0 && (
+                            {isMyTurn && selectedTileIndex !== null && gameState?.board.length > 0 && (
                                 <>
                                     {validMoves.includes('left') && boardLayout[0] && (
                                         <div
@@ -1980,7 +2033,7 @@
                                                 transform: 'translate(-50%, -50%)'
                                             }}
                                         >
-                                            <span className="text-yellow-400 font-black text-[10px] drop-shadow-md">BURAYA</span>
+                                            <span className="text-yellow-400 font-black text-[10px]">BURAYA</span>
                                         </div>
                                     )}
                                     {validMoves.includes('right') && boardLayout[boardLayout.length - 1] && (
@@ -1993,12 +2046,12 @@
                                                 transform: 'translate(-50%, -50%)'
                                             }}
                                         >
-                                            <span className="text-yellow-400 font-black text-[10px] drop-shadow-md">BURAYA</span>
+                                            <span className="text-yellow-400 font-black text-[10px]">BURAYA</span>
                                         </div>
                                     )}
                                 </>
                             )}
-                            {isMyTurn && selectedTileIndex !== null && boardLayout.length === 0 && validMoves.includes('start') && (
+                            {isMyTurn && selectedTileIndex !== null && gameState?.board.length === 0 && validMoves.includes('start') && (
                                 <div
                                     className="absolute w-32 h-16 border-4 border-yellow-400 border-dashed rounded-2xl flex items-center justify-center animate-bounce cursor-pointer bg-yellow-400/10 z-50"
                                     onClick={() => playTile('start')}
@@ -2015,30 +2068,18 @@
                         <div className="flex items-center justify-between mb-2">
                             <div className="text-white/50 text-xs font-bold uppercase tracking-widest">{t.yourHand} ({myHand.length})</div>
                             <div className="flex items-center gap-2">
-                                {isMyTurn && (
-                                    marketSize > 0 ? (
-                                        <button onClick={() => sendMessage({ type: 'drawFromMarket' })} className="bg-yellow-500 text-black px-4 py-1 rounded-full text-xs font-bold shadow-glow flex items-center gap-1">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                                            </svg>
-                                            {t.drawTile} ({marketSize})
-                                        </button>
-                                    ) : null
+                                {isMyTurn && marketSize > 0 && (
+                                    <button onClick={() => sendMessage({ type: 'drawFromMarket' })} className="bg-yellow-500 text-black px-4 py-1 rounded-full text-xs font-bold shadow-glow flex items-center gap-1">
+                                        <span>+</span> {t.drawTile} ({marketSize})
+                                    </button>
                                 )}
-
-                                <button
-                                    onClick={leaveGameClient}
-                                    title={t.leaveGame}
-                                    className="w-8 h-8 bg-red-800/80 hover:bg-red-700 rounded-full flex items-center justify-center shadow-lg transition-all"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
+                                <button onClick={leaveGameClient} className="w-8 h-8 bg-red-800/80 rounded-full flex items-center justify-center">
+                                    <span className="text-white text-xs font-bold">X</span>
                                 </button>
                             </div>
                         </div>
 
-                        <div className="hand-container grid grid-cols-4 sm:grid-cols-8 gap-2 overflow-y-auto max-h-[160px] pb-4 px-2">
+                        <div className="hand-container flex items-center gap-2 overflow-x-auto whitespace-nowrap scroll-smooth py-4 px-2 no-scrollbar">
                             {myHand.map((tile, idx) => (
                                 <DominoTile
                                     key={idx}
@@ -2052,6 +2093,7 @@
                     </div>
                 </div>
             );
+
 
             if (screen === 'calculation') {
                 return (
@@ -2177,31 +2219,32 @@
             );
 
             if (screen === 'leaderboard') return (
-                <div className="flex flex-col items-center justify-start min-h-screen p-8 bg-[#0b241c] overflow-y-auto relative">
+                <div className="flex flex-col items-center justify-start min-h-screen pt-[150px] pb-8 px-8 bg-[#0b241c] overflow-y-auto relative">
                     <button
                         onClick={() => setScreen('lobby')}
-                        className="absolute top-6 left-6 w-12 h-12 flex items-center justify-center bg-white/10 rounded-2xl text-white text-2xl hover:bg-white/20 transition-all font-black"
+                        className="absolute top-10 left-6 w-12 h-12 flex items-center justify-center bg-white/10 rounded-2xl text-white text-2xl hover:bg-white/20 transition-all font-black border border-white/20"
                     >
-                        ←
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
+                        </svg>
                     </button>
-                    <h1 className="text-4xl font-black text-white mb-8">📊 LADERBOARD 📊</h1>
-                    <div className="w-full max-w-xl space-y-3">
+                    <h1 className="text-4xl font-black text-white mb-12 drop-shadow-glow">📊 LADERBOARD 📊</h1>
+                    <div className="w-full max-w-xl space-y-4">
                         {leaderboard.map((p, i) => (
-                            <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-3xl border border-white/5">
-                                <div className="text-2xl font-black w-8 text-center">{i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</div>
-                                <img src={p.photoUrl || 'https://via.placeholder.com/50'} className="w-12 h-12 rounded-full" />
+                            <div key={i} className={`flex items-center gap-4 p-5 rounded-3xl border transition-all ${i < 3 ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-white/5 border-white/10'}`}>
+                                <div className="text-2xl font-black w-10 text-center">{i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</div>
+                                <img src={p.photoUrl || 'https://via.placeholder.com/60'} className="w-14 h-14 rounded-full border-2 border-white/20 shadow-xl" />
                                 <div className="flex-1">
-                                    <div className="text-white font-bold">{p.username}</div>
+                                    <div className="text-white font-black text-lg">{p.username}</div>
                                     <div className="flex items-center gap-2 mt-1">
                                         <LevelBadge level={p.level} />
-                                        <div className="text-white/40 text-xs">{p.wins} Galibiyet</div>
+                                        <div className="text-white/40 text-xs font-bold uppercase">{p.wins} {t.winner}</div>
                                     </div>
                                 </div>
-                                <div className="text-yellow-400 font-black">{p.elo} ELO</div>
+                                <div className="text-yellow-400 font-black text-xl drop-shadow-md">{p.elo} ELO</div>
                             </div>
                         ))}
                     </div>
-                    <button onClick={() => setScreen('lobby')} className="mt-10 px-10 py-3 bg-white/10 text-white rounded-2xl font-bold">GERİ DÖN</button>
                 </div>
             );
 
