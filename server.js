@@ -1079,6 +1079,15 @@ function handleCreateRoom(ws, data) {
 
     // PlayerId'yi set et
     const playerId = ws.playerId || `guest_${Math.random().toString(36).substr(2, 9)}`;
+    // Aynı hesabla başka odada olup olmadığını kontrol et
+    if (ws.telegramId) {
+        for (const [code, r] of rooms.entries()) {
+            if (Object.values(r.players).some(p => p.telegramId === ws.telegramId)) {
+                return sendMessage(ws, { type: 'error', message: 'Siz artıq başqa bir oyundasınız!' });
+            }
+        }
+    }
+
     ws.playerId = playerId;
     ws.playerName = data.playerName || data.username || 'Guest';
     ws.language = data.language || ws.language || 'en';
@@ -1131,6 +1140,21 @@ function handleJoinRoom(ws, data) {
 
     if (Object.keys(room.players).length >= capacity && !room.players[ws.playerId]) {
         return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'roomFull') });
+    }
+
+    // Aynı hesabla odaya zaten girmiş mi kontrol et (Eğer farklı bir socket ise)
+    if (ws.telegramId) {
+        const alreadyInRoom = Object.values(room.players).find(p => p.telegramId === ws.telegramId);
+        if (alreadyInRoom && alreadyInRoom.id !== ws.playerId) {
+            return sendMessage(ws, { type: 'error', message: 'Bu hesab ilə artıq otaqdasınız!' });
+        }
+
+        // Başka bir odaya mı dahil?
+        for (const [rCode, r] of rooms.entries()) {
+            if (rCode !== code && Object.values(r.players).some(p => p.telegramId === ws.telegramId)) {
+                return sendMessage(ws, { type: 'error', message: 'Siz artıq başqa bir otaqdasınız!' });
+            }
+        }
     }
 
     const pid = ws.playerId || `guest_${Math.random().toString(36).substr(2, 9)}`;
@@ -1337,12 +1361,11 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
         Object.keys(room.players).forEach(pid => {
             const pWs = playerConnections.get(pid);
             if (pWs && pWs.readyState === WebSocket.OPEN) {
-                const scoreTable = playerIds.map(id => `${room.players[id].name}: ${room.players[id].score}`).join('\n');
-                sendMessage(pWs, {
-                    type: 'gameMessage',
-                    message: `El bitti!\n\n${scoreTable}\n\n101 olan kazanır. Yeni raund başlıyor...`,
-                    duration: 5000
-                });
+                pWs.send(JSON.stringify({
+                    type: 'calculationLobby',
+                    players: room.gameState.players,
+                    eloChanges: null // Raund içi ELO değişmez
+                }));
             }
         });
 
@@ -1350,7 +1373,7 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
             if (!rooms.has(roomCode)) return;
             const newGS = initializeGame(roomCode, ...playerIds);
             playerIds.forEach(pid => sendGameState(roomCode, pid));
-        }, 5000);
+        }, 8000); // CalculationTimer 8s olduğu için
 
         return; // Fonksiyondan çık, odayı silme!
     }
