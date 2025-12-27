@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <meta charset="UTF-8">
@@ -88,13 +89,19 @@
             -webkit-tap-highlight-color: transparent;
             user-select: none;
             -webkit-user-select: none;
-            padding-top: 90px; /* Siteyi biraz aşağı indir */
+            padding-top: 90px;
+            /* Siteyi biraz aşağı indir */
             animation: bg-scroll 20s linear infinite;
         }
 
         @keyframes bg-scroll {
-            0% { background-position: 0 0; }
-            100% { background-position: 40px 40px; }
+            0% {
+                background-position: 0 0;
+            }
+
+            100% {
+                background-position: 40px 40px;
+            }
         }
 
         .pip-grid {
@@ -149,22 +156,35 @@
         }
 
         @keyframes pulse-glow {
-            0%, 100% {
+
+            0%,
+            100% {
                 box-shadow: 0 0 20px rgba(251, 191, 36, 0.6), 0 0 40px rgba(251, 191, 36, 0.3);
             }
+
             50% {
                 box-shadow: 0 0 30px rgba(251, 191, 36, 0.9), 0 0 60px rgba(251, 191, 36, 0.5);
             }
         }
 
         @keyframes rotate {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         @keyframes progress {
-            from { width: 0%; }
-            to { width: 100%; }
+            from {
+                width: 0%;
+            }
+
+            to {
+                width: 100%;
+            }
         }
 
         .animate-progress {
@@ -172,13 +192,27 @@
         }
 
         @keyframes slide-right {
-            from { transform: translateX(-50px); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
+            from {
+                transform: translateX(-50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
 
         @keyframes slide-left {
-            from { transform: translateX(50px); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
+            from {
+                transform: translateX(50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
 
         .animate-slide-right {
@@ -190,10 +224,13 @@
         }
 
         @keyframes neon-pulse {
-            0%, 100% {
+
+            0%,
+            100% {
                 box-shadow: 0 0 10px rgba(255, 0, 0, 0.8), 0 0 20px rgba(255, 0, 0, 0.4);
                 filter: brightness(1.2);
             }
+
             50% {
                 box-shadow: 0 0 20px rgba(255, 0, 0, 1), 0 0 40px rgba(255, 0, 0, 0.6);
                 filter: brightness(1.5);
@@ -201,10 +238,41 @@
         }
 
         @keyframes border-flow {
-            0% { border-color: #ff0000; }
-            33% { border-color: #00ff00; }
-            66% { border-color: #0000ff; }
-            100% { border-color: #ff0000; }
+            0% {
+                border-color: #ff0000;
+            }
+
+            33% {
+                border-color: #00ff00;
+            }
+
+            66% {
+                border-color: #0000ff;
+            }
+
+            100% {
+                border-color: #ff0000;
+            }
+        }
+
+        @keyframes dominoFall {
+
+            0%,
+            100% {
+                transform: rotate(0deg) translateY(0);
+            }
+
+            25% {
+                transform: rotate(-15deg) translateY(-10px);
+            }
+
+            50% {
+                transform: rotate(0deg) translateY(0);
+            }
+
+            75% {
+                transform: rotate(15deg) translateY(-10px);
+            }
         }
 
         .neon-pro {
@@ -242,7 +310,7 @@
             background: linear-gradient(135deg, #2c3e50, #34495e);
             border: 2px solid rgba(255, 255, 255, 0.1);
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         /* Hesaplama lobisi için yeni stiller */
@@ -259,17 +327,25 @@
             border: 1px solid #fff;
             box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
         }
-        @keyframes gradient-shine { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+        @keyframes gradient-shine {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
+        }
     </style>
 </head>
 
 <body>
-    <div id="root">
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #0b241c; color: white; font-family: Arial, sans-serif;">
-            <h1>DOMINO 101</h1>
-            <p>Yükleniyor, lütfen bekleyin...</p>
-        </div>
-    </div>
+    <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
@@ -380,7 +456,7 @@
         // 5. Game Timer Component
         const GameTimer = ({ startTime }) => {
             const [timeLeft, setTimeLeft] = useState(30);
-            
+
             useEffect(() => {
                 const interval = setInterval(() => {
                     if (!startTime) return;
@@ -407,44 +483,44 @@
             useEffect(() => {
                 fetch(`${API_URL}/api/admin/users`, {
                     method: 'GET',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'Authorization': 'YOUR_ADMIN_SECRET'  // Replace with your actual admin secret
                     }
                 })
-                .then(res => {
-                    if (!res.ok) throw new Error('Failed to fetch users');
-                    return res.json();
-                })
-                .then(data => {
-                    if (data.success && data.users) {
-                        setPlayers(data.users);
-                    }
-                    setLoading(false);
-                })
-                .catch(error => {
-                    console.error('Error fetching users:', error);
-                    setLoading(false);
-                    alert('Kullanıcılar yüklenirken hata oluştu: ' + error.message);
-                });
+                    .then(res => {
+                        if (!res.ok) throw new Error('Failed to fetch users');
+                        return res.json();
+                    })
+                    .then(data => {
+                        if (data.success && data.users) {
+                            setPlayers(data.users);
+                        }
+                        setLoading(false);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching users:', error);
+                        setLoading(false);
+                        alert('Kullanıcılar yüklenirken hata oluştu: ' + error.message);
+                    });
             }, [adminId]);
 
             const updatePlayer = (id, updates) => {
                 fetch(`${API_URL}/api/admin/update`, {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'Authorization': 'YOUR_ADMIN_SECRET'  // Replace with your actual admin secret
                     },
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ adminId, targetId: id, updates })
                 })
-                .then(res => res.json())
-                .then(data => {
-                    if(data.success) {
-                        setPlayers(players.map(p => p._id === id ? { ...p, ...updates } : p));
-                    }
-                });
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            setPlayers(players.map(p => p._id === id ? { ...p, ...updates } : p));
+                        }
+                    });
             };
 
             const filteredPlayers = players.filter(p => p.username.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -456,9 +532,9 @@
                             <h2 className="text-2xl font-black text-yellow-500">ADMIN PANEL</h2>
                             <button onClick={onClose} className="bg-red-600 text-white px-4 py-2 rounded-xl font-bold">KAPAT</button>
                         </div>
-                        <input 
-                            type="text" 
-                            placeholder="Kullanıcı ara..." 
+                        <input
+                            type="text"
+                            placeholder="Kullanıcı ara..."
                             className="w-full bg-white/10 text-white p-3 rounded-xl mb-4 border border-white/10 focus:border-yellow-500 outline-none"
                             onChange={e => setSearchTerm(e.target.value)}
                         />
@@ -467,7 +543,7 @@
                                 {filteredPlayers.map(p => (
                                     <div key={p._id} className="bg-white/5 p-4 rounded-xl border border-white/5 flex flex-col sm:flex-row items-center gap-4">
                                         <div className="flex items-center gap-3 flex-1 w-full">
-                                            <img src={p.photoUrl || 'https://via.placeholder.com/40'} className="w-10 h-10 rounded-full"/>
+                                            <img src={p.photoUrl || 'https://via.placeholder.com/40'} className="w-10 h-10 rounded-full" />
                                             <div className="flex flex-col">
                                                 <span className="text-white font-bold">{p.username}</span>
                                                 <span className="text-white/40 text-xs">{p.telegramId}</span>
@@ -616,7 +692,7 @@
                     // Timer bitti, oyun sonu ekranına geç
                     const myId = String(playerId || '');
                     const amIWinner = calculationLobby.winner.isMe;
-                    
+
                     setEndInfo({
                         isWinner: amIWinner,
                         isRanked: gameState?.isRanked || false,
@@ -632,10 +708,10 @@
                             eloChange: 0
                         }
                     });
-                    
+
                     setScreen('end');
                     setCalculationLobby(null);
-                    
+
                     localStorage.removeItem('domino_session');
                     setTimeout(() => {
                         resetGameClientState();
@@ -691,7 +767,7 @@
                 if (gameState && isMyTurn && screen === 'game') {
                     const myHand = gameState.players[myPlayerId]?.hand || [];
                     const marketSize = gameState.market?.length || 0;
-                    
+
                     // Eğer elinde taş varsa ve pazarda taş yoksa otomatik pass kontrolü
                     if (myHand.length > 0 && marketSize === 0) {
                         // Valid moves kontrolü
@@ -703,7 +779,7 @@
                                 break;
                             }
                         }
-                        
+
                         // Geçerli hamle yoksa otomatik pass
                         if (!hasValidMove) {
                             const timeout = setTimeout(() => {
@@ -711,7 +787,7 @@
                                 playSound('pass');
                                 showNotification(t.noValidMove, 'info');
                             }, 1000);
-                            
+
                             return () => clearTimeout(timeout);
                         }
                     }
@@ -722,7 +798,7 @@
             useEffect(() => {
                 if (!gameState) return;
                 const currentLen = gameState.board.length;
-                
+
                 // Tahtadaki taş sayısı arttıysa
                 if (currentLen > prevBoardLength.current) {
                     // Ve hamleyi ben yapmadıysam (isMyMove false ise)
@@ -909,20 +985,6 @@
                         break;
                     case 'roomCreated':
                         setRoomCode(data.roomCode);
-                        showNotification(`Oda oluşturuldu: ${data.roomCode}`, 'success');
-                        break;
-                    case 'roomJoined':
-                        setRoomCode(data.roomCode);
-                        setOpponent(data.opponent);
-                        showNotification(`Odaya katıldınız: ${data.roomCode}`, 'success');
-                        break;
-                    case 'playerJoined':
-                        setOpponent(data.player);
-                        showNotification(`${data.player.username || 'Rakip'} odaya katıldı!`, 'success');
-                        // Start game if enough players
-                        if (data.startGame) {
-                            setTimeout(() => setScreen('matching_lobby'), 1000);
-                        }
                         break;
                     case 'gameStart':
                     case 'gameUpdate':
@@ -967,7 +1029,7 @@
                             const change = amIWinner ? (data.eloChanges?.winner || 0) : (data.eloChanges?.loser || 0);
                             const newElo = Math.max(0, playerData.elo + change);
                             const newLevel = calculateLevel(newElo);
-                            
+
                             setPlayerData(prev => ({
                                 ...prev,
                                 elo: newElo,
@@ -1025,7 +1087,7 @@
                         // Hesaplama lobisi göster
                         const players = data.players || {};
                         const myIdForCalc = String(playerId || '');
-                        
+
                         // Oyuncu puanlarını hesapla
                         const playerScores = {};
                         for (const [pid, player] of Object.entries(players)) {
@@ -1038,21 +1100,21 @@
                                 isMe: pid === myIdForCalc
                             };
                         }
-                        
+
                         // Daha az puan yapan kazanır
                         const entries = Object.entries(playerScores);
                         entries.sort((a, b) => a[1].score - b[1].score);
-                        
+
                         const winner = entries[0][1];
                         const loser = entries[1][1];
-                        
+
                         setCalculationLobby({
                             players: playerScores,
                             winner,
                             loser,
                             myScore: playerScores[myIdForCalc]?.score || 0
                         });
-                        
+
                         setCalculationTimer(8);
                         setScreen('calculation');
                         break;
@@ -1186,7 +1248,7 @@
             const myHand = gameState?.players[myPlayerId]?.hand || [];
             const marketSize = gameState?.market?.length || 0;
             const canDrawFromMarket = marketSize > 0;
-            
+
             const opponentPlayerId = Object.keys(gameState?.players || {}).find(id => id !== myPlayerId);
             const opponentHand = gameState?.players[opponentPlayerId]?.hand || [];
 
@@ -1247,56 +1309,167 @@
                     showNotification('Lütfən oda kodu girin', 'warning');
                     return;
                 }
-                
-                sendMessage({ 
-                    type: 'joinRoom', 
-                    roomCode: joinCode, 
+
+                sendMessage({
+                    type: 'joinRoom',
+                    roomCode: joinCode,
                     ...playerData,
                     language
                 });
+            };
 
-        const bWidth = maxX - minX;
-        const bHeight = maxY - minY;
+            // --- RENDER PARTS ---
 
-        const cWidth = boardContainerRef.current.clientWidth;
-        const cHeight = boardContainerRef.current.clientHeight;
+            if (screen === 'loading') return (
+                <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-table-dark via-table-base to-table-light relative overflow-hidden">
+                    {/* Animated Background Dots */}
+                    <div className="absolute inset-0 opacity-20">
+                        {[...Array(20)].map((_, i) => (
+                            <div
+                                key={i}
+                                className="absolute w-2 h-2 bg-white rounded-full animate-float"
+                                style={{
+                                    left: `${Math.random() * 100}%`,
+                                    top: `${Math.random() * 100}%`,
+                                    animationDelay: `${Math.random() * 3}s`,
+                                    animationDuration: `${3 + Math.random() * 2}s`
+                                }}
+                            />
+                        ))}
+                    </div>
 
-        const scaleX = cWidth / bWidth;
-        const scaleY = (cHeight * 0.75) / bHeight;
-        const scale = Math.min(scaleX, scaleY, 1.2);
+                    {/* Main Loading Animation */}
+                    <div className="relative z-10 flex flex-col items-center">
+                        {/* Falling Dominoes Animation */}
+                        <div className="relative w-64 h-32 mb-8">
+                            {[0, 1, 2, 3, 4].map((i) => (
+                                <div
+                                    key={i}
+                                    className="absolute bg-bone-face border-2 border-gray-300 rounded-lg shadow-3d"
+                                    style={{
+                                        width: '40px',
+                                        height: '80px',
+                                        left: `${i * 50}px`,
+                                        animation: `dominoFall 1.5s ease-in-out infinite`,
+                                        animationDelay: `${i * 0.15}s`,
+                                        transformOrigin: 'bottom center'
+                                    }}
+                                >
+                                    <div className="w-full h-1/2 border-b border-gray-200 flex items-center justify-center">
+                                        <div className="w-2 h-2 bg-black rounded-full"></div>
+                                    </div>
+                                    <div className="w-full h-1/2 flex items-center justify-center">
+                                        <div className="w-2 h-2 bg-black rounded-full"></div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
 
-        setBoardScale(scale);
+                        {/* Logo */}
+                        <h1 className="text-5xl font-black text-white drop-shadow-2xl mb-4 animate-pulse">
+                            DOMINO <span className="text-yellow-400">101</span>
+                        </h1>
 
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
+                        {/* Loading Spinner */}
+                        <div className="relative w-16 h-16 mt-4">
+                            <div className="absolute inset-0 border-4 border-yellow-500/20 rounded-full"></div>
+                            <div className="absolute inset-0 border-4 border-t-yellow-500 rounded-full animate-spin"></div>
+                        </div>
 
-        setBoardOffset({
-            x: (cWidth / 2) - centerX * scale,
-            y: (cHeight / 2) - centerY * scale
-        });
-    } else if (boardContainerRef.current) {
-        setBoardOffset({ x: boardContainerRef.current.clientWidth / 2, y: boardContainerRef.current.clientHeight / 2 });
-        setBoardScale(1);
-    }
-}, [boardLayout]);
+                        {/* Loading Text */}
+                        <p className="text-white/60 mt-6 text-sm tracking-widest uppercase animate-pulse">Hazırlanıyor</p>
+                    </div>
 
-const sendMessage = (msg) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify(msg));
-    }
-};
 
-const showNotification = (msg, type = 'info') => {
-    setNotification({ message: msg, type });
-    setTimeout(() => setNotification(null), 3000);
-};
+                </div>
+            );
 
-// --- OYUN MANTIĞI ---
-const myPlayerId = gameState?.playerId;
-const isMyTurn = gameState?.currentPlayer === myPlayerId;
-const myHand = gameState?.players[myPlayerId]?.hand || [];
-const marketSize = gameState?.market?.length || 0;
-const canDrawFromMarket = marketSize > 0;
+            if (screen === 'lobby') return (
+                <div className="flex flex-col items-center justify-center min-h-screen p-6">
+                    {notification && <Toast message={notification.message} type={notification.type} />}
+
+                    {/* Admin Button - Moved down by 5cm */}
+                    {playerData?.telegramId === '976640409' && (
+                        <div className="absolute top-[5cm] right-4 z-50">
+                            <button
+                                onClick={() => setShowAdmin(true)}
+                                className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white px-5 py-2.5 rounded-xl font-black shadow-lg text-xs tracking-widest border border-purple-400/50 transition-all duration-300 transform hover:scale-105"
+                            >
+                                ADMIN PANEL
+                            </button>
+                        </div>
+                    )}
+                    {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} adminId={playerData.telegramId} />}
+
+                    <div className="text-center mb-10 animate-float">
+                        <h1 className="text-6xl font-black text-white drop-shadow-2xl mb-2">DOMINO <span className="text-yellow-400">101</span></h1>
+                        <p className="text-white/60 tracking-widest uppercase">Premium Multiplayer Experience ( BETA )</p>
+                    </div>
+
+                    <div className="w-full max-w-sm bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10 shadow-2xl">
+                        {playerData && (
+                            <div className="mb-8 text-center">
+                                {playerData.photoUrl && <img src={playerData.photoUrl} className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-yellow-400 p-1" />}
+                                <div className="text-white text-2xl font-bold">{playerData.username}</div>
+                                <div className="flex justify-center gap-2 mt-2 items-center flex-wrap">
+                                    <LevelBadge level={playerData.level} />
+                                    <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold">{playerData.elo} ELO</span>
+                                    {playerData.telegramId === '976640409' && <span className="owner-badge px-2 py-1 rounded text-[10px] font-black tracking-wider">OWNER</span>}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex justify-center mb-4 gap-2">
+                            <button
+                                onClick={() => setLanguage(lang => lang === 'az' ? 'en' : 'az')}
+                                className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-sm font-bold transition-all"
+                            >
+                                {language === 'az' ? '🇦🇿 AZ' : '🇺🇸 EN'}
+                            </button>
+                        </div>
+
+                        <button onClick={() => {
+                            setScreen('searching');
+                            setSearching(true);
+                            sendMessage({ type: 'findMatch', ...playerData, language });
+                        }} className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-4 rounded-2xl mb-4 transition-all transform active:scale-95 shadow-lg flex items-center justify-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" />
+                            </svg>
+                            {t.ranked}
+                        </button>
+
+                        <div className="flex flex-col gap-3">
+                            <button onClick={() => sendMessage({ type: 'createRoom', ...playerData, language })} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM14 11a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1v-1a1 1 0 011-1z" />
+                                </svg>
+                                {t.createRoom}
+                            </button>
+
+                            <div className="flex gap-2">
+                                <input
+                                    value={joinCode}
+                                    onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                                    placeholder={t.roomCode}
+                                    className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 text-white text-center font-bold focus:border-yellow-500 transition-all"
+                                />
+                                <button
+                                    onClick={() => {
+                                        if (!joinCode || joinCode.trim() === '') return showNotification('Lütfen oda kodu girin', 'warning');
+                                        const code = joinCode.toUpperCase().trim();
+                                        console.log('🚪 Odaya katılma isteği:', code);
+                                        sendMessage({ type: 'joinRoom', roomCode: code, ...playerData, language });
+                                    }}
+                                    className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 rounded-xl font-black transition-all shadow-glow active:scale-95"
+                                >
+                                    GİR
+                                </button>
+                            </div>
+                        </div>
+
+                        {roomCode && (
+                            <div
                                 onClick={() => {
                                     navigator.clipboard.writeText(roomCode);
                                     showNotification('Oda kodu kopyalandı!', 'success');
@@ -1417,7 +1590,7 @@ const canDrawFromMarket = marketSize > 0;
                                     </div>
                                 </div>
                             </div>
-                            
+
                             {/* Opponent Tiles */}
                             {opponentHand.length > 0 && (
                                 <div className="px-2 pb-1.5">
@@ -1432,8 +1605,8 @@ const canDrawFromMarket = marketSize > 0;
                     </div>
 
                     {/* Board Area */}
-                    <div 
-                        ref={boardContainerRef} 
+                    <div
+                        ref={boardContainerRef}
                         className="flex-1 relative cursor-grab active:cursor-grabbing overflow-auto touch-auto"
                         style={{ WebkitOverflowScrolling: 'touch' }}
                         onTouchStart={(e) => {
@@ -1460,12 +1633,12 @@ const canDrawFromMarket = marketSize > 0;
                                 const touch = e.touches[0];
                                 const deltaX = touch.clientX - lastTouch.x;
                                 const deltaY = touch.clientY - lastTouch.y;
-                                
+
                                 setBoardOffset(prev => ({
                                     x: prev.x + deltaX,
                                     y: prev.y + deltaY
                                 }));
-                                
+
                                 setLastTouch({ x: touch.clientX, y: touch.clientY });
                                 e.stopPropagation();
                             } else if (e.touches.length === 2) {
@@ -1476,7 +1649,7 @@ const canDrawFromMarket = marketSize > 0;
                                     touch2.pageX - touch1.pageX,
                                     touch2.pageY - touch1.pageY
                                 );
-                                
+
                                 if (lastDistance > 0) {
                                     const scale = (distance - lastDistance) * 0.01;
                                     setBoardScale(prev => Math.min(Math.max(0.5, prev + scale), 2));
@@ -1584,7 +1757,7 @@ const canDrawFromMarket = marketSize > 0;
                                         </button>
                                     ) : null
                                 )}
-                                
+
                                 <button
                                     onClick={leaveGameClient}
                                     title={t.leaveGame}
@@ -1596,7 +1769,7 @@ const canDrawFromMarket = marketSize > 0;
                                 </button>
                             </div>
                         </div>
-                        
+
                         <div className={`hand-container ${myHand.length > 8 ? '' : 'single-row'}`}>
                             {myHand.map((tile, idx) => (
                                 <DominoTile
@@ -1617,20 +1790,19 @@ const canDrawFromMarket = marketSize > 0;
                     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-[#0b241c] to-black p-6">
                         <h1 className="text-4xl font-black text-yellow-400 mb-2">{t.calculationTitle}</h1>
                         <p className="text-white/60 mb-8">{t.calculationSubtitle}</p>
-                        
+
                         <div className="w-full max-w-md space-y-6">
                             {calculationLobby && Object.entries(calculationLobby.players).map(([pid, player]) => (
-                                <div 
+                                <div
                                     key={pid}
-                                    className={`flex items-center gap-4 p-4 rounded-2xl border-2 ${
-                                        player.isMe 
-                                            ? 'bg-blue-900/30 border-blue-500/50' 
-                                            : 'bg-white/5 border-white/10'
-                                    }`}
+                                    className={`flex items-center gap-4 p-4 rounded-2xl border-2 ${player.isMe
+                                        ? 'bg-blue-900/30 border-blue-500/50'
+                                        : 'bg-white/5 border-white/10'
+                                        }`}
                                 >
                                     <div className="relative">
-                                        <img 
-                                            src={player.photo || 'https://via.placeholder.com/64'} 
+                                        <img
+                                            src={player.photo || 'https://via.placeholder.com/64'}
                                             className="w-16 h-16 rounded-full border-2 border-white/20"
                                         />
                                         {player.isMe && (
@@ -1649,13 +1821,13 @@ const canDrawFromMarket = marketSize > 0;
                                 </div>
                             ))}
                         </div>
-                        
+
                         <div className="mt-10 text-center">
                             <div className="text-white/40 text-sm mb-2">
                                 {t.winnerAnnouncing} {calculationTimer}s
                             </div>
                             <div className="w-64 h-2 bg-white/10 rounded-full overflow-hidden">
-                                <div 
+                                <div
                                     className="h-full bg-yellow-500 transition-all duration-1000"
                                     style={{ width: `${(8 - calculationTimer) * 12.5}%` }}
                                 ></div>
@@ -1670,7 +1842,7 @@ const canDrawFromMarket = marketSize > 0;
                     <h1 className="text-5xl font-black text-white mb-2">
                         {endInfo.isWinner ? 'QAZANDINIZ!' : 'MƏĞLUB OLDUNUZ'}
                     </h1>
-                    
+
                     {endInfo.reason === 'disconnect' && <p className="text-yellow-400 mb-6 text-lg">Rəqib oyundan ayrıldı.</p>}
                     {endInfo.reason === 'afk' && <p className="text-yellow-400 mb-6 text-lg">{endInfo.isWinner ? 'Rəqib AFK qaldı.' : 'AFK qaldığınız üçün məğlub oldunuz.'}</p>}
                     {endInfo.reason === 'score_calculation' && <p className="text-yellow-400 mb-6 text-lg">En az puanı olan kazandı!</p>}
@@ -1768,22 +1940,8 @@ const canDrawFromMarket = marketSize > 0;
             return null;
         };
 
-        // Sayfa yüklendiğinde React uygulamasını başlat
-        document.addEventListener('DOMContentLoaded', function() {
-            try {
-                const root = ReactDOM.createRoot(document.getElementById('root'));
-                root.render(<DominoGame />);
-            } catch (error) {
-                console.error('Uygulama başlatılırken hata oluştu:', error);
-                document.getElementById('root').innerHTML = `
-                    <div style="padding: 20px; color: white; background: #ff4444; margin: 20px; border-radius: 5px;">
-                        <h2>Bir hata oluştu</h2>
-                        <p>${error.message}</p>
-                        <p>Lütfen sayfayı yenileyin veya daha sonra tekrar deneyin.</p>
-                    </div>
-                `;
-            }
-        });
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<DominoGame />);
     </script>
 
     <script>
@@ -1792,13 +1950,13 @@ const canDrawFromMarket = marketSize > 0;
         tgApp.expand();
         if (tgApp.requestFullscreen) {
             tgApp.requestFullscreen();
-        } 
+        }
         tgApp.disableVerticalSwipes();
         tgApp.setHeaderColor('#1b4d3e');
-        
+
         // Telegram WebApp çıkış işlemi için özel düzenleme
         const originalConfirm = window.confirm;
-        window.confirm = function(message) {
+        window.confirm = function (message) {
             // Site ismini gizle
             if (message.includes('site') || message.includes('Site')) {
                 return originalConfirm('Oyundan çıkmak istediğinize emin misiniz?');
@@ -1808,4 +1966,5 @@ const canDrawFromMarket = marketSize > 0;
     </script>
 
 </body>
+
 </html>
