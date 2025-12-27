@@ -325,7 +325,7 @@ app.post('/api/report/bug', async (req, res) => {
 app.post('/api/admin/ban', async (req, res) => {
     try {
         const { adminId, targetId, reason, durationDays } = req.body;
-        if (adminId !== '1840079939') return res.status(403).json({ success: false, error: 'Yetkisiz' });
+        if (adminId !== '976640409') return res.status(403).json({ success: false, error: 'Yetkisiz' });
 
         let expiresAt = null;
         if (durationDays && durationDays > 0) {
@@ -355,7 +355,7 @@ app.post('/api/admin/ban', async (req, res) => {
 app.post('/api/admin/unban', async (req, res) => {
     try {
         const { adminId, targetId } = req.body;
-        if (adminId !== '1840079939') return res.status(403).json({ success: false });
+        if (adminId !== '976640409') return res.status(403).json({ success: false });
         await Ban.deleteOne({ telegramId: targetId });
         res.json({ success: true });
     } catch (err) {
@@ -385,7 +385,7 @@ app.post('/api/admin/update', async (req, res) => {
         const { adminId, targetId, updates } = req.body;
 
         // Yetki kontrolü
-        if (!adminId || adminId !== '1840079939') {
+        if (!adminId || adminId !== '976640409') {
             return res.status(403).json({ success: false, error: 'Yetkisiz işlem' });
         }
 
@@ -558,7 +558,7 @@ const wss = new WebSocket.Server({
 app.post('/api/admin/broadcast', async (req, res) => {
     const { adminId, message } = req.body;
     // Basit admin kontrolü
-    if (adminId !== '1840079939') return res.status(403).json({ success: false, message: 'Yetkisiz erişim' });
+    if (adminId !== '976640409') return res.status(403).json({ success: false, message: 'Yetkisiz erişim' });
 
     try {
         // Eski mesajları pasife çek (opsiyonel)
@@ -1037,6 +1037,7 @@ function handleFindMatch(ws, data) {
         rooms.set(roomCode, room);
 
         const gameState = initializeGame(roomCode, ...playerIds);
+        gameState.turnDuration = 30000;
 
         participants.forEach(p => {
             const others = playerIds.filter(id => id !== p.playerId).map(id => ({
@@ -1620,17 +1621,13 @@ function handleDrawFromMarket(ws) {
     // Elinde oynanacak taş var mı kontrol et
     const canPlay = player.hand.some(tile => canPlayTile(tile, gs.board));
     if (canPlay && gs.board.length > 0) {
-        return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'hasPlayableTile') });
+        return sendMessage(ws, { type: 'error', message: 'Elinizdə oynana bilən daş var!' });
     }
 
     // Pazarda taş var mı?
     if (!gs.market || gs.market.length === 0) {
         // Pazar boş, otomatik sıra geç
-        console.log(`🎲 ${player.name} pazardan çekemedi (boş) - Sıra geçiyor`);
-        gs.turn++;
-        gs.currentPlayer = Object.keys(gs.players).find(id => id !== ws.playerId);
-        gs.turnStartTime = Date.now();
-        Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+        sendMessage(ws, { type: 'error', message: 'Bazarda daş qalmayıb!' });
         return;
     }
 
