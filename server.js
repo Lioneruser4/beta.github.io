@@ -63,6 +63,7 @@ const Broadcast = mongoose.model('DominoBroadcast', broadcastSchema);
 
 const reportSchema = new mongoose.Schema({
     reporterId: { type: String, required: true },
+    reporterName: { type: String },
     reportedId: { type: String, required: true },
     reportedName: { type: String },
     reason: { type: String, required: true },
@@ -371,11 +372,11 @@ app.post('/api/admin/unban', async (req, res) => {
 
 app.post('/api/report', async (req, res) => {
     try {
-        const { reporterId, reportedId, reportedName, reason } = req.body;
+        const { reporterId, reporterName, reportedId, reportedName, reason } = req.body;
         if (!reporterId || !reportedId || !reason) return res.status(400).json({ success: false });
 
         const newReport = new Report({
-            reporterId, reportedId, reportedName, reason
+            reporterId, reporterName, reportedId, reportedName, reason
         });
         await newReport.save();
         res.json({ success: true });
@@ -646,7 +647,8 @@ function initializeGame(roomCode, ...playerIds) {
             score: room.players[pid].score || 0, // Önceki raundlardan gelen skoru koru
             photoUrl: room.players[pid].photoUrl,
             level: room.players[pid].level,
-            elo: room.players[pid].elo
+            elo: room.players[pid].elo,
+            telegramId: room.players[pid].telegramId
         };
         currentIndex++;
     });
@@ -843,8 +845,8 @@ function sendGameState(roomCode, playerId) {
         }
 
         ws.send(JSON.stringify({
-            type: 'gameUpdate',
-            gameState: {
+            type: 'GAME_STATE_UPDATE',
+            payload: {
                 ...room.gameState,
                 players: playersData,
                 playerId: playerId // Hangi oyuncuya gönderildiğini belirt
@@ -1087,7 +1089,8 @@ async function handleFindMatch(ws, data) {
             console.log(`✅ Oyun başladı: ${roomCode} (${targetSize} kişi)`);
         }, 4000);
     } else {
-        sendMessage(ws, { type: 'searchStatus', message: `Rakip aranıyor... (${matchQueues[mode].length}/${targetSize})` });
+        const searchMsg = getMsg(ws.language, 'searchingOpponent') + ` (${matchQueues[mode].length}/${targetSize})`;
+        sendMessage(ws, { type: 'SEARCH_STATUS', payload: { message: searchMsg } });
     }
 }
 
@@ -1466,9 +1469,12 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
             const pWs = playerConnections.get(pid);
             if (pWs && pWs.readyState === WebSocket.OPEN) {
                 pWs.send(JSON.stringify({
-                    type: 'calculationLobby',
-                    players: room.gameState.players,
-                    eloChanges: null // Raund içi ELO değişmez
+                    type: 'ROUND_OVER',
+                    payload: {
+                        players: room.gameState.players,
+                        scores: room.players, // Skorları gönder
+                        winnerId: winnerId
+                    }
                 }));
             }
         });
@@ -1614,16 +1620,18 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
                 const winnerName = isDraw ? getMsg(lang, 'draw') : (gameState.players[finalWinnerId]?.name || getMsg(lang, 'opponent'));
 
                 pWs.send(JSON.stringify({
-                    type: 'gameEnd',
-                    winner: String(finalWinnerId),
-                    winnerName: winnerName,
-                    isRanked: isRankedMatch,
-                    reason: winnerReason || (isForfeit ? 'forfeit' : 'score'),
-                    players: allPlayersInfo,
-                    eloChanges: eloChanges ? {
-                        winner: eloChanges.winnerChange,
-                        loser: eloChanges.loserChange
-                    } : null
+                    type: 'GAME_OVER',
+                    payload: {
+                        winner: { ...room.players[finalWinnerId], id: finalWinnerId },
+                        winnerName: winnerName,
+                        isRanked: isRankedMatch,
+                        reason: winnerReason || (isForfeit ? 'forfeit' : 'score'),
+                        players: allPlayersInfo,
+                        eloChanges: eloChanges ? {
+                            winner: eloChanges.winnerChange,
+                            loser: eloChanges.loserChange
+                        } : null
+                    }
                 }));
             }
         });
