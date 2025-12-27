@@ -570,120 +570,203 @@
 
         // 6. Admin Panel Component
         const AdminPanel = ({ onClose, adminId }) => {
-            const [players, setPlayers] = useState([]);
+            const [activeTab, setActiveTab] = useState('players'); // players, bans, reports, bugs
+            const [data, setData] = useState({ users: [], bans: [], reports: [], bugs: [] });
             const [loading, setLoading] = useState(true);
             const [searchTerm, setSearchTerm] = useState('');
 
             useEffect(() => {
+                fetchData();
+            }, []);
+
+            const fetchData = () => {
+                setLoading(true);
                 fetch(`${API_URL}/api/admin/users`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'YOUR_ADMIN_SECRET'  // Replace with your actual admin secret
-                    }
+                    headers: { 'Authorization': 'YOUR_ADMIN_SECRET' }
                 })
-                    .then(res => {
-                        if (!res.ok) throw new Error('Failed to fetch users');
-                        return res.json();
-                    })
-                    .then(data => {
-                        if (data.success && data.users) {
-                            setPlayers(data.users);
-                        }
+                    .then(res => res.json())
+                    .then(d => {
+                        if (d.success) setData(d);
                         setLoading(false);
                     })
-                    .catch(error => {
-                        console.error('Error fetching users:', error);
-                        setLoading(false);
-                        alert('Kullanıcılar yüklenirken hata oluştu: ' + error.message);
-                    });
-            }, [adminId]);
+                    .catch(() => setLoading(false));
+            };
+
+            const banPlayer = (targetId) => {
+                const reason = prompt("Ban səbəbi:");
+                const days = prompt("Neçə günlük? (Süresiz üçün boş bırak):");
+                if (reason === null) return;
+
+                fetch(`${API_URL}/api/admin/ban`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId, targetId, reason, durationDays: days })
+                }).then(() => fetchData());
+            };
+
+            const unbanPlayer = (targetId) => {
+                if (!confirm("Banı açmaq istəyirsiniz?")) return;
+                fetch(`${API_URL}/api/admin/unban`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId, targetId })
+                }).then(() => fetchData());
+            };
 
             const updatePlayer = (id, updates) => {
                 fetch(`${API_URL}/api/admin/update`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'YOUR_ADMIN_SECRET'
-                    },
-                    body: JSON.stringify({ adminId, targetId: id, updates })
-                })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.success) {
-                            setPlayers(prev => prev.map(p => p._id === id ? { ...p, ...updates } : p));
-                        }
-                    })
-                    .catch(err => console.error("Update error:", err));
-            };
-
-            const [broadcastMsg, setBroadcastMsg] = useState('');
-
-            const sendBroadcast = () => {
-                if (!broadcastMsg.trim()) return;
-                fetch(`${API_URL}/api/admin/broadcast`, {
-                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminId, message: broadcastMsg })
-                }).then(res => res.json()).then(data => {
-                    if (data.success) {
-                        alert('Duyuru gönderildi!');
-                        setBroadcastMsg('');
-                    }
-                });
+                    body: JSON.stringify({ adminId, targetId: id, updates })
+                }).then(() => fetchData());
             };
 
-            const filteredPlayers = players.filter(p => (p.username || '').toLowerCase().includes(searchTerm.toLowerCase()));
+            const filteredUsers = data.users.filter(u =>
+                (u.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (u.telegramId || '').includes(searchTerm)
+            );
 
             return (
-                <div className="fixed inset-0 bg-black/95 z-[100] overflow-y-auto p-4 animate-slide-up">
-                    <div className="max-w-4xl mx-auto">
-                        <div className="flex justify-between items-center mb-6 sticky top-0 bg-black/95 py-4 z-10 border-b border-white/10">
-                            <h2 className="text-2xl font-black text-yellow-500">ADMIN PANEL</h2>
-                            <button onClick={onClose} className="bg-red-600 text-white px-4 py-2 rounded-xl font-bold">KAPAT</button>
+                <div className="fixed inset-0 bg-black/95 z-[5000] overflow-y-auto animate-slide-up">
+                    <div className="max-w-5xl mx-auto p-4 md:p-8">
+                        {/* Header */}
+                        <div className="flex justify-between items-center mb-8 border-b border-white/10 pb-4 sticky top-0 bg-black/95 z-10">
+                            <div>
+                                <h2 className="text-3xl font-black text-yellow-500">ADMİN PANEL</h2>
+                                <p className="text-white/40 text-xs">Yönetici: {adminId}</p>
+                            </div>
+                            <button onClick={onClose} className="bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-lg active:scale-95">PANELİ KAPAT</button>
                         </div>
 
-                        {/* Broadcast Message Section */}
-                        <div className="bg-purple-900/20 border border-purple-500/30 p-4 rounded-2xl mb-6">
-                            <h3 className="text-purple-400 font-bold text-sm mb-3">GLOBAL DUYURU GÖNDER</h3>
-                            <div className="flex gap-2">
-                                <textarea
-                                    value={broadcastMsg}
-                                    onChange={e => setBroadcastMsg(e.target.value)}
-                                    placeholder="Tüm oyunculara gidecek mesaj..."
-                                    className="flex-1 bg-black/50 text-white p-3 rounded-xl border border-white/10 focus:border-purple-500 outline-none text-sm resize-none h-20"
-                                />
+                        {/* Tabs */}
+                        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+                            {[
+                                { id: 'players', label: 'OYUNCULAR', icon: '👥' },
+                                { id: 'bans', label: 'YASAKLAR', icon: '🚫' },
+                                { id: 'reports', label: 'RAPORLAR', icon: '🚩' },
+                                { id: 'bugs', label: 'HATALAR', icon: '🐞' }
+                            ].map(tab => (
                                 <button
-                                    onClick={sendBroadcast}
-                                    className="bg-purple-600 hover:bg-purple-500 text-white px-6 rounded-xl font-bold transition-all"
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`flex items-center gap-2 px-6 py-4 rounded-2xl font-bold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-yellow-500 text-black scale-105 shadow-xl' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
                                 >
-                                    GÖNDER
+                                    <span>{tab.icon}</span>
+                                    {tab.label}
                                 </button>
-                            </div>
+                            ))}
                         </div>
-                        <input
-                            type="text"
-                            placeholder="Kullanıcı ara..."
-                            className="w-full bg-white/10 text-white p-3 rounded-xl mb-4 border border-white/10 focus:border-yellow-500 outline-none"
-                            onChange={e => setSearchTerm(e.target.value)}
-                        />
-                        {loading ? <div className="text-white text-center">Yükleniyor...</div> : (
-                            <div className="space-y-3">
-                                {filteredPlayers.map(p => (
-                                    <div key={p._id} className="bg-white/5 p-4 rounded-xl border border-white/5 flex flex-col sm:flex-row items-center gap-4">
-                                        <div className="flex items-center gap-3 flex-1 w-full">
-                                            <img src={p.photoUrl || 'https://via.placeholder.com/40'} className="w-10 h-10 rounded-full" />
+
+                        {/* Search */}
+                        {activeTab === 'players' && (
+                            <input
+                                type="text"
+                                placeholder="İsim veya ID ile ara..."
+                                className="w-full bg-white/5 border border-white/10 text-white p-4 rounded-2xl mb-6 outline-none focus:border-yellow-500 focus:bg-white/10 transition-all font-bold"
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                            />
+                        )}
+
+                        {loading ? (
+                            <div className="flex flex-col items-center justify-center py-20 text-white/40">
+                                <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                                <p className="font-bold animate-pulse">VERİLER YÜKLENİYOR...</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {activeTab === 'players' && filteredUsers.map(u => (
+                                    <div key={u._id} className="bg-white/5 border border-white/5 p-5 rounded-2xl flex flex-col md:flex-row md:items-center gap-4 hover:bg-white/10 transition-all group">
+                                        <div className="flex items-center gap-4 flex-1">
+                                            <div className="relative">
+                                                <img src={u.photoUrl || 'https://via.placeholder.com/50'} className="w-12 h-12 rounded-2xl border-2 border-white/10 group-hover:border-yellow-500/50 transition-all" />
+                                                <span className="absolute -bottom-1 -right-1 bg-yellow-500 text-black text-[10px] font-black px-1.5 rounded-md">Lvl {u.level}</span>
+                                            </div>
                                             <div className="flex flex-col">
-                                                <span className="text-white font-bold">{p.username}</span>
-                                                <span className="text-white/40 text-xs">{p.telegramId}</span>
+                                                <span className="text-white font-black text-lg">{u.username}</span>
+                                                <span className="text-white/30 text-[10px] font-mono">{u.telegramId}</span>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2 w-full sm:w-auto">
-                                            <div className="flex flex-col"><label className="text-[10px] text-white/50">ELO</label><input type="number" defaultValue={p.elo} className="bg-black/50 text-white p-2 rounded w-20 text-center" onBlur={(e) => updatePlayer(p._id, { elo: e.target.value })} /></div>
-                                            <button onClick={() => updatePlayer(p._id, { isVisibleInLeaderboard: !p.isVisibleInLeaderboard })} className={`px-4 py-3 rounded-xl text-xs font-bold w-24 ${p.isVisibleInLeaderboard !== false ? 'bg-green-600/20 text-green-400 border border-green-600/50' : 'bg-red-600/20 text-red-400 border border-red-600/50'}`}>{p.isVisibleInLeaderboard !== false ? 'GÖRÜNÜR' : 'GİZLİ'}</button>
+
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <div className="flex flex-col">
+                                                <label className="text-[10px] text-white/40 font-bold ml-1 mb-1">ELO</label>
+                                                <input
+                                                    type="number"
+                                                    value={u.elo}
+                                                    onChange={e => updatePlayer(u._id, { elo: e.target.value })}
+                                                    className="bg-black/40 text-yellow-500 font-bold p-2.5 rounded-xl w-24 text-center border border-white/5 outline-none focus:border-yellow-500"
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={() => banPlayer(u.telegramId)}
+                                                className="bg-red-600/20 text-red-400 border border-red-600/30 px-5 py-3 rounded-2xl font-black text-xs hover:bg-red-600 hover:text-white transition-all"
+                                            >
+                                                YASAKLA
+                                            </button>
+                                            <button
+                                                onClick={() => updatePlayer(u._id, { isVisibleInLeaderboard: !u.isVisibleInLeaderboard })}
+                                                className={`px-5 py-3 rounded-2xl font-black text-xs transition-all ${u.isVisibleInLeaderboard !== false ? 'bg-green-600/20 text-green-400 border border-green-600/30' : 'bg-gray-600/20 text-gray-400 border border-gray-600/30'}`}
+                                            >
+                                                {u.isVisibleInLeaderboard !== false ? 'GÖRÜNÜR' : 'GİZLİ'}
+                                            </button>
                                         </div>
                                     </div>
                                 ))}
+
+                                {activeTab === 'bans' && data.bans.map(b => (
+                                    <div key={b._id} className="bg-red-950/20 border border-red-500/20 p-5 rounded-3xl flex items-center justify-between">
+                                        <div className="flex flex-col">
+                                            <span className="text-red-400 font-black text-lg">{b.telegramId}</span>
+                                            <p className="text-white/60 text-sm mt-1">Səbəb: <span className="text-white">{b.reason || 'Yoxdur'}</span></p>
+                                            <p className="text-white/30 text-xs mt-1">Bitiş: {b.expiresAt ? new Date(b.expiresAt).toLocaleString() : 'Süresiz'}</p>
+                                        </div>
+                                        <button onClick={() => unbanPlayer(b.telegramId)} className="bg-green-600 text-white px-6 py-3 rounded-2xl font-black text-xs shadow-lg active:scale-95 transition-all">YASAĞI KALDIR</button>
+                                    </div>
+                                ))}
+
+                                {activeTab === 'reports' && data.reports.map(r => (
+                                    <div key={r._id} className="bg-white/5 border border-white/5 p-5 rounded-3xl group">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div className="flex flex-col">
+                                                <span className="text-red-400 text-[10px] font-black uppercase tracking-widest">Şİkayet Edİlen</span>
+                                                <span className="text-white font-black text-lg">{r.reportedName} ({r.reportedId})</span>
+                                            </div>
+                                            <span className="bg-white/5 text-white/40 px-3 py-1 rounded-full text-[10px]">{new Date(r.createdAt).toLocaleString()}</span>
+                                        </div>
+                                        <div className="bg-black/30 p-4 rounded-2xl mb-3">
+                                            <p className="text-white/80 text-sm leading-relaxed"><span className="text-yellow-500 font-bold">SEBEP:</span> {r.reason}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-white/20 text-[10px] font-bold uppercase">Raporlayan:</span>
+                                            <span className="text-white/40 text-[10px] font-mono">{r.reporterId}</span>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {activeTab === 'bugs' && data.bugs.map(bug => (
+                                    <div key={bug._id} className="bg-blue-900/10 border border-blue-500/20 p-5 rounded-3xl hover:bg-blue-900/20 transition-all">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center text-xl">🐞</div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-white font-black">{bug.username}</span>
+                                                    <span className="text-white/30 text-[10px] font-mono">{bug.userId}</span>
+                                                </div>
+                                            </div>
+                                            <span className="text-white/20 text-[10px] px-2 py-1 bg-white/5 rounded-lg">{bug.language.toUpperCase()}</span>
+                                        </div>
+                                        <p className="text-white/90 text-sm bg-black/40 p-4 rounded-2xl leading-relaxed italic border-l-4 border-blue-500/50">"{bug.message}"</p>
+                                        <p className="text-white/20 text-[10px] mt-3 text-right">{new Date(bug.createdAt).toLocaleString()}</p>
+                                    </div>
+                                ))}
+
+                                {activeTab === 'players' && filteredUsers.length === 0 && (
+                                    <div className="text-center py-20 text-white/20">
+                                        <span className="text-6xl mb-4 block">🔍</span>
+                                        <p className="font-black">ARANAN OYUNCU BULUNAMADI</p>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -1388,11 +1471,16 @@
                             resetGameClientState();
                             if (playerData) initializeTelegramAuth();
 
-                            // Eğer oda 4 kişilikse veya özel odaydaysak lobiye zorla atma (Server roomUpdated gönderecek)
-                            const isPersistentRoom = (gameState?.playerOrder?.length === 4) || (roomCode !== null);
-                            if (!isPersistentRoom) {
+                            // Redirection Logic
+                            const isRanked = data.isRanked;
+                            const isPersistent = (gameState?.playerOrder?.length === 4) || (roomCode && roomCode !== '');
+
+                            if (isRanked || !isPersistent) {
                                 sendMessage({ type: 'cancelSearch' });
                                 setScreen('lobby');
+                            } else {
+                                // Özel oda veya 4p maç ise oda lobisine dön
+                                setScreen('room_lobby');
                             }
                         }, 5000);
                         break;
@@ -1689,18 +1777,53 @@
                 }
             };
 
-            // Odaya katılma işlemi
             const handleJoinRoom = () => {
                 if (!joinCode.trim()) {
                     showNotification('Lütfən oda kodu girin', 'warning');
                     return;
                 }
-
                 sendMessage({
                     type: 'joinRoom',
                     roomCode: joinCode,
                     ...playerData,
                     language
+                });
+            };
+
+            const reportBug = () => {
+                const msg = prompt(language === 'az' ? "Hatanı bildirin:" : "Report your bug:");
+                if (!msg || !msg.trim()) return;
+
+                fetch(`${API_URL}/api/report/bug`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: playerId,
+                        username: playerData?.username || 'Guest',
+                        message: msg,
+                        language
+                    })
+                }).then(res => res.json()).then(data => {
+                    if (data.success) showNotification(language === 'az' ? 'Raporunuz göndərildi!' : 'Report sent!', 'success');
+                });
+            };
+
+            const reportUser = (targetPid, targetName) => {
+                const reason = prompt(language === 'az' ? `${targetName} haqqında şikayət səbəbi:` : `Reason for reporting ${targetName}:`);
+                if (!reason || !reason.trim()) return;
+
+                fetch(`${API_URL}/api/report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        reporterId: playerId,
+                        reportedId: targetPid,
+                        reportedName: targetName,
+                        reason
+                    })
+                }).then(res => res.json()).then(data => {
+                    if (data.success) showNotification(language === 'az' ? 'Şikayətiniz göndərildi!' : 'Report sent!', 'success');
+                    else if (data.message) showNotification(data.message, 'warning');
                 });
             };
 
@@ -1767,7 +1890,7 @@
                     {announcement && <AnnouncementPopup message={announcement} onClose={() => setAnnouncement(null)} />}
 
                     {/* Admin Button - Moved down by 5cm */}
-                    {playerData?.telegramId === '976640409' && (
+                    {playerData?.telegramId === '1840079939' && (
                         <div className="absolute top-[5cm] right-4 z-50">
                             <button
                                 onClick={() => setShowAdmin(true)}
@@ -1794,7 +1917,7 @@
                                         <span className="text-white text-[10px] font-black tracking-widest uppercase">LV.{playerData.level}</span>
                                         <div className="w-px h-3 bg-white/20"></div>
                                         <span className="text-yellow-400 text-xs font-black">{playerData.elo} ELO</span>
-                                        {playerData.telegramId === '976640409' && (
+                                        {playerData.telegramId === '1840079939' && (
                                             <>
                                                 <div className="w-px h-3 bg-white/20"></div>
                                                 <span className="text-white text-[9px] font-black tracking-widest">OWNER</span>
@@ -1811,6 +1934,12 @@
                                 className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-sm font-bold transition-all"
                             >
                                 {language === 'az' ? '🇦🇿 AZ' : '🇺🇸 EN'}
+                            </button>
+                            <button
+                                onClick={reportBug}
+                                className="bg-red-500/20 hover:bg-red-500/40 text-red-400 px-4 py-2 rounded-full text-xs font-black transition-all border border-red-500/30 flex items-center gap-2"
+                            >
+                                🐞 {language === 'az' ? 'HATA BİLDİR' : 'REPORT BUG'}
                             </button>
                         </div>
 
@@ -1881,20 +2010,22 @@
                             </div>
                         </div>
 
-                        {roomCode && (
-                            <div
-                                onClick={() => {
-                                    navigator.clipboard.writeText(roomCode);
-                                    showNotification('Oda kodu kopyalandı!', 'success');
-                                }}
-                                className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/40 rounded-2xl text-center cursor-pointer hover:bg-yellow-500/20 active:scale-95 transition-all group"
-                            >
-                                <div className="text-yellow-400 text-xs font-bold flex items-center justify-center gap-2">
-                                    ODA KODU <span className="text-[10px] bg-yellow-500/20 px-2 py-0.5 rounded-full">{t.copy}</span>
+                        {
+                            roomCode && (
+                                <div
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(roomCode);
+                                        showNotification('Oda kodu kopyalandı!', 'success');
+                                    }}
+                                    className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/40 rounded-2xl text-center cursor-pointer hover:bg-yellow-500/20 active:scale-95 transition-all group"
+                                >
+                                    <div className="text-yellow-400 text-xs font-bold flex items-center justify-center gap-2">
+                                        ODA KODU <span className="text-[10px] bg-yellow-500/20 px-2 py-0.5 rounded-full">{t.copy}</span>
+                                    </div>
+                                    <div className="text-4xl text-white font-black tracking-widest mt-1 group-hover:text-yellow-400">{roomCode}</div>
                                 </div>
-                                <div className="text-4xl text-white font-black tracking-widest mt-1 group-hover:text-yellow-400">{roomCode}</div>
-                            </div>
-                        )}
+                            )
+                        }
 
                         <button onClick={() => { loadLeaderboard(); setScreen('leaderboard'); }} className="w-full mt-6 text-white/40 hover:text-white transition-colors text-sm font-bold flex items-center justify-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -1902,8 +2033,8 @@
                             </svg>
                             {t.leaderboard}
                         </button>
-                    </div>
-                </div>
+                    </div >
+                </div >
             );
 
             if (screen === 'room_lobby') return (
@@ -2090,9 +2221,12 @@
                                                 </div>
                                             </div>
                                             <div className="flex flex-col">
-                                                <div className="flex items-center gap-1">
-                                                    <span className={`text-white font-black text-[10px] sm:text-xs truncate max-w-[60px] ${activeTurn ? 'text-yellow-400' : ''}`}>{p.username || p.name}</span>
-                                                    <LevelBadge level={calculateLevel(p.elo || 0)} />
+                                                <div className="flex flex-col min-w-0">
+                                                    <div className="flex items-center gap-1">
+                                                        <span className={`text-white font-black text-[10px] sm:text-xs truncate max-w-[60px] ${activeTurn ? 'text-yellow-400' : ''}`}>{p.name || 'Oyuncu'}</span>
+                                                        <LevelBadge level={calculateLevel(p.elo || 0)} />
+                                                    </div>
+                                                    <span className="text-white/40 text-[8px] font-mono truncate max-w-[60px]">@{p.username || pid}</span>
                                                 </div>
                                                 <div className="text-yellow-500/80 text-[9px] font-black">{p.score} / 101</div>
 
@@ -2102,6 +2236,12 @@
                                                         <div key={i} className="w-1.5 h-2.5 bg-gray-100 rounded-[1px] border border-black/20"></div>
                                                     ))}
                                                 </div>
+                                                <button
+                                                    onClick={() => reportUser(pid, p.username || p.name)}
+                                                    className="mt-1 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white px-2 py-0.5 rounded-md text-[8px] font-black transition-all border border-red-600/30 w-full"
+                                                >
+                                                    🚩 {language === 'az' ? 'ŞİKAYƏT' : 'REPORT'}
+                                                </button>
                                             </div>
                                         </div>
                                     );
@@ -2290,7 +2430,7 @@
                             ))}
                         </div>
                     </div>
-                </div>
+                </div >
             );
 
 
