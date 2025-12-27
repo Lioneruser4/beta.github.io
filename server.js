@@ -161,16 +161,10 @@ function calculateElo(winnerElo, loserElo, winnerLevel) {
 
 // Level Calculation - User requested shifts
 function calculateLevel(elo) {
-    if (elo < 100) return 1;
-    if (elo < 200) return 2;
-    if (elo < 300) return 3;
-    if (elo < 400) return 4;
-    if (elo < 500) return 5;
-    if (elo < 600) return 6;
-    if (elo < 700) return 7;
-    if (elo < 800) return 8;
-    if (elo < 900) return 9;
-    return 10; // Max Level 10
+    if (elo < 200) return 1;
+    let lvl = Math.floor(elo / 100);
+    if (lvl >= 10) return 'PRO';
+    return lvl;
 }
 
 // API Endpoints
@@ -287,7 +281,7 @@ app.get('/api/admin/users', async (req, res) => {
             return res.status(403).json({ error: 'Yetkisiz erişim' });
         }
 
-        const users = await Player.find({})
+        const users = await Player.find({ telegramId: { $ne: null } })
             .sort({ elo: -1 })
             .select('telegramId username firstName lastName elo level wins losses draws totalGames createdAt lastPlayed isVisibleInLeaderboard');
 
@@ -1606,6 +1600,43 @@ function handleDisconnect(ws) {
             }
         }
     }
+}
+
+function handleRejoin(ws, data) {
+    const { playerId, roomCode } = data;
+    if (!playerId || !roomCode) return;
+
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState || room.gameState.winner) {
+        // Oyun bitmiş veya oda bulunamadıysa bir bildirim gönderilebilir
+        return;
+    }
+
+    console.log(`🔄 Yeniden bağlanma isteği: ${playerId} (Oda: ${roomCode})`);
+
+    // Eski bağlantıyı sil ve yeni bağlantıyı ata
+    ws.playerId = playerId;
+    ws.roomCode = roomCode;
+    ws.playerName = room.players[playerId]?.name || 'Oyuncu';
+    playerConnections.set(playerId, ws);
+
+    // AFK sayacını sıfırla ve bekleme süresini iptal et
+    resetAfkCounter(room, playerId);
+    const graceTimer = disconnectGraceTimers.get(playerId);
+    if (graceTimer) {
+        clearTimeout(graceTimer);
+        disconnectGraceTimers.delete(playerId);
+    }
+
+    // Oyuncuya güncel durumu gönder
+    setTimeout(() => {
+        sendGameState(roomCode, playerId);
+        // Diğerlerine bildir
+        broadcastToRoom(roomCode, {
+            type: 'playerReconnected',
+            playerName: ws.playerName
+        }, playerId);
+    }, 500);
 }
 
 // --- TIMEOUT KONTROLÜ ---
