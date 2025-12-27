@@ -264,7 +264,12 @@
 </head>
 
 <body>
-    <div id="root"></div>
+    <div id="root">
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #0b241c; color: white; font-family: Arial, sans-serif;">
+            <h1>DOMINO 101</h1>
+            <p>Yükleniyor, lütfen bekleyin...</p>
+        </div>
+    </div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
@@ -1763,8 +1768,22 @@ const canDrawFromMarket = marketSize > 0;
             return null;
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<DominoGame />);
+        // Sayfa yüklendiğinde React uygulamasını başlat
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                const root = ReactDOM.createRoot(document.getElementById('root'));
+                root.render(<DominoGame />);
+            } catch (error) {
+                console.error('Uygulama başlatılırken hata oluştu:', error);
+                document.getElementById('root').innerHTML = `
+                    <div style="padding: 20px; color: white; background: #ff4444; margin: 20px; border-radius: 5px;">
+                        <h2>Bir hata oluştu</h2>
+                        <p>${error.message}</p>
+                        <p>Lütfen sayfayı yenileyin veya daha sonra tekrar deneyin.</p>
+                    </div>
+                `;
+            }
+        });
     </script>
 
     <script>
