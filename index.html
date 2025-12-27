@@ -756,7 +756,16 @@
                                         <div className="flex justify-between items-start mb-3">
                                             <div className="flex flex-col">
                                                 <span className="text-red-400 text-[10px] font-black uppercase tracking-widest">Şİkayet Edİlen</span>
-                                                <span className="text-white font-black text-lg">{r.reportedName} ({r.reportedId})</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-white font-black text-lg">{r.reportedName}</span>
+                                                    <span 
+                                                        onClick={() => { navigator.clipboard.writeText(r.reportedId); alert('ID Kopyalandı: ' + r.reportedId); }}
+                                                        className="text-white/40 text-xs font-mono cursor-pointer hover:text-yellow-500 transition-colors bg-black/20 px-2 py-1 rounded-lg"
+                                                        title="Kopyalamak için tıkla"
+                                                    >
+                                                        ({r.reportedId}) 📋
+                                                    </span>
+                                                </div>
                                             </div>
                                             <span className="bg-white/5 text-white/40 px-3 py-1 rounded-full text-[10px]">{new Date(r.createdAt).toLocaleString()}</span>
                                         </div>
@@ -765,7 +774,14 @@
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <span className="text-white/20 text-[10px] font-bold uppercase">Raporlayan:</span>
-                                            <span className="text-white/40 text-[10px] font-mono">{r.reporterId}</span>
+                                            <span className="text-white font-bold text-xs">{r.reporterName || 'Bilinmiyor'}</span>
+                                            <span 
+                                                onClick={() => { navigator.clipboard.writeText(r.reporterId); alert('ID Kopyalandı: ' + r.reporterId); }}
+                                                className="text-white/40 text-[10px] font-mono cursor-pointer hover:text-yellow-500 transition-colors bg-black/20 px-2 py-1 rounded-lg"
+                                                title="Kopyalamak için tıkla"
+                                            >
+                                                {r.reporterId} 📋
+                                            </span>
                                         </div>
                                     </div>
                                 ))}
@@ -1954,7 +1970,7 @@
                 });
             };
 
-            const reportUser = (targetPid, targetName) => {
+            const reportUser = (targetPid, targetName, targetTelegramId) => {
                 const reason = prompt(language === 'az' ? `${targetName} haqqında şikayət səbəbi:` : `Reason for reporting ${targetName}:`);
                 if (!reason || !reason.trim()) return;
 
@@ -1962,8 +1978,9 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        reporterId: playerId,
-                        reportedId: targetPid,
+                        reporterId: playerData?.telegramId || playerId,
+                        reporterName: playerData?.username || 'Guest',
+                        reportedId: targetTelegramId || targetPid,
                         reportedName: targetName,
                         reason
                     })
