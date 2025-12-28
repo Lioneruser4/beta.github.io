@@ -1605,6 +1605,7 @@
                         break;
                     case 'playerReconnected':
                         showNotification(`${data.playerName} geri döndü!`, 'success');
+                        setServerMessage(null); // Rəqib gələn kimi böyük bildirişi sil
                         break;
                     case 'turnPassed':
                         showNotification(`${data.playerName} pas geçti`, 'info');
