@@ -639,6 +639,7 @@ function initializeGame(roomCode, ...playerIds) {
             name: room.players[pid].name,
             score: room.players[pid].score || 0, // Önceki raundlardan gelen skoru koru
             photoUrl: room.players[pid].photoUrl,
+            telegramId: room.players[pid].telegramId, // ID bilgisini ekle
             level: room.players[pid].level,
             elo: room.players[pid].elo,
             micEnabled: room.players[pid].micEnabled || false, // Səs vəziyyətini qoru
