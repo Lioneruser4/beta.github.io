@@ -296,7 +296,12 @@ app.get('/api/admin/users', async (req, res) => {
         const reports = await Report.find().sort({ createdAt: -1 });
         const bugs = await BugReport.find().sort({ createdAt: -1 });
 
-        res.json({ success: true, users, bans, reports, bugs });
+        res.json({
+            success: true,
+            users, bans, reports, bugs,
+            onlineCount: playerConnections.size,
+            totalUsers: await Player.countDocuments({ telegramId: { $ne: null } })
+        });
     } catch (error) {
         console.error('Admin users error:', error);
         res.status(500).json({ error: 'Sunucu hatası' });
@@ -1500,6 +1505,7 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
                 pWs.send(JSON.stringify({
                     type: 'calculationLobby',
                     players: room.gameState.players,
+                    roundWinnerId: winnerId,
                     eloChanges: null // Raund içi ELO değişmez
                 }));
             }
