@@ -1456,6 +1456,7 @@
                         break;
                     case 'roomCreated':
                         setRoomCode(data.roomCode);
+                        setPlayerId(data.playerId); // FIX: Dublikat və səs problemi üçün ID-ni yenilə
                         setIsHost(true); // Set host status
                         setScreen('room_lobby'); // Transition to room lobby
                         setOpponents([]); // Clear opponents for new room
@@ -1605,7 +1606,7 @@
                         break;
                     case 'playerReconnected':
                         showNotification(`${data.playerName} geri döndü!`, 'success');
-                        setServerMessage(null); // Rəqib gələn kimi böyük bildirişi sil
+                        setServerMessage(null); // FIX: Rəqib gələn kimi AFK bildirişini dərhal sil
                         break;
                     case 'turnPassed':
                         showNotification(`${data.playerName} pas geçti`, 'info');
