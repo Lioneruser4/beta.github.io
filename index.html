@@ -1075,10 +1075,15 @@
             const wsRef = useRef(null);
             const searchTimerRef = useRef(null);
             const playerIdRef = useRef(null);
+            const languageRef = useRef('az');
 
             useEffect(() => {
                 playerIdRef.current = playerId;
             }, [playerId]);
+
+            useEffect(() => {
+                languageRef.current = language;
+            }, [language]);
 
             // Dil çevirileri
             const translations = {
@@ -1459,6 +1464,8 @@
             const handleServerMessage = (data) => {
                 console.log('📨 Server mesajı:', data.type, data);
                 const currentPid = playerIdRef.current;
+                const currentLang = languageRef.current;
+                const currentT = translations[currentLang];
 
                 switch (data.type) {
                     case 'session':
@@ -1628,7 +1635,7 @@
                         playSound('pass');
                         break;
                     case 'voiceRequest':
-                        showNotification(`${data.senderName} ${t.voiceRequestMsg}`, 'info');
+                        showNotification(`${data.senderName} ${currentT.voiceRequestMsg}`, 'info');
                         break;
                     case 'matchFound':
                         playSound('found');
