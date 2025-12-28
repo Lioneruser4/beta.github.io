@@ -1340,7 +1340,7 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
 
     const playerIds = Object.keys(room.players);
     // KAZANAN VE SKOR HESAPLAMA
-    const winnerId = (winnerResult && typeof winnerResult === 'object') ? winnerResult.id : winnerResult;
+    const winnerId = (winnerResult && typeof winnerResult === 'object') ? (winnerResult.winnerId || winnerResult.id) : winnerResult;
 
     // 4 Kişilik Oyun - Özel Kopma Puanlaması
     if (winnerReason === 'disconnect_4p' && extraData.points) {
@@ -1443,6 +1443,14 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
                     type: 'calculationLobby',
                     players: room.gameState.players,
                     eloChanges: null // Raund içi ELO değişmez
+                }));
+                // Client uyumluluğu için ROUND_OVER gönder
+                pWs.send(JSON.stringify({
+                    type: 'ROUND_OVER',
+                    payload: {
+                        winnerId: winnerId,
+                        scores: room.players
+                    }
                 }));
             }
         });
@@ -1587,7 +1595,7 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
                 const lang = pWs.language || 'en';
                 const winnerName = isDraw ? getMsg(lang, 'draw') : (gameState.players[finalWinnerId]?.name || getMsg(lang, 'opponent'));
 
-                pWs.send(JSON.stringify({
+                const gameEndMsg = {
                     type: 'gameEnd',
                     winner: String(finalWinnerId),
                     winnerName: winnerName,
@@ -1598,6 +1606,17 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
                         winner: eloChanges.winnerChange,
                         loser: eloChanges.loserChange
                     } : null
+                };
+                pWs.send(JSON.stringify(gameEndMsg));
+
+                // Client uyumluluğu için GAME_OVER gönder
+                pWs.send(JSON.stringify({
+                    type: 'GAME_OVER',
+                    payload: {
+                        winner: { id: finalWinnerId, ...room.players[finalWinnerId] },
+                        isRanked: isRankedMatch,
+                        eloChange: eloChanges ? (pid === finalWinnerId ? eloChanges.winnerChange : eloChanges.loserChange) : 0
+                    }
                 }));
             }
         });
