@@ -1505,6 +1505,10 @@
                     case 'error':
                         showNotification(data.message, 'error');
                         setSearching(false);
+                        
+                        // FIX: Oyun içi uyarılarda lobiye atma
+                        if (data.code === 'HAS_PLAYABLE_TILE' || data.code === 'NO_MARKET_FIRST_ROUND') return;
+
                         // Eğer oyundaysak lobiye dönme, sadece bildirim göster
                         if (screen !== 'game') {
                             sendMessage({ type: 'cancelSearch' });
@@ -2772,7 +2776,7 @@
         tgApp.ready();
         tgApp.expand();
         if (tgApp.requestFullscreen) {
-            tgApp.requestFullscreen();
+            tgApp.requestFullscreen(); 
         }
         tgApp.disableVerticalSwipes();
         tgApp.setHeaderColor('#1b4d3e');
