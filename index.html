@@ -1554,16 +1554,9 @@
                         // FIX: Oyun içi uyarılarda lobiye atma
                         if (data.code === 'HAS_PLAYABLE_TILE' || data.code === 'NO_MARKET_FIRST_ROUND') return;
 
-                        // Eğer oyundaysak lobiye dönme, sadece bildirim göster
-                        if (screen !== 'game') {
-                            sendMessage({ type: 'cancelSearch' });
-                            setScreen('lobby');
-                        } else {
-                            // Oyundaysak sadece toast gösterdik, ek bir şey yapma
-                            if (data.message === 'Elinizdə oynana bilən daş var!' || data.message.includes('Sadece')) {
-                                // Ekstra ses veya görsel eklenebilir
-                            }
-                        }
+                        // FIX: Kesinlikle lobiye atma, sadece bildirim göster
+                        // sendMessage({ type: 'cancelSearch' });
+                        // setScreen('lobby');
                         break;
                     case 'gameEnd':
                         console.log('🏁 Oyun Bitti!', data);
@@ -1652,9 +1645,9 @@
                         break;
                     case 'roomUpdated':
                         setRoomCode(data.roomCode);
-                        const otherPlayers = data.players.filter(p => String(p.id) !== String(currentPid));
+                        const otherPlayers = data.players.filter(p => String(p.id) !== String(playerIdRef.current));
                         setOpponents(otherPlayers);
-                        setIsHost(data.host === currentPid);
+                        setIsHost(data.host === playerIdRef.current);
                         setRoomCapacity(data.capacity);
                         setScreen('room_lobby');
 
@@ -1925,6 +1918,7 @@
                     type: 'joinRoom',
                     roomCode: joinCode,
                     ...playerData,
+                    playerId: playerId, // Mevcut ID'yi gönder
                     language
                 });
             };
