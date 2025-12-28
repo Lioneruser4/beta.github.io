@@ -824,6 +824,15 @@ function handleVoiceRequest(ws) {
     }, ws.playerId);
 }
 
+function handleEmote(ws, data) {
+    if (!ws.roomCode || !ws.playerId) return;
+    broadcastToRoom(ws.roomCode, {
+        type: 'emote',
+        senderId: ws.playerId,
+        emoji: data.emoji
+    });
+}
+
 function sendGameState(roomCode, playerId) {
     const room = rooms.get(roomCode);
     if (!room || !room.gameState) return;
@@ -832,6 +841,11 @@ function sendGameState(roomCode, playerId) {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
     try {
+        // Zamanlayıcı Senkronizasyonu: Kalan süreyi sunucu hesaplar
+        const now = Date.now();
+        const elapsed = room.gameState.turnStartTime ? (now - room.gameState.turnStartTime) : 0;
+        const remaining = Math.max(0, (room.gameState.turnTimeLimit || 22000) - elapsed);
+
         // Oyuncunun kendi elini ve diğer oyuncuların sadece sayısını gönder
         const playersData = {};
         for (const pid in room.gameState.players) {
@@ -847,7 +861,8 @@ function sendGameState(roomCode, playerId) {
             gameState: {
                 ...room.gameState,
                 players: playersData,
-                playerId: playerId // Hangi oyuncuya gönderildiğini belirt
+                playerId: playerId, // Hangi oyuncuya gönderildiğini belirt
+                turnRemaining: remaining // İstemciye kalan süreyi gönder (Cihaz saati farkını önler)
             }
         }));
     } catch (error) { console.error(error); }
@@ -884,6 +899,7 @@ wss.on('connection', (ws, req) => {
                 case 'voiceSignal': handleVoiceSignal(ws, data); break;
                 case 'updateAudioStatus': handleUpdateAudioStatus(ws, data); break;
                 case 'requestVoice': handleVoiceRequest(ws); break;
+                case 'emote': handleEmote(ws, data); break;
             }
         } catch (error) {
             console.error('Hata:', error);
