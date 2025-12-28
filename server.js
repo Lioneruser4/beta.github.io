@@ -1103,7 +1103,7 @@ function handleCreateRoom(ws, data) {
     });
 
     console.log(`🏠 Oda oluşturuldu: ${roomCode} - Host: ${ws.playerName} (${data.capacity || 2} kişilik)`);
-    sendMessage(ws, { type: 'roomCreated', roomCode, capacity: data.capacity || 2 });
+    sendMessage(ws, { type: 'roomCreated', roomCode, capacity: data.capacity || 2, playerId: playerId });
 }
 
 function handleJoinRoom(ws, data) {
@@ -1303,7 +1303,7 @@ function handlePlayTile(ws, data) {
     const nextIdx = (currentIdx + 1) % gs.playerOrder.length;
     gs.currentPlayer = gs.playerOrder[nextIdx];
     gs.turn++;
-    gs.turnStartTime = Date.now();wwwwwwwwhwwawwwrwwiwwwwkwa
+    gs.turnStartTime = Date.now();
 
     // Kazanan kontrolü
     const winner = checkWinner(gs);
@@ -1906,7 +1906,7 @@ function handleDisconnect(ws) {
                     pWs.send(JSON.stringify({
                         type: 'gameMessage',
                         message: getMsg(lang, 'opponentDisconnected').replace('{name}', ws.playerName),
-                        duration: 20000
+                        duration: 20000 // 20 saniyə bildiriş
                     }));
                 }
             });
@@ -1933,7 +1933,7 @@ function handleDisconnect(ws) {
                     }
                 }
                 disconnectGraceTimers.delete(ws.playerId);
-            }, 20000);
+            }, 20000); // 20 saniyə timeout
 
             disconnectGraceTimers.set(ws.playerId, timer);
         } else if (room && !room.gameState) {
@@ -2132,15 +2132,20 @@ function handleTurnTimeout(roomCode) {
             drawIndex = player.hand.length - 1;
 
             // Çəkilən daş uyğunmu?
-            const leftEnd = gs.board[0][0];
-            const rightEnd = gs.board[gs.board.length - 1][1];
-
-            if (drawnTile[0] === leftEnd || drawnTile[1] === leftEnd) {
+            if (gs.board.length === 0) {
                 autoMovePosition = 'left';
                 foundPlayable = true;
-            } else if (drawnTile[0] === rightEnd || drawnTile[1] === rightEnd) {
-                autoMovePosition = 'right';
-                foundPlayable = true;
+            } else {
+                const leftEnd = gs.board[0][0];
+                const rightEnd = gs.board[gs.board.length - 1][1];
+
+                if (drawnTile[0] === leftEnd || drawnTile[1] === leftEnd) {
+                    autoMovePosition = 'left';
+                    foundPlayable = true;
+                } else if (drawnTile[0] === rightEnd || drawnTile[1] === rightEnd) {
+                    autoMovePosition = 'right';
+                    foundPlayable = true;
+                }
             }
         }
 
