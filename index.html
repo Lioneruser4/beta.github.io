@@ -954,6 +954,13 @@
 
                 if (localStream.current) {
                     localStream.current.getTracks().forEach(track => pc.addTrack(track, localStream.current));
+                    // Mikrofon açıksa hemen teklif gönder
+                    pc.createOffer()
+                        .then(offer => pc.setLocalDescription(offer))
+                        .then(() => {
+                            sendMessage({ type: 'voiceSignal', to: targetPid, signal: { offer: pc.localDescription } });
+                        })
+                        .catch(e => console.error('Offer error:', e));
                 }
 
                 peerConnections.current[targetPid] = pc;
@@ -1550,7 +1557,7 @@
                     case 'error':
                         showNotification(data.message, 'error');
                         setSearching(false);
-                        
+
                         // FIX: Oyun içi uyarılarda lobiye atma
                         if (data.code === 'HAS_PLAYABLE_TILE' || data.code === 'NO_MARKET_FIRST_ROUND') return;
 
@@ -1966,7 +1973,7 @@
                     showNotification(t.waitCooldown, 'warning');
                     return;
                 }
-                
+
                 sendMessage({ type: 'requestVoice' });
                 setLastVoiceRequestTime(now);
                 showNotification(t.voiceRequestSent, 'success');
@@ -2557,7 +2564,7 @@
                             >
                                 <span className="text-2xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
                             </button>
-                            
+
                             <button
                                 onClick={sendVoiceRequest}
                                 className="h-12 px-3 bg-purple-600/80 hover:bg-purple-500 border border-purple-400/50 rounded-xl text-white text-[10px] font-black uppercase tracking-wider shadow-lg active:scale-95 transition-all ml-2"
@@ -2832,7 +2839,7 @@
         tgApp.ready();
         tgApp.expand();
         if (tgApp.requestFullscreen) {
-            tgApp.requestFullscreen(); 
+            tgApp.requestFullscreen();
         }
         tgApp.disableVerticalSwipes();
         tgApp.setHeaderColor('#1b4d3e');
