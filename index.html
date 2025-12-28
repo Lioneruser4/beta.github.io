@@ -496,7 +496,7 @@
         const Toast = ({ message, type }) => {
             const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600', warning: 'bg-yellow-600' };
             return (
-                <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-2 rounded-full shadow-lg text-white font-medium text-sm animate-slide-up flex items-center gap-2 ${colors[type] || colors.info}`}>
+                <div className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999] px-8 py-4 rounded-2xl shadow-2xl text-white font-black text-lg animate-bounce flex flex-col items-center gap-2 text-center border-2 border-white/20 backdrop-blur-md ${colors[type] || colors.info}`}>
                     <span>{type === 'success' ? '✓' : type === 'error' ? '!' : 'i'}</span>
                     {message}
                 </div>
@@ -892,7 +892,7 @@
             const [opponents, setOpponents] = useState([]);
             const [lastSoundIndex, setLastSoundIndex] = useState(0); // For sequential sounds 6, 7, 8
             const [calculationLobby, setCalculationLobby] = useState(null);
-            const [calculationTimer, setCalculationTimer] = useState(8);
+            const [calculationTimer, setCalculationTimer] = useState(7);
             const [showAdmin, setShowAdmin] = useState(false);
             const [isHost, setIsHost] = useState(false);
             const [announcement, setAnnouncement] = useState(null);
@@ -1102,7 +1102,13 @@
                     waitingPlayers: "Oyunçular gözlənilir...",
                     hostStarted: "Oyun sahibi oyunu başlatdı!",
                     minPlayersRequired: "Ən azı 2 nəfər lazımdır",
-                    mustStartWithDouble: "Oyun {tile} daşı ilə başlamalıdır!"
+                    mustStartWithDouble: "Oyun {tile} daşı ilə başlamalıdır!",
+                    roundEnded: "RAUND BİTDİ",
+                    scores: "XALLAR",
+                    points: "XAL",
+                    sec: "SAN",
+                    nextRoundPreparing: "NÖVBƏTİ RAUND HAZIRLANIR",
+                    afkReason: "{name} AFK qaldığı üçün oyun bitdi"
                 },
                 en: {
                     ranked: "Ranked",
@@ -1141,7 +1147,13 @@
                     confirmStart: "Start game?",
                     waitingPlayers: "Waiting for players...",
                     hostStarted: "Host started the game!",
-                    minPlayersRequired: "At least 2 players required"
+                    minPlayersRequired: "At least 2 players required",
+                    roundEnded: "ROUND ENDED",
+                    scores: "SCORES",
+                    points: "PTS",
+                    sec: "SEC",
+                    nextRoundPreparing: "PREPARING NEXT ROUND",
+                    afkReason: "Game ended because {name} was AFK"
                 }
             };
 
@@ -1205,7 +1217,7 @@
                 setOpponents([]);
                 setJoinCode('');
                 setCalculationLobby(null);
-                setCalculationTimer(8);
+                setCalculationTimer(7);
                 setIsHost(false); // Reset host status
                 prevBoardLength.current = 0;
                 isMyMove.current = false;
@@ -1546,6 +1558,7 @@
                             isWinner: amIWinner,
                             isRanked: data.isRanked,
                             reason: endReason,
+                            afkPlayerName: data.afkPlayerName,
                             players: data.players || [], // All players from server
                             winner: {
                                 id: data.winner,
@@ -1677,7 +1690,7 @@
                             myScore: playerScores[myIdForCalc]?.score || 0
                         });
 
-                        setCalculationTimer(8);
+                        setCalculationTimer(7);
                         setScreen('calculation');
                         break;
                 }
@@ -2306,18 +2319,21 @@
                                 const playersMap = gameState?.players || {};
                                 const playerIds = gameState?.playerOrder || [];
                                 const isFourPlayer = playerIds.length > 2;
+                                const isTwoPlayer = playerIds.length === 2;
 
                                 return playerIds.filter(pid => pid !== myPlayerId).map((pid, idx) => {
                                     const p = playersMap[pid];
                                     if (!p) return null;
                                     const activeTurn = gameState?.currentPlayer === pid;
 
-                                    const isFourPlayer = playerIds.length > 2;
-
                                     return (
-                                        <div key={idx} className={`relative flex items-center gap-2 px-2 py-1.5 rounded-2xl transition-all duration-300 ${activeTurn ? 'bg-yellow-500/20 z-10 border border-yellow-500/50 shadow-glow' : 'bg-black/40 opacity-70 border border-white/10'} ${isFourPlayer ? 'scale-90 origin-top' : ''}`}>
+                                        <div key={idx} className={`relative flex items-center gap-2 px-2 py-1.5 rounded-2xl transition-all duration-300 
+                                            ${activeTurn ? 'bg-yellow-500/20 z-10 border border-yellow-500/50 shadow-glow' : 'bg-black/40 opacity-70 border border-white/10'} 
+                                            ${isFourPlayer ? 'scale-90 origin-top' : ''}
+                                            ${isTwoPlayer ? 'scale-125 px-4 py-3 mx-2 mt-2' : ''}
+                                        `}>
                                             <div className="flex flex-col items-center">
-                                                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative ${p.micEnabled ? 'voice-pulse' : ''}`}>
+                                                <div className={`${isTwoPlayer ? 'w-16 h-16' : 'w-10 h-10 sm:w-12 sm:h-12'} rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative ${p.micEnabled ? 'voice-pulse' : ''}`}>
                                                     <img src={p.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" alt={p.name} />
                                                     <div className="absolute top-0 right-0 p-0.5 z-20">
                                                         {p.micEnabled ? <span className="block w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse border border-black shadow-lg"></span> : <span className="block w-2.5 h-2.5 bg-red-500 rounded-full border border-black"></span>}
@@ -2327,17 +2343,17 @@
                                             <div className="flex flex-col">
                                                 <div className="flex flex-col min-w-0">
                                                     <div className="flex items-center gap-1">
-                                                        <span className={`text-white font-black text-[10px] sm:text-xs truncate max-w-[60px] ${activeTurn ? 'text-yellow-400' : ''}`}>{p.name || 'Oyuncu'}</span>
+                                                        <span className={`text-white font-black ${isTwoPlayer ? 'text-sm' : 'text-[10px] sm:text-xs'} truncate max-w-[80px] ${activeTurn ? 'text-yellow-400' : ''}`}>{p.name || 'Oyuncu'}</span>
                                                         <LevelBadge level={calculateLevel(p.elo || 0)} />
                                                     </div>
                                                     <span className="text-white/40 text-[8px] font-mono truncate max-w-[60px]">@{p.username || pid}</span>
                                                 </div>
-                                                <div className="text-yellow-500/80 text-[9px] font-black">{p.score} / 101</div>
+                                                <div className={`text-yellow-500/80 font-black ${isTwoPlayer ? 'text-xs mt-1' : 'text-[9px]'}`}>{p.score} / 101</div>
 
                                                 {/* Küçük Rakip Taşları */}
-                                                <div className="flex gap-0.5 mt-1 flex-wrap max-w-[60px]">
+                                                <div className={`flex gap-0.5 mt-1 flex-wrap ${isTwoPlayer ? 'max-w-[120px] gap-1' : 'max-w-[60px]'}`}>
                                                     {Array(p.hand?.length || 0).fill(0).map((_, i) => (
-                                                        <div key={i} className="w-1.5 h-2.5 bg-gray-100 rounded-[1px] border border-black/20"></div>
+                                                        <div key={i} className={`${isTwoPlayer ? 'w-3 h-5 rounded-sm' : 'w-1.5 h-2.5 rounded-[1px]'} bg-gray-100 border border-black/20`}></div>
                                                     ))}
                                                 </div>
                                                 <button
@@ -2558,10 +2574,10 @@
                             {/* Pro Header */}
                             <div className="text-center mb-10">
                                 <div className="inline-block px-4 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 text-[10px] font-black tracking-[0.4em] uppercase mb-4 animate-bounce">
-                                    RAUNT SONLANDI
+                                    {t.roundEnded}
                                 </div>
                                 <h1 className="text-5xl font-black text-white italic tracking-tighter drop-shadow-2xl">
-                                    PUANLAR
+                                    {t.scores}
                                 </h1>
                             </div>
 
@@ -2600,13 +2616,13 @@
                                                         </div>
                                                         <div className="flex items-center gap-1.5 mt-1 text-white/40 text-[9px] font-black tracking-widest uppercase">
                                                             <span className="w-1.5 h-1.5 rounded-full bg-current opacity-50"></span>
-                                                            {t.handTotal}
+                                                            {t.handTotal}: <span className="text-white ml-1">{player.handPoints || 0}</span>
                                                         </div>
                                                     </div>
 
                                                     <div className={`flex flex-col items-center justify-center min-w-[75px] h-16 rounded-3xl border ${isWinner ? 'bg-yellow-400/10 border-yellow-400/30' : 'bg-black/40 border-white/10'
                                                         }`}>
-                                                        <span className={`text-[9px] font-black tracking-widest ${isWinner ? 'text-yellow-400' : 'text-white/40'}`}>PUAN</span>
+                                                        <span className={`text-[9px] font-black tracking-widest ${isWinner ? 'text-yellow-400' : 'text-white/40'}`}>{t.points}</span>
                                                         <span className={`text-3xl font-black italic leading-none mt-1 ${isWinner ? 'text-yellow-400' : 'text-white'}`}>{player.score}</span>
                                                     </div>
                                                 </div>
@@ -2624,10 +2640,10 @@
                                     </svg>
                                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                                         <span className="text-white font-black text-xl leading-none">{calculationTimer}</span>
-                                        <span className="text-[8px] text-white/40 font-bold uppercase tracking-tighter">SEC</span>
+                                        <span className="text-[8px] text-white/40 font-bold uppercase tracking-tighter">{t.sec}</span>
                                     </div>
                                 </div>
-                                <span className="mt-4 text-white/30 text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">SONRAKİ RAUNT HAZIRLANIR</span>
+                                <span className="mt-4 text-white/30 text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">{t.nextRoundPreparing}</span>
                             </div>
                         </div>
                     </div>
@@ -2660,7 +2676,7 @@
 
                         {/* Status Banners */}
                         {endInfo.reason === 'disconnect' && <div className="mb-8 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-500 font-black text-sm uppercase tracking-widest animate-pulse">Rəqib oyundan ayrıldı • Hükmen Galibiyet</div>}
-                        {endInfo.reason === 'afk' && <div className="mb-8 p-4 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 font-black text-sm uppercase tracking-widest animate-pulse">AFK Qaldığınız üçün oyun sonlandı</div>}
+                        {endInfo.reason === 'afk' && <div className="mb-8 p-4 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 font-black text-sm uppercase tracking-widest animate-pulse">{t.afkReason.replace('{name}', endInfo.afkPlayerName || 'Oyunçu')}</div>}
 
                         {/* Players Final Result Cards */}
                         <div className="space-y-4 mb-20">
