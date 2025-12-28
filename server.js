@@ -830,7 +830,7 @@ function handleEmote(ws, data) {
         type: 'emote',
         senderId: ws.playerId,
         emoji: data.emoji
-    });
+    }, ws.playerId); // Gönderene geri yollama (zaten yerelde gösteriliyor)
 }
 
 function sendGameState(roomCode, playerId) {
