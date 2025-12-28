@@ -1367,7 +1367,7 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
 
     const playerIds = Object.keys(room.players);
     // KAZANAN VE SKOR HESAPLAMA
-    const winnerId = (winnerResult && typeof winnerResult === 'object') ? winnerResult.id : winnerResult;
+    const winnerId = (winnerResult && typeof winnerResult === 'object') ? (winnerResult.winnerId || winnerResult.id) : winnerResult;
 
     // 4 Kişilik Oyun - Özel Kopma Puanlaması
     if (winnerReason === 'disconnect_4p' && extraData.points) {
@@ -1719,6 +1719,9 @@ function handleDrawFromMarket(ws) {
 
     const player = gs.players[ws.playerId];
 
+    // BOARD KONTROLU - Hata önleyici
+    if (!Array.isArray(gs.board)) gs.board = [];
+
     // İlk elde pazar butonunu devre dışı bırak
     if (gs.moves === 0) {
         return sendMessage(ws, { 
@@ -1730,7 +1733,7 @@ function handleDrawFromMarket(ws) {
 
     // Elinde oynanacak taş var mı kontrol et
     const canPlay = player.hand.some(tile => canPlayTile(tile, gs.board));
-    if (canPlay && gs.board.length > 0) {
+    if (canPlay) {
         // Sadece hata mesajı göster, başka bir işlem yapma
         return sendMessage(ws, { 
             type: 'error', 
