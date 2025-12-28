@@ -1294,13 +1294,17 @@ function handlePlayTile(ws, data) {
 
     // Eğer oyuncunun elinde taş kalmadıysa, oyunu bitir
     if (player.hand.length === 0) {
+        console.log(`🎉 ${player.name} elindeki son taşı attı! Oyun bitti.`);
         // Diğer oyuncuların elindeki taşların toplamını hesapla
         let scoreGained = 0;
         for (const pid in gs.players) {
             if (pid !== ws.playerId) {
-                scoreGained += gs.players[pid].hand.reduce((sum, t) => sum + t[0] + t[1], 0);
+                const playerScore = gs.players[pid].hand.reduce((sum, t) => sum + t[0] + t[1], 0);
+                console.log(`   - ${gs.players[pid].name} elindeki taşların toplamı: ${playerScore}`);
+                scoreGained += playerScore;
             }
         }
+        console.log(`   Toplam kazanılan puan: ${scoreGained}`);
         const winner = { type: 'HAND_WIN', winnerId: ws.playerId, scoreGained };
         handleGameEnd(ws.roomCode, winner, gs, false);
         return; // Fonksiyondan çık
@@ -1714,6 +1718,15 @@ function handleDrawFromMarket(ws) {
     if (gs.currentPlayer !== ws.playerId) return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'notYourTurn') });
 
     const player = gs.players[ws.playerId];
+
+    // İlk elde pazar butonunu devre dışı bırak
+    if (gs.moves === 0) {
+        return sendMessage(ws, { 
+            type: 'error', 
+            message: 'İlk eldə pazar istifadə etmək olmaz!',
+            code: 'NO_MARKET_FIRST_ROUND'
+        });
+    }
 
     // Elinde oynanacak taş var mı kontrol et
     const canPlay = player.hand.some(tile => canPlayTile(tile, gs.board));
