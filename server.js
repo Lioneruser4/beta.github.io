@@ -1154,7 +1154,10 @@ function handleJoinRoom(ws, data) {
         const alreadyInRoom = Object.values(room.players).find(p => p.telegramId === ws.telegramId);
         if (alreadyInRoom) {
             // Zaten odadaysa ID'sini eşitle
-            // pid = Object.keys(room.players).find(key => room.players[key].telegramId === ws.telegramId);
+            const existingPid = Object.keys(room.players).find(key => room.players[key].telegramId === ws.telegramId);
+            if (existingPid) {
+                pid = existingPid;
+            }
         }
 
         // Başka bir odaya mı dahil?
@@ -1186,6 +1189,9 @@ function handleJoinRoom(ws, data) {
         micEnabled: false,
         speakerEnabled: false
     };
+
+    // İstemciye güncel ID'sini bildir (Duplicate önleme sonrası ID değişmiş olabilir)
+    sendMessage(ws, { type: 'session', playerId: pid, roomCode: code });
 
     console.log(`✅ ${ws.playerName} odaya katıldı: ${code} (${currentPlayerCount + 1}/${capacity})`);
 
@@ -1303,7 +1309,7 @@ function handlePlayTile(ws, data) {
     // Eğer oyuncunun elinde taş kalmadıysa, oyunu bitir
     if (player.hand.length === 0) {
         console.log(`🎉 ${player.name} elindeki son taşı attı! Oyun bitti.`);
-        
+
         // FIX: Son hamleyi herkese gönder ki taşın atıldığı görülsün
         Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
 
@@ -1318,7 +1324,7 @@ function handlePlayTile(ws, data) {
         }
         console.log(`   Toplam kazanılan puan: ${scoreGained}`);
         const winner = { type: 'HAND_WIN', winnerId: ws.playerId, scoreGained };
-        
+
         // Gecikmeli bitir ki animasyon tamamlansın
         setTimeout(() => handleGameEnd(ws.roomCode, winner, gs, false), 500);
         return; // Fonksiyondan çık
@@ -1471,7 +1477,7 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
 
     if (!isMatchOver) {
         // --- RAUND BİTTİ, MAÇ DEVAM EDİYOR ---
-        
+
         // Client'a güncel puanları ve eldeki puanı gönder
         playerIds.forEach(pid => {
             if (room.gameState.players[pid]) {
@@ -1745,8 +1751,8 @@ function handleDrawFromMarket(ws) {
 
     // İlk elde pazar butonunu devre dışı bırak
     if (gs.moves === 0) {
-        return sendMessage(ws, { 
-            type: 'error', 
+        return sendMessage(ws, {
+            type: 'error',
             message: 'İlk eldə pazar istifadə etmək olmaz!',
             code: 'NO_MARKET_FIRST_ROUND'
         });
@@ -1756,8 +1762,8 @@ function handleDrawFromMarket(ws) {
     const canPlay = player.hand.some(tile => canPlayTile(tile, gs.board));
     if (canPlay) {
         // Sadece hata mesajı göster, başka bir işlem yapma
-        return sendMessage(ws, { 
-            type: 'error', 
+        return sendMessage(ws, {
+            type: 'error',
             message: 'Elinizdə oynaya biləcəyiniz daş var!',
             code: 'HAS_PLAYABLE_TILE'
         });
@@ -1776,7 +1782,7 @@ function handleDrawFromMarket(ws) {
     resetAfkCounter(room, ws.playerId); // Manuel pazar hareketi sıfırlar
 
     console.log(`🎲 ${player.name} bazardan daş çəkdi. Kalan: ${gs.market.length}`);
-    
+
     // Çekilen taş oynanabilir mi?
     const canPlayDrawn = canPlayTile(drawnTile, gs.board);
     if (!canPlayDrawn && gs.market.length === 0) {
