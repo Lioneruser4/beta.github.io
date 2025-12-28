@@ -1342,6 +1342,11 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
     // KAZANAN VE SKOR HESAPLAMA
     const winnerId = (winnerResult && typeof winnerResult === 'object') ? (winnerResult.winnerId || winnerResult.id) : winnerResult;
 
+    if (!winnerId && winnerId !== 0) {
+        console.error("Game End Error: Invalid winnerId", winnerResult);
+        return;
+    }
+
     // 4 Kişilik Oyun - Özel Kopma Puanlaması
     if (winnerReason === 'disconnect_4p' && extraData.points) {
         const pointsCall = extraData.points;
@@ -1437,6 +1442,9 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
     if (!isMatchOver) {
         // --- RAUND BİTTİ, MAÇ DEVAM EDİYOR ---
         Object.keys(room.players).forEach(pid => {
+            // ÖNCE SON DURUMU GÖNDER (Eldeki son taşın gittiğini görsünler)
+            sendGameState(roomCode, pid);
+
             const pWs = playerConnections.get(pid);
             if (pWs && pWs.readyState === WebSocket.OPEN) {
                 pWs.send(JSON.stringify({
@@ -1713,7 +1721,7 @@ function handleDrawFromMarket(ws) {
 
     // Elinde oynanacak taş var mı kontrol et
     const canPlay = player.hand.some(tile => canPlayTile(tile, gs.board));
-    if (canPlay && gs.board.length > 0) {
+    if (canPlay) {
         return sendMessage(ws, { type: 'error', message: 'Elinizdə oynana bilən daş var!' });
     }
 
