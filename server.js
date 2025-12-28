@@ -640,7 +640,9 @@ function initializeGame(roomCode, ...playerIds) {
             score: room.players[pid].score || 0, // Önceki raundlardan gelen skoru koru
             photoUrl: room.players[pid].photoUrl,
             level: room.players[pid].level,
-            elo: room.players[pid].elo
+            elo: room.players[pid].elo,
+            micEnabled: room.players[pid].micEnabled || false, // Səs vəziyyətini qoru
+            speakerEnabled: room.players[pid].speakerEnabled || false
         };
         currentIndex++;
     });
@@ -808,6 +810,14 @@ function broadcastToRoom(roomCode, message, excludePlayer = null) {
     }
 }
 
+function handleVoiceRequest(ws) {
+    if (!ws.roomCode || !ws.playerId) return;
+    broadcastToRoom(ws.roomCode, {
+        type: 'voiceRequest',
+        senderName: ws.playerName
+    }, ws.playerId);
+}
+
 function sendGameState(roomCode, playerId) {
     const room = rooms.get(roomCode);
     if (!room || !room.gameState) return;
@@ -867,6 +877,7 @@ wss.on('connection', (ws, req) => {
                 case 'startGameEarly': handleStartGameEarly(ws); break;
                 case 'voiceSignal': handleVoiceSignal(ws, data); break;
                 case 'updateAudioStatus': handleUpdateAudioStatus(ws, data); break;
+                case 'requestVoice': handleVoiceRequest(ws); break;
             }
         } catch (error) {
             console.error('Hata:', error);
