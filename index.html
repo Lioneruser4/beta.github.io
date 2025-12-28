@@ -803,9 +803,7 @@
         // --- SES MOTORU (WEB AUDIO API) ---
         // Bu motor, seslerin arka plan uygulamalarını (YouTube, Spotify vb.) durdurmasını engeller.
         const AudioEngine = (() => {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            if (!AudioContext) return { play: () => {}, context: null };
-            const context = new AudioContext({
+            const context = new (window.AudioContext || window.webkitAudioContext)({
                 latencyHint: 'interactive'
             });
             const buffers = {};
@@ -899,13 +897,6 @@
             const [isHost, setIsHost] = useState(false);
             const [announcement, setAnnouncement] = useState(null);
             const [roomCapacity, setRoomCapacity] = useState(2);
-
-            // Ref to hold the current screen state to avoid stale closures in WebSocket handlers
-            const screenRef = useRef(screen);
-            useEffect(() => {
-                screenRef.current = screen;
-            }, [screen]);
-
             const prevBoardLength = useRef(0);
             const isMyMove = useRef(false);
 
@@ -1222,6 +1213,12 @@
 
             // Ses Efektleri (Opsiyonel - Tarayıcı izin verirse çalışır)
 
+            useEffect(() => {
+                initializeTelegramAuth();
+                connectToServer();
+                return () => { if (wsRef.current) wsRef.current.close(); };
+            }, []);
+
             // Confetti Effect
             useEffect(() => {
                 if (screen === 'end' && endInfo?.isWinner) {
@@ -1467,12 +1464,6 @@
                             showNotification('Artık odanın sahibisiniz!', 'info');
                         }
                         break;
-                    case 'ROUND_OVER':
-                        const { winnerId, scores } = data.payload;
-                        const roundWinner = scores[winnerId];
-                        const wName = roundWinner ? roundWinner.name : 'Beraberlik';
-                        showNotification(`🖐️ El Bitti! Kazanan: ${wName}`, 'success');
-                        break;
                     case 'gameStart':
                     case 'gameUpdate':
                     case 'gameState':
@@ -1514,11 +1505,15 @@
                     case 'error':
                         showNotification(data.message, 'error');
                         setSearching(false);
-                        // Prevent being kicked to lobby on in-game errors like "has playable tile"
-                        // Use ref to get the latest screen state, avoiding stale closure issue.
-                        if (screenRef.current !== 'game') {
+                        // Eğer oyundaysak lobiye dönme, sadece bildirim göster
+                        if (screen !== 'game') {
                             sendMessage({ type: 'cancelSearch' });
                             setScreen('lobby');
+                        } else {
+                            // Oyundaysak sadece toast gösterdik, ek bir şey yapma
+                            if (data.message === 'Elinizdə oynana bilən daş var!' || data.message.includes('Sadece')) {
+                                // Ekstra ses veya görsel eklenebilir
+                            }
                         }
                         break;
                     case 'gameEnd':
@@ -1665,31 +1660,24 @@
                         const isMatchEnd = Object.values(players).some(p => p.score >= 101);
 
                         // Daha az puan yapan kazanır
-                        const entries = Object.entries(players);
-                        entries.sort((a, b) => b[1].score - a[1].score);
+                        const entries = Object.entries(playerScores);
+                        entries.sort((a, b) => a[1].score - b[1].score);
 
                         const winner = entries[0][1];
                         const loser = entries[1][1];
 
                         setCalculationLobby({
-                            players: players,
+                            players: playerScores,
                             winner,
                             loser,
-                            myScore: players[myIdForCalc]?.score || 0
+                            myScore: playerScores[myIdForCalc]?.score || 0
                         });
 
-                        setCalculationTimer(5);
+                        setCalculationTimer(8);
                         setScreen('calculation');
                         break;
                 }
             };
-
-            // Başlangıç Effect'i (Fonksiyonlar tanımlandıktan sonra çağrılmalı)
-            useEffect(() => {
-                initializeTelegramAuth();
-                connectToServer();
-                return () => { if (wsRef.current) wsRef.current.close(); };
-            }, []);
 
             // Dynamics: Snake Layout Calculation
             const calculateLayout = (board) => {
@@ -2521,7 +2509,7 @@
                         <div className="flex items-center justify-between mb-2">
                             <div className="text-white/50 text-[10px] font-black uppercase tracking-[0.2em]">{t.yourHand} ({myHand.length})</div>
                             <div className="flex items-center gap-3">
-                                {isMyTurn && marketSize > 0 && !myHand.some(t => calculateValidMoves(t).length > 0) && (
+                                {isMyTurn && marketSize > 0 && (
                                     <button
                                         onClick={() => sendMessage({ type: 'drawFromMarket' })}
                                         className="bg-yellow-500 text-black px-6 py-2 rounded-full text-xs font-black shadow-glow flex items-center gap-2 hover:scale-105 active:scale-95 transition-all"
@@ -2576,7 +2564,7 @@
                             {/* Pro Score Cards */}
                             <div className="space-y-4">
                                 {calculationLobby && Object.entries(calculationLobby.players)
-                                    .sort((a, b) => b[1].score - a[1].score)
+                                    .sort((a, b) => a[1].score - b[1].score)
                                     .map(([pid, player], idx) => {
                                         const isWinner = idx === 0;
                                         const isMe = pid === (playerId || playerData?.id);
@@ -2610,14 +2598,6 @@
                                                             <span className="w-1.5 h-1.5 rounded-full bg-current opacity-50"></span>
                                                             {t.handTotal}
                                                         </div>
-                                                        {/* Elde kalan taşları göster */}
-                                                        <div className="flex flex-wrap gap-1 mt-2">
-                                                            {player.hand && player.hand.map((tile, tIdx) => (
-                                                                <div key={tIdx} className="opacity-90 hover:opacity-100 transition-opacity">
-                                                                    <DominoTile values={tile} vertical={true} disabled={true} scale={0.4} />
-                                                                </div>
-                                                            ))}
-                                                        </div>
                                                     </div>
 
                                                     <div className={`flex flex-col items-center justify-center min-w-[75px] h-16 rounded-3xl border ${isWinner ? 'bg-yellow-400/10 border-yellow-400/30' : 'bg-black/40 border-white/10'
@@ -2636,7 +2616,7 @@
                                 <div className="relative w-20 h-20">
                                     <svg className="w-full h-full -rotate-90">
                                         <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="2" fill="transparent" className="text-white/5" />
-                                        <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-yellow-500 transition-all duration-1000 shadow-glow" strokeDasharray="226" strokeDashoffset={226 - (226 * (5 - calculationTimer) / 5)} strokeLinecap="round" />
+                                        <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-yellow-500 transition-all duration-1000 shadow-glow" strokeDasharray="226" strokeDashoffset={226 - (226 * (8 - calculationTimer) / 8)} strokeLinecap="round" />
                                     </svg>
                                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                                         <span className="text-white font-black text-xl leading-none">{calculationTimer}</span>
