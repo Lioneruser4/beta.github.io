@@ -993,14 +993,6 @@ function handleFindMatch(ws, data) {
 
     playerConnections.set(playerId, ws);
 
-    // Anti-Cheat: Aynı IP ile kuyruğa girmeyi engelle (Ranked için)
-    if (mode === '2p' && !ws.isGuest) {
-        const sameIpInQueue = matchQueues[mode].find(p => p.ws.ip === ws.ip);
-        if (sameIpInQueue) {
-            return sendMessage(ws, { type: 'error', message: 'Eynı ağdan giriş yapamazsınız' });
-        }
-    }
-
     matchQueues[mode].push({
         ws, playerId, playerName: ws.playerName, telegramId: ws.telegramId,
         photoUrl: ws.photoUrl, level: ws.level, elo: ws.elo, isGuest: ws.isGuest,
@@ -1314,7 +1306,7 @@ function handlePlayTile(ws, data) {
         const winner = { type: 'HAND_WIN', winnerId: ws.playerId, scoreGained };
         
         // Gecikmeli bitir ki animasyon tamamlansın
-        setTimeout(() => handleGameEnd(ws.roomCode, winner, gs, false), 500);
+        setTimeout(() => handleGameEnd(ws.roomCode, winner, gs, false), 1000);
         return; // Fonksiyondan çık
     }
 
@@ -1465,6 +1457,17 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
 
     if (!isMatchOver) {
         // --- RAUND BİTTİ, MAÇ DEVAM EDİYOR ---
+        
+        // Client'a güncel puanları ve eldeki puanı gönder
+        playerIds.forEach(pid => {
+            if (room.gameState.players[pid]) {
+                const hand = room.gameState.players[pid].hand || [];
+                const handPoints = hand.reduce((s, t) => s + t[0] + t[1], 0);
+                room.gameState.players[pid].handPoints = handPoints; // Eldeki puan
+                room.gameState.players[pid].score = room.players[pid].score; // Toplam ceza puanı
+            }
+        });
+
         Object.keys(room.players).forEach(pid => {
             const pWs = playerConnections.get(pid);
             if (pWs && pWs.readyState === WebSocket.OPEN) {
@@ -1480,7 +1483,7 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
             if (!rooms.has(roomCode)) return;
             const newGS = initializeGame(roomCode, ...playerIds);
             playerIds.forEach(pid => sendGameState(roomCode, pid));
-        }, 8000); // CalculationTimer 8s olduğu için
+        }, 7000); // 7 Saniye Bekleme
 
         return; // Fonksiyondan çık, odayı silme!
     }
@@ -1622,6 +1625,7 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
                     winnerName: winnerName,
                     isRanked: isRankedMatch,
                     reason: winnerReason || (isForfeit ? 'forfeit' : 'score'),
+                    afkPlayerName: extraData.afkPlayerName,
                     players: allPlayersInfo,
                     eloChanges: eloChanges ? {
                         winner: eloChanges.winnerChange,
@@ -2061,7 +2065,7 @@ function handleTurnTimeout(roomCode) {
         // Diğer oyuncuyu kazanan ilan et (4 oyuncu varsa ilk diğerini al)
         const otherPlayerId = Object.keys(gs.players).find(id => id !== currentPlayerId);
         if (otherPlayerId) {
-            handleGameEnd(roomCode, otherPlayerId, gs, true, 'afk'); // true = Forfeit
+            handleGameEnd(roomCode, otherPlayerId, gs, true, 'afk', { afkPlayerName: player.name }); // true = Forfeit
         } else {
             rooms.delete(roomCode);
         }
