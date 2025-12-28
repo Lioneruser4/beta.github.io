@@ -1105,10 +1105,9 @@
                     mustStartWithDouble: "Oyun {tile} daşı ilə başlamalıdır!",
                     roundEnded: "RAUND BİTDİ",
                     scores: "XALLAR",
-                    points: "XAL",
-                    sec: "SAN",
                     nextRoundPreparing: "NÖVBƏTİ RAUND HAZIRLANIR",
-                    afkReason: "{name} AFK qaldığı üçün oyun bitdi"
+                    points: "XAL",
+                    seconds: "SAN"
                 },
                 en: {
                     ranked: "Ranked",
@@ -1150,10 +1149,9 @@
                     minPlayersRequired: "At least 2 players required",
                     roundEnded: "ROUND ENDED",
                     scores: "SCORES",
+                    nextRoundPreparing: "NEXT ROUND PREPARING",
                     points: "PTS",
-                    sec: "SEC",
-                    nextRoundPreparing: "PREPARING NEXT ROUND",
-                    afkReason: "Game ended because {name} was AFK"
+                    seconds: "SEC"
                 }
             };
 
@@ -1558,7 +1556,6 @@
                             isWinner: amIWinner,
                             isRanked: data.isRanked,
                             reason: endReason,
-                            afkPlayerName: data.afkPlayerName,
                             players: data.players || [], // All players from server
                             winner: {
                                 id: data.winner,
@@ -2330,7 +2327,7 @@
                                         <div key={idx} className={`relative flex items-center gap-2 px-2 py-1.5 rounded-2xl transition-all duration-300 
                                             ${activeTurn ? 'bg-yellow-500/20 z-10 border border-yellow-500/50 shadow-glow' : 'bg-black/40 opacity-70 border border-white/10'} 
                                             ${isFourPlayer ? 'scale-90 origin-top' : ''}
-                                            ${isTwoPlayer ? 'scale-125 px-4 py-3 mx-2 mt-2' : ''}
+                                            ${isTwoPlayer ? 'scale-110 origin-top mt-4 px-4 py-2' : ''}
                                         `}>
                                             <div className="flex flex-col items-center">
                                                 <div className={`${isTwoPlayer ? 'w-16 h-16' : 'w-10 h-10 sm:w-12 sm:h-12'} rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative ${p.micEnabled ? 'voice-pulse' : ''}`}>
@@ -2353,7 +2350,7 @@
                                                 {/* Küçük Rakip Taşları */}
                                                 <div className={`flex gap-0.5 mt-1 flex-wrap ${isTwoPlayer ? 'max-w-[120px] gap-1' : 'max-w-[60px]'}`}>
                                                     {Array(p.hand?.length || 0).fill(0).map((_, i) => (
-                                                        <div key={i} className={`${isTwoPlayer ? 'w-3 h-5 rounded-sm' : 'w-1.5 h-2.5 rounded-[1px]'} bg-gray-100 border border-black/20`}></div>
+                                                        <div key={i} className={`${isTwoPlayer ? 'w-4 h-6 rounded-sm' : 'w-1.5 h-2.5 rounded-[1px]'} bg-gray-100 border border-black/20`}></div>
                                                     ))}
                                                 </div>
                                                 <button
@@ -2640,7 +2637,7 @@
                                     </svg>
                                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                                         <span className="text-white font-black text-xl leading-none">{calculationTimer}</span>
-                                        <span className="text-[8px] text-white/40 font-bold uppercase tracking-tighter">{t.sec}</span>
+                                        <span className="text-[8px] text-white/40 font-bold uppercase tracking-tighter">{t.seconds}</span>
                                     </div>
                                 </div>
                                 <span className="mt-4 text-white/30 text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">{t.nextRoundPreparing}</span>
@@ -2676,7 +2673,7 @@
 
                         {/* Status Banners */}
                         {endInfo.reason === 'disconnect' && <div className="mb-8 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-500 font-black text-sm uppercase tracking-widest animate-pulse">Rəqib oyundan ayrıldı • Hükmen Galibiyet</div>}
-                        {endInfo.reason === 'afk' && <div className="mb-8 p-4 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 font-black text-sm uppercase tracking-widest animate-pulse">{t.afkReason.replace('{name}', endInfo.afkPlayerName || 'Oyunçu')}</div>}
+                        {endInfo.reason === 'afk' && <div className="mb-8 p-4 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 font-black text-sm uppercase tracking-widest animate-pulse">AFK Qaldığınız üçün oyun sonlandı</div>}
 
                         {/* Players Final Result Cards */}
                         <div className="space-y-4 mb-20">
