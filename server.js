@@ -699,7 +699,9 @@ function initializeGame(roomCode, ...playerIds) {
 }
 
 function canPlayTile(tile, board) {
-    if (board.length === 0) return true;
+    if (!Array.isArray(board) || board.length === 0) return true;
+    if (!board[0] || !board[board.length - 1]) return true; // Güvenlik kontrolü
+
     const leftEnd = board[0][0];
     const rightEnd = board[board.length - 1][1];
     return tile[0] === leftEnd || tile[1] === leftEnd ||
@@ -1718,6 +1720,7 @@ function handleDrawFromMarket(ws) {
     if (gs.currentPlayer !== ws.playerId) return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'notYourTurn') });
 
     const player = gs.players[ws.playerId];
+    if (!player) return;
 
     // BOARD KONTROLU - Hata önleyici
     if (!Array.isArray(gs.board)) gs.board = [];
