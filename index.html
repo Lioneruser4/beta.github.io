@@ -496,7 +496,7 @@
         const Toast = ({ message, type }) => {
             const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600', warning: 'bg-yellow-600' };
             return (
-                <div className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999] px-8 py-4 rounded-2xl shadow-2xl text-white font-black text-lg animate-bounce flex flex-col items-center gap-2 text-center border-2 border-white/20 backdrop-blur-md ${colors[type] || colors.info}`}>
+                <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[9999] px-4 py-2 rounded-xl shadow-lg text-white font-bold text-sm animate-bounce flex flex-col items-center gap-1 text-center border border-white/20 backdrop-blur-md ${colors[type] || colors.info}`}>
                     <span>{type === 'success' ? '✓' : type === 'error' ? '!' : 'i'}</span>
                     {message}
                 </div>
@@ -526,10 +526,11 @@
         };
 
         // 5. Game Timer Component
-        const GameTimer = ({ startTime, duration, isMyTurn }) => {
+        const GameTimer = ({ startTime, duration, isMyTurn, paused }) => {
             const [timeLeft, setTimeLeft] = useState(30);
 
             useEffect(() => {
+                if (paused) return; // Oyun donubsa timer işləməsin
                 const totalDuration = duration || 30000;
                 const calculate = () => {
                     if (!startTime) return 30;
@@ -543,7 +544,7 @@
                     setTimeLeft(calculate());
                 }, 200);
                 return () => clearInterval(interval);
-            }, [startTime, duration]);
+            }, [startTime, duration, paused]);
 
             return (
                 <div className="fixed bottom-0 left-0 right-0 h-1.5 z-[110] bg-black/20 overflow-hidden">
@@ -910,9 +911,14 @@
 
             const [localMicEnabled, setLocalMicEnabled] = useState(false);
             const [localSpeakerEnabled, setLocalSpeakerEnabled] = useState(false);
+            const localSpeakerEnabledRef = useRef(false);
             const speakingToastShown = useRef(new Set());
             const localStream = useRef(null);
             const peerConnections = useRef({}); // pid -> RTCPeerConnection
+
+            useEffect(() => {
+                localSpeakerEnabledRef.current = localSpeakerEnabled;
+            }, [localSpeakerEnabled]);
 
             // WebRTC Signaling Helpers
             const createPeerConnection = (targetPid) => {
@@ -939,7 +945,10 @@
                         document.body.appendChild(audio);
                     }
                     audio.srcObject = remoteStream;
-                    audio.muted = !localSpeakerEnabled;
+                    audio.muted = !localSpeakerEnabledRef.current;
+                    if (!audio.muted) {
+                        audio.play().catch(e => console.log('Audio play error:', e));
+                    }
                 };
 
                 if (localStream.current) {
@@ -1052,6 +1061,9 @@
                 // Mevcut tüm audio elementlerini güncelle
                 document.querySelectorAll('audio').forEach(a => {
                     a.muted = !newState;
+                    if (!a.muted) {
+                        a.play().catch(e => console.log('Toggle play error:', e));
+                    }
                 });
 
                 showNotification(newState ? 'Səslər açıldı' : 'Səslər qapadıldı', 'info');
@@ -1556,6 +1568,7 @@
                             isWinner: amIWinner,
                             isRanked: data.isRanked,
                             reason: endReason,
+                            afkPlayerName: data.afkPlayerName,
                             players: data.players || [], // All players from server
                             winner: {
                                 id: data.winner,
@@ -1663,28 +1676,18 @@
                         const players = data.players || {};
                         const myIdForCalc = String(playerId || '');
 
-                        // Oyuncu puanlarını hesapla
-                        // Puanı 101 olan KAYBEDER (Elimination)
-                        // Kullanıcı isteği: "101 olan kazansın" (Belki hedef puandır?)
-                        // Genelde domino/okeyde ceza puanı birikir. Kullanıcı "Rakibe yazılsın, 101 olan kazansın" dedi.
-                        // Bu çelişkili olabilir. Genellikle 101'e ulaşan ELENİR. Ama "101 olan kazansın" dediyse hedef skor olabilir.
-                        // Ancak "Rakibe yazılsın" dediği için bu CEZA puanıdır.
-                        // Biz standart "Ceza Puanı" mantığını uyguladık (Server). Client sadece gösterir.
-
-                        const isMatchEnd = Object.values(players).some(p => p.score >= 101);
-
                         // Daha az puan yapan kazanır
-                        const entries = Object.entries(playerScores);
+                        const entries = Object.entries(players);
                         entries.sort((a, b) => a[1].score - b[1].score);
 
                         const winner = entries[0][1];
                         const loser = entries[1][1];
 
                         setCalculationLobby({
-                            players: playerScores,
+                            players: players,
                             winner,
                             loser,
-                            myScore: playerScores[myIdForCalc]?.score || 0
+                            myScore: players[myIdForCalc]?.score || 0
                         });
 
                         setCalculationTimer(7);
@@ -2297,7 +2300,7 @@
                     {notification && <Toast message={notification.message} type={notification.type} />}
                     {announcement && <AnnouncementPopup message={announcement} onClose={() => setAnnouncement(null)} />}
 
-                    <GameTimer startTime={gameState?.turnStartTime} duration={gameState?.turnTimeLimit || 30000} isMyTurn={isMyTurn} />
+                    <GameTimer startTime={gameState?.turnStartTime} duration={gameState?.turnTimeLimit || 22000} isMyTurn={isMyTurn} paused={gameState?.paused} />
 
                     {serverMessage && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
@@ -2310,8 +2313,8 @@
                     )}
 
                     {/* Top Bar - ONLY Opponents */}
-                    <div className="fixed top-14 left-0 right-0 z-40">
-                        <div className="flex items-center justify-center px-4 py-2 gap-4">
+                    <div className="fixed top-0 left-0 w-full z-40 bg-black/80 backdrop-blur-md pb-4 pt-2 border-b border-white/10 shadow-2xl">
+                        <div className="flex items-center justify-center w-full px-2 gap-4">
                             {(() => {
                                 const playersMap = gameState?.players || {};
                                 const playerIds = gameState?.playerOrder || [];
@@ -2673,7 +2676,7 @@
 
                         {/* Status Banners */}
                         {endInfo.reason === 'disconnect' && <div className="mb-8 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-500 font-black text-sm uppercase tracking-widest animate-pulse">Rəqib oyundan ayrıldı • Hükmen Galibiyet</div>}
-                        {endInfo.reason === 'afk' && <div className="mb-8 p-4 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 font-black text-sm uppercase tracking-widest animate-pulse">AFK Qaldığınız üçün oyun sonlandı</div>}
+                        {endInfo.reason === 'afk' && <div className="mb-8 p-4 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 font-black text-sm uppercase tracking-widest animate-pulse">{endInfo.afkPlayerName ? `${endInfo.afkPlayerName} AFK qaldığı üçün oyun bitdi` : 'AFK səbəbilə oyun bitdi'}</div>}
 
                         {/* Players Final Result Cards */}
                         <div className="space-y-4 mb-20">
