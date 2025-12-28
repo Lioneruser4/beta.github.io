@@ -1340,12 +1340,7 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
 
     const playerIds = Object.keys(room.players);
     // KAZANAN VE SKOR HESAPLAMA
-    const winnerId = (winnerResult && typeof winnerResult === 'object') ? (winnerResult.winnerId || winnerResult.id) : winnerResult;
-
-    if (!winnerId && winnerId !== 0) {
-        console.error("Game End Error: Invalid winnerId", winnerResult);
-        return;
-    }
+    const winnerId = (winnerResult && typeof winnerResult === 'object') ? winnerResult.id : winnerResult;
 
     // 4 Kişilik Oyun - Özel Kopma Puanlaması
     if (winnerReason === 'disconnect_4p' && extraData.points) {
@@ -1442,37 +1437,21 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
     if (!isMatchOver) {
         // --- RAUND BİTTİ, MAÇ DEVAM EDİYOR ---
         Object.keys(room.players).forEach(pid => {
-            // ÖNCE SON DURUMU GÖNDER (Eldeki son taşın gittiğini görsünler)
-            sendGameState(roomCode, pid);
+            const pWs = playerConnections.get(pid);
+            if (pWs && pWs.readyState === WebSocket.OPEN) {
+                pWs.send(JSON.stringify({
+                    type: 'calculationLobby',
+                    players: room.gameState.players,
+                    eloChanges: null // Raund içi ELO değişmez
+                }));
+            }
         });
-
-        // 1.5 saniye gecikme ile sonuç ekranını göster (Son taşın atıldığını görsünler)
-        setTimeout(() => {
-            Object.keys(room.players).forEach(pid => {
-                const pWs = playerConnections.get(pid);
-                if (pWs && pWs.readyState === WebSocket.OPEN) {
-                    pWs.send(JSON.stringify({
-                        type: 'calculationLobby',
-                        players: room.gameState.players,
-                        eloChanges: null // Raund içi ELO değişmez
-                    }));
-                    // Client uyumluluğu için ROUND_OVER gönder
-                    pWs.send(JSON.stringify({
-                        type: 'ROUND_OVER',
-                        payload: {
-                            winnerId: winnerId,
-                            scores: room.players
-                        }
-                    }));
-                }
-            });
-        }, 1500);
 
         setTimeout(() => {
             if (!rooms.has(roomCode)) return;
             const newGS = initializeGame(roomCode, ...playerIds);
             playerIds.forEach(pid => sendGameState(roomCode, pid));
-        }, 5000); // CalculationTimer 5s (Kullanıcı isteği)
+        }, 8000); // CalculationTimer 8s olduğu için
 
         return; // Fonksiyondan çık, odayı silme!
     }
@@ -1608,7 +1587,7 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
                 const lang = pWs.language || 'en';
                 const winnerName = isDraw ? getMsg(lang, 'draw') : (gameState.players[finalWinnerId]?.name || getMsg(lang, 'opponent'));
 
-                const gameEndMsg = {
+                pWs.send(JSON.stringify({
                     type: 'gameEnd',
                     winner: String(finalWinnerId),
                     winnerName: winnerName,
@@ -1619,17 +1598,6 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
                         winner: eloChanges.winnerChange,
                         loser: eloChanges.loserChange
                     } : null
-                };
-                pWs.send(JSON.stringify(gameEndMsg));
-
-                // Client uyumluluğu için GAME_OVER gönder
-                pWs.send(JSON.stringify({
-                    type: 'GAME_OVER',
-                    payload: {
-                        winner: { id: finalWinnerId, ...room.players[finalWinnerId] },
-                        isRanked: isRankedMatch,
-                        eloChange: eloChanges ? (pid === finalWinnerId ? eloChanges.winnerChange : eloChanges.loserChange) : 0
-                    }
                 }));
             }
         });
@@ -1724,16 +1692,9 @@ function handleDrawFromMarket(ws) {
 
     const player = gs.players[ws.playerId];
 
-    // Defensive check for player and board
-    if (!player) {
-        console.error(`handleDrawFromMarket: Player ${ws.playerId} not found in room ${ws.roomCode}`);
-        return;
-    }
-    if (!Array.isArray(gs.board)) gs.board = [];
-
     // Elinde oynanacak taş var mı kontrol et
     const canPlay = player.hand.some(tile => canPlayTile(tile, gs.board));
-    if (canPlay) {
+    if (canPlay && gs.board.length > 0) {
         return sendMessage(ws, { type: 'error', message: 'Elinizdə oynana bilən daş var!' });
     }
 
