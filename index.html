@@ -597,12 +597,37 @@
             );
         };
 
+        // Helper Component for ELO Editing
+        const EloEditor = ({ initialElo, onSave }) => {
+            const [value, setValue] = useState(initialElo);
+
+            useEffect(() => {
+                setValue(initialElo);
+            }, [initialElo]);
+
+            return (
+                <input
+                    type="text"
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    onBlur={() => {
+                        const newElo = parseInt(value, 10);
+                        if (!isNaN(newElo) && newElo !== initialElo) {
+                            onSave(newElo);
+                        }
+                    }}
+                    className="bg-black/40 text-yellow-500 font-bold p-2.5 rounded-xl w-24 text-center border border-white/5 outline-none focus:border-yellow-500"
+                />
+            );
+        };
+
         // 6. Admin Panel Component
         const AdminPanel = ({ onClose, adminId }) => {
-            const [activeTab, setActiveTab] = useState('players'); // players, bans, reports, bugs
-            const [data, setData] = useState({ users: [], bans: [], reports: [], bugs: [] });
+            const [activeTab, setActiveTab] = useState('players'); // players, bans, reports, bugs, broadcast
+            const [data, setData] = useState({ users: [], bans: [], reports: [], bugs: [], onlineCount: 0, totalUsers: 0 });
             const [loading, setLoading] = useState(true);
             const [searchTerm, setSearchTerm] = useState('');
+            const [broadcastMessage, setBroadcastMessage] = useState('');
 
             useEffect(() => {
                 fetchData();
@@ -650,6 +675,22 @@
                 }).then(() => fetchData());
             };
 
+            const sendBroadcast = () => {
+                if (!broadcastMessage.trim()) return;
+                if (!confirm(`Duyuru gönderilsin mi?\n\n"${broadcastMessage}"`)) return;
+
+                fetch(`${API_URL}/api/admin/broadcast`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId, message: broadcastMessage })
+                }).then(res => res.json()).then(d => {
+                    if (d.success) {
+                        alert('Duyuru gönderildi!');
+                        setBroadcastMessage('');
+                    } else alert('Hata oluştu.');
+                });
+            };
+
             const filteredUsers = data.users.filter(u =>
                 (u.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (u.telegramId || '').includes(searchTerm)
@@ -661,8 +702,8 @@
                         {/* Header */}
                         <div className="flex justify-between items-center mb-8 border-b border-white/10 pb-4 sticky top-0 bg-black/95 z-10">
                             <div>
-                                <h2 className="text-3xl font-black text-yellow-500">ADMİN PANEL</h2>
-                                <p className="text-white/40 text-xs">Yönetici: {adminId}</p>
+                                <h2 className="text-3xl font-black text-yellow-500">ADMİN PANELİ</h2>
+                                <p className="text-white/40 text-xs">Online: <span className="text-green-400 font-bold">{data.onlineCount || 0}</span> / Toplam: <span className="text-white font-bold">{data.totalUsers || 0}</span></p>
                             </div>
                             <button onClick={onClose} className="bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-lg active:scale-95">PANELİ KAPAT</button>
                         </div>
@@ -673,7 +714,8 @@
                                 { id: 'players', label: 'OYUNCULAR', icon: '👥' },
                                 { id: 'bans', label: 'YASAKLAR', icon: '🚫' },
                                 { id: 'reports', label: 'RAPORLAR', icon: '🚩' },
-                                { id: 'bugs', label: 'HATALAR', icon: '🐞' }
+                                { id: 'bugs', label: 'HATALAR', icon: '🐞' },
+                                { id: 'broadcast', label: 'DUYURU', icon: '📢' }
                             ].map(tab => (
                                 <button
                                     key={tab.id}
@@ -720,11 +762,9 @@
                                         <div className="flex flex-wrap items-center gap-3">
                                             <div className="flex flex-col">
                                                 <label className="text-[10px] text-white/40 font-bold ml-1 mb-1">ELO</label>
-                                                <input
-                                                    type="number"
-                                                    value={u.elo}
-                                                    onChange={e => updatePlayer(u._id, { elo: e.target.value })}
-                                                    className="bg-black/40 text-yellow-500 font-bold p-2.5 rounded-xl w-24 text-center border border-white/5 outline-none focus:border-yellow-500"
+                                                <EloEditor
+                                                    initialElo={u.elo}
+                                                    onSave={(newElo) => updatePlayer(u._id, { elo: newElo })}
                                                 />
                                             </div>
                                             <button
@@ -794,6 +834,22 @@
                                     <div className="text-center py-20 text-white/20">
                                         <span className="text-6xl mb-4 block">🔍</span>
                                         <p className="font-black">ARANAN OYUNCU BULUNAMADI</p>
+                                    </div>
+                                )}
+
+                                {activeTab === 'broadcast' && (
+                                    <div className="bg-white/5 p-8 rounded-3xl border border-white/10">
+                                        <h3 className="text-2xl font-black text-white mb-4">Yeni Duyuru Gönder</h3>
+                                        <p className="text-white/50 text-sm mb-6">Bu mesaj tüm aktif kullanıcılara gönderilecek ve yeni bağlananlar tarafından görülecektir.</p>
+                                        <textarea
+                                            value={broadcastMessage}
+                                            onChange={e => setBroadcastMessage(e.target.value)}
+                                            placeholder="Duyuru metnini buraya yazın..."
+                                            className="w-full h-40 bg-black/40 border border-white/10 rounded-2xl p-4 text-white font-bold outline-none focus:border-purple-500 transition-all mb-6"
+                                        ></textarea>
+                                        <button onClick={sendBroadcast} className="w-full bg-purple-600 hover:bg-purple-500 text-white font-black py-4 rounded-2xl shadow-lg transition-all active:scale-95">
+                                            TÜM KULLANICILARA GÖNDER
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -1628,7 +1684,7 @@
                         setOpponents(otherPlayers);
                         setIsHost(data.host === playerIdRef.current);
                         setRoomCapacity(data.capacity);
-                        setScreen('room_lobby');
+                        if (screen !== 'game') setScreen('room_lobby'); // Oyundaysan lobiye dönme
 
                         // WebRTC: Oda güncellendiğinde rakiplerle bağlantı kur
                         otherPlayers.forEach(p => {
@@ -1637,11 +1693,11 @@
                         break;
                     case 'broadcastMessage':
                         try {
-                            if (!localStorage.getItem('announcement_closed')) {
-                                setAnnouncement(data.message);
+                            if (!localStorage.getItem(`announcement_read_${data.id}`)) {
+                                setAnnouncement({ message: data.message, id: data.id });
                             }
-                        } catch (e) {
-                            setAnnouncement(data.message);
+                        } catch (e) { // localStorage yoksa
+                            setAnnouncement({ message: data.message, id: data.id });
                         }
                         break;
                     case 'audioStatusUpdate':
@@ -1675,18 +1731,19 @@
                         const players = data.players || {};
                         const myIdForCalc = String(currentPid || '');
 
-                        // Daha çok puan yapan kazanır (101'e ulaşan)
+                        // Toplam puana göre sırala
                         const entries = Object.entries(players);
                         entries.sort((a, b) => b[1].score - a[1].score);
 
-                        const winner = entries[0][1];
+                        const winner = entries[0][1]; // Bu genel lider
                         const loser = entries[1][1];
 
                         setCalculationLobby({
                             players: players,
                             winner,
                             loser,
-                            myScore: players[myIdForCalc]?.score || 0
+                            myScore: players[myIdForCalc]?.score || 0,
+                            roundWinnerId: data.roundWinnerId // Eli kazananın ID'si
                         });
 
                         setCalculationTimer(7);
@@ -2011,7 +2068,7 @@
             if (screen === 'lobby') return (
                 <div className="flex flex-col items-center justify-center min-h-screen p-6">
                     {notification && <Toast message={notification.message} type={notification.type} />}
-                    {announcement && <AnnouncementPopup message={announcement} onClose={() => setAnnouncement(null)} />}
+                    {announcement && <AnnouncementPopup message={announcement.message} id={announcement.id} onClose={() => setAnnouncement(null)} />}
 
                     {/* Admin Button - Moved down by 5cm - Güvenli Kontrol */}
                     {playerData && String(playerData.telegramId) === '976640409' && (
@@ -2318,7 +2375,7 @@
             if (screen === 'game') return (
                 <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden">
                     {notification && <Toast message={notification.message} type={notification.type} />}
-                    {announcement && <AnnouncementPopup message={announcement} onClose={() => setAnnouncement(null)} />}
+                    {announcement && <AnnouncementPopup message={announcement.message} id={announcement.id} onClose={() => setAnnouncement(null)} />}
 
                     <GameTimer startTime={gameState?.turnStartTime} duration={gameState?.turnTimeLimit || 22000} isMyTurn={isMyTurn} paused={gameState?.paused} />
 
@@ -2602,7 +2659,7 @@
                                 {calculationLobby && Object.entries(calculationLobby.players)
                                     .sort((a, b) => b[1].score - a[1].score)
                                     .map(([pid, player], idx) => {
-                                        const isWinner = idx === 0;
+                                        const isWinner = pid === calculationLobby.roundWinnerId;
                                         const isMe = pid === (playerId || playerData?.id);
 
                                         return (
