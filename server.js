@@ -665,18 +665,6 @@ function initializeGame(roomCode, ...playerIds) {
         if (foundStartTile) break;
     }
 
-    // Çift yoksa: 0:0 kontrol et
-    if (!foundStartTile) {
-        for (const pid of playerIds) {
-            if (players[pid].hand.some(t => t[0] === 0 && t[1] === 0)) {
-                startingPlayer = pid;
-                foundStartTile = true;
-                firstMoveTile = [0, 0];
-                break;
-            }
-        }
-    }
-
     const initialBoard = [];
 
     room.gameState = {
@@ -690,7 +678,7 @@ function initializeGame(roomCode, ...playerIds) {
         turn: 1,
         lastMove: null,
         turnStartTime: Date.now(),
-        turnTimeLimit: 25000
+        turnTimeLimit: 22000
     };
 
     rooms.set(roomCode, room);
@@ -1306,7 +1294,7 @@ function handlePlayTile(ws, data) {
         const winner = { type: 'HAND_WIN', winnerId: ws.playerId, scoreGained };
         
         // Gecikmeli bitir ki animasyon tamamlansın
-        setTimeout(() => handleGameEnd(ws.roomCode, winner, gs, false), 1000);
+        setTimeout(() => handleGameEnd(ws.roomCode, winner, gs, false), 500);
         return; // Fonksiyondan çık
     }
 
@@ -1907,6 +1895,7 @@ function handleDisconnect(ws) {
     if (ws.roomCode) {
         const room = rooms.get(ws.roomCode);
         if (room && room.gameState && !room.gameState.winner) {
+            room.gameState.paused = true; // Oyunu dondur
             console.log(`🕒 Oyuncu için 15 saniye bekleme başlatıldı: ${ws.playerName}`);
 
             // Diğer oyuncularlara dillerine göre bildir
@@ -1917,7 +1906,7 @@ function handleDisconnect(ws) {
                     pWs.send(JSON.stringify({
                         type: 'gameMessage',
                         message: getMsg(lang, 'opponentDisconnected').replace('{name}', ws.playerName),
-                        duration: 15000
+                        duration: 20000
                     }));
                 }
             });
@@ -1944,7 +1933,7 @@ function handleDisconnect(ws) {
                     }
                 }
                 disconnectGraceTimers.delete(ws.playerId);
-            }, 15000);
+            }, 20000);
 
             disconnectGraceTimers.set(ws.playerId, timer);
         } else if (room && !room.gameState) {
@@ -1989,6 +1978,11 @@ function handleRejoin(ws, data) {
     ws.playerName = room.players[playerId]?.name || 'Oyuncu';
     playerConnections.set(playerId, ws);
 
+    if (room.gameState) {
+        room.gameState.paused = false; // Oyunu davam etdir
+        room.gameState.turnStartTime = Date.now(); // Timeri başdan başlat
+    }
+
     // AFK sayacını sıfırla ve bekleme süresini iptal et
     resetAfkCounter(room, playerId);
     const graceTimer = disconnectGraceTimers.get(playerId);
@@ -2014,8 +2008,10 @@ setInterval(() => {
     rooms.forEach((room, roomCode) => {
         if (!room.gameState || !room.gameState.turnStartTime || room.gameState.winner) return;
 
-        // 25 saniye süre (Kullanıcı 25 istedi)
-        const TURN_LIMIT = 25000;
+        if (room.gameState.paused) return; // Oyun donubsa timer işləməsin
+
+        // 22 saniye süre
+        const TURN_LIMIT = 22000;
         const elapsed = Date.now() - room.gameState.turnStartTime;
 
         if (elapsed > TURN_LIMIT) {
