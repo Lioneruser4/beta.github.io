@@ -1478,6 +1478,11 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
     if (!isMatchOver) {
         // --- RAUND BİTTİ, MAÇ DEVAM EDİYOR ---
 
+        // FIX: Timer'ı durdur ki Calculation sırasında AFK/Timeout tetiklenmesin
+        if (room.gameState) {
+            room.gameState.turnStartTime = null;
+        }
+
         // Client'a güncel puanları ve eldeki puanı gönder
         playerIds.forEach(pid => {
             if (room.gameState.players[pid]) {
@@ -1930,6 +1935,9 @@ function handleDisconnect(ws) {
             room.gameState.paused = true; // Oyunu dondur
             console.log(`🕒 Oyuncu için 15 saniye bekleme başlatıldı: ${ws.playerName}`);
 
+            // Duraklatma bilgisini herkese gönder (Timer dursun)
+            Object.keys(room.players).forEach(pid => sendGameState(ws.roomCode, pid));
+
             // Diğer oyuncularlara dillerine göre bildir
             Object.keys(room.players).forEach(pid => {
                 const pWs = playerConnections.get(pid);
@@ -2025,7 +2033,8 @@ function handleRejoin(ws, data) {
 
     // Oyuncuya güncel durumu gönder
     setTimeout(() => {
-        sendGameState(roomCode, playerId);
+        // Herkese güncel durumu gönder (Timer yeniden başlasın)
+        Object.keys(room.players).forEach(pid => sendGameState(roomCode, pid));
         // Diğerlerine bildir
         broadcastToRoom(roomCode, {
             type: 'playerReconnected',
