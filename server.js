@@ -1297,6 +1297,10 @@ function handlePlayTile(ws, data) {
     // Eğer oyuncunun elinde taş kalmadıysa, oyunu bitir
     if (player.hand.length === 0) {
         console.log(`🎉 ${player.name} elindeki son taşı attı! Oyun bitti.`);
+        
+        // FIX: Son hamleyi herkese gönder ki taşın atıldığı görülsün
+        Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+
         // Diğer oyuncuların elindeki taşların toplamını hesapla
         let scoreGained = 0;
         for (const pid in gs.players) {
@@ -1308,7 +1312,9 @@ function handlePlayTile(ws, data) {
         }
         console.log(`   Toplam kazanılan puan: ${scoreGained}`);
         const winner = { type: 'HAND_WIN', winnerId: ws.playerId, scoreGained };
-        handleGameEnd(ws.roomCode, winner, gs, false);
+        
+        // Gecikmeli bitir ki animasyon tamamlansın
+        setTimeout(() => handleGameEnd(ws.roomCode, winner, gs, false), 500);
         return; // Fonksiyondan çık
     }
 
@@ -1322,15 +1328,9 @@ function handlePlayTile(ws, data) {
     // Kazanan kontrolü
     const winner = checkWinner(gs);
     if (winner) {
-        handleGameEnd(ws.roomCode, winner, gs, false);
+        Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+        setTimeout(() => handleGameEnd(ws.roomCode, winner, gs, false), 500);
     } else {
-        // TURN SIRASI (2 veya 4 oyuncu için uyumlu)
-        const currentIdx = gs.playerOrder.indexOf(ws.playerId);
-        const nextIdx = (currentIdx + 1) % gs.playerOrder.length;
-        gs.currentPlayer = gs.playerOrder[nextIdx];
-        gs.turn++;
-        gs.turnStartTime = Date.now();
-
         // AUTO PASS LOGIC (4p için 2 saniye delay)
         const nextPlayerId = gs.currentPlayer;
         const nextPlayer = gs.players[nextPlayerId];
@@ -1759,16 +1759,6 @@ function handleDrawFromMarket(ws) {
 
     console.log(`🎲 ${player.name} bazardan daş çəkdi. Kalan: ${gs.market.length}`);
     
-    // Sıradaki oyuncuya geç
-    const currentIdx = gs.playerOrder.indexOf(ws.playerId);
-    const nextIdx = (currentIdx + 1) % gs.playerOrder.length;
-    gs.currentPlayer = gs.playerOrder[nextIdx];
-    gs.turn++;
-    gs.turnStartTime = Date.now();
-    
-    // Oyun durumunu güncelle
-    Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
-
     // Çekilen taş oynanabilir mi?
     const canPlayDrawn = canPlayTile(drawnTile, gs.board);
     if (!canPlayDrawn && gs.market.length === 0) {
