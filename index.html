@@ -496,9 +496,11 @@
         const Toast = ({ message, type }) => {
             const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600', warning: 'bg-yellow-600' };
             return (
-                <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[9999] px-4 py-2 rounded-xl shadow-lg text-white font-bold text-sm animate-bounce flex flex-col items-center gap-1 text-center border border-white/20 backdrop-blur-md ${colors[type] || colors.info}`}>
-                    <span>{type === 'success' ? '✓' : type === 'error' ? '!' : 'i'}</span>
-                    {message}
+                <div className="fixed top-24 left-0 w-full flex justify-center z-[9999] pointer-events-none">
+                    <div className={`px-6 py-3 rounded-xl shadow-2xl text-white font-bold text-sm animate-bounce flex flex-col items-center gap-1 text-center border border-white/20 backdrop-blur-md pointer-events-auto max-w-[90%] ${colors[type] || colors.info}`}>
+                        <span className="text-lg">{type === 'success' ? '✓' : type === 'error' ? '!' : 'i'}</span>
+                        {message}
+                    </div>
                 </div>
             );
         };
@@ -1207,37 +1209,6 @@
                         setCalculationTimer(prev => prev - 1);
                     }, 1000);
                     return () => clearTimeout(timer);
-                } else if (calculationTimer === 0 && calculationLobby) {
-                    // Timer bitti, oyun sonu ekranına geç
-                    const myId = String(playerId || '');
-                    const amIWinner = calculationLobby.winner.isMe;
-
-                    setEndInfo({
-                        isWinner: amIWinner,
-                        isRanked: gameState?.isRanked || false,
-                        reason: 'score_calculation',
-                        winner: {
-                            name: calculationLobby.winner.name,
-                            photo: calculationLobby.winner.photo,
-                            eloChange: calculationLobby.winner.eloChange || 0
-                        },
-                        loser: {
-                            name: calculationLobby.loser.name,
-                            photo: calculationLobby.loser.photo,
-                            eloChange: calculationLobby.loser.eloChange || 0
-                        }
-                    });
-
-                    setScreen('end');
-                    setCalculationLobby(null);
-
-                    localStorage.removeItem('domino_session');
-                    setTimeout(() => {
-                        resetGameClientState();
-                        if (playerData) initializeTelegramAuth();
-                        sendMessage({ type: 'cancelSearch' });
-                        setScreen('lobby');
-                    }, 8000);
                 }
             }, [calculationLobby, calculationTimer]);
 
@@ -1527,7 +1498,6 @@
                             }));
                             setScreen('game');
                             setSearching(false);
-                            prevBoardLength.current = data.gameState.board.length;
                             if (data.type === 'gameStart') {
                                 playSound('start');
                                 showNotification('Oyun Başladı!', 'success');
@@ -1549,6 +1519,7 @@
                                         roomCode: data.gameState.roomCode
                                     }));
                                 }
+                                prevBoardLength.current = data.gameState.board.length;
                             }
                         }
                         setSelectedTileIndex(null);
@@ -1557,6 +1528,7 @@
                     case 'error':
                         showNotification(data.message, 'error');
                         setSearching(false);
+                        isMyMove.current = false;
 
                         // FIX: Oyun içi uyarılarda lobiye atma
                         if (data.code === 'HAS_PLAYABLE_TILE' || data.code === 'NO_MARKET_FIRST_ROUND') return;
@@ -2651,7 +2623,7 @@
 
                                                     <div className="relative ml-2">
                                                         <div className={`w-16 h-16 rounded-3xl border-2 transition-transform duration-500 overflow-hidden ${isMe ? 'border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : (isWinner ? 'border-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.5)]' : 'border-white/20')}`}>
-                                                            <img src={player.photo || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" />
+                                                            <img src={player.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" />
                                                         </div>
                                                         {isWinner && <div className="absolute -top-4 -right-4 text-3xl animate-bounce">👑</div>}
                                                     </div>
