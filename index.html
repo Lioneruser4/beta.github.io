@@ -803,7 +803,9 @@
         // --- SES MOTORU (WEB AUDIO API) ---
         // Bu motor, seslerin arka plan uygulamalarını (YouTube, Spotify vb.) durdurmasını engeller.
         const AudioEngine = (() => {
-            const context = new (window.AudioContext || window.webkitAudioContext)({
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return { play: () => {}, context: null };
+            const context = new AudioContext({
                 latencyHint: 'interactive'
             });
             const buffers = {};
@@ -1219,12 +1221,6 @@
             };
 
             // Ses Efektleri (Opsiyonel - Tarayıcı izin verirse çalışır)
-
-            useEffect(() => {
-                initializeTelegramAuth();
-                connectToServer();
-                return () => { if (wsRef.current) wsRef.current.close(); };
-            }, []);
 
             // Confetti Effect
             useEffect(() => {
@@ -1669,17 +1665,17 @@
                         const isMatchEnd = Object.values(players).some(p => p.score >= 101);
 
                         // Daha az puan yapan kazanır
-                        const entries = Object.entries(playerScores);
-                        entries.sort((a, b) => a[1].score - b[1].score);
+                        const entries = Object.entries(players);
+                        entries.sort((a, b) => b[1].score - a[1].score);
 
                         const winner = entries[0][1];
                         const loser = entries[1][1];
 
                         setCalculationLobby({
-                            players: playerScores,
+                            players: players,
                             winner,
                             loser,
-                            myScore: playerScores[myIdForCalc]?.score || 0
+                            myScore: players[myIdForCalc]?.score || 0
                         });
 
                         setCalculationTimer(5);
@@ -1687,6 +1683,13 @@
                         break;
                 }
             };
+
+            // Başlangıç Effect'i (Fonksiyonlar tanımlandıktan sonra çağrılmalı)
+            useEffect(() => {
+                initializeTelegramAuth();
+                connectToServer();
+                return () => { if (wsRef.current) wsRef.current.close(); };
+            }, []);
 
             // Dynamics: Snake Layout Calculation
             const calculateLayout = (board) => {
@@ -2573,7 +2576,7 @@
                             {/* Pro Score Cards */}
                             <div className="space-y-4">
                                 {calculationLobby && Object.entries(calculationLobby.players)
-                                    .sort((a, b) => a[1].score - b[1].score)
+                                    .sort((a, b) => b[1].score - a[1].score)
                                     .map(([pid, player], idx) => {
                                         const isWinner = idx === 0;
                                         const isMe = pid === (playerId || playerData?.id);
