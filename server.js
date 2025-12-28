@@ -1287,6 +1287,7 @@ function handlePlayTile(ws, data) {
         return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'invalidMove') });
     }
 
+    // Taşı oyuncunun elinden kaldır
     player.hand.splice(data.tileIndex, 1);
     gs.moves = (gs.moves || 0) + 1;
     resetAfkCounter(room, ws.playerId);
@@ -1301,9 +1302,18 @@ function handlePlayTile(ws, data) {
             }
         }
         const winner = { type: 'HAND_WIN', winnerId: ws.playerId, scoreGained };
-        return handleGameEnd(ws.roomCode, winner, gs, false);
+        handleGameEnd(ws.roomCode, winner, gs, false);
+        return; // Fonksiyondan çık
     }
 
+    // Sıradaki oyuncuya geç
+    const currentIdx = gs.playerOrder.indexOf(ws.playerId);
+    const nextIdx = (currentIdx + 1) % gs.playerOrder.length;
+    gs.currentPlayer = gs.playerOrder[nextIdx];
+    gs.turn++;
+    gs.turnStartTime = Date.now();
+
+    // Kazanan kontrolü
     const winner = checkWinner(gs);
     if (winner) {
         handleGameEnd(ws.roomCode, winner, gs, false);
@@ -1708,7 +1718,12 @@ function handleDrawFromMarket(ws) {
     // Elinde oynanacak taş var mı kontrol et
     const canPlay = player.hand.some(tile => canPlayTile(tile, gs.board));
     if (canPlay && gs.board.length > 0) {
-        return sendMessage(ws, { type: 'error', message: 'Elinizdə oynana bilən daş var!' });
+        // Sadece hata mesajı göster, başka bir işlem yapma
+        return sendMessage(ws, { 
+            type: 'error', 
+            message: 'Elinizdə oynaya biləcəyiniz daş var!',
+            code: 'HAS_PLAYABLE_TILE'
+        });
     }
 
     // Pazarda taş var mı?
@@ -1724,6 +1739,16 @@ function handleDrawFromMarket(ws) {
     resetAfkCounter(room, ws.playerId); // Manuel pazar hareketi sıfırlar
 
     console.log(`🎲 ${player.name} bazardan daş çəkdi. Kalan: ${gs.market.length}`);
+    
+    // Sıradaki oyuncuya geç
+    const currentIdx = gs.playerOrder.indexOf(ws.playerId);
+    const nextIdx = (currentIdx + 1) % gs.playerOrder.length;
+    gs.currentPlayer = gs.playerOrder[nextIdx];
+    gs.turn++;
+    gs.turnStartTime = Date.now();
+    
+    // Oyun durumunu güncelle
+    Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
 
     // Çekilen taş oynanabilir mi?
     const canPlayDrawn = canPlayTile(drawnTile, gs.board);
