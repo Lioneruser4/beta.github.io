@@ -1289,7 +1289,20 @@ function handlePlayTile(ws, data) {
 
     player.hand.splice(data.tileIndex, 1);
     gs.moves = (gs.moves || 0) + 1;
-    resetAfkCounter(room, ws.playerId); // Manuel hareket AFK sayacını sıfırlar
+    resetAfkCounter(room, ws.playerId);
+
+    // Eğer oyuncunun elinde taş kalmadıysa, oyunu bitir
+    if (player.hand.length === 0) {
+        // Diğer oyuncuların elindeki taşların toplamını hesapla
+        let scoreGained = 0;
+        for (const pid in gs.players) {
+            if (pid !== ws.playerId) {
+                scoreGained += gs.players[pid].hand.reduce((sum, t) => sum + t[0] + t[1], 0);
+            }
+        }
+        const winner = { type: 'HAND_WIN', winnerId: ws.playerId, scoreGained };
+        return handleGameEnd(ws.roomCode, winner, gs, false);
+    }
 
     const winner = checkWinner(gs);
     if (winner) {
