@@ -1303,7 +1303,7 @@ function handlePlayTile(ws, data) {
     const nextIdx = (currentIdx + 1) % gs.playerOrder.length;
     gs.currentPlayer = gs.playerOrder[nextIdx];
     gs.turn++;
-    gs.turnStartTime = Date.now();
+    gs.turnStartTime = Date.now();wwwwwwwwhwwawwwrwwiwwwwkwa
 
     // Kazanan kontrolü
     const winner = checkWinner(gs);
@@ -2118,19 +2118,58 @@ function handleTurnTimeout(roomCode) {
         }
     }
 
-    // 2. Oynanacak taş yoksa pazar kontrolü
+    // 2. Oynanacak taş yoksa pazar kontrolü (Otomatik Çekme Döngüsü)
     if (gs.market && gs.market.length > 0) {
-        const drawnTile = gs.market.shift();
-        player.hand.push(drawnTile);
+        let foundPlayable = false;
+        let drawnTile = null;
+        let drawIndex = -1;
+        let autoMovePosition = null;
 
-        const currentIdx = gs.playerOrder.indexOf(currentPlayerId);
-        const nextIdx = (currentIdx + 1) % gs.playerOrder.length;
-        gs.currentPlayer = gs.playerOrder[nextIdx];
-        gs.turn++;
-        gs.turnStartTime = Date.now();
+        // Uyğun daş tapana qədər və ya bazar bitənə qədər çək
+        while (gs.market.length > 0 && !foundPlayable) {
+            drawnTile = gs.market.shift();
+            player.hand.push(drawnTile);
+            drawIndex = player.hand.length - 1;
 
-        Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
-        return;
+            // Çəkilən daş uyğunmu?
+            const leftEnd = gs.board[0][0];
+            const rightEnd = gs.board[gs.board.length - 1][1];
+
+            if (drawnTile[0] === leftEnd || drawnTile[1] === leftEnd) {
+                autoMovePosition = 'left';
+                foundPlayable = true;
+            } else if (drawnTile[0] === rightEnd || drawnTile[1] === rightEnd) {
+                autoMovePosition = 'right';
+                foundPlayable = true;
+            }
+        }
+
+        // Əgər uyğun daş tapıldısa, onu oyna
+        if (foundPlayable && drawnTile) {
+            const success = playTileOnBoard(drawnTile, gs.board, autoMovePosition);
+            if (success) {
+                player.hand.splice(drawIndex, 1);
+                gs.moves = (gs.moves || 0) + 1;
+
+                // Qalib yoxlanışı
+                const winner = checkWinner(gs);
+                if (winner) {
+                    handleGameEnd(roomCode, winner, gs, false);
+                    return;
+                }
+
+                // Sıra dəyiş
+                const currentIdx = gs.playerOrder.indexOf(currentPlayerId);
+                const nextIdx = (currentIdx + 1) % gs.playerOrder.length;
+                gs.currentPlayer = gs.playerOrder[nextIdx];
+                gs.turn++;
+                gs.turnStartTime = Date.now();
+
+                Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+                return;
+            }
+        }
+        // Əgər bazar bitdi və hələ də daş yoxdursa, aşağıdakı Pas məntiqinə keçəcək
     }
 
     // 3. Pazar boşsa pas geç
