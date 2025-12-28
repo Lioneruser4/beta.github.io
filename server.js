@@ -150,7 +150,7 @@ const translations = {
         youLost: 'Uduzdunuz! 🚨',
         turnPassed: 'Növbə keçdi',
         opponent: 'Rəqib',
-        opponentDisconnected: '⚠️ {name} ayrıldı. 15 saniyə gözlənilir...',
+        opponentDisconnected: '⚠️ {name} ayrıldı. 20 saniyə gözlənilir...',
         afkWin: 'Rəqib AFK qaldığı üçün qazandınız! 🏆',
         afkLoss: 'Üst-üstə AFK qaldığınız üçün uduzdunuz! 🚨',
         disconnectWin: 'Rəqib geri dönmədiyi üçün qazandınız! 🏆',
@@ -910,7 +910,7 @@ const pingInterval = setInterval(() => {
         ws.isAlive = false;
         ws.ping();
     });
-}, 30000);
+}, 5000);
 
 wss.on('close', () => clearInterval(pingInterval));
 
@@ -1933,7 +1933,7 @@ function handleDisconnect(ws) {
         const room = rooms.get(ws.roomCode);
         if (room && room.gameState && !room.gameState.winner) {
             room.gameState.paused = true; // Oyunu dondur
-            console.log(`🕒 Oyuncu için 15 saniye bekleme başlatıldı: ${ws.playerName}`);
+            console.log(`🕒 Oyuncu için 20 saniye bekleme başlatıldı: ${ws.playerName}`);
 
             // Duraklatma bilgisini herkese gönder (Timer dursun)
             Object.keys(room.players).forEach(pid => sendGameState(ws.roomCode, pid));
@@ -2040,7 +2040,7 @@ function handleRejoin(ws, data) {
             type: 'playerReconnected',
             playerName: ws.playerName
         }, playerId);
-    }, 500);
+    }, 100);
 }
 
 // --- TIMEOUT KONTROLÜ ---
