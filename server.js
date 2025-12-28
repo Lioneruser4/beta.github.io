@@ -1071,13 +1071,20 @@ function handleCancelSearch(ws, data) {
 function handleCreateRoom(ws, data) {
     const roomCode = generateRoomCode();
 
-    // PlayerId'yi set et
-    const playerId = ws.playerId || `guest_${Math.random().toString(36).substr(2, 9)}`;
+    // FIX: PlayerId'yi varsa kullan, yoksa data'dan al, yoksa üret
+    let playerId = ws.playerId || data.playerId;
+    if (!playerId) {
+        playerId = `guest_${Math.random().toString(36).substr(2, 9)}`;
+    }
+
     // Aynı hesabla başka odada olup olmadığını kontrol et
     if (ws.telegramId) {
         for (const [code, r] of rooms.entries()) {
             if (Object.values(r.players).some(p => p.telegramId === ws.telegramId)) {
-                return sendMessage(ws, { type: 'error', message: 'Siz artıq başqa bir oyundasınız!' });
+                // Eğer zaten bir odadaysa, odayı silme ama hata ver (veya rejoin yap)
+                // Kullanıcı "klon" sorunu yaşıyorsa, eski bağlantıyı temizlememiz gerekebilir
+                // Ancak şimdilik sadece uyarı verelim, rejoin handleRejoin ile yapılır
+                // return sendMessage(ws, { type: 'error', message: 'Siz artıq başqa bir oyundasınız!' });
             }
         }
     }
@@ -1101,7 +1108,9 @@ function handleCreateRoom(ws, data) {
         level: ws.level,
         elo: ws.elo,
         isGuest: ws.isGuest,
-        score: 0
+        score: 0,
+        micEnabled: false, // Başlangıçta kapalı
+        speakerEnabled: false
     };
 
     rooms.set(roomCode, {
@@ -1132,26 +1141,30 @@ function handleJoinRoom(ws, data) {
     const capacity = room.capacity || 2;
     const currentPlayerCount = Object.keys(room.players).length;
 
-    if (Object.keys(room.players).length >= capacity && !room.players[ws.playerId]) {
+    // FIX: ID kontrolü - Eğer zaten odadaysa tekrar girmesine izin ver (Reconnect gibi davran)
+    let pid = ws.playerId || data.playerId;
+    if (!pid) pid = `guest_${Math.random().toString(36).substr(2, 9)}`;
+
+    if (Object.keys(room.players).length >= capacity && !room.players[pid]) {
         return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'roomFull') });
     }
 
     // Aynı hesabla odaya zaten girmiş mi kontrol et (Eğer farklı bir socket ise)
     if (ws.telegramId) {
         const alreadyInRoom = Object.values(room.players).find(p => p.telegramId === ws.telegramId);
-        if (alreadyInRoom && alreadyInRoom.id !== ws.playerId) {
-            return sendMessage(ws, { type: 'error', message: 'Bu hesab ilə artıq otaqdasınız!' });
+        if (alreadyInRoom) {
+            // Zaten odadaysa ID'sini eşitle
+            // pid = Object.keys(room.players).find(key => room.players[key].telegramId === ws.telegramId);
         }
 
         // Başka bir odaya mı dahil?
         for (const [rCode, r] of rooms.entries()) {
             if (rCode !== code && Object.values(r.players).some(p => p.telegramId === ws.telegramId)) {
-                return sendMessage(ws, { type: 'error', message: 'Siz artıq başqa bir otaqdasınız!' });
+                // return sendMessage(ws, { type: 'error', message: 'Siz artıq başqa bir otaqdasınız!' });
             }
         }
     }
 
-    const pid = ws.playerId || `guest_${Math.random().toString(36).substr(2, 9)}`;
     ws.playerId = pid;
     ws.playerName = data.playerName || data.username || 'Guest';
     ws.telegramId = data.telegramId || null;
@@ -1169,7 +1182,9 @@ function handleJoinRoom(ws, data) {
         level: ws.level,
         elo: ws.elo,
         isGuest: ws.isGuest,
-        score: 0
+        score: 0,
+        micEnabled: false,
+        speakerEnabled: false
     };
 
     console.log(`✅ ${ws.playerName} odaya katıldı: ${code} (${currentPlayerCount + 1}/${capacity})`);
