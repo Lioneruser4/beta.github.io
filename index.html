@@ -713,7 +713,7 @@
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="text-white font-black text-lg">{u.username}</span>
-                                                <span className="text-white/30 text-[10px] font-mono">{u.telegramId}</span>
+                                                <span className="text-yellow-500/80 text-[11px] font-mono font-bold">ID: {u.telegramId}</span>
                                             </div>
                                         </div>
 
@@ -759,7 +759,7 @@
                                         <div className="flex justify-between items-start mb-3">
                                             <div className="flex flex-col">
                                                 <span className="text-red-400 text-[10px] font-black uppercase tracking-widest">Şİkayet Edİlen</span>
-                                                <span className="text-white font-black text-lg">{r.reportedName} ({r.reportedId})</span>
+                                                <span className="text-white font-black text-lg">{r.reportedName} <span className="text-white/50 text-xs">({r.reportedId})</span></span>
                                             </div>
                                             <span className="bg-white/5 text-white/40 px-3 py-1 rounded-full text-[10px]">{new Date(r.createdAt).toLocaleString()}</span>
                                         </div>
@@ -768,7 +768,7 @@
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <span className="text-white/20 text-[10px] font-bold uppercase">Raporlayan:</span>
-                                            <span className="text-white/40 text-[10px] font-mono">{r.reporterId}</span>
+                                            <span className="text-yellow-500/80 text-[10px] font-mono font-bold">{r.reporterId}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -1123,7 +1123,7 @@
                     waitingOpponent: "Rəqib Gözlənilir",
                     enter: "DAXİL OL",
                     calculationTitle: "SKOR HESAPLANIYOR",
-                    calculationSubtitle: "En az puana sahip olan kazanır!",
+                    calculationSubtitle: "101 puana ilk ulaşan kazanır!",
                     you: "Siz",
                     handTotal: "Elindeki Taşların Toplamı",
                     winnerAnnouncing: "Kazanan açıklanıyor...",
@@ -1172,7 +1172,7 @@
                     waitingOpponent: "Waiting Opponent",
                     enter: "ENTER",
                     calculationTitle: "SCORE CALCULATION",
-                    calculationSubtitle: "The player with lowest score wins!",
+                    calculationSubtitle: "First to reach 101 points wins!",
                     you: "You",
                     handTotal: "Total Points in Hand",
                     winnerAnnouncing: "Winner announcing...",
@@ -1675,9 +1675,9 @@
                         const players = data.players || {};
                         const myIdForCalc = String(currentPid || '');
 
-                        // Daha az puan yapan kazanır
+                        // Daha çok puan yapan kazanır (101'e ulaşan)
                         const entries = Object.entries(players);
-                        entries.sort((a, b) => a[1].score - b[1].score);
+                        entries.sort((a, b) => b[1].score - a[1].score);
 
                         const winner = entries[0][1];
                         const loser = entries[1][1];
@@ -2169,7 +2169,15 @@
 
                     <div className="text-center mb-12 relative z-10">
                         <div className="text-yellow-500 text-xs font-black tracking-[0.3em] uppercase mb-2">ÖZEL ODA KATILIMCILARI</div>
-                        <h2 className="text-4xl font-black text-white">{roomCode}</h2>
+                        <h2
+                            onClick={() => {
+                                navigator.clipboard.writeText(roomCode);
+                                showNotification('Oda kodu kopyalandı!', 'success');
+                            }}
+                            className="text-4xl font-black text-white cursor-pointer hover:text-yellow-400 transition-colors active:scale-95"
+                        >
+                            {roomCode} <span className="text-sm align-top opacity-50 ml-1">📋</span>
+                        </h2>
                         <div className="mt-2 inline-flex items-center bg-white/10 px-4 py-1 rounded-full border border-white/10 gap-2">
                             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                             <span className="text-white/60 text-[10px] font-bold uppercase tracking-widest">
@@ -2325,55 +2333,43 @@
                     )}
 
                     {/* Top Bar - ONLY Opponents */}
-                    <div className="fixed top-0 left-0 w-full z-40 bg-black/80 backdrop-blur-md pb-4 pt-2 border-b border-white/10 shadow-2xl">
-                        <div className={`flex items-center justify-center w-full px-2 ${gameState?.playerOrder?.length > 2 ? 'gap-1' : 'gap-4'}`}>
+                    <div className="fixed top-0 left-0 w-full z-40 bg-black/90 backdrop-blur-md border-b border-white/10 shadow-2xl">
+                        <div className="flex w-full items-stretch">
                             {(() => {
                                 const playersMap = gameState?.players || {};
                                 const playerIds = gameState?.playerOrder || [];
+                                const opponents = playerIds.filter(pid => pid !== myPlayerId);
                                 const isFourPlayer = playerIds.length > 2;
-                                const isTwoPlayer = playerIds.length === 2;
 
-                                return playerIds.filter(pid => pid !== myPlayerId).map((pid, idx) => {
+                                return opponents.map((pid, idx) => {
                                     const p = playersMap[pid];
                                     if (!p) return null;
                                     const activeTurn = gameState?.currentPlayer === pid;
 
                                     return (
-                                        <div key={idx} className={`relative flex items-center gap-2 px-2 py-1.5 rounded-2xl transition-all duration-300 
-                                            ${activeTurn ? 'bg-yellow-500/30 z-10 border border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.6)]' : 'bg-black/40 opacity-70 border border-white/10'} 
-                                            ${isFourPlayer ? 'scale-75 origin-top mt-4' : ''}
-                                            ${isTwoPlayer ? 'scale-110 origin-top mt-4 px-4 py-2' : ''}
+                                        <div key={idx} className={`relative flex-1 flex flex-col items-center justify-center py-2 transition-all duration-300 
+                                            ${activeTurn ? 'bg-yellow-500/20 shadow-[inset_0_0_15px_rgba(234,179,8,0.3)]' : 'bg-transparent'} 
+                                            ${idx !== opponents.length - 1 ? 'border-r border-white/10' : ''}
                                         `}>
-                                            <div className="flex flex-col items-center">
-                                                <div className={`${isTwoPlayer ? 'w-16 h-16' : 'w-10 h-10 sm:w-12 sm:h-12'} rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative ${p.micEnabled ? 'voice-pulse' : ''}`}>
+                                            <div className="flex items-center gap-2 px-1">
+                                                <div className={`${isFourPlayer ? 'w-8 h-8' : 'w-10 h-10'} rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative flex-shrink-0 ${p.micEnabled ? 'voice-pulse' : ''}`}>
                                                     <img src={p.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" alt={p.name} />
                                                     <div className="absolute top-0 right-0 p-0.5 z-20">
                                                         {p.micEnabled ? <span className="block w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse border border-black shadow-lg"></span> : <span className="block w-2.5 h-2.5 bg-red-500 rounded-full border border-black"></span>}
                                                     </div>
                                                 </div>
+                                                <div className="flex flex-col min-w-0 overflow-hidden">
+                                                    <span className={`text-white font-black ${isFourPlayer ? 'text-[10px]' : 'text-xs'} truncate max-w-[70px] sm:max-w-[100px] ${activeTurn ? 'text-yellow-400' : ''}`}>{p.name || 'Oyuncu'}</span>
+                                                    <span className="text-[8px] text-white/50 font-mono leading-none mb-0.5">ID: {p.telegramId || pid?.substring(0, 6)}</span>
+                                                    <div className={`text-yellow-500/80 font-black ${isFourPlayer ? 'text-[9px]' : 'text-[10px]'} leading-tight`}>{p.score} / 101</div>
+                                                </div>
                                             </div>
-                                            <div className="flex flex-col">
-                                                <div className="flex flex-col min-w-0">
-                                                    <div className="flex items-center gap-1">
-                                                        <span className={`text-white font-black ${isTwoPlayer ? 'text-sm' : 'text-[10px] sm:text-xs'} truncate max-w-[80px] ${activeTurn ? 'text-yellow-400' : ''}`}>{p.name || 'Oyuncu'}</span>
-                                                        <LevelBadge level={calculateLevel(p.elo || 0)} />
-                                                    </div>
-                                                    <span className="text-white/40 text-[8px] font-mono truncate max-w-[60px]">@{p.username || pid}</span>
-                                                </div>
-                                                <div className={`text-yellow-500/80 font-black ${isTwoPlayer ? 'text-xs mt-1' : 'text-[9px]'}`}>{p.score} / 101</div>
 
-                                                {/* Küçük Rakip Taşları */}
-                                                <div className={`flex gap-0.5 mt-1 flex-wrap ${isTwoPlayer ? 'max-w-[120px] gap-1' : 'max-w-[60px]'}`}>
-                                                    {Array(p.hand?.length || 0).fill(0).map((_, i) => (
-                                                        <div key={i} className={`${isTwoPlayer ? 'w-4 h-6 rounded-sm' : 'w-1.5 h-2.5 rounded-[1px]'} bg-gray-100 border border-black/20`}></div>
-                                                    ))}
-                                                </div>
-                                                <button
-                                                    onClick={() => reportUser(pid, p.username || p.name)}
-                                                    className="mt-1 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white px-2 py-0.5 rounded-md text-[8px] font-black transition-all border border-red-600/30 w-full"
-                                                >
-                                                    🚩 {language === 'az' ? 'ŞİKAYƏT' : 'REPORT'}
-                                                </button>
+                                            {/* Küçük Rakip Taşları */}
+                                            <div className={`flex justify-center gap-0.5 mt-1 flex-wrap w-full px-2`}>
+                                                {Array(p.hand?.length || 0).fill(0).map((_, i) => (
+                                                    <div key={i} className={`${isFourPlayer ? 'w-1.5 h-2.5' : 'w-2 h-3'} bg-gray-300/50 rounded-[1px]`}></div>
+                                                ))}
                                             </div>
                                         </div>
                                     );
@@ -2523,26 +2519,27 @@
                         </div>
 
                         {/* Voice Buttons - HAND ÜSTÜNDE SOLDA */}
-                        <div className="absolute -top-14 left-4 flex items-center gap-2 z-50">
-                            <button
-                                onClick={toggleMic}
-                                className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localMicEnabled ? 'bg-green-500 border-green-400 text-white animate-glow-pulse' : 'bg-gray-900/80 border-white/10 text-gray-400'}`}
-                            >
-                                <span className="text-2xl">{localMicEnabled ? '🎙️' : '🔇'}</span>
-                            </button>
-                            <button
-                                onClick={toggleSpeaker}
-                                className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localSpeakerEnabled ? 'bg-blue-500 border-blue-400 text-white shadow-glow' : 'bg-gray-900/80 border-white/10 text-gray-400'}`}
-                            >
-                                <span className="text-2xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
-                            </button>
-
+                        <div className="absolute -top-24 left-4 flex flex-col items-start gap-2 z-50">
                             <button
                                 onClick={sendVoiceRequest}
-                                className="h-12 px-3 bg-purple-600/80 hover:bg-purple-500 border border-purple-400/50 rounded-xl text-white text-[10px] font-black uppercase tracking-wider shadow-lg active:scale-95 transition-all ml-2"
+                                className="h-8 px-3 bg-purple-600/80 hover:bg-purple-500 border border-purple-400/50 rounded-xl text-white text-[10px] font-black uppercase tracking-wider shadow-lg active:scale-95 transition-all mb-1"
                             >
                                 {t.voiceRequestBtn}
                             </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={toggleMic}
+                                    className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localMicEnabled ? 'bg-green-500 border-green-400 text-white animate-glow-pulse' : 'bg-gray-900/80 border-white/10 text-gray-400'}`}
+                                >
+                                    <span className="text-2xl">{localMicEnabled ? '🎙️' : '🔇'}</span>
+                                </button>
+                                <button
+                                    onClick={toggleSpeaker}
+                                    className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localSpeakerEnabled ? 'bg-blue-500 border-blue-400 text-white shadow-glow' : 'bg-gray-900/80 border-white/10 text-gray-400'}`}
+                                >
+                                    <span className="text-2xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
+                                </button>
+                            </div>
                         </div>
 
                         <div className="flex items-center justify-between mb-2">
@@ -2603,7 +2600,7 @@
                             {/* Pro Score Cards */}
                             <div className="space-y-4">
                                 {calculationLobby && Object.entries(calculationLobby.players)
-                                    .sort((a, b) => a[1].score - b[1].score)
+                                    .sort((a, b) => b[1].score - a[1].score)
                                     .map(([pid, player], idx) => {
                                         const isWinner = idx === 0;
                                         const isMe = pid === (playerId || playerData?.id);
