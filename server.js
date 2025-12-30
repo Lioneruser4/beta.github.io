@@ -883,6 +883,11 @@ function sendGameState(roomCode, playerId) {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
     try {
+        // Calculate turnRemaining
+        const now = Date.now();
+        const elapsed = now - room.gameState.turnStartTime;
+        const turnRemaining = Math.max(0, room.gameState.turnTimeLimit - elapsed);
+
         // Oyuncunun kendi elini ve diğer oyuncuların sadece sayısını gönder
         const playersData = {};
         for (const pid in room.gameState.players) {
@@ -897,6 +902,7 @@ function sendGameState(roomCode, playerId) {
             type: 'gameUpdate',
             gameState: {
                 ...room.gameState,
+                turnRemaining,
                 players: playersData,
                 playerId: playerId // Hangi oyuncuya gönderildiğini belirt
             }
