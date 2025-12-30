@@ -1299,7 +1299,7 @@
             const showEmote = (senderId, emoji) => {
                 const id = Date.now() + Math.random();
                 setActiveEmotes(prev => [...prev, { id, emoji, senderId }]);
-                setTimeout(() => setActiveEmotes(prev => prev.filter(e => e.id !== id)), 2000);
+                setTimeout(() => setActiveEmotes(prev => prev.filter(e => e.id !== id)), 4000);
             };
 
             // Ses Efektleri (Opsiyonel - Tarayıcı izin verirse çalışır)
@@ -2416,7 +2416,7 @@
                     )}
 
                     {/* Top Bar - ONLY Opponents */}
-                    {/* RAKİP BARI KONUMU: Aşağıdaki 'top-[5cm]' değerini değiştirerek barı aşağı veya yukarı taşıyabilirsiniz. */}
+                    {/* RAKİP BARI KONUMU: Aşağıdaki 'top-[2cm]' değerini değiştirerek barı aşağı veya yukarı taşıyabilirsiniz. */}
                     <div className="fixed top-[2cm] left-0 w-full z-40 bg-black/90 backdrop-blur-md border-b border-white/10 shadow-2xl">
                         <div className="flex w-full items-stretch">
                             {(() => {
@@ -2424,6 +2424,7 @@
                                 const playerIds = gameState?.playerOrder || [];
                                 const opponents = playerIds.filter(pid => pid !== myPlayerId);
                                 const isFourPlayer = playerIds.length > 2;
+                                const isSingleOpponent = opponents.length === 1;
 
                                 return opponents.map((pid, idx) => {
                                     const p = playersMap[pid];
@@ -2431,19 +2432,19 @@
                                     const activeTurn = gameState?.currentPlayer === pid;
 
                                     return (
-                                        <div key={idx} className={`relative flex-1 flex flex-col items-center justify-center py-2 transition-all duration-300 
+                                        <div key={idx} className={`relative flex-1 flex flex-col items-center justify-center ${isSingleOpponent ? 'py-4' : 'py-2'} transition-all duration-300 
                                             ${activeTurn ? 'bg-yellow-500/20 shadow-[inset_0_0_15px_rgba(234,179,8,0.3)]' : 'bg-transparent'} 
                                             ${idx !== opponents.length - 1 ? 'border-r border-white/10' : ''}
                                         `}>
                                             {/* Emote Display for Opponent - MOVED OUTSIDE OVERFLOW HIDDEN */}
                                             {activeEmotes.filter(e => e.senderId === pid).map(e => (
-                                                <div key={e.id} className="absolute top-14 left-1/2 -translate-x-1/2 text-4xl animate-float-up z-50 pointer-events-none drop-shadow-lg">
+                                                <div key={e.id} className="absolute top-14 left-1/2 -translate-x-1/2 text-6xl animate-float-up z-50 pointer-events-none drop-shadow-lg">
                                                     {e.emoji}
                                                 </div>
                                             ))}
 
                                             <div className="flex items-center gap-2 px-1">
-                                                <div className={`${isFourPlayer ? 'w-8 h-8' : 'w-10 h-10'} rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative flex-shrink-0 ${p.micEnabled ? 'voice-pulse' : ''}`}>
+                                                <div className={`${isSingleOpponent ? 'w-14 h-14' : (isFourPlayer ? 'w-9 h-9' : 'w-11 h-11')} rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative flex-shrink-0 ${p.micEnabled ? 'voice-pulse' : ''}`}>
                                                     <img src={p.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" alt={p.name} />
 
                                                     <div className="absolute top-0 right-0 p-0.5 z-20">
@@ -2451,7 +2452,7 @@
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-col min-w-0 overflow-hidden">
-                                                    <span className={`text-white font-black ${isFourPlayer ? 'text-[10px]' : 'text-xs'} truncate max-w-[70px] sm:max-w-[100px] ${activeTurn ? 'text-yellow-400' : ''}`}>{p.name || 'Oyuncu'}</span>
+                                                    <span className={`text-white font-black ${isSingleOpponent ? 'text-sm' : (isFourPlayer ? 'text-[10px]' : 'text-xs')} truncate max-w-[70px] sm:max-w-[100px] ${activeTurn ? 'text-yellow-400' : ''}`}>{p.name || 'Oyuncu'}</span>
                                                     <span className="text-[8px] text-white/50 font-mono leading-none mb-0.5">ID: {p.telegramId || pid?.substring(0, 6)}</span>
                                                     <div className={`text-yellow-500/80 font-black ${isFourPlayer ? 'text-[9px]' : 'text-[10px]'} leading-tight`}>{p.score} / 101</div>
                                                 </div>
@@ -2460,7 +2461,7 @@
                                             {/* Küçük Rakip Taşları */}
                                             <div className={`flex justify-center gap-0.5 mt-1 flex-wrap w-full px-2`}>
                                                 {Array(p.hand?.length || 0).fill(0).map((_, i) => (
-                                                    <div key={i} className={`${isFourPlayer ? 'w-1.5 h-2.5' : 'w-2 h-3'} bg-gray-300/50 rounded-[1px]`}></div>
+                                                    <div key={i} className={`${isSingleOpponent ? 'w-2.5 h-4' : (isFourPlayer ? 'w-1.5 h-2.5' : 'w-2 h-3')} bg-gray-300/50 rounded-[1px]`}></div>
                                                 ))}
                                             </div>
                                         </div>
@@ -2593,7 +2594,7 @@
 
                                         {/* Emote Display for Me - MOVED OUTSIDE OVERFLOW HIDDEN */}
                                         {activeEmotes.filter(e => e.senderId === myPlayerId).map(e => (
-                                            <div key={e.id} className="absolute -top-12 left-1/2 -translate-x-1/2 text-4xl animate-float-up z-50 pointer-events-none drop-shadow-lg">
+                                            <div key={e.id} className="absolute -top-12 left-1/2 -translate-x-1/2 text-6xl animate-float-up z-50 pointer-events-none drop-shadow-lg">
                                                 {e.emoji}
                                             </div>
                                         ))}
