@@ -356,6 +356,16 @@
             gap: 4px;
             max-height: 120px;
             overflow-y: auto;
+            transition: all 0.3s ease;
+            padding: 8px;
+            border-radius: 12px;
+        }
+        
+        .hand-container.my-turn {
+            background: rgba(251, 191, 36, 0.1);
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            animation: glow-pulse 2s infinite;
         }
 
         .hand-container.single-row {
@@ -366,8 +376,12 @@
         .opponent-hand {
             display: flex;
             justify-content: center;
-            gap: 4px;
-            margin-top: 10px;
+            gap: 6px;
+            margin-top: 15px;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
         }
 
         .opponent-tile {
@@ -566,17 +580,19 @@
         const AnnouncementPopup = ({ message, onClose }) => {
             if (!message) return null;
 
-            const messageKey = `announcement_read_${btoa(unescape(encodeURIComponent(message))).substring(0, 30)}`;
+            const messageKey = `announcement_read_${btoa(message.substring(0, 20))}`;
             const [isVisible, setIsVisible] = useState(false);
 
             useEffect(() => {
-                const isRead = localStorage.getItem(messageKey);
-                if (!isRead) setIsVisible(true);
-            }, [messageKey]);
+                const isRead = sessionStorage.getItem(messageKey);
+                if (!isRead) {
+                    setIsVisible(true);
+                    sessionStorage.setItem(messageKey, 'true');
+                }
+            }, [message]);
 
             const handleClose = (e) => {
                 if (e) e.stopPropagation();
-                localStorage.setItem(messageKey, 'true');
                 setIsVisible(false);
                 onClose();
             };
@@ -584,18 +600,16 @@
             if (!isVisible) return null;
 
             return (
-                <div className="fixed top-4 left-0 w-full z-[2000] flex justify-center px-4 pointer-events-none">
-                    <div className="bg-gradient-to-r from-purple-900/95 to-indigo-900/95 backdrop-blur-md border border-purple-500/50 shadow-2xl rounded-2xl p-4 w-full max-w-md pointer-events-auto flex items-center gap-4 animate-slide-down">
-                        <div className="w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center flex-shrink-0 border border-purple-500/30">
-                            <span className="text-xl animate-pulse">📢</span>
+                <div className="fixed inset-0 z-[2000] flex items-start justify-center pt-12 bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-gradient-to-br from-purple-900/90 to-indigo-900/90 border-2 border-purple-500/50 rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-scale-up text-center">
+                        <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-purple-500/30">
+                            <span className="text-4xl animate-bounce">📢</span>
                         </div>
-                        <div className="flex-1 min-w-0">
-                            <h3 className="text-purple-300 text-[10px] font-black tracking-widest uppercase mb-0.5">ADMİN DUYURUSU</h3>
-                            <p className="text-white text-xs font-bold leading-snug break-words">{message}</p>
-                        </div>
+                        <h3 className="text-purple-300 text-xs font-black tracking-widest uppercase mb-2">ADMİN DUYURUSU</h3>
+                        <p className="text-white text-lg font-bold leading-relaxed mb-8">{message}</p>
                         <button
                             onClick={handleClose}
-                            className="bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black px-4 py-2 rounded-xl shadow-lg transition-all active:scale-95 border border-white/10 whitespace-nowrap"
+                            className="w-full bg-purple-600 hover:bg-purple-500 text-white font-black py-4 rounded-2xl shadow-xl transition-all active:scale-95 border border-white/10"
                         >
                             ANLADIM
                         </button>
@@ -2317,12 +2331,15 @@
                             >
                                 <span className="text-3xl">{localMicEnabled ? '🎙️' : '🔇'}</span>
                             </button>
-                            <button
-                                onClick={toggleSpeaker}
-                                className={`w-14 h-14 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localSpeakerEnabled ? 'bg-blue-500 border-blue-400 text-white shadow-glow' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
-                            >
-                                <span className="text-3xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
-                            </button>
+                            <div className="w-full px-4">
+                                <button
+                                    onClick={toggleSpeaker}
+                                    className={`w-full py-3 rounded-2xl flex items-center justify-center gap-2 border-2 transition-all shadow-2xl ${localSpeakerEnabled ? 'bg-blue-500 border-blue-400 text-white shadow-glow' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
+                                >
+                                    <span className="text-2xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
+                                    <span className="text-sm font-bold">{localSpeakerEnabled ? 'Səs Açıq' : 'Səs Bağlı'}</span>
+                                </button>
+                            </div>
                         </div>
 
                         {isHost && opponents.length >= 1 && (
@@ -2645,12 +2662,15 @@
                                 >
                                     <span className="text-2xl">{localMicEnabled ? '🎙️' : '🔇'}</span>
                                 </button>
-                                <button
-                                    onClick={toggleSpeaker}
-                                    className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localSpeakerEnabled ? 'bg-blue-500 border-blue-400 text-white shadow-glow' : 'bg-gray-900/80 border-white/10 text-gray-400'}`}
-                                >
-                                    <span className="text-2xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
-                                </button>
+                                <div className="w-full px-2">
+                                    <button
+                                        onClick={toggleSpeaker}
+                                        className={`w-full py-2 rounded-2xl flex items-center justify-center gap-2 border-2 transition-all shadow-2xl ${localSpeakerEnabled ? 'bg-blue-500 border-blue-400 text-white shadow-glow' : 'bg-gray-900/80 border-white/10 text-white/60'}`}
+                                    >
+                                        <span className="text-xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
+                                        <span className="text-xs font-bold">{localSpeakerEnabled ? 'Açıq' : 'Bağlı'}</span>
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Emote Picker */}
@@ -2680,7 +2700,7 @@
                             </div>
                         </div>
 
-                        <div className="hand-container flex items-center gap-2 overflow-x-auto whitespace-nowrap scroll-smooth py-4 px-2 no-scrollbar">
+                        <div className={`hand-container flex items-center gap-2 overflow-x-auto whitespace-nowrap scroll-smooth py-4 px-2 no-scrollbar ${isMyTurn ? 'my-turn' : ''}`}>
                             {myHand.map((tile, idx) => (
                                 <DominoTile
                                     key={idx}
@@ -2947,4 +2967,4 @@
 
 </body>
 
-</html>
+</html> 
