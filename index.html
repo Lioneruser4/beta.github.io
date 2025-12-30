@@ -2395,7 +2395,7 @@
                 <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden">
                     {notification && <Toast message={notification.message} type={notification.type} />}
                     {announcement && <AnnouncementPopup message={announcement.message} id={announcement.id} onClose={() => setAnnouncement(null)} />}
-                    
+
                     {/* Bağlantı Kopma Uyarısı */}
                     {!connected && (
                         <div className="fixed top-0 left-0 w-full bg-red-600 text-white text-center text-xs font-bold py-1 z-[9999] animate-pulse">
@@ -2416,7 +2416,8 @@
                     )}
 
                     {/* Top Bar - ONLY Opponents */}
-                    <div className="fixed top-0 left-0 w-full z-40 bg-black/90 backdrop-blur-md border-b border-white/10 shadow-2xl">
+                    {/* RAKİP BARI KONUMU: Aşağıdaki 'top-[5cm]' değerini değiştirerek barı aşağı veya yukarı taşıyabilirsiniz. */}
+                    <div className="fixed top-[5cm] left-0 w-full z-40 bg-black/90 backdrop-blur-md border-b border-white/10 shadow-2xl">
                         <div className="flex w-full items-stretch">
                             {(() => {
                                 const playersMap = gameState?.players || {};
@@ -2589,7 +2590,7 @@
                                 const activeTurn = gameState?.currentPlayer === myPlayerId;
                                 return (
                                     <div className={`relative flex items-center gap-3 px-4 py-2 rounded-2xl border-2 transition-all duration-300 ${activeTurn ? 'bg-yellow-500/20 border-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.5)] scale-105' : 'bg-black/60 border-white/10 opacity-90'}`}>
-                                        
+
                                         {/* Emote Display for Me - MOVED OUTSIDE OVERFLOW HIDDEN */}
                                         {activeEmotes.filter(e => e.senderId === myPlayerId).map(e => (
                                             <div key={e.id} className="absolute -top-12 left-1/2 -translate-x-1/2 text-4xl animate-float-up z-50 pointer-events-none drop-shadow-lg">
@@ -2640,7 +2641,7 @@
                                     <span className="text-2xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
                                 </button>
                             </div>
-                            
+
                             {/* Emote Picker */}
                             <div className="flex gap-1 mt-2 bg-black/40 p-1 rounded-full backdrop-blur-sm border border-white/5">
                                 {['👍', '😂', '😡', '👏', '🤔'].map(emoji => (
