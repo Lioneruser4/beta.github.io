@@ -52,7 +52,8 @@
                         'celebrate': 'celebrate 1s ease-out',
                         'glow-pulse': 'glowPulse 2s ease-in-out infinite',
                         'shake': 'shake 0.5s ease-in-out',
-                        'float-up': 'floatUp 2s ease-out forwards'
+                        'float-up': 'floatUp 2s ease-out forwards',
+                        'slide-down': 'slideDown 0.5s cubic-bezier(0.16, 1, 0.3, 1)'
                     },
                     keyframes: {
                         slideUp: { '0%': { transform: 'translateY(100%)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
@@ -78,7 +79,8 @@
                             '0%': { transform: 'translateY(0) scale(0.5)', opacity: '0' },
                             '20%': { transform: 'translateY(-20px) scale(1.2)', opacity: '1' },
                             '100%': { transform: 'translateY(-100px) scale(1)', opacity: '0' }
-                        }
+                        },
+                        slideDown: { '0%': { transform: 'translateY(-100%)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } }
                     }
                 }
             }
@@ -564,13 +566,13 @@
         const AnnouncementPopup = ({ message, onClose }) => {
             if (!message) return null;
 
-            const messageKey = `announcement_read_${btoa(message.substring(0, 20))}`;
+            const messageKey = `announcement_read_${btoa(unescape(encodeURIComponent(message))).substring(0, 30)}`;
             const [isVisible, setIsVisible] = useState(false);
 
             useEffect(() => {
                 const isRead = localStorage.getItem(messageKey);
                 if (!isRead) setIsVisible(true);
-            }, [message]);
+            }, [messageKey]);
 
             const handleClose = (e) => {
                 if (e) e.stopPropagation();
@@ -582,16 +584,18 @@
             if (!isVisible) return null;
 
             return (
-                <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-gradient-to-br from-purple-900/90 to-indigo-900/90 border-2 border-purple-500/50 rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-scale-up text-center">
-                        <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-purple-500/30">
-                            <span className="text-4xl animate-bounce">📢</span>
+                <div className="fixed top-4 left-0 w-full z-[2000] flex justify-center px-4 pointer-events-none">
+                    <div className="bg-gradient-to-r from-purple-900/95 to-indigo-900/95 backdrop-blur-md border border-purple-500/50 shadow-2xl rounded-2xl p-4 w-full max-w-md pointer-events-auto flex items-center gap-4 animate-slide-down">
+                        <div className="w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center flex-shrink-0 border border-purple-500/30">
+                            <span className="text-xl animate-pulse">📢</span>
                         </div>
-                        <h3 className="text-purple-300 text-xs font-black tracking-widest uppercase mb-2">ADMİN DUYURUSU</h3>
-                        <p className="text-white text-lg font-bold leading-relaxed mb-8">{message}</p>
+                        <div className="flex-1 min-w-0">
+                            <h3 className="text-purple-300 text-[10px] font-black tracking-widest uppercase mb-0.5">ADMİN DUYURUSU</h3>
+                            <p className="text-white text-xs font-bold leading-snug break-words">{message}</p>
+                        </div>
                         <button
                             onClick={handleClose}
-                            className="w-full bg-purple-600 hover:bg-purple-500 text-white font-black py-4 rounded-2xl shadow-xl transition-all active:scale-95 border border-white/10"
+                            className="bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black px-4 py-2 rounded-xl shadow-lg transition-all active:scale-95 border border-white/10 whitespace-nowrap"
                         >
                             ANLADIM
                         </button>
@@ -1378,6 +1382,11 @@
             // Telegram Auth
             const initializeTelegramAuth = async () => {
                 try {
+                    // Önce URL'deki hash'e bak, eğer boşsa normal Telegram objesine bak
+                    const initData = window.location.hash.split('tgWebAppData=')[1]?.split('&')[0]
+                        || window.Telegram.WebApp.initData;
+                    // Artık 'initData' değişkenini kullanarak giriş yapabilirsin.
+
                     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
                         // Telegram WebApp - Otomatik giriş
                         const user = tg.initDataUnsafe.user;
@@ -1386,7 +1395,8 @@
                             username: user.username || user.first_name || 'User',
                             firstName: user.first_name || '',
                             lastName: user.last_name || '',
-                            photoUrl: user.photo_url || null
+                            photoUrl: user.photo_url || null,
+                            initData: initData
                         };
 
                         console.log('📡 Telegram kullanıcısı:', telegramData);
