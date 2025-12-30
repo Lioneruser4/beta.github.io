@@ -577,22 +577,30 @@
             );
         };
 
-        const AnnouncementPopup = ({ message, onClose }) => {
+        const AnnouncementPopup = ({ message, id, onClose }) => {
             if (!message) return null;
 
-            const messageKey = `announcement_read_${btoa(message.substring(0, 20))}`;
+            const messageKey = `announcement_read_${id || btoa(message.substring(0, 20))}`;
             const [isVisible, setIsVisible] = useState(false);
 
             useEffect(() => {
-                const isRead = sessionStorage.getItem(messageKey);
+                const isRead = localStorage.getItem(messageKey);
                 if (!isRead) {
                     setIsVisible(true);
-                    sessionStorage.setItem(messageKey, 'true');
+                    // View count increment
+                    if (id) {
+                        fetch(`${API_URL}/api/broadcast/view`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ broadcastId: id, viewerId: window._lastSession?.playerId || 'unknown' })
+                        });
+                    }
                 }
-            }, [message]);
+            }, [message, id]);
 
             const handleClose = (e) => {
                 if (e) e.stopPropagation();
+                localStorage.setItem(messageKey, 'true'); // Mark as read only on close
                 setIsVisible(false);
                 onClose();
             };
@@ -600,7 +608,7 @@
             if (!isVisible) return null;
 
             return (
-                <div className="fixed inset-0 z-[2000] flex items-start justify-center pt-12 bg-black/60 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-[2000] flex items-start justify-center pt-[140px] bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-gradient-to-br from-purple-900/90 to-indigo-900/90 border-2 border-purple-500/50 rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-scale-up text-center">
                         <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-purple-500/30">
                             <span className="text-4xl animate-bounce">📢</span>
@@ -645,7 +653,7 @@
         // 6. Admin Panel Component
         const AdminPanel = ({ onClose, adminId }) => {
             const [activeTab, setActiveTab] = useState('players'); // players, bans, reports, bugs, broadcast
-            const [data, setData] = useState({ users: [], bans: [], reports: [], bugs: [], onlineCount: 0, totalUsers: 0 });
+            const [data, setData] = useState({ users: [], bans: [], reports: [], bugs: [], stats: { onlineCount: 0, totalUsers: 0, broadcastViews: 0 } });
             const [loading, setLoading] = useState(true);
             const [searchTerm, setSearchTerm] = useState('');
             const [broadcastMessage, setBroadcastMessage] = useState('');
@@ -724,7 +732,11 @@
                         <div className="flex justify-between items-center mb-8 border-b border-white/10 pb-4 sticky top-0 bg-black/95 z-10">
                             <div>
                                 <h2 className="text-3xl font-black text-yellow-500">ADMİN PANELİ</h2>
-                                <p className="text-white/40 text-xs">Online: <span className="text-green-400 font-bold">{data.onlineCount || 0}</span> / Toplam: <span className="text-white font-bold">{data.totalUsers || 0}</span></p>
+                                <p className="text-white/40 text-xs mt-1">
+                                    Online: <span className="text-green-400 font-bold">{data.stats?.onlineCount || 0}</span> • 
+                                    Toplam: <span className="text-white font-bold">{data.stats?.totalUsers || 0}</span> • 
+                                    Duyuru Bakış: <span className="text-yellow-500 font-bold">{data.stats?.broadcastViews || 0}</span>
+                                </p>
                             </div>
                             <button onClick={onClose} className="bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-lg active:scale-95">PANELİ KAPAT</button>
                         </div>
@@ -2459,7 +2471,7 @@
                                     const activeTurn = gameState?.currentPlayer === pid;
 
                                     return (
-                                        <div key={idx} className={`relative flex-1 flex flex-col items-center justify-center ${isSingleOpponent ? 'py-4' : 'py-2'} transition-all duration-300 
+                                        <div key={idx} className={`relative flex-1 flex flex-col items-center justify-center ${isSingleOpponent ? 'py-6' : 'py-4'} transition-all duration-300 
                                             ${activeTurn ? 'bg-yellow-500/20 shadow-[inset_0_0_15px_rgba(234,179,8,0.3)]' : 'bg-transparent'} 
                                             ${idx !== opponents.length - 1 ? 'border-r border-white/10' : ''}
                                         `}>
@@ -2609,15 +2621,15 @@
                     </div>
 
                     {/* Controls Footer */}
-                    <div className="h-52 z-30 bg-black/60 backdrop-blur-xl border-t border-white/10 p-4 relative">
+                    <div className={`h-52 z-30 backdrop-blur-xl border-t p-4 relative transition-all duration-500 ${isMyTurn ? 'bg-yellow-900/20 border-yellow-500/50 shadow-[0_-4px_30px_rgba(251,191,36,0.3)]' : 'bg-black/60 border-white/10'}`}>
                         {/* MY PROFILE AREA - RIGHT ABOVE HAND */}
-                        <div className="absolute -top-16 right-4 z-50">
+                        <div className="absolute -top-16 left-24 right-4 z-50">
                             {(() => {
                                 const me = gameState?.players[myPlayerId];
                                 if (!me) return null;
                                 const activeTurn = gameState?.currentPlayer === myPlayerId;
                                 return (
-                                    <div className={`relative flex items-center gap-3 px-4 py-2 rounded-2xl border-2 transition-all duration-300 ${activeTurn ? 'bg-yellow-500/20 border-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.5)] scale-105' : 'bg-black/60 border-white/10 opacity-90'}`}>
+                                    <div className={`relative flex items-center justify-between w-full gap-3 px-4 py-2 rounded-2xl border-2 transition-all duration-300 ${activeTurn ? 'bg-yellow-500/20 border-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.5)] scale-105' : 'bg-black/60 border-white/10 opacity-90'}`}>
 
                                         {/* Emote Display for Me - MOVED OUTSIDE OVERFLOW HIDDEN */}
                                         {activeEmotes.filter(e => e.senderId === myPlayerId).map(e => (
@@ -2626,22 +2638,24 @@
                                             </div>
                                         ))}
 
-                                        <div className={`w-12 h-12 rounded-full border-2 ${activeTurn ? 'border-yellow-400 animate-pulse' : 'border-white/20'} overflow-hidden shadow-xl relative ${localMicEnabled ? 'voice-pulse' : ''}`}>
-                                            <img src={me.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" />
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-12 h-12 rounded-full border-2 ${activeTurn ? 'border-yellow-400 animate-pulse' : 'border-white/20'} overflow-hidden shadow-xl relative ${localMicEnabled ? 'voice-pulse' : ''}`}>
+                                                <img src={me.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" />
 
-                                            {localMicEnabled && (
-                                                <div className="absolute top-0 right-0 p-1 z-20">
-                                                    <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-lg border border-white/20"></div>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <div className="flex items-center gap-1.5">
-                                                <span className={`text-white font-black text-xs uppercase ${activeTurn ? 'text-yellow-400' : ''}`}>SİZ</span>
-                                                <LevelBadge level={calculateLevel(me.elo || 0)} />
+                                                {localMicEnabled && (
+                                                    <div className="absolute top-0 right-0 p-1 z-20">
+                                                        <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-lg border border-white/20"></div>
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div className={`text-[10px] font-black ${activeTurn ? 'text-yellow-400' : 'text-blue-400'}`}>{me.score} / 101</div>
+                                            <div className="flex flex-col">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className={`text-white font-black text-xs uppercase ${activeTurn ? 'text-yellow-400' : ''}`}>SİZ</span>
+                                                    <LevelBadge level={calculateLevel(me.elo || 0)} />
+                                                </div>
+                                            </div>
                                         </div>
+                                        <div className={`text-lg font-black ${activeTurn ? 'text-yellow-400' : 'text-blue-400'}`}>{me.score} / 101</div>
                                     </div>
                                 );
                             })()}
