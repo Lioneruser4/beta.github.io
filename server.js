@@ -57,7 +57,9 @@ const broadcastSchema = new mongoose.Schema({
     message: { type: String, required: true },
     senderId: { type: String },
     createdAt: { type: Date, default: Date.now },
-    isActive: { type: Boolean, default: true }
+    isActive: { type: Boolean, default: true },
+    viewCount: { type: Number, default: 0 },
+    viewers: [{ type: String }] // Store unique viewer IDs
 });
 const Broadcast = mongoose.model('DominoBroadcast', broadcastSchema);
 
@@ -150,7 +152,7 @@ const translations = {
         youLost: 'Uduzdunuz! 🚨',
         turnPassed: 'Növbə keçdi',
         opponent: 'Rəqib',
-        opponentDisconnected: '⚠️ {name} ayrıldı. 20 saniyə gözlənilir...',
+        opponentDisconnected: '⚠️ {name} ayrıldı. 15 saniyə gözlənilir...',
         afkWin: 'Rəqib AFK qaldığı üçün qazandınız! 🏆',
         afkLoss: 'Üst-üstə AFK qaldığınız üçün uduzdunuz! 🚨',
         disconnectWin: 'Rəqib geri dönmədiyi üçün qazandınız! 🏆',
@@ -296,12 +298,13 @@ app.get('/api/admin/users', async (req, res) => {
         const reports = await Report.find().sort({ createdAt: -1 });
         const bugs = await BugReport.find().sort({ createdAt: -1 });
 
-        res.json({
-            success: true,
-            users, bans, reports, bugs,
-            onlineCount: playerConnections.size,
-            totalUsers: await Player.countDocuments({ telegramId: { $ne: null } })
-        });
+        // Stats Calculation
+        const totalUsers = await Player.countDocuments({});
+        const onlineCount = wss.clients.size;
+        const activeBroadcast = await Broadcast.findOne({ isActive: true });
+        const broadcastViews = activeBroadcast ? activeBroadcast.viewCount : 0;
+
+        res.json({ success: true, users, bans, reports, bugs, stats: { totalUsers, onlineCount, broadcastViews } });
     } catch (error) {
         console.error('Admin users error:', error);
         res.status(500).json({ error: 'Sunucu hatası' });
@@ -470,36 +473,76 @@ app.get('/api/player/:telegramId/stats', async (req, res) => {
 
         const recentMatches = await Match.find({
             $or: [{ player1: player._id }, { player2: player._id }]
-        })
-            .sort({ createdAt: -1 })
-            .limit(10)
-            .populate('player1 player2 winner');
+app.get('/api/admin/stats', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || authHeader !== 'YOUR_ADMIN_SECRET') {
+            return res.status(403).json({ success: false, error: 'Yetkisiz erişim' });
+        }
 
-        res.json({ success: true, player, recentMatches });
+        // Toplam kullanıcı sayısı
+        const totalUsers = await Player.countDocuments({});
+        
+        // Son 24 saatte aktif olan kullanıcılar
+        const oneDayAgo = new Date();
+        oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+        const activeToday = await Player.countDocuments({ lastPlayed: { $gte: oneDayAgo } });
+        
+        // Bu hafta aktif olan kullanıcılar
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        const activeThisWeek = await Player.countDocuments({ lastPlayed: { $gte: oneWeekAgo } });
+        
+        // Bu ay aktif olan kullanıcılar
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+        const activeThisMonth = await Player.countDocuments({ lastPlayed: { $gte: oneMonthAgo } });
+        
+        // Toplam oynanan oyun sayısı
+        const gamesPlayed = await Match.countDocuments({});
+        
+        // Son duyuru görüntülenme sayısı
+        const latestBroadcast = await Broadcast.findOne({ isActive: true }).sort({ createdAt: -1 });
+        const broadcastViews = latestBroadcast ? latestBroadcast.viewCount : 0;
+
+        // Çevrimiçi oyuncu sayısı (WebSocket bağlantıları üzerinden)
+        let onlineCount = 0;
+        wss.clients.forEach(client => {
+            if (client.telegramId) onlineCount++;
+        });
+
+        res.json({
+            success: true,
+            stats: {
+                totalUsers,
+                activeToday,
+                activeThisWeek,
+                activeThisMonth,
+                gamesPlayed,
+                broadcastViews,
+                onlineCount
+            }
+        });
     } catch (error) {
         console.error('Stats error:', error);
-        res.status(500).json({ error: 'Sunucu hatası' });
+        res.status(500).json({ success: false, error: 'İstatistikler alınırken hata oluştu' });
     }
 });
 
-app.get('/api/player/:telegramId/matches', async (req, res) => {
+app.post('/api/broadcast/view', async (req, res) => {
     try {
-        const player = await Player.findOne({ telegramId: req.params.telegramId });
-        if (!player) {
-            return res.status(404).json({ error: 'Oyuncu bulunamadı' });
+        const { broadcastId, viewerId } = req.body;
+        if (!broadcastId) return res.status(400).json({ success: false });
+        
+        const broadcast = await Broadcast.findById(broadcastId);
+        if (broadcast && viewerId && !broadcast.viewers.includes(viewerId)) {
+            broadcast.viewers.push(viewerId);
+            broadcast.viewCount = broadcast.viewers.length;
+            await broadcast.save();
         }
-
-        const matches = await Match.find({
-            $or: [{ player1: player._id }, { player2: player._id }]
-        })
-            .sort({ createdAt: -1 })
-            .limit(50)
-            .populate('player1 player2 winner');
-
-        res.json({ success: true, matches });
-    } catch (error) {
-        console.error('Matches error:', error);
-        res.status(500).json({ error: 'Sunucu hatası' });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false });
     }
 });
 
@@ -598,6 +641,15 @@ app.post('/api/admin/broadcast', async (req, res) => {
 app.get('/api/admin/broadcast/latest', async (req, res) => {
     try {
         const latest = await Broadcast.findOne({ isActive: true }).sort({ createdAt: -1 });
+        if (latest) {
+            // Increment view count if this is a new viewer
+            const viewerId = req.query.viewerId;
+            if (viewerId && !latest.viewers.includes(viewerId)) {
+                latest.viewers.push(viewerId);
+                latest.viewCount = latest.viewers.length;
+                await latest.save();
+            }
+        }
         res.json({ success: true, broadcast: latest });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
@@ -644,7 +696,6 @@ function initializeGame(roomCode, ...playerIds) {
             name: room.players[pid].name,
             score: room.players[pid].score || 0, // Önceki raundlardan gelen skoru koru
             photoUrl: room.players[pid].photoUrl,
-            telegramId: room.players[pid].telegramId, // ID bilgisini ekle
             level: room.players[pid].level,
             elo: room.players[pid].elo,
             micEnabled: room.players[pid].micEnabled || false, // Səs vəziyyətini qoru
@@ -824,15 +875,6 @@ function handleVoiceRequest(ws) {
     }, ws.playerId);
 }
 
-function handleEmote(ws, data) {
-    if (!ws.roomCode || !ws.playerId) return;
-    broadcastToRoom(ws.roomCode, {
-        type: 'emote',
-        senderId: ws.playerId,
-        emoji: data.emoji
-    }, ws.playerId); // Gönderene geri yollama (zaten yerelde gösteriliyor)
-}
-
 function sendGameState(roomCode, playerId) {
     const room = rooms.get(roomCode);
     if (!room || !room.gameState) return;
@@ -841,11 +883,6 @@ function sendGameState(roomCode, playerId) {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
     try {
-        // Zamanlayıcı Senkronizasyonu: Kalan süreyi sunucu hesaplar
-        const now = Date.now();
-        const elapsed = room.gameState.turnStartTime ? (now - room.gameState.turnStartTime) : 0;
-        const remaining = Math.max(0, (room.gameState.turnTimeLimit || 22000) - elapsed);
-
         // Oyuncunun kendi elini ve diğer oyuncuların sadece sayısını gönder
         const playersData = {};
         for (const pid in room.gameState.players) {
@@ -861,8 +898,7 @@ function sendGameState(roomCode, playerId) {
             gameState: {
                 ...room.gameState,
                 players: playersData,
-                playerId: playerId, // Hangi oyuncuya gönderildiğini belirt
-                turnRemaining: remaining // İstemciye kalan süreyi gönder (Cihaz saati farkını önler)
+                playerId: playerId // Hangi oyuncuya gönderildiğini belirt
             }
         }));
     } catch (error) { console.error(error); }
@@ -899,7 +935,6 @@ wss.on('connection', (ws, req) => {
                 case 'voiceSignal': handleVoiceSignal(ws, data); break;
                 case 'updateAudioStatus': handleUpdateAudioStatus(ws, data); break;
                 case 'requestVoice': handleVoiceRequest(ws); break;
-                case 'emote': handleEmote(ws, data); break;
             }
         } catch (error) {
             console.error('Hata:', error);
@@ -932,7 +967,7 @@ const pingInterval = setInterval(() => {
         ws.isAlive = false;
         ws.ping();
     });
-}, 5000);
+}, 30000);
 
 wss.on('close', () => clearInterval(pingInterval));
 
@@ -1176,10 +1211,7 @@ function handleJoinRoom(ws, data) {
         const alreadyInRoom = Object.values(room.players).find(p => p.telegramId === ws.telegramId);
         if (alreadyInRoom) {
             // Zaten odadaysa ID'sini eşitle
-            const existingPid = Object.keys(room.players).find(key => room.players[key].telegramId === ws.telegramId);
-            if (existingPid) {
-                pid = existingPid;
-            }
+            // pid = Object.keys(room.players).find(key => room.players[key].telegramId === ws.telegramId);
         }
 
         // Başka bir odaya mı dahil?
@@ -1211,9 +1243,6 @@ function handleJoinRoom(ws, data) {
         micEnabled: false,
         speakerEnabled: false
     };
-
-    // İstemciye güncel ID'sini bildir (Duplicate önleme sonrası ID değişmiş olabilir)
-    sendMessage(ws, { type: 'session', playerId: pid, roomCode: code });
 
     console.log(`✅ ${ws.playerName} odaya katıldı: ${code} (${currentPlayerCount + 1}/${capacity})`);
 
@@ -1331,7 +1360,7 @@ function handlePlayTile(ws, data) {
     // Eğer oyuncunun elinde taş kalmadıysa, oyunu bitir
     if (player.hand.length === 0) {
         console.log(`🎉 ${player.name} elindeki son taşı attı! Oyun bitti.`);
-
+        
         // FIX: Son hamleyi herkese gönder ki taşın atıldığı görülsün
         Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
 
@@ -1346,7 +1375,7 @@ function handlePlayTile(ws, data) {
         }
         console.log(`   Toplam kazanılan puan: ${scoreGained}`);
         const winner = { type: 'HAND_WIN', winnerId: ws.playerId, scoreGained };
-
+        
         // Gecikmeli bitir ki animasyon tamamlansın
         setTimeout(() => handleGameEnd(ws.roomCode, winner, gs, false), 500);
         return; // Fonksiyondan çık
@@ -1499,12 +1528,7 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
 
     if (!isMatchOver) {
         // --- RAUND BİTTİ, MAÇ DEVAM EDİYOR ---
-
-        // FIX: Timer'ı durdur ki Calculation sırasında AFK/Timeout tetiklenmesin
-        if (room.gameState) {
-            room.gameState.turnStartTime = null;
-        }
-
+        
         // Client'a güncel puanları ve eldeki puanı gönder
         playerIds.forEach(pid => {
             if (room.gameState.players[pid]) {
@@ -1521,7 +1545,6 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
                 pWs.send(JSON.stringify({
                     type: 'calculationLobby',
                     players: room.gameState.players,
-                    roundWinnerId: winnerId,
                     eloChanges: null // Raund içi ELO değişmez
                 }));
             }
@@ -1779,8 +1802,8 @@ function handleDrawFromMarket(ws) {
 
     // İlk elde pazar butonunu devre dışı bırak
     if (gs.moves === 0) {
-        return sendMessage(ws, {
-            type: 'error',
+        return sendMessage(ws, { 
+            type: 'error', 
             message: 'İlk eldə pazar istifadə etmək olmaz!',
             code: 'NO_MARKET_FIRST_ROUND'
         });
@@ -1790,8 +1813,8 @@ function handleDrawFromMarket(ws) {
     const canPlay = player.hand.some(tile => canPlayTile(tile, gs.board));
     if (canPlay) {
         // Sadece hata mesajı göster, başka bir işlem yapma
-        return sendMessage(ws, {
-            type: 'error',
+        return sendMessage(ws, { 
+            type: 'error', 
             message: 'Elinizdə oynaya biləcəyiniz daş var!',
             code: 'HAS_PLAYABLE_TILE'
         });
@@ -1810,7 +1833,7 @@ function handleDrawFromMarket(ws) {
     resetAfkCounter(room, ws.playerId); // Manuel pazar hareketi sıfırlar
 
     console.log(`🎲 ${player.name} bazardan daş çəkdi. Kalan: ${gs.market.length}`);
-
+    
     // Çekilen taş oynanabilir mi?
     const canPlayDrawn = canPlayTile(drawnTile, gs.board);
     if (!canPlayDrawn && gs.market.length === 0) {
@@ -1956,10 +1979,7 @@ function handleDisconnect(ws) {
         const room = rooms.get(ws.roomCode);
         if (room && room.gameState && !room.gameState.winner) {
             room.gameState.paused = true; // Oyunu dondur
-            console.log(`🕒 Oyuncu için 20 saniye bekleme başlatıldı: ${ws.playerName}`);
-
-            // Duraklatma bilgisini herkese gönder (Timer dursun)
-            Object.keys(room.players).forEach(pid => sendGameState(ws.roomCode, pid));
+            console.log(`🕒 Oyuncu için 15 saniye bekleme başlatıldı: ${ws.playerName}`);
 
             // Diğer oyuncularlara dillerine göre bildir
             Object.keys(room.players).forEach(pid => {
@@ -2056,14 +2076,13 @@ function handleRejoin(ws, data) {
 
     // Oyuncuya güncel durumu gönder
     setTimeout(() => {
-        // Herkese güncel durumu gönder (Timer yeniden başlasın)
-        Object.keys(room.players).forEach(pid => sendGameState(roomCode, pid));
+        sendGameState(roomCode, playerId);
         // Diğerlerine bildir
         broadcastToRoom(roomCode, {
             type: 'playerReconnected',
             playerName: ws.playerName
         }, playerId);
-    }, 100);
+    }, 500);
 }
 
 // --- TIMEOUT KONTROLÜ ---
