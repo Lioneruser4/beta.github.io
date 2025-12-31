@@ -1221,7 +1221,7 @@
                     calculationTitle: "SKOR HESAPLANIYOR",
                     calculationSubtitle: "101 puana ilk ulaşan kazanır!",
                     you: "Siz",
-                    handTotal: "Elindeki Taşların Toplamı",
+                    handTotal: "Elindəki Daşların Toplamı",
                     winnerAnnouncing: "Kazanan açıklanıyor...",
                     noValidMove: "Geçerli hamle yok, otomatik pas geçildi",
                     roundSystem: "Raund Sistemi: 3-5 (2 Farkla Qazanmaq)",
@@ -1646,7 +1646,7 @@
                         // setScreen('lobby');
                         break;
                     case 'gameEnd':
-                        console.log('🏁 Oyun Bitti!', data);
+                        console.log('🏁 Oyun Bitdi!', data);
                         const myId = String(currentPid || '');
                         const winnerId = String(data.winner || '');
                         const amIWinner = (winnerId && winnerId !== 'DRAW' && winnerId === myId);
@@ -2689,7 +2689,7 @@
 
                             {/* Emote Picker */}
                             <div className="flex gap-1 mt-2 bg-black/40 p-1 rounded-full backdrop-blur-sm border border-white/5">
-                                {['👍', '😂', '😡', '👏', '🤔'].map(emoji => (
+                                {['👍', '😂', '😡', '👏', '🤔', '❤️', '😭', '😒'].map(emoji => (
                                     <button key={emoji} onClick={() => sendEmote(emoji)} className="text-lg hover:scale-125 transition-transform p-1">
                                         {emoji}
                                     </button>
