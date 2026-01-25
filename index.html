@@ -360,7 +360,7 @@
             padding: 8px;
             border-radius: 12px;
         }
-
+        
         .hand-container.my-turn {
             background: rgba(251, 191, 36, 0.1);
             box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
@@ -733,8 +733,8 @@
                             <div>
                                 <h2 className="text-3xl font-black text-yellow-500">ADMİN PANELİ</h2>
                                 <p className="text-white/40 text-xs mt-1">
-                                    Online: <span className="text-green-400 font-bold">{data.stats?.onlineCount || 0}</span> •
-                                    Toplam: <span className="text-white font-bold">{data.stats?.totalUsers || 0}</span> •
+                                    Online: <span className="text-green-400 font-bold">{data.stats?.onlineCount || 0}</span> • 
+                                    Toplam: <span className="text-white font-bold">{data.stats?.totalUsers || 0}</span> • 
                                     Duyuru Bakış: <span className="text-yellow-500 font-bold">{data.stats?.broadcastViews || 0}</span>
                                 </p>
                             </div>
@@ -2661,41 +2661,36 @@
                             })()}
                         </div>
 
-                        {/* Voice & Emote Controls */}
-                        <div className="absolute -top-28 left-4 flex flex-col items-start gap-3 z-50">
-                            {/* Voice Status Indicator */}
-                            {localMicEnabled && (
-                                <div className="flex items-center gap-2 bg-green-500/20 px-3 py-1 rounded-full border border-green-500/50 animate-pulse">
-                                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                                    <span className="text-[10px] text-green-400 font-black">CANLI SES</span>
-                                </div>
-                            )}
-
+                        {/* Voice Buttons - HAND ÜSTÜNDE SOLDA */}
+                        <div className="absolute -top-24 left-4 flex flex-col items-start gap-2 z-50">
+                            <button
+                                onClick={sendVoiceRequest}
+                                className="h-8 px-3 bg-purple-600/80 hover:bg-purple-500 border border-purple-400/50 rounded-xl text-white text-[10px] font-black uppercase tracking-wider shadow-lg active:scale-95 transition-all mb-1"
+                            >
+                                {t.voiceRequestBtn}
+                            </button>
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={toggleMic}
-                                    title="Mikrofonu Aç/Kapat"
-                                    className={`w-14 h-14 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localMicEnabled ? 'bg-green-600 border-green-400 text-white animate-glow-pulse shadow-green-500/50' : 'bg-black/60 border-white/10 text-white/40 hover:bg-white/10'}`}
+                                    className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localMicEnabled ? 'bg-green-500 border-green-400 text-white animate-glow-pulse' : 'bg-gray-900/80 border-white/10 text-gray-400'}`}
                                 >
-                                    <span className="text-3xl">{localMicEnabled ? '🎙️' : '🎙️'}</span>
+                                    <span className="text-2xl">{localMicEnabled ? '🎙️' : '🔇'}</span>
                                 </button>
-                                <button
-                                    onClick={toggleSpeaker}
-                                    title="Hoparlörü Aç/Kapat"
-                                    className={`w-14 h-14 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localSpeakerEnabled ? 'bg-blue-600 border-blue-400 text-white shadow-blue-500/50' : 'bg-black/60 border-white/10 text-white/40'}`}
-                                >
-                                    <span className="text-3xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
-                                </button>
+                                <div className="w-full px-2">
+                                    <button
+                                        onClick={toggleSpeaker}
+                                        className={`w-full py-2 rounded-2xl flex items-center justify-center gap-2 border-2 transition-all shadow-2xl ${localSpeakerEnabled ? 'bg-blue-500 border-blue-400 text-white shadow-glow' : 'bg-gray-900/80 border-white/10 text-white/60'}`}
+                                    >
+                                        <span className="text-xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
+                                        <span className="text-xs font-bold">{localSpeakerEnabled ? 'Açıq' : 'Bağlı'}</span>
+                                    </button>
+                                </div>
                             </div>
 
-                            {/* Premium Emote Picker */}
-                            <div className="flex flex-wrap gap-2 max-w-[200px] bg-black/60 p-2 rounded-3xl backdrop-blur-md border border-white/10 shadow-2xl">
-                                {['😂', '😍', '😭', '😡', '👍', '🧠', '👎', '🔥', '💩', '❤️', '😱', '👑'].map(emoji => (
-                                    <button
-                                        key={emoji}
-                                        onClick={() => sendEmote(emoji)}
-                                        className="text-2xl hover:scale-125 hover:rotate-12 transition-all p-1 active:scale-90"
-                                    >
+                            {/* Emote Picker */}
+                            <div className="flex gap-1 mt-2 bg-black/40 p-1 rounded-full backdrop-blur-sm border border-white/5">
+                                {['🧠', '😂', '😡', '👏', '💩', '❤️', '💋', '🖕🏼'].map(emoji => (
+                                    <button key={emoji} onClick={() => sendEmote(emoji)} className="text-lg hover:scale-125 transition-transform p-1">
                                         {emoji}
                                     </button>
                                 ))}
@@ -2705,23 +2700,16 @@
                         <div className="flex items-center justify-between mb-2">
                             <div className="text-white/50 text-[10px] font-black uppercase tracking-[0.2em]">{t.yourHand} ({myHand.length})</div>
                             <div className="flex items-center gap-3">
-                                {marketSize > 0 && (
+                                {isMyTurn && marketSize > 0 && (
                                     <button
                                         onClick={() => sendMessage({ type: 'drawFromMarket' })}
-                                        disabled={!isMyTurn}
-                                        className={`group relative flex items-center gap-3 px-6 py-3 rounded-2xl font-black text-sm transition-all duration-300 transform active:scale-95 shadow-2xl ${isMyTurn ? 'bg-gradient-to-r from-yellow-400 to-amber-600 text-black shadow-yellow-500/40' : 'bg-white/5 text-white/20 border border-white/10 grayscale cursor-not-allowed'}`}
+                                        className="bg-yellow-500 text-black px-6 py-2 rounded-full text-xs font-black shadow-glow flex items-center gap-2 hover:scale-105 active:scale-95 transition-all"
                                     >
-                                        <div className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded-full border border-white/50 shadow-lg">{marketSize}</div>
-                                        <span className="text-xl">🎲</span>
-                                        <span className="tracking-tighter">PAZARDAN ÇEK</span>
-                                        <div className={`absolute inset-x-0 bottom-0 h-1 bg-black/20 rounded-b-2xl transition-all ${isMyTurn ? 'group-hover:h-full group-hover:bg-white/10' : ''}`}></div>
+                                        <span className="text-lg font-bold">+</span> <span>KARTI ÇEK ({marketSize})</span>
                                     </button>
                                 )}
-                                <button
-                                    onClick={leaveGameClient}
-                                    className="w-12 h-12 bg-red-600/20 hover:bg-red-600 border-2 border-red-500/30 rounded-2xl flex items-center justify-center transition-all group shadow-lg"
-                                >
-                                    <span className="text-red-500 group-hover:text-white text-xl font-bold">✕</span>
+                                <button onClick={leaveGameClient} className="w-10 h-10 bg-red-600/20 hover:bg-red-600 border border-red-500/50 rounded-xl flex items-center justify-center transition-all group">
+                                    <span className="text-red-500 group-hover:text-white text-xl">✕</span>
                                 </button>
                             </div>
                         </div>
@@ -2993,4 +2981,4 @@
 
 </body>
 
-</html>
+</html> 
