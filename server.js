@@ -2294,3 +2294,26 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Domino Sunucusu çalışıyor: Port ${PORT}`);
 });
+// SUNUCUYU UYANIK TUTMA KODU
+function keepServerAwake() {
+    const YOUR_SITE_URL = 'https://beta-github-io.onrender.com'; // Sitenizin URL'si
+    const pingInterval = 30 * 1000; // 30 saniye (30 * 1000 ms)
+
+    setInterval(() => {
+        // HTTPS ile ping atma
+        require('https').get(YOUR_SITE_URL + '/health', (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                console.log(`✅ Ping başarılı - ${new Date().toLocaleTimeString('tr-TR')} - Durum: ${res.statusCode}`);
+            });
+        }).on('error', (err) => {
+            console.log(`⚠️ Ping hatası - ${new Date().toLocaleTimeString('tr-TR')}: ${err.message}`);
+        });
+    }, pingInterval);
+
+    console.log(`🔄 Sunucu uyanık tutma başlatıldı. Her 30 saniyede ping atılacak.`);
+}
+
+// Sunucu başlayınca çağır
+keepServerAwake();
