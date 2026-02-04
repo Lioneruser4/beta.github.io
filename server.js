@@ -2265,7 +2265,21 @@ function handleTurnTimeout(roomCode) {
         }
         // Əgər bazar bitdi və hələ də daş yoxdursa, aşağıdakı Pas məntiqinə keçəcək
     }
+// RENDER UYUMA KODU (Server.js içine bu kısmı ekle)
+function keepRenderAlive() {
+    const YOUR_SITE = 'https://beta-github-io.onrender.com';
+    
+    setInterval(() => {
+        require('https').get(YOUR_SITE + '/ping', (res) => {
+            console.log(`✅ Ping gönderildi: ${new Date().toLocaleTimeString()}`);
+        }).on('error', () => {
+            console.log('⚠️ Ping hatası');
+        });
+    }, 25000); // Her 25 saniyede
+}
 
+// Server başlayınca çağır
+keepRenderAlive();
     // 3. Pazar boşsa pas geç
     const currentIdx = gs.playerOrder.indexOf(currentPlayerId);
     const nextIdx = (currentIdx + 1) % gs.playerOrder.length;
