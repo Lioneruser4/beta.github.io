@@ -604,24 +604,31 @@ app.post('/api/admin/broadcast', async (req, res) => {
         });
         await newBroadcast.save();
 
-        // Online olan herkese anlık gönder
-        const broadcastData = {
-            type: 'broadcastMessage',
-            message: message,
-            id: newBroadcast._id
-        };
-
+        // Herkese duyuruyu gönder
         wss.clients.forEach(client => {
             if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify(broadcastData));
+                client.send(JSON.stringify({
+                    type: 'broadcastMessage',
+                    message: message,
+                    id: newBroadcast._id
+                }));
             }
         });
 
-        res.json({ success: true, message: 'Duyuru başarıyla gönderildi' });
+        res.json({ success: true, message: 'Duyuru gönderildi' });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, message: 'Sunucu hatası' });
     }
 });
+
+function handleEmote(ws, data) {
+    if (!ws.roomCode || !ws.playerId) return;
+    broadcastToRoom(ws.roomCode, {
+        type: 'emote',
+        senderId: ws.playerId,
+        emoji: data.emoji
+    });
+}
 
 app.get('/api/admin/broadcast/latest', async (req, res) => {
     try {
@@ -932,6 +939,7 @@ wss.on('connection', (ws, req) => {
                 case 'voiceSignal': handleVoiceSignal(ws, data); break;
                 case 'updateAudioStatus': handleUpdateAudioStatus(ws, data); break;
                 case 'requestVoice': handleVoiceRequest(ws); break;
+                case 'emote': handleEmote(ws, data); break;
             }
         } catch (error) {
             console.error('Hata:', error);
@@ -1251,10 +1259,14 @@ function handleJoinRoom(ws, data) {
                 players: playerList,
                 host: room.host,
                 capacity: capacity,
-                roomCode: code
+                roomCode: code,
+                playerId: playerId // Alıcının kendi ID'sini bildir
             });
         }
     });
+
+    // Odaya yeni biri girdiğinde, giren kişiye kendi ID'sini de teyit et (Dublikat engelleme için kritik)
+    sendMessage(ws, { type: 'roomJoined', roomCode: code, players: playerList, playerId: pid });
 
     // --- PRIVATE ODALARDA OTOMATİK BAŞLATMA KAPASİTEYE GÖRE ---
     if (Object.keys(room.players).length >= capacity) {
@@ -1951,22 +1963,38 @@ function handleLeaveGame(ws) {
     }
 
     const leaverId = String(ws.playerId);
-    const winnerId = playerIds.find(id => String(id) !== leaverId);
+    // 4 kişilik oda veya özel oda ise herkesi odaya döndür, oyunu bitir
+    if (room.capacity === 4 || room.type === 'private') {
+        Object.keys(room.players).forEach(pid => {
+            const pWs = playerConnections.get(pid);
+            if (pWs && pWs.readyState === WebSocket.OPEN) {
+                const lang = pWs.language || 'az';
+                pWs.send(JSON.stringify({
+                    type: 'gameMessage',
+                    message: getMsg(lang, 'playerLeft').replace('{name}', ws.playerName),
+                    duration: 6000
+                }));
+            }
+        });
 
-    // X butonu ile ciktiginda hemen bitir ve bildir
-    Object.keys(room.players).forEach(pid => {
-        const pWs = playerConnections.get(pid);
-        if (pWs && pWs.readyState === WebSocket.OPEN) {
-            const lang = pWs.language || 'az';
-            pWs.send(JSON.stringify({
-                type: 'gameMessage',
-                message: getMsg(lang, 'playerLeft').replace('{name}', ws.playerName),
-                duration: 6000
-            }));
-        }
-    });
-
-    handleGameEnd(ws.roomCode, winnerId, gs, true, 'forfeit');
+        // Oyunu derhal bitir
+        handleGameEnd(ws.roomCode, null, gs, true, 'forfeit');
+    } else {
+        // 2 kişilik normal maç
+        const winnerId = playerIds.find(id => String(id) !== leaverId);
+        Object.keys(room.players).forEach(pid => {
+            const pWs = playerConnections.get(pid);
+            if (pWs && pWs.readyState === WebSocket.OPEN) {
+                const lang = pWs.language || 'az';
+                pWs.send(JSON.stringify({
+                    type: 'gameMessage',
+                    message: getMsg(lang, 'playerLeft').replace('{name}', ws.playerName),
+                    duration: 6000
+                }));
+            }
+        });
+        handleGameEnd(ws.roomCode, winnerId, gs, true, 'forfeit');
+    }
 
     // Oyun bitti, bu soketin oda bilgisini temizle ki tekrar eşleşme arayabilsin
     ws.roomCode = null;
@@ -2031,11 +2059,16 @@ function handleDisconnect(ws) {
             const timer = setTimeout(() => {
                 const refreshedRoom = rooms.get(ws.roomCode);
                 if (refreshedRoom && refreshedRoom.gameState && !refreshedRoom.gameState.winner) {
-                    const otherPlayerId = Object.keys(refreshedRoom.players).find(id => id !== ws.playerId);
-                    if (otherPlayerId) {
-                        handleGameEnd(ws.roomCode, otherPlayerId, refreshedRoom.gameState, true, 'disconnect');
+                    // Eğer 4 kişilikse veya özel odayda herkes lobisine dönsün
+                    if (refreshedRoom.capacity === 4 || refreshedRoom.type === 'private') {
+                        handleGameEnd(ws.roomCode, null, refreshedRoom.gameState, true, 'disconnect');
                     } else {
-                        rooms.delete(ws.roomCode);
+                        const otherPlayerId = Object.keys(refreshedRoom.players).find(id => id !== ws.playerId);
+                        if (otherPlayerId) {
+                            handleGameEnd(ws.roomCode, otherPlayerId, refreshedRoom.gameState, true, 'disconnect');
+                        } else {
+                            rooms.delete(ws.roomCode);
+                        }
                     }
                 }
                 disconnectGraceTimers.delete(ws.playerId);
