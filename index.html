@@ -1238,13 +1238,13 @@
                     returningLobby: "Lobiya qayıdılır...",
                     waitingOpponent: "Rəqib Gözlənilir",
                     enter: "DAXİL OL",
-                    calculationTitle: "SKOR HESAPLANIYOR",
-                    calculationSubtitle: "101 puana ilk ulaşan kazanır!",
+                    calculationTitle: "XAL HESABLANIR",
+                    calculationSubtitle: "101 xala ilk çatan qazanır!",
                     you: "Siz",
-                    handTotal: "Elindəki Daşların Toplamı",
-                    winnerAnnouncing: "Kazanan açıklanıyor...",
-                    noValidMove: "Geçerli hamle yok, otomatik pas geçildi",
-                    roundSystem: "Raund Sistemi: 3-5 (2 Farkla Qazanmaq)",
+                    handTotal: "Əlindəki Daşların Cəmi",
+                    winnerAnnouncing: "Qalib açıqlanır...",
+                    noValidMove: "Gediş yoxdur, avtomatik pas keçildi",
+                    roundSystem: "Raund Sistemi: 3-5 (2 Fərqlə Qazanmaq)",
                     startEarly: "Oyuna Başla",
                     confirmStart: "Oyuna başlansın?",
                     waitingPlayers: "Oyunçular gözlənilir...",
@@ -1307,7 +1307,8 @@
                     voiceRequestBtn: "Let's Voice Chat",
                     voiceRequestMsg: "wants to talk, open mic and speaker!",
                     voiceRequestSent: "Request sent",
-                    waitCooldown: "Please wait..."
+                    waitCooldown: "Please wait...",
+                    draw: "Draw"
                 }
             };
 
@@ -1720,7 +1721,7 @@
                                 // Özel oda veya 4p maç ise oda lobisine dön
                                 setScreen('room_lobby');
                             }
-                        }, 5000);
+                        }, 6000);
                         break;
                     case 'playerDisconnected':
                         showNotification('Rakip bağlantısı koptu, bekleniyor...', 'warning');
@@ -1795,6 +1796,14 @@
                                 newPlayers[data.playerId].speakerEnabled = data.speakerEnabled;
                             }
                             return { ...prev, players: newPlayers };
+                        });
+                        setOpponents(prev => {
+                            return prev.map(p => {
+                                if (String(p.id) === String(data.playerId)) {
+                                    return { ...p, micEnabled: data.micEnabled, speakerEnabled: data.speakerEnabled };
+                                }
+                                return p;
+                            });
                         });
                         break;
                     case 'voiceSignal':
@@ -1887,7 +1896,7 @@
                         const nextW = nextIsDouble ? T_SHORT : T_LONG;
 
                         const currentIsHorizontal = !isDouble && rotation !== 90;
-                        const shouldTurn = currentIsHorizontal && tilesInRow >= 6;
+                        const shouldTurn = currentIsHorizontal && tilesInRow >= 5;
 
                         if (shouldTurn) {
                             curX += (w / 2 - T_SHORT / 2) * dirX;
@@ -2623,7 +2632,7 @@
                                                 transform: 'translate(-50%, -50%)'
                                             }}
                                         >
-                                            <span className="text-yellow-400 font-black text-[10px]">BURAYA</span>
+                                            <span className="text-yellow-400 font-black text-[10px]">BURAYA AT</span>
                                         </div>
                                     )}
                                     {validMoves.includes('right') && boardLayout[boardLayout.length - 1] && (
@@ -2636,7 +2645,7 @@
                                                 transform: 'translate(-50%, -50%)'
                                             }}
                                         >
-                                            <span className="text-yellow-400 font-black text-[10px]">BURAYA</span>
+                                            <span className="text-yellow-400 font-black text-[10px]">BURAYA AT</span>
                                         </div>
                                     )}
                                 </>
