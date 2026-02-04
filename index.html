@@ -360,7 +360,7 @@
             padding: 8px;
             border-radius: 12px;
         }
-        
+
         .hand-container.my-turn {
             background: rgba(251, 191, 36, 0.1);
             box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
@@ -733,8 +733,8 @@
                             <div>
                                 <h2 className="text-3xl font-black text-yellow-500">ADMİN PANELİ</h2>
                                 <p className="text-white/40 text-xs mt-1">
-                                    Online: <span className="text-green-400 font-bold">{data.stats?.onlineCount || 0}</span> • 
-                                    Toplam: <span className="text-white font-bold">{data.stats?.totalUsers || 0}</span> • 
+                                    Online: <span className="text-green-400 font-bold">{data.stats?.onlineCount || 0}</span> •
+                                    Toplam: <span className="text-white font-bold">{data.stats?.totalUsers || 0}</span> •
                                     Duyuru Bakış: <span className="text-yellow-500 font-bold">{data.stats?.broadcastViews || 0}</span>
                                 </p>
                             </div>
@@ -1014,16 +1014,36 @@
             }, [localSpeakerEnabled]);
 
             // WebRTC Signaling Helpers
+            // WebRTC Signaling Helpers (Perfect Negotiation Pattern)
             const createPeerConnection = (targetPid) => {
-                if (peerConnections.current[targetPid]) return peerConnections.current[targetPid];
+                if (peerConnections.current[targetPid]) return peerConnections.current[targetPid].pc;
 
                 const pc = new RTCPeerConnection({
                     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
                 });
 
+                const pcEntry = {
+                    pc,
+                    makingOffer: false,
+                    ignoreOffer: false
+                };
+                peerConnections.current[targetPid] = pcEntry;
+
                 pc.onicecandidate = (event) => {
                     if (event.candidate) {
                         sendMessage({ type: 'voiceSignal', to: targetPid, signal: { candidate: event.candidate } });
+                    }
+                };
+
+                pc.onnegotiationneeded = async () => {
+                    try {
+                        pcEntry.makingOffer = true;
+                        await pc.setLocalDescription();
+                        sendMessage({ type: 'voiceSignal', to: targetPid, signal: { description: pc.localDescription } });
+                    } catch (err) {
+                        console.error('Negotiation error:', err);
+                    } finally {
+                        pcEntry.makingOffer = false;
                     }
                 };
 
@@ -1034,64 +1054,81 @@
                         audio = document.createElement('audio');
                         audio.id = `audio-${targetPid}`;
                         audio.autoplay = true;
-                        audio.playsInline = true; // Mobile fix
+                        audio.playsInline = true;
                         document.body.appendChild(audio);
                     }
-                    audio.srcObject = remoteStream;
+                    if (audio.srcObject !== remoteStream) {
+                        audio.srcObject = remoteStream;
+                    }
                     audio.muted = !localSpeakerEnabledRef.current;
                     if (!audio.muted) {
                         audio.play().catch(e => console.log('Audio play error:', e));
                     }
                 };
 
+                // Add existing stream if available
                 if (localStream.current) {
                     localStream.current.getTracks().forEach(track => pc.addTrack(track, localStream.current));
-                    // Mikrofon açıksa hemen teklif gönder
-                    pc.createOffer()
-                        .then(offer => pc.setLocalDescription(offer))
-                        .then(() => {
-                            sendMessage({ type: 'voiceSignal', to: targetPid, signal: { offer: pc.localDescription } });
-                        })
-                        .catch(e => console.error('Offer error:', e));
                 }
 
-                peerConnections.current[targetPid] = pc;
                 return pc;
             };
 
             const handleWebRTCSignal = async (fromPid, signal) => {
                 const pc = createPeerConnection(fromPid);
+                const pcEntry = peerConnections.current[fromPid];
+                if (!pcEntry) return;
+
+                const isPolite = String(playerIdRef.current || '') < String(fromPid);
+
                 try {
-                    if (signal.offer) {
-                        await pc.setRemoteDescription(new RTCSessionDescription(signal.offer));
-                        const answer = await pc.createAnswer();
-                        await pc.setLocalDescription(answer);
-                        sendMessage({ type: 'voiceSignal', to: fromPid, signal: { answer } });
-                    } else if (signal.answer) {
-                        await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
+                    const description = signal.description || signal.offer || signal.answer;
+                    if (description) {
+                        const type = description.type || (signal.offer ? 'offer' : 'answer');
+                        const sessionDesc = new RTCSessionDescription({
+                            type: type,
+                            sdp: description.sdp || description
+                        });
+
+                        const offerCollision = (type === "offer") &&
+                            (pcEntry.makingOffer || pc.signalingState !== "stable");
+
+                        pcEntry.ignoreOffer = !isPolite && offerCollision;
+                        if (pcEntry.ignoreOffer) return;
+
+                        await pc.setRemoteDescription(sessionDesc);
+                        if (type === "offer") {
+                            await pc.setLocalDescription();
+                            sendMessage({
+                                type: 'voiceSignal',
+                                to: fromPid,
+                                signal: { description: pc.localDescription }
+                            });
+                        }
                     } else if (signal.candidate) {
-                        await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                        try {
+                            const candData = signal.candidate.candidate ? signal.candidate : signal.candidate;
+                            await pc.addIceCandidate(new RTCIceCandidate(candData));
+                        } catch (err) {
+                            if (!pcEntry.ignoreOffer) throw err;
+                        }
                     }
                 } catch (e) { console.error('Signal Error:', e); }
             };
 
             const cleanupVoiceChat = () => {
-                // Close all peer connections
-                Object.values(peerConnections.current).forEach(pc => pc.close());
+                Object.values(peerConnections.current).forEach(({ pc }) => {
+                    if (pc) pc.close();
+                });
                 peerConnections.current = {};
 
-                // Stop local stream
                 if (localStream.current) {
                     localStream.current.getTracks().forEach(track => track.stop());
                     localStream.current = null;
                 }
 
-                // Remove audio elements
                 document.querySelectorAll('audio').forEach(a => a.remove());
-
                 setLocalMicEnabled(false);
-                // Speaker durumunu korumak isteyebiliriz ama temizlik için resetleyelim veya koruyalım. 
-                // Speaker'ı kapatmıyoruz, sadece bağlantıları kesiyoruz.
             };
 
             const toggleMic = async () => {
@@ -1100,42 +1137,26 @@
                 if (newState) {
                     try {
                         if (!localStream.current) {
-                            const stream = await navigator.mediaDevices.getUserMedia({
+                            localStream.current = await navigator.mediaDevices.getUserMedia({
                                 audio: {
                                     echoCancellation: true,
                                     noiseSuppression: true,
                                     autoGainControl: true
                                 }
                             });
-                            localStream.current = stream;
-
-                            // Send offers to all peers to start the stream
-                            const pids = Object.keys(peerConnections.current);
-                            if (pids.length === 0) {
-                                console.log('⚠️ No peers to send voice offer to');
-                            }
-
-                            for (const pid of pids) {
-                                const pc = peerConnections.current[pid];
-                                if (!pc) continue;
-
-                                // Eğer stream trackleri henüz eklenmediyse ekle
-                                const senders = pc.getSenders();
-                                const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
-
-                                if (!audioSender) {
-                                    stream.getTracks().forEach(track => pc.addTrack(track, stream));
-                                } else {
-                                    audioSender.replaceTrack(stream.getAudioTracks()[0]);
-                                }
-
-                                const offer = await pc.createOffer();
-                                await pc.setLocalDescription(offer);
-                                sendMessage({ type: 'voiceSignal', to: pid, signal: { offer } });
-                            }
                         } else {
                             localStream.current.getTracks().forEach(t => t.enabled = true);
                         }
+
+                        // Ensure tracks are added to all existing connections
+                        Object.values(peerConnections.current).forEach(({ pc }) => {
+                            if (!pc) return;
+                            const senders = pc.getSenders();
+                            if (!senders.find(s => s.track && s.track.kind === 'audio')) {
+                                localStream.current.getTracks().forEach(track => pc.addTrack(track, localStream.current));
+                            }
+                        });
+
                         setLocalMicEnabled(true);
                         showNotification('Mikrofon açıldı', 'success');
                     } catch (err) {
@@ -1158,7 +1179,6 @@
                 const newState = !localSpeakerEnabled;
                 setLocalSpeakerEnabled(newState);
 
-                // Mevcut tüm audio elementlerini güncelle
                 document.querySelectorAll('audio').forEach(a => {
                     a.muted = !newState;
                     if (!a.muted) {
@@ -1686,12 +1706,11 @@
 
                         localStorage.removeItem('domino_session');
                         setTimeout(() => {
+                            const isPersistent = (gameState?.playerOrder?.length === 4) || (roomCode && roomCode !== '');
+                            const isRanked = data.isRanked;
+
                             resetGameClientState();
                             if (playerData) initializeTelegramAuth();
-
-                            // Redirection Logic
-                            const isRanked = data.isRanked;
-                            const isPersistent = (gameState?.playerOrder?.length === 4) || (roomCode && roomCode !== '');
 
                             if (isRanked || !isPersistent) {
                                 sendMessage({ type: 'cancelSearch' });
@@ -1721,9 +1740,14 @@
                         playSound('found');
                         setSearching(false);
                         if (data.opponents) {
-                            setOpponents(data.opponents);
+                            // Dublikat engelleme
+                            const uniqueMap = new Map();
+                            data.opponents.forEach(p => uniqueMap.set(p.telegramId || p.id, p));
+                            const uniqueOpponents = Array.from(uniqueMap.values());
+
+                            setOpponents(uniqueOpponents);
                             // For single opponent display in matching_lobby if needed, take the first one
-                            setOpponent(data.opponents[0]);
+                            setOpponent(uniqueOpponents[0]);
                         } else if (data.opponent) {
                             setOpponents([data.opponent]);
                             setOpponent(data.opponent);
@@ -1732,7 +1756,17 @@
                         break;
                     case 'roomUpdated':
                         setRoomCode(data.roomCode);
-                        const otherPlayers = data.players.filter(p => String(p.id) !== String(playerIdRef.current));
+                        // Dublikat engelleme: telegramId varsa ona göre, yoksa id'ye göre filter et
+                        const uniquePlayersMap = new Map();
+                        data.players.forEach(p => {
+                            const key = p.telegramId || p.id;
+                            if (!uniquePlayersMap.has(key) || (p.id === playerIdRef.current)) {
+                                uniquePlayersMap.set(key, p);
+                            }
+                        });
+                        const uniquePlayers = Array.from(uniquePlayersMap.values());
+                        const otherPlayers = uniquePlayers.filter(p => String(p.id) !== String(playerIdRef.current));
+
                         setOpponents(otherPlayers);
                         setIsHost(data.host === playerIdRef.current);
                         setRoomCapacity(data.capacity);
@@ -2471,36 +2505,35 @@
                                     const activeTurn = gameState?.currentPlayer === pid;
 
                                     return (
-                                        <div key={idx} className={`relative flex-1 flex flex-col items-center justify-center ${isSingleOpponent ? 'py-6' : 'py-4'} transition-all duration-300 
+                                        <div key={idx} className={`relative flex-1 flex flex-col items-center justify-center ${isSingleOpponent ? 'py-4' : 'py-2'} transition-all duration-300 
                                             ${activeTurn ? 'bg-yellow-500/20 shadow-[inset_0_0_15px_rgba(234,179,8,0.3)]' : 'bg-transparent'} 
                                             ${idx !== opponents.length - 1 ? 'border-r border-white/10' : ''}
                                         `}>
                                             {/* Emote Display for Opponent - MOVED OUTSIDE OVERFLOW HIDDEN */}
                                             {activeEmotes.filter(e => e.senderId === pid).map(e => (
-                                                <div key={e.id} className="absolute top-14 left-1/2 -translate-x-1/2 text-6xl animate-float-up z-50 pointer-events-none drop-shadow-lg">
+                                                <div key={e.id} className="absolute top-10 left-1/2 -translate-x-1/2 text-5xl animate-float-down z-50 pointer-events-none drop-shadow-lg">
                                                     {e.emoji}
                                                 </div>
                                             ))}
 
-                                            <div className="flex items-center gap-2 px-1">
-                                                <div className={`${isSingleOpponent ? 'w-14 h-14' : (isFourPlayer ? 'w-9 h-9' : 'w-11 h-11')} rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative flex-shrink-0 ${p.micEnabled ? 'voice-pulse' : ''}`}>
+                                            <div className="flex items-center gap-1.5 px-0.5 w-full justify-center">
+                                                <div className={`${isSingleOpponent ? 'w-12 h-12' : (isFourPlayer ? 'w-8 h-8' : 'w-10 h-10')} rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative flex-shrink-0 ${p.micEnabled ? 'voice-pulse' : ''}`}>
                                                     <img src={p.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" alt={p.name} />
 
                                                     <div className="absolute top-0 right-0 p-0.5 z-20">
-                                                        {p.micEnabled ? <span className="block w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse border border-black shadow-lg"></span> : <span className="block w-2.5 h-2.5 bg-red-500 rounded-full border border-black"></span>}
+                                                        {p.micEnabled ? <span className="block w-2 h-2 bg-green-500 rounded-full animate-pulse border border-black shadow-lg"></span> : <span className="block w-2 h-2 bg-red-500 rounded-full border border-black"></span>}
                                                     </div>
                                                 </div>
-                                                <div className="flex flex-col min-w-0 overflow-hidden">
-                                                    <span className={`text-white font-black ${isSingleOpponent ? 'text-sm' : (isFourPlayer ? 'text-[10px]' : 'text-xs')} truncate max-w-[70px] sm:max-w-[100px] ${activeTurn ? 'text-yellow-400' : ''}`}>{p.name || 'Oyuncu'}</span>
-                                                    <span className="text-[8px] text-white/50 font-mono leading-none mb-0.5">ID: {p.telegramId || pid?.substring(0, 6)}</span>
-                                                    <div className={`text-yellow-500/80 font-black ${isFourPlayer ? 'text-[9px]' : 'text-[10px]'} leading-tight`}>{p.score} / 101</div>
+                                                <div className="flex flex-col min-w-0 max-w-[60px] sm:max-w-[100px]">
+                                                    <span className={`text-white font-black ${isSingleOpponent ? 'text-xs' : (isFourPlayer ? 'text-[9px]' : 'text-[10px]')} truncate ${activeTurn ? 'text-yellow-400' : ''}`}>{p.name || 'Oyuncu'}</span>
+                                                    <div className={`text-yellow-500/80 font-black ${isFourPlayer ? 'text-[8px]' : 'text-[9px]'} leading-tight`}>{p.score} / 101</div>
                                                 </div>
                                             </div>
 
                                             {/* Küçük Rakip Taşları */}
-                                            <div className={`flex justify-center gap-0.5 mt-1 flex-wrap w-full px-2`}>
+                                            <div className={`flex justify-center gap-0.5 mt-0.5 flex-wrap w-full px-1`}>
                                                 {Array(p.hand?.length || 0).fill(0).map((_, i) => (
-                                                    <div key={i} className={`${isSingleOpponent ? 'w-2.5 h-4' : (isFourPlayer ? 'w-1.5 h-2.5' : 'w-2 h-3')} bg-gray-300/50 rounded-[1px]`}></div>
+                                                    <div key={i} className={`${isSingleOpponent ? 'w-2 h-3' : (isFourPlayer ? 'w-1.5 h-2' : 'w-1.5 h-2.5')} bg-gray-300/50 rounded-[1px]`}></div>
                                                 ))}
                                             </div>
                                         </div>
@@ -2633,7 +2666,7 @@
 
                                         {/* Emote Display for Me - MOVED OUTSIDE OVERFLOW HIDDEN */}
                                         {activeEmotes.filter(e => e.senderId === myPlayerId).map(e => (
-                                            <div key={e.id} className="absolute -top-12 left-1/2 -translate-x-1/2 text-6xl animate-float-up z-50 pointer-events-none drop-shadow-lg">
+                                            <div key={e.id} className="absolute -top-12 left-1/2 -translate-x-1/2 text-6xl animate-float-down z-50 pointer-events-none drop-shadow-lg">
                                                 {e.emoji}
                                             </div>
                                         ))}
@@ -2669,22 +2702,19 @@
                             >
                                 {t.voiceRequestBtn}
                             </button>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-col items-center gap-2">
                                 <button
                                     onClick={toggleMic}
-                                    className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localMicEnabled ? 'bg-green-500 border-green-400 text-white animate-glow-pulse' : 'bg-gray-900/80 border-white/10 text-gray-400'}`}
+                                    className={`w-12 h-10 rounded-xl flex items-center justify-center border-2 transition-all shadow-xl ${localMicEnabled ? 'bg-green-500 border-green-400 text-white animate-glow-pulse' : 'bg-gray-900/80 border-white/10 text-gray-400'}`}
                                 >
-                                    <span className="text-2xl">{localMicEnabled ? '🎙️' : '🔇'}</span>
+                                    <span className="text-xl">{localMicEnabled ? '🎙️' : '🔇'}</span>
                                 </button>
-                                <div className="w-full px-2">
-                                    <button
-                                        onClick={toggleSpeaker}
-                                        className={`w-full py-2 rounded-2xl flex items-center justify-center gap-2 border-2 transition-all shadow-2xl ${localSpeakerEnabled ? 'bg-blue-500 border-blue-400 text-white shadow-glow' : 'bg-gray-900/80 border-white/10 text-white/60'}`}
-                                    >
-                                        <span className="text-xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
-                                        <span className="text-xs font-bold">{localSpeakerEnabled ? 'Açıq' : 'Bağlı'}</span>
-                                    </button>
-                                </div>
+                                <button
+                                    onClick={toggleSpeaker}
+                                    className={`w-12 h-10 rounded-xl flex items-center justify-center border-2 transition-all shadow-xl ${localSpeakerEnabled ? 'bg-blue-500 border-blue-400 text-white shadow-glow' : 'bg-gray-900/80 border-white/10 text-white/60'}`}
+                                >
+                                    <span className="text-xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
+                                </button>
                             </div>
 
                             {/* Emote Picker */}
@@ -2981,4 +3011,4 @@
 
 </body>
 
-</html> 
+</html>
