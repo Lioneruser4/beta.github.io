@@ -1437,14 +1437,15 @@
             // Telegram Auth
             const initializeTelegramAuth = async () => {
                 try {
-                    // Önce URL'deki hash'e bak, eğer boşsa normal Telegram objesine bak
-                    const initData = window.location.hash.split('tgWebAppData=')[1]?.split('&')[0]
-                        || window.Telegram.WebApp.initData;
-                    // Artık 'initData' değişkenini kullanarak giriş yapabilirsin.
+                    // Safe access to Telegram WebApp
+                    const telegram = window.Telegram?.WebApp;
 
-                    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                        // Telegram WebApp - Otomatik giriş
-                        const user = tg.initDataUnsafe.user;
+                    // URL hash check followed by initData check
+                    const initData = window.location.hash.split('tgWebAppData=')[1]?.split('&')[0]
+                        || telegram?.initData;
+
+                    if (telegram?.initDataUnsafe?.user) {
+                        const user = telegram.initDataUnsafe.user;
                         const telegramData = {
                             telegramId: user.id.toString(),
                             username: user.username || user.first_name || 'User',
@@ -1502,7 +1503,8 @@
                         telegramId: null
                     });
                 } finally {
-                    setScreen('lobby');
+                    // Only transition to lobby if we haven't already transitioned to a room/game (e.g. via reconnection)
+                    setScreen(prev => (prev === 'loading' ? 'lobby' : prev));
                 }
             };
 
@@ -1529,11 +1531,17 @@
 
             // Reconnection & Session Management
             useEffect(() => {
-                const savedSession = localStorage.getItem('domino_session');
-                if (savedSession) {
-                    const session = JSON.parse(savedSession);
-                    // Sunucuya rejoin isteği gönderilecek (connectToServer içinde)
-                    window._lastSession = session;
+                try {
+                    const savedSession = localStorage.getItem('domino_session');
+                    if (savedSession) {
+                        const session = JSON.parse(savedSession);
+                        if (session && session.playerId && session.roomCode) {
+                            window._lastSession = session;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Session persistence error:', e);
+                    localStorage.removeItem('domino_session');
                 }
             }, []);
 
@@ -1777,12 +1785,6 @@
 
                         // WebRTC
                         uniquePlayers.forEach(p => {
-                            createPeerConnection(String(p.id));
-                        });
-                        break;
-
-                        // WebRTC: Oda güncellendiğinde rakiplerle bağlantı kur
-                        otherPlayers.forEach(p => {
                             createPeerConnection(String(p.id));
                         });
                         break;
@@ -3009,7 +3011,13 @@
                 </div>
             );
 
-            return null;
+            // Catch-all fallback if screen state is somehow invalid
+            return (
+                <div className="flex flex-col items-center justify-center min-h-screen bg-[#0b241c]">
+                    <div className="w-16 h-16 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-white/40 mt-4 font-bold uppercase tracking-widest text-xs">Yüklənir...</p>
+                </div>
+            );
         };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -3017,14 +3025,20 @@
     </script>
 
     <script>
-        const tgApp = window.Telegram.WebApp;
-        tgApp.ready();
-        tgApp.expand();
-        if (tgApp.requestFullscreen) {
-            tgApp.requestFullscreen();
+        try {
+            const tgApp = window.Telegram?.WebApp;
+            if (tgApp) {
+                tgApp.ready();
+                tgApp.expand();
+                if (tgApp.requestFullscreen) {
+                    tgApp.requestFullscreen();
+                }
+                tgApp.disableVerticalSwipes();
+                tgApp.setHeaderColor('#1b4d3e');
+            }
+        } catch (e) {
+            console.error('Telegram WebApp script error:', e);
         }
-        tgApp.disableVerticalSwipes();
-        tgApp.setHeaderColor('#1b4d3e');
 
         // Telegram WebApp çıkış işlemi için özel düzenleme
         const originalConfirm = window.confirm;
