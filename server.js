@@ -145,22 +145,24 @@ const translations = {
         playerNotInRoom: 'Bu oyunçu otağa aid deyil',
         hasValidMoves: 'Oynaya biləcəyiniz daş var!',
         draw: 'Heç-heçə',
-        gameClosed: 'Oyun Bağlandı! Xallar hesablanır...',
+        gameClosed: 'Oyun Başa Çatdı! Xallar hesablanır...',
         yourScore: 'Sənin xalın',
         opponentScore: 'Rəqibin xalı',
         youWon: 'Qazandınız! 🏆',
         youLost: 'Uduzdunuz! 🚨',
         turnPassed: 'Növbə keçdi',
         opponent: 'Rəqib',
-        opponentDisconnected: '⚠️ {name} ayrıldı. 15 saniyə gözlənilir...',
+        opponentDisconnected: '⚠️ {name} ayrıldı! Geri dönməsi üçün 30 saniyə gözlənilir...',
+        playerLeft: '{name} oyundan ayrıldı!',
         afkWin: 'Rəqib AFK qaldığı üçün qazandınız! 🏆',
         afkLoss: 'Üst-üstə AFK qaldığınız üçün uduzdunuz! 🚨',
-        disconnectWin: 'Rəqib geri dönmədiyi üçün qazandınız! 🏆',
+        disconnectWin: 'Rəqib ayrıldığı üçün qazandınız! 🏆',
         wantsToPlayAgain: '{name} təkrar oynamaq istəyir! ({count}/{needed})',
         allConfirmed: 'Hamı təsdiqlədi, oyun başlayır!',
         notEnoughPlayers: 'Oyuna başlamaq üçün ən azı 2 nəfər lazımdır!',
         confirmStartEarly: '{count} nəfərlə oyuna başlamaq istəyirsiniz?',
-        mustStartWithDouble: 'Oyun {tile} daşı ilə başlamalıdır!'
+        mustStartWithDouble: 'Oyun {tile} daşı ilə başlamalıdır!',
+        gameClosedNotification: 'Oyun Başa Çatdı! {name} ayrıldı.'
     }
 };
 
@@ -565,8 +567,8 @@ function handleUpdateAudioStatus(ws, data) {
     broadcastToRoom(ws.roomCode, {
         type: 'audioStatusUpdate',
         playerId: ws.playerId,
-        micEnabled: enabled,
-        speakerEnabled: enabled
+        micEnabled: room.players[ws.playerId]?.micEnabled,
+        speakerEnabled: room.players[ws.playerId]?.speakerEnabled
     });
 }
 
@@ -689,22 +691,28 @@ function initializeGame(roomCode, ...playerIds) {
 
     const market = tiles.slice(playersCount * 7);
 
-    // En düşük çifti bul (1|1, 2|2, ..., 6|6)
+    // En düşük çifti bul (Sadece İLK ELDE)
     let startingPlayer = playerIds[0];
     let foundStartTile = false;
     let firstMoveTile = null;
 
-    // Önce çiftleri kontrol et (1:1'den başlayarak)
-    for (let d = 1; d <= 6; d++) {
-        for (const pid of playerIds) {
-            if (players[pid].hand.some(t => t[0] === d && t[1] === d)) {
-                startingPlayer = pid;
-                foundStartTile = true;
-                firstMoveTile = [d, d];
-                break;
+    if (!room.lastWinnerId) {
+        // İlk el: En düşük çifti olan başlar
+        for (let d = 1; d <= 6; d++) {
+            for (const pid of playerIds) {
+                if (players[pid].hand.some(t => t[0] === d && t[1] === d)) {
+                    startingPlayer = pid;
+                    foundStartTile = true;
+                    firstMoveTile = [d, d];
+                    break;
+                }
             }
+            if (foundStartTile) break;
         }
-        if (foundStartTile) break;
+    } else {
+        // Sonraki eller: Kazanan başlar (İstediği taşla)
+        startingPlayer = room.lastWinnerId;
+        firstMoveTile = null; // İstediği taşı atabilir
     }
 
     const initialBoard = [];
@@ -1421,6 +1429,11 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
     // KAZANAN VE SKOR HESAPLAMA
     const winnerId = (winnerResult && typeof winnerResult === 'object') ? (winnerResult.winnerId || winnerResult.id) : winnerResult;
 
+    // Son kazananı lobi bazlı kaydet (Bir sonraki oyunda o başlasın diye)
+    if (winnerId && winnerId !== 'DRAW') {
+        room.lastWinnerId = winnerId;
+    }
+
     // 4 Kişilik Oyun - Özel Kopma Puanlaması
     if (winnerReason === 'disconnect_4p' && extraData.points) {
         const pointsCall = extraData.points;
@@ -1940,11 +1953,23 @@ function handleLeaveGame(ws) {
     const leaverId = String(ws.playerId);
     const winnerId = playerIds.find(id => String(id) !== leaverId);
 
-    handleGameEnd(ws.roomCode, winnerId, gs, true); // true = Forfeit (Hükmen)
+    // X butonu ile ciktiginda hemen bitir ve bildir
+    Object.keys(room.players).forEach(pid => {
+        const pWs = playerConnections.get(pid);
+        if (pWs && pWs.readyState === WebSocket.OPEN) {
+            const lang = pWs.language || 'az';
+            pWs.send(JSON.stringify({
+                type: 'gameMessage',
+                message: getMsg(lang, 'playerLeft').replace('{name}', ws.playerName),
+                duration: 6000
+            }));
+        }
+    });
+
+    handleGameEnd(ws.roomCode, winnerId, gs, true, 'forfeit');
 
     // Oyun bitti, bu soketin oda bilgisini temizle ki tekrar eşleşme arayabilsin
     ws.roomCode = null;
-    // playerId bağlantı için dursun ama aktif oda ilişkisi kalmasın
 }
 
 const disconnectGraceTimers = new Map();
@@ -1990,29 +2015,31 @@ function handleDisconnect(ws) {
                 }
             });
 
-            // 15 saniyelik zamanlayıcı kur
+            // 7 saniyelik zamanlayıcı kur
+            Object.keys(room.players).forEach(pid => {
+                const pWs = playerConnections.get(pid);
+                if (pWs && pWs.readyState === WebSocket.OPEN) {
+                    const lang = pWs.language || 'az';
+                    pWs.send(JSON.stringify({
+                        type: 'gameMessage',
+                        message: getMsg(lang, 'opponentDisconnected').replace('{name}', ws.playerName),
+                        duration: 30000
+                    }));
+                }
+            });
+
             const timer = setTimeout(() => {
                 const refreshedRoom = rooms.get(ws.roomCode);
                 if (refreshedRoom && refreshedRoom.gameState && !refreshedRoom.gameState.winner) {
-                    // 4 Kişilik Oyun Özel ELO Mantığı
-                    if (refreshedRoom.capacity === 4) {
-                        console.log(`🏆 4p maçta oyuncu düştü. Kalanlara puan dağıtılıyor.`);
-                        const totalTiles = refreshedRoom.gameState.board?.length || 0;
-                        const isLateGame = totalTiles > 15;
-                        const pointsToGive = isLateGame ? 17 : 10;
-
-                        handleGameEnd(ws.roomCode, null, refreshedRoom.gameState, true, 'disconnect_4p', {
-                            points: pointsToGive,
-                            leaver: ws.playerId
-                        });
-                    } else {
-                        // 2 Kişilik
-                        const otherPlayerId = Object.keys(refreshedRoom.players).find(id => id !== ws.playerId);
+                    const otherPlayerId = Object.keys(refreshedRoom.players).find(id => id !== ws.playerId);
+                    if (otherPlayerId) {
                         handleGameEnd(ws.roomCode, otherPlayerId, refreshedRoom.gameState, true, 'disconnect');
+                    } else {
+                        rooms.delete(ws.roomCode);
                     }
                 }
                 disconnectGraceTimers.delete(ws.playerId);
-            }, 20000); // 20 saniyə timeout
+            }, 30000);
 
             disconnectGraceTimers.set(ws.playerId, timer);
         } else if (room && !room.gameState) {
