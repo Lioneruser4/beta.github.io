@@ -53,6 +53,7 @@
                         'glow-pulse': 'glowPulse 2s ease-in-out infinite',
                         'shake': 'shake 0.5s ease-in-out',
                         'float-up': 'floatUp 2s ease-out forwards',
+                        'float-center': 'floatCenter 2s ease-out forwards',
                         'slide-down': 'slideDown 0.5s cubic-bezier(0.16, 1, 0.3, 1)'
                     },
                     keyframes: {
@@ -79,6 +80,12 @@
                             '0%': { transform: 'translateY(0) scale(0.5)', opacity: '0' },
                             '20%': { transform: 'translateY(-20px) scale(1.2)', opacity: '1' },
                             '100%': { transform: 'translateY(-100px) scale(1)', opacity: '0' }
+                        },
+                        floatCenter: {
+                            '0%': { transform: 'inherit', opacity: '0', scale: '0.5' },
+                            '20%': { opacity: '1', scale: '1.5' },
+                            '50%': { transform: 'translate(0,0)', opacity: '1', scale: '1.2' },
+                            '100%': { transform: 'translate(0, -20px)', opacity: '0', scale: '0.8' }
                         },
                         slideDown: { '0%': { transform: 'translateY(-100%)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } }
                     }
@@ -613,13 +620,13 @@
                         <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-purple-500/30">
                             <span className="text-4xl animate-bounce">📢</span>
                         </div>
-                        <h3 className="text-purple-300 text-xs font-black tracking-widest uppercase mb-2">ADMİN DUYURUSU</h3>
+                        <h3 className="text-purple-300 text-xs font-black tracking-widest uppercase mb-2">{language === 'az' ? 'ADMİN ELANI' : 'ADMIN ANNOUNCEMENT'}</h3>
                         <p className="text-white text-lg font-bold leading-relaxed mb-8">{message}</p>
                         <button
                             onClick={handleClose}
                             className="w-full bg-purple-600 hover:bg-purple-500 text-white font-black py-4 rounded-2xl shadow-xl transition-all active:scale-95 border border-white/10"
                         >
-                            ANLADIM
+                            {t.anladim || 'ANLADIM'}
                         </button>
                     </div>
                 </div>
@@ -1259,7 +1266,8 @@
                     voiceRequestBtn: "Səsli Söhbət edək",
                     voiceRequestMsg: "danışmaq istəyir, mikrofonu və hoparloru aç!",
                     voiceRequestSent: "İstək göndərildi",
-                    waitCooldown: "Biraz gözləyin..."
+                    waitCooldown: "Biraz gözləyin...",
+                    anladim: "ANLADIM"
                 },
                 en: {
                     ranked: "Ranked",
@@ -1713,13 +1721,13 @@
                             resetGameClientState();
                             if (playerData) initializeTelegramAuth();
 
-                            if (isRanked || !isPersistent) {
+                            // EĞER ÖZEL ODA VEYA 4 KİŞİLİKSE ANA MENÜYE DÖNME, ODA LOBİSİNDE KAL
+                            if (isPersistent && !isRanked) {
+                                setScreen('room_lobby');
+                            } else {
                                 sendMessage({ type: 'cancelSearch' });
                                 cleanupVoiceChat();
                                 setScreen('lobby');
-                            } else {
-                                // Özel oda veya 4p maç ise oda lobisine dön
-                                setScreen('room_lobby');
                             }
                         }, 6000);
                         break;
@@ -1756,22 +1764,22 @@
                         setScreen('matching_lobby');
                         break;
                     case 'roomUpdated':
+                        if (data.playerId) {
+                            setPlayerId(data.playerId);
+                        }
                         setRoomCode(data.roomCode);
-                        // Dublikat engelleme: telegramId varsa ona göre, yoksa id'ye göre filter et
-                        const uniquePlayersMap = new Map();
-                        data.players.forEach(p => {
-                            const key = p.telegramId || p.id;
-                            if (!uniquePlayersMap.has(key) || (p.id === playerIdRef.current)) {
-                                uniquePlayersMap.set(key, p);
-                            }
-                        });
-                        const uniquePlayers = Array.from(uniquePlayersMap.values());
-                        const otherPlayers = uniquePlayers.filter(p => String(p.id) !== String(playerIdRef.current));
-
-                        setOpponents(otherPlayers);
-                        setIsHost(data.host === playerIdRef.current);
+                        // Dublikat engelleme
+                        const uniquePlayers = data.players.filter(p => String(p.id) !== String(data.playerId || playerIdRef.current));
+                        setOpponents(uniquePlayers);
+                        setIsHost(data.host === (data.playerId || playerIdRef.current));
                         setRoomCapacity(data.capacity);
-                        if (screen !== 'game') setScreen('room_lobby'); // Oyundaysan lobiye dönme
+                        if (screen !== 'game') setScreen('room_lobby');
+
+                        // WebRTC
+                        uniquePlayers.forEach(p => {
+                            createPeerConnection(String(p.id));
+                        });
+                        break;
 
                         // WebRTC: Oda güncellendiğinde rakiplerle bağlantı kur
                         otherPlayers.forEach(p => {
@@ -1786,6 +1794,9 @@
                         } catch (e) { // localStorage yoksa
                             setAnnouncement({ message: data.message, id: data.id });
                         }
+                        break;
+                    case 'emote':
+                        showEmote(data.senderId, data.emoji);
                         break;
                     case 'audioStatusUpdate':
                         setGameState(prev => {
@@ -2475,6 +2486,27 @@
 
             if (screen === 'game') return (
                 <div className="fixed inset-0 flex flex-col bg-[#0b241c] overflow-hidden">
+                    {/* Global Emote Container - FLOW TO CENTER */}
+                    <div className="fixed inset-0 pointer-events-none z-[100] flex items-center justify-center">
+                        {activeEmotes.map(e => {
+                            const isMe = String(e.senderId) === String(myPlayerId);
+                            const pIdx = (gameState?.playerOrder || []).indexOf(e.senderId);
+                            const myIdx = (gameState?.playerOrder || []).indexOf(myPlayerId);
+                            const relativeIdx = (pIdx - myIdx + (gameState?.playerOrder?.length || 0)) % (gameState?.playerOrder?.length || 1);
+
+                            let startPos = "translate-y-0";
+                            if (isMe) startPos = "translate-y-40";
+                            else if (relativeIdx === 1) startPos = (gameState?.playerOrder?.length === 2) ? "-translate-y-40" : "-translate-x-40";
+                            else if (relativeIdx === 2) startPos = "-translate-y-40";
+                            else if (relativeIdx === 3) startPos = "translate-x-40";
+
+                            return (
+                                <div key={e.id} className={`absolute text-7xl animate-float-center pointer-events-none drop-shadow-2xl ${startPos}`}>
+                                    {e.emoji}
+                                </div>
+                            );
+                        })}
+                    </div>
                     {notification && <Toast message={notification.message} type={notification.type} />}
                     {announcement && <AnnouncementPopup message={announcement.message} id={announcement.id} onClose={() => setAnnouncement(null)} />}
 
@@ -2518,12 +2550,6 @@
                                             ${activeTurn ? 'bg-yellow-500/20 shadow-[inset_0_0_15px_rgba(234,179,8,0.3)]' : 'bg-transparent'} 
                                             ${idx !== opponents.length - 1 ? 'border-r border-white/10' : ''}
                                         `}>
-                                            {/* Emote Display for Opponent - MOVED OUTSIDE OVERFLOW HIDDEN */}
-                                            {activeEmotes.filter(e => e.senderId === pid).map(e => (
-                                                <div key={e.id} className="absolute top-10 left-1/2 -translate-x-1/2 text-5xl animate-float-down z-50 pointer-events-none drop-shadow-lg">
-                                                    {e.emoji}
-                                                </div>
-                                            ))}
 
                                             <div className="flex items-center gap-1.5 px-0.5 w-full justify-center">
                                                 <div className={`${isSingleOpponent ? 'w-12 h-12' : (isFourPlayer ? 'w-8 h-8' : 'w-10 h-10')} rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative flex-shrink-0 ${p.micEnabled ? 'voice-pulse' : ''}`}>
@@ -2672,13 +2698,6 @@
                                 const activeTurn = gameState?.currentPlayer === myPlayerId;
                                 return (
                                     <div className={`relative flex items-center justify-between w-full gap-3 px-4 py-2 rounded-2xl border-2 transition-all duration-300 ${activeTurn ? 'bg-yellow-500/20 border-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.5)] scale-105' : 'bg-black/60 border-white/10 opacity-90'}`}>
-
-                                        {/* Emote Display for Me - MOVED OUTSIDE OVERFLOW HIDDEN */}
-                                        {activeEmotes.filter(e => e.senderId === myPlayerId).map(e => (
-                                            <div key={e.id} className="absolute -top-12 left-1/2 -translate-x-1/2 text-6xl animate-float-down z-50 pointer-events-none drop-shadow-lg">
-                                                {e.emoji}
-                                            </div>
-                                        ))}
 
                                         <div className="flex items-center gap-3">
                                             <div className={`w-12 h-12 rounded-full border-2 ${activeTurn ? 'border-yellow-400 animate-pulse' : 'border-white/20'} overflow-hidden shadow-xl relative ${localMicEnabled ? 'voice-pulse' : ''}`}>
