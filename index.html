@@ -1402,7 +1402,15 @@
             useEffect(() => {
                 initializeTelegramAuth();
                 connectToServer();
-                return () => { if (wsRef.current) wsRef.current.close(); };
+
+                const fallbackTimer = setTimeout(() => {
+                    setScreen(prev => (prev === 'loading' ? 'lobby' : prev));
+                }, 4000);
+
+                return () => {
+                    clearTimeout(fallbackTimer);
+                    if (wsRef.current) wsRef.current.close();
+                };
             }, []);
 
             // Confetti Effect
