@@ -204,7 +204,28 @@ app.post('/api/auth/telegram', async (req, res) => {
         const { telegramId, username, firstName, lastName, photoUrl, isGuest = false } = req.body;
 
         if (isGuest || !telegramId || !username) {
-            return res.status(403).json({ success: false, message: 'Misafir girişi artık desteklenmiyor. Lütfen Telegram ile giriş yapın.' });
+            // Geçici olarak guest modunu aktif et - bağlantı sorunu için
+            if (isGuest) {
+                const guestPlayer = {
+                    _id: 'guest_' + Date.now(),
+                    telegramId: null,
+                    username: username || 'Guest' + Math.floor(Math.random() * 9999),
+                    firstName: '',
+                    lastName: '',
+                    photoUrl: null,
+                    elo: 0,
+                    level: 0,
+                    wins: 0,
+                    losses: 0,
+                    draws: 0,
+                    totalGames: 0,
+                    winStreak: 0,
+                    bestWinStreak: 0,
+                    isGuest: true
+                };
+                return res.json({ success: true, player: guestPlayer });
+            }
+            return res.status(403).json({ success: false, message: 'Telegram bilgileri bulunamadı.' });
         }
 
         // Ban Kontrolü
