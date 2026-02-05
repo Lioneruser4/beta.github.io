@@ -1012,6 +1012,11 @@ function handleFindMatch(ws, data) {
                 disconnectGraceTimers.delete(pKey);
             }
 
+            if (existingRoom.gameState) {
+                existingRoom.gameState.paused = false;
+                existingRoom.gameState.turnStartTime = Date.now();
+            }
+
             ws.playerId = pKey;
             ws.roomCode = existingRoom.code;
             ws.playerName = existingRoom.players[pKey].name;
@@ -1208,31 +1213,22 @@ function handleJoinRoom(ws, data) {
     let pid = ws.playerId || data.playerId;
     if (!pid) pid = `guest_${Math.random().toString(36).substr(2, 9)}`;
 
-    if (Object.keys(room.players).length >= capacity && !room.players[pid] && !Object.values(room.players).some(p => p.telegramId === ws.telegramId)) {
+    if (Object.keys(room.players).length >= capacity && !room.players[pid]) {
         return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'roomFull') });
     }
 
     // Aynı hesabla odaya zaten girmiş mi kontrol et (Eğer farklı bir socket ise)
     if (ws.telegramId) {
-        const existingPlayerId = Object.keys(room.players).find(key => room.players[key].telegramId === ws.telegramId);
+        const alreadyInRoom = Object.entries(room.players).find(([, p]) => p.telegramId === ws.telegramId);
+        if (alreadyInRoom) {
+            // Zaten odadaysa aynı ID'yi kullan (duplikasyonu engelle)
+            pid = alreadyInRoom[0];
+        }
 
-        if (existingPlayerId) {
-            console.log(`🔄 Aynı Telegram hesabı algılandı (${ws.telegramId}), ID güncelleniyor: ${pid} -> ${existingPlayerId}`);
-            // Eski bağlantıyı kapat (opsiyonel ama sağlıklı)
-            const oldWs = playerConnections.get(existingPlayerId);
-            if (oldWs && oldWs !== ws && oldWs.readyState === WebSocket.OPEN) {
-                try { oldWs.close(); } catch(e){}
-            }
-            
-            pid = existingPlayerId; // Mevcut ID'yi kullan
-            ws.isReconnecting = true; // Flag for reconnection logic
-        } else {
-             // Başka bir odaya mı dahil?
-            for (const [rCode, r] of rooms.entries()) {
-                if (rCode !== code && Object.values(r.players).some(p => p.telegramId === ws.telegramId)) {
-                    // Kullanıcıyı diğer odadan düşür veya uyar
-                    // return sendMessage(ws, { type: 'error', message: 'Siz artıq başqa bir otaqdasınız!' });
-                }
+        // Başka bir odaya mı dahil?
+        for (const [rCode, r] of rooms.entries()) {
+            if (rCode !== code && Object.values(r.players).some(p => p.telegramId === ws.telegramId)) {
+                // return sendMessage(ws, { type: 'error', message: 'Siz artıq başqa bir otaqdasınız!' });
             }
         }
     }
@@ -1247,16 +1243,18 @@ function handleJoinRoom(ws, data) {
     ws.roomCode = code;
     playerConnections.set(pid, ws);
 
+    const existingPlayer = room.players[pid];
     room.players[pid] = {
+        ...existingPlayer,
         name: ws.playerName,
         telegramId: ws.telegramId,
         photoUrl: ws.photoUrl,
         level: ws.level,
         elo: ws.elo,
         isGuest: ws.isGuest,
-        score: 0,
-        micEnabled: false,
-        speakerEnabled: false
+        score: existingPlayer?.score ?? 0,
+        micEnabled: existingPlayer?.micEnabled ?? false,
+        speakerEnabled: existingPlayer?.speakerEnabled ?? false
     };
 
     console.log(`✅ ${ws.playerName} odaya katıldı: ${code} (${currentPlayerCount + 1}/${capacity})`);
@@ -1862,6 +1860,45 @@ function handleDrawFromMarket(ws) {
     }
 
     Object.keys(gs.players).forEach(pid => sendGameState(ws.roomCode, pid));
+}
+
+function handleRejoin(ws, data) {
+    const { playerId, roomCode } = data;
+    ws.language = data.language || ws.language || 'az';
+    if (!playerId || !roomCode) return;
+
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState) {
+        return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'gameNotFound') });
+    }
+
+    // Kopma zamanlayıcısını temizle
+    const timer = disconnectGraceTimers.get(playerId);
+    if (timer) {
+        clearTimeout(timer);
+        disconnectGraceTimers.delete(playerId);
+        console.log(`⏱️ Kopma zamanlayıcısı temizlendi (Rejoin): ${playerId}`);
+    }
+
+    if (!room.players[playerId]) {
+        return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'playerNotInRoom') });
+    }
+
+    // Reattach
+    ws.playerId = playerId;
+    ws.roomCode = roomCode;
+    ws.playerName = room.players[playerId].name;
+    playerConnections.set(playerId, ws);
+
+    resetAfkCounter(room, playerId); // AFK sayacını sıfırla
+
+    console.log(`🔄 Oyuncu geri döndü: ${ws.playerName} (Oda: ${roomCode})`);
+
+    // Send full state to rejoining player
+    setTimeout(() => {
+        sendGameState(roomCode, playerId);
+        broadcastToRoom(roomCode, { type: 'playerReconnected', playerName: ws.playerName }, playerId);
+    }, 500);
 }
 
 function handlePlayAgain(ws) {
