@@ -1452,7 +1452,8 @@
                     }
                 } catch (error) {
                     console.error('Auth error:', error);
-                    setPlayerData({
+                    // Hata durumunda guest moduna geç - bağlantı sorunu için
+                    const guestData = {
                         isGuest: true,
                         username: 'Guest' + Math.floor(Math.random() * 9999),
                         firstName: '',
@@ -1461,7 +1462,9 @@
                         level: 0,
                         elo: 0,
                         telegramId: null
-                    });
+                    };
+                    setPlayerData(guestData);
+                    console.log('👥 Guest mode (error fallback):', guestData);
                 } finally {
                     setScreen('lobby');
                 }
