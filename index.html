@@ -360,7 +360,7 @@
             padding: 8px;
             border-radius: 12px;
         }
-        
+
         .hand-container.my-turn {
             background: rgba(251, 191, 36, 0.1);
             box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
@@ -580,7 +580,7 @@
         const AnnouncementPopup = ({ message, id, onClose }) => {
             if (!message) return null;
 
-            const messageKey = `announcement_read_${id || 'unknown'}`;
+            const messageKey = `announcement_read_${id || btoa(message.substring(0, 20))}`;
             const [isVisible, setIsVisible] = useState(false);
 
             useEffect(() => {
@@ -600,6 +600,7 @@
 
             const handleClose = (e) => {
                 if (e) e.stopPropagation();
+                localStorage.setItem(messageKey, 'true'); // Mark as read only on close
                 setIsVisible(false);
                 onClose();
             };
@@ -732,8 +733,8 @@
                             <div>
                                 <h2 className="text-3xl font-black text-yellow-500">ADMİN PANELİ</h2>
                                 <p className="text-white/40 text-xs mt-1">
-                                    Online: <span className="text-green-400 font-bold">{data.stats?.onlineCount || 0}</span> • 
-                                    Toplam: <span className="text-white font-bold">{data.stats?.totalUsers || 0}</span> • 
+                                    Online: <span className="text-green-400 font-bold">{data.stats?.onlineCount || 0}</span> •
+                                    Toplam: <span className="text-white font-bold">{data.stats?.totalUsers || 0}</span> •
                                     Duyuru Bakış: <span className="text-yellow-500 font-bold">{data.stats?.broadcastViews || 0}</span>
                                 </p>
                             </div>
@@ -1001,27 +1002,48 @@
                 return lvl;
             };
 
-            const [voiceEnabled, setVoiceEnabled] = useState(false);
-            const voiceEnabledRef = useRef(false);
+            const [localMicEnabled, setLocalMicEnabled] = useState(false);
+            const [localSpeakerEnabled, setLocalSpeakerEnabled] = useState(false);
+            const localSpeakerEnabledRef = useRef(false);
             const speakingToastShown = useRef(new Set());
             const localStream = useRef(null);
             const peerConnections = useRef({}); // pid -> RTCPeerConnection
 
             useEffect(() => {
-                voiceEnabledRef.current = voiceEnabled;
-            }, [voiceEnabled]);
+                localSpeakerEnabledRef.current = localSpeakerEnabled;
+            }, [localSpeakerEnabled]);
 
             // WebRTC Signaling Helpers
+            // WebRTC Signaling Helpers (Perfect Negotiation Pattern)
             const createPeerConnection = (targetPid) => {
-                if (peerConnections.current[targetPid]) return peerConnections.current[targetPid];
+                if (peerConnections.current[targetPid]) return peerConnections.current[targetPid].pc;
 
                 const pc = new RTCPeerConnection({
                     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
                 });
 
+                const pcEntry = {
+                    pc,
+                    makingOffer: false,
+                    ignoreOffer: false
+                };
+                peerConnections.current[targetPid] = pcEntry;
+
                 pc.onicecandidate = (event) => {
                     if (event.candidate) {
                         sendMessage({ type: 'voiceSignal', to: targetPid, signal: { candidate: event.candidate } });
+                    }
+                };
+
+                pc.onnegotiationneeded = async () => {
+                    try {
+                        pcEntry.makingOffer = true;
+                        await pc.setLocalDescription();
+                        sendMessage({ type: 'voiceSignal', to: targetPid, signal: { description: pc.localDescription } });
+                    } catch (err) {
+                        console.error('Negotiation error:', err);
+                    } finally {
+                        pcEntry.makingOffer = false;
                     }
                 };
 
@@ -1032,130 +1054,140 @@
                         audio = document.createElement('audio');
                         audio.id = `audio-${targetPid}`;
                         audio.autoplay = true;
-                        audio.playsInline = true; // Mobile fix
+                        audio.playsInline = true;
                         document.body.appendChild(audio);
                     }
-                    audio.srcObject = remoteStream;
-                    audio.muted = !voiceEnabledRef.current;
+                    if (audio.srcObject !== remoteStream) {
+                        audio.srcObject = remoteStream;
+                    }
+                    audio.muted = !localSpeakerEnabledRef.current;
                     if (!audio.muted) {
                         audio.play().catch(e => console.log('Audio play error:', e));
                     }
                 };
 
+                // Add existing stream if available
                 if (localStream.current) {
                     localStream.current.getTracks().forEach(track => pc.addTrack(track, localStream.current));
-                    // Mikrofon açıksa hemen teklif gönder
-                    pc.createOffer()
-                        .then(offer => pc.setLocalDescription(offer))
-                        .then(() => {
-                            sendMessage({ type: 'voiceSignal', to: targetPid, signal: { offer: pc.localDescription } });
-                        })
-                        .catch(e => console.error('Offer error:', e));
                 }
 
-                peerConnections.current[targetPid] = pc;
                 return pc;
             };
 
             const handleWebRTCSignal = async (fromPid, signal) => {
                 const pc = createPeerConnection(fromPid);
+                const pcEntry = peerConnections.current[fromPid];
+                if (!pcEntry) return;
+
+                const isPolite = String(playerIdRef.current || '') < String(fromPid);
+
                 try {
-                    if (signal.offer) {
-                        await pc.setRemoteDescription(new RTCSessionDescription(signal.offer));
-                        const answer = await pc.createAnswer();
-                        await pc.setLocalDescription(answer);
-                        sendMessage({ type: 'voiceSignal', to: fromPid, signal: { answer } });
-                    } else if (signal.answer) {
-                        await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
+                    const description = signal.description || signal.offer || signal.answer;
+                    if (description) {
+                        const type = description.type || (signal.offer ? 'offer' : 'answer');
+                        const sessionDesc = new RTCSessionDescription({
+                            type: type,
+                            sdp: description.sdp || description
+                        });
+
+                        const offerCollision = (type === "offer") &&
+                            (pcEntry.makingOffer || pc.signalingState !== "stable");
+
+                        pcEntry.ignoreOffer = !isPolite && offerCollision;
+                        if (pcEntry.ignoreOffer) return;
+
+                        await pc.setRemoteDescription(sessionDesc);
+                        if (type === "offer") {
+                            await pc.setLocalDescription();
+                            sendMessage({
+                                type: 'voiceSignal',
+                                to: fromPid,
+                                signal: { description: pc.localDescription }
+                            });
+                        }
                     } else if (signal.candidate) {
-                        await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                        try {
+                            const candData = signal.candidate.candidate ? signal.candidate : signal.candidate;
+                            await pc.addIceCandidate(new RTCIceCandidate(candData));
+                        } catch (err) {
+                            if (!pcEntry.ignoreOffer) throw err;
+                        }
                     }
                 } catch (e) { console.error('Signal Error:', e); }
             };
 
             const cleanupVoiceChat = () => {
-                // Close all peer connections
-                Object.values(peerConnections.current).forEach(pc => pc.close());
+                Object.values(peerConnections.current).forEach(({ pc }) => {
+                    if (pc) pc.close();
+                });
                 peerConnections.current = {};
 
-                // Stop local stream
                 if (localStream.current) {
                     localStream.current.getTracks().forEach(track => track.stop());
                     localStream.current = null;
                 }
 
-                // Remove audio elements
                 document.querySelectorAll('audio').forEach(a => a.remove());
-
-                setVoiceEnabled(false);
+                setLocalMicEnabled(false);
             };
 
-            const toggleVoice = async () => {
-                const newState = !voiceEnabled;
+            const toggleMic = async () => {
+                const newState = !localMicEnabled;
 
                 if (newState) {
                     try {
                         if (!localStream.current) {
-                            const stream = await navigator.mediaDevices.getUserMedia({
+                            localStream.current = await navigator.mediaDevices.getUserMedia({
                                 audio: {
                                     echoCancellation: true,
                                     noiseSuppression: true,
                                     autoGainControl: true
                                 }
                             });
-                            localStream.current = stream;
-
-                            // Send offers to all peers
-                            const pids = Object.keys(peerConnections.current);
-                            if (pids.length === 0) {
-                                console.log('⚠️ No peers to send voice offer to');
-                            }
-
-                            for (const pid of pids) {
-                                const pc = peerConnections.current[pid];
-                                if (!pc) continue;
-
-                                const senders = pc.getSenders();
-                                const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
-
-                                if (!audioSender) {
-                                    stream.getTracks().forEach(track => pc.addTrack(track, stream));
-                                } else {
-                                    audioSender.replaceTrack(stream.getAudioTracks()[0]);
-                                }
-
-                                const offer = await pc.createOffer();
-                                await pc.setLocalDescription(offer);
-                                sendMessage({ type: 'voiceSignal', to: pid, signal: { offer } });
-                            }
                         } else {
                             localStream.current.getTracks().forEach(t => t.enabled = true);
                         }
 
-                        // Enable all audio elements
-                        document.querySelectorAll('audio').forEach(a => {
-                            a.muted = false;
-                            a.play().catch(e => console.log('Audio play error:', e));
+                        // Ensure tracks are added to all existing connections
+                        Object.values(peerConnections.current).forEach(({ pc }) => {
+                            if (!pc) return;
+                            const senders = pc.getSenders();
+                            if (!senders.find(s => s.track && s.track.kind === 'audio')) {
+                                localStream.current.getTracks().forEach(track => pc.addTrack(track, localStream.current));
+                            }
                         });
 
-                        setVoiceEnabled(true);
-                        showNotification('Səs açıldı (Mikrofon + Hoparlör)', 'success');
-                        sendMessage({ type: 'updateAudioStatus', audioType: 'both', enabled: true });
+                        setLocalMicEnabled(true);
+                        showNotification('Mikrofon açıldı', 'success');
                     } catch (err) {
-                        console.error('Voice Error:', err);
-                        setVoiceEnabled(false);
-                        showNotification('Səs hatası: ' + err.message, 'error');
+                        console.error('Mic Error:', err);
+                        setLocalMicEnabled(false);
+                        showNotification('Mikrofon hatası: ' + err.message, 'error');
                         return;
                     }
                 } else {
                     if (localStream.current) {
                         localStream.current.getTracks().forEach(t => t.enabled = false);
                     }
-                    document.querySelectorAll('audio').forEach(a => a.muted = true);
-                    setVoiceEnabled(false);
-                    showNotification('Səs bağlandı', 'info');
-                    sendMessage({ type: 'updateAudioStatus', audioType: 'both', enabled: false });
+                    setLocalMicEnabled(false);
+                    showNotification('Mikrofon qapadıldı', 'info');
                 }
+                sendMessage({ type: 'updateAudioStatus', audioType: 'mic', enabled: newState });
+            };
+
+            const toggleSpeaker = () => {
+                const newState = !localSpeakerEnabled;
+                setLocalSpeakerEnabled(newState);
+
+                document.querySelectorAll('audio').forEach(a => {
+                    a.muted = !newState;
+                    if (!a.muted) {
+                        a.play().catch(e => console.log('Toggle play error:', e));
+                    }
+                });
+
+                showNotification(newState ? 'Səslər açıldı' : 'Səslər qapadıldı', 'info');
+                sendMessage({ type: 'updateAudioStatus', audioType: 'speaker', enabled: newState });
             };
 
             const sendEmote = (emoji) => {
@@ -1206,13 +1238,13 @@
                     returningLobby: "Lobiya qayıdılır...",
                     waitingOpponent: "Rəqib Gözlənilir",
                     enter: "DAXİL OL",
-                    calculationTitle: "SKOR HESAPLANIYOR",
-                    calculationSubtitle: "101 puana ilk ulaşan kazanır!",
+                    calculationTitle: "XAL HESABLANIR",
+                    calculationSubtitle: "101 xala ilk çatan qazanır!",
                     you: "Siz",
-                    handTotal: "Elindəki Daşların Toplamı",
-                    winnerAnnouncing: "Kazanan açıklanıyor...",
-                    noValidMove: "Geçerli hamle yok, otomatik pas geçildi",
-                    roundSystem: "Raund Sistemi: 3-5 (2 Farkla Qazanmaq)",
+                    handTotal: "Əlindəki Daşların Cəmi",
+                    winnerAnnouncing: "Qalib açıqlanır...",
+                    noValidMove: "Gediş yoxdur, avtomatik pas keçildi",
+                    roundSystem: "Raund Sistemi: 3-5 (2 Fərqlə Qazanmaq)",
                     startEarly: "Oyuna Başla",
                     confirmStart: "Oyuna başlansın?",
                     waitingPlayers: "Oyunçular gözlənilir...",
@@ -1275,7 +1307,8 @@
                     voiceRequestBtn: "Let's Voice Chat",
                     voiceRequestMsg: "wants to talk, open mic and speaker!",
                     voiceRequestSent: "Request sent",
-                    waitCooldown: "Please wait..."
+                    waitCooldown: "Please wait...",
+                    draw: "Draw"
                 }
             };
 
@@ -1297,21 +1330,19 @@
             }, [calculationLobby, calculationTimer]);
 
             // Oyun state'ini temizlemek için merkezi bir fonksiyon
-            const resetGameClientState = (keepRoom = false) => {
+            const resetGameClientState = () => {
                 setGameState(null);
-                if (!keepRoom) {
-                    setRoomCode('');
-                    setOpponents([]);
-                    setIsHost(false);
-                    setJoinCode('');
-                }
+                setRoomCode('');
                 setSearching(false);
                 setSelectedTileIndex(null);
                 setValidMoves([]);
                 setEndInfo(null);
                 setOpponent(null);
+                setOpponents([]);
+                setJoinCode('');
                 setCalculationLobby(null);
                 setCalculationTimer(7);
+                setIsHost(false); // Reset host status
                 prevBoardLength.current = 0;
                 isMyMove.current = false;
             };
@@ -1518,6 +1549,12 @@
                     setConnected(true);
                     showNotification('Sunucuya Bağlandı', 'success');
 
+                    // Keep-Alive Ping
+                    if (window.pingInterval) clearInterval(window.pingInterval);
+                    window.pingInterval = setInterval(() => {
+                        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
+                    }, 10000);
+
                     // Rejoin if session exists
                     if (window._lastSession) {
                         ws.send(JSON.stringify({
@@ -1556,7 +1593,6 @@
                         setRoomCode(data.roomCode);
                         setPlayerId(data.playerId); // FIX: Dublikat və səs problemi üçün ID-ni yenilə
                         setIsHost(true); // Set host status
-                        setRoomCapacity(data.capacity || 2);
                         setScreen('room_lobby'); // Transition to room lobby
                         setOpponents([]); // Clear opponents for new room
                         break;
@@ -1574,7 +1610,10 @@
                         break;
                     case 'playerJoinedRoom':
                         showNotification(`${data.player.username} odaya katıldı!`, 'info');
-                        setOpponents(prev => [...prev, data.player]);
+                        setOpponents(prev => {
+                            if (prev.some(p => p.id === data.player.id)) return prev;
+                            return [...prev, data.player];
+                        });
                         // WebRTC: Yeni gelen oyuncuyla bağlantı kur
                         createPeerConnection(String(data.player.id));
                         break;
@@ -1677,21 +1716,21 @@
 
                         localStorage.removeItem('domino_session');
                         setTimeout(() => {
-                            // Redirection Logic
-                            const isRanked = data.isRanked;
                             const isPersistent = (gameState?.playerOrder?.length === 4) || (roomCode && roomCode !== '');
+                            const isRanked = data.isRanked;
+
+                            resetGameClientState();
+                            if (playerData) initializeTelegramAuth();
 
                             if (isRanked || !isPersistent) {
-                                resetGameClientState();
-                                if (playerData) initializeTelegramAuth();
                                 sendMessage({ type: 'cancelSearch' });
                                 cleanupVoiceChat();
                                 setScreen('lobby');
                             } else {
-                                resetGameClientState(true);
+                                // Özel oda veya 4p maç ise oda lobisine dön
                                 setScreen('room_lobby');
                             }
-                        }, 5000);
+                        }, 6000);
                         break;
                     case 'playerDisconnected':
                         showNotification('Rakip bağlantısı koptu, bekleniyor...', 'warning');
@@ -1711,9 +1750,14 @@
                         playSound('found');
                         setSearching(false);
                         if (data.opponents) {
-                            setOpponents(data.opponents);
+                            // Dublikat engelleme
+                            const uniqueMap = new Map();
+                            data.opponents.forEach(p => uniqueMap.set(p.telegramId || p.id, p));
+                            const uniqueOpponents = Array.from(uniqueMap.values());
+
+                            setOpponents(uniqueOpponents);
                             // For single opponent display in matching_lobby if needed, take the first one
-                            setOpponent(data.opponents[0]);
+                            setOpponent(uniqueOpponents[0]);
                         } else if (data.opponent) {
                             setOpponents([data.opponent]);
                             setOpponent(data.opponent);
@@ -1722,7 +1766,17 @@
                         break;
                     case 'roomUpdated':
                         setRoomCode(data.roomCode);
-                        const otherPlayers = data.players.filter(p => String(p.id) !== String(playerIdRef.current));
+                        // Dublikat engelleme: telegramId varsa ona göre, yoksa id'ye göre filter et
+                        const uniquePlayersMap = new Map();
+                        data.players.forEach(p => {
+                            const key = p.telegramId || p.id;
+                            if (!uniquePlayersMap.has(key) || (p.id === playerIdRef.current)) {
+                                uniquePlayersMap.set(key, p);
+                            }
+                        });
+                        const uniquePlayers = Array.from(uniquePlayersMap.values());
+                        const otherPlayers = uniquePlayers.filter(p => String(p.id) !== String(playerIdRef.current));
+
                         setOpponents(otherPlayers);
                         setIsHost(data.host === playerIdRef.current);
                         setRoomCapacity(data.capacity);
@@ -1735,9 +1789,7 @@
                         break;
                     case 'broadcastMessage':
                         try {
-                            const broadcastKey = `announcement_read_${data.id || 'unknown'}`;
-                            if (!localStorage.getItem(broadcastKey)) {
-                                localStorage.setItem(broadcastKey, 'true');
+                            if (!localStorage.getItem(`announcement_read_${data.id}`)) {
                                 setAnnouncement({ message: data.message, id: data.id });
                             }
                         } catch (e) { // localStorage yoksa
@@ -1753,6 +1805,14 @@
                                 newPlayers[data.playerId].speakerEnabled = data.speakerEnabled;
                             }
                             return { ...prev, players: newPlayers };
+                        });
+                        setOpponents(prev => {
+                            return prev.map(p => {
+                                if (String(p.id) === String(data.playerId)) {
+                                    return { ...p, micEnabled: data.micEnabled, speakerEnabled: data.speakerEnabled };
+                                }
+                                return p;
+                            });
                         });
                         break;
                     case 'voiceSignal':
@@ -1845,7 +1905,7 @@
                         const nextW = nextIsDouble ? T_SHORT : T_LONG;
 
                         const currentIsHorizontal = !isDouble && rotation !== 90;
-                        const shouldTurn = currentIsHorizontal && tilesInRow >= 6;
+                        const shouldTurn = currentIsHorizontal && tilesInRow >= 5;
 
                         if (shouldTurn) {
                             curX += (w / 2 - T_SHORT / 2) * dirX;
@@ -2167,7 +2227,7 @@
                                 onClick={reportBug}
                                 className="bg-red-500/20 hover:bg-red-500/40 text-red-400 px-4 py-2 rounded-full text-xs font-black transition-all border border-red-500/30 flex items-center gap-2"
                             >
-                                🐞 {language === 'az' ? 'XETA BİLDİR' : 'REPORT BUG'}
+                                🐞 {language === 'az' ? 'HATA BİLDİR' : 'REPORT BUG'}
                             </button>
                         </div>
 
@@ -2327,15 +2387,23 @@
                     </div>
 
                     <div className="mt-12 flex flex-col gap-3 w-full max-w-xs relative z-10">
-                        {/* Voice Button for Lobby - TEK BUTON */}
-                        <div className="flex justify-center mb-6">
+                        {/* Voice Buttons for Lobby */}
+                        <div className="flex flex-col gap-2 items-center mb-6">
                             <button
-                                onClick={toggleVoice}
-                                className={`w-20 h-20 rounded-full flex flex-col items-center justify-center border-4 transition-all shadow-2xl ${voiceEnabled ? 'bg-green-500 border-green-400 text-white shadow-[0_0_20px_rgba(34,197,94,0.6)]' : 'bg-gray-800 border-gray-600 text-gray-400'}`}
+                                onClick={toggleMic}
+                                className={`w-14 h-14 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localMicEnabled ? 'bg-green-500 border-green-400 text-white animate-glow-pulse' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
                             >
-                                <span className="text-3xl mb-1">{voiceEnabled ? '🎙️' : '🔇'}</span>
-                                <span className="text-[10px] font-bold uppercase">{voiceEnabled ? 'Səs Açıq' : 'Səs Bağlı'}</span>
+                                <span className="text-3xl">{localMicEnabled ? '🎙️' : '🔇'}</span>
                             </button>
+                            <div className="w-full px-4">
+                                <button
+                                    onClick={toggleSpeaker}
+                                    className={`w-full py-3 rounded-2xl flex items-center justify-center gap-2 border-2 transition-all shadow-2xl ${localSpeakerEnabled ? 'bg-blue-500 border-blue-400 text-white shadow-glow' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
+                                >
+                                    <span className="text-2xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
+                                    <span className="text-sm font-bold">{localSpeakerEnabled ? 'Səs Açıq' : 'Səs Bağlı'}</span>
+                                </button>
+                            </div>
                         </div>
 
                         {isHost && opponents.length >= 1 && (
@@ -2455,36 +2523,35 @@
                                     const activeTurn = gameState?.currentPlayer === pid;
 
                                     return (
-                                        <div key={idx} className={`relative flex-1 flex flex-col items-center justify-center ${isSingleOpponent ? 'py-6' : 'py-4'} transition-all duration-300 
+                                        <div key={idx} className={`relative flex-1 flex flex-col items-center justify-center ${isSingleOpponent ? 'py-4' : 'py-1'} transition-all duration-300 
                                             ${activeTurn ? 'bg-yellow-500/20 shadow-[inset_0_0_15px_rgba(234,179,8,0.3)]' : 'bg-transparent'} 
                                             ${idx !== opponents.length - 1 ? 'border-r border-white/10' : ''}
                                         `}>
                                             {/* Emote Display for Opponent - MOVED OUTSIDE OVERFLOW HIDDEN */}
                                             {activeEmotes.filter(e => e.senderId === pid).map(e => (
-                                                <div key={e.id} className="absolute top-14 left-1/2 -translate-x-1/2 text-6xl animate-float-up z-50 pointer-events-none drop-shadow-lg">
+                                                <div key={e.id} className="absolute top-14 left-1/2 -translate-x-1/2 text-5xl animate-float-down z-50 pointer-events-none drop-shadow-lg">
                                                     {e.emoji}
                                                 </div>
                                             ))}
 
-                                            <div className="flex items-center gap-2 px-1">
-                                                <div className={`${isSingleOpponent ? 'w-14 h-14' : (isFourPlayer ? 'w-9 h-9' : 'w-11 h-11')} rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative flex-shrink-0 ${p.micEnabled ? 'voice-pulse' : ''}`}>
+                                            <div className="flex items-center gap-1.5 px-0.5 w-full justify-center">
+                                                <div className={`${isSingleOpponent ? 'w-12 h-12' : (isFourPlayer ? 'w-8 h-8' : 'w-10 h-10')} rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative flex-shrink-0 ${p.micEnabled ? 'voice-pulse' : ''}`}>
                                                     <img src={p.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" alt={p.name} />
 
                                                     <div className="absolute top-0 right-0 p-0.5 z-20">
-                                                        {p.micEnabled ? <span className="block w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse border border-black shadow-lg"></span> : <span className="block w-2.5 h-2.5 bg-red-500 rounded-full border border-black"></span>}
+                                                        {p.micEnabled ? <span className="block w-2 h-2 bg-green-500 rounded-full animate-pulse border border-black shadow-lg"></span> : <span className="block w-2 h-2 bg-red-500 rounded-full border border-black"></span>}
                                                     </div>
                                                 </div>
-                                                <div className="flex flex-col min-w-0 w-full">
-                                                    <span className={`text-white font-black ${isSingleOpponent ? 'text-sm' : (isFourPlayer ? 'text-[9px]' : 'text-xs')} text-center leading-tight break-words max-w-full ${activeTurn ? 'text-yellow-400' : ''}`}>{p.name || 'Oyuncu'}</span>
-                                                    <span className="text-[8px] text-white/50 font-mono leading-none mb-0.5">ID: {p.telegramId || pid?.substring(0, 6)}</span>
-                                                    <div className={`text-yellow-500/80 font-black ${isFourPlayer ? 'text-[9px]' : 'text-[10px]'} leading-tight`}>{p.score} / 101</div>
+                                                <div className="flex flex-col min-w-0 w-full px-1 overflow-hidden">
+                                                    <span className={`text-white font-black ${isSingleOpponent ? 'text-xs' : 'text-[9px]'} truncate w-full ${activeTurn ? 'text-yellow-400' : ''}`}>{p.name || 'Oyuncu'}</span>
+                                                    <div className={`text-yellow-500/80 font-black ${isFourPlayer ? 'text-[8px]' : 'text-[9px]'} leading-tight truncate`}>{p.score} / 101</div>
                                                 </div>
                                             </div>
 
                                             {/* Küçük Rakip Taşları */}
-                                            <div className={`flex justify-center gap-0.5 mt-1 flex-wrap w-full px-2`}>
+                                            <div className={`flex justify-center gap-0.5 mt-0.5 flex-wrap w-full px-1`}>
                                                 {Array(p.hand?.length || 0).fill(0).map((_, i) => (
-                                                    <div key={i} className={`${isSingleOpponent ? 'w-2.5 h-4' : (isFourPlayer ? 'w-1.5 h-2.5' : 'w-2 h-3')} bg-gray-300/50 rounded-[1px]`}></div>
+                                                    <div key={i} className={`${isSingleOpponent ? 'w-2 h-3' : (isFourPlayer ? 'w-1.5 h-2' : 'w-1.5 h-2.5')} bg-gray-300/50 rounded-[1px]`}></div>
                                                 ))}
                                             </div>
                                         </div>
@@ -2574,7 +2641,7 @@
                                                 transform: 'translate(-50%, -50%)'
                                             }}
                                         >
-                                            <span className="text-yellow-400 font-black text-[10px]">BURAYA</span>
+                                            <span className="text-yellow-400 font-black text-[10px]">BURAYA AT</span>
                                         </div>
                                     )}
                                     {validMoves.includes('right') && boardLayout[boardLayout.length - 1] && (
@@ -2587,7 +2654,7 @@
                                                 transform: 'translate(-50%, -50%)'
                                             }}
                                         >
-                                            <span className="text-yellow-400 font-black text-[10px]">BURAYA</span>
+                                            <span className="text-yellow-400 font-black text-[10px]">BURAYA AT</span>
                                         </div>
                                     )}
                                 </>
@@ -2617,16 +2684,16 @@
 
                                         {/* Emote Display for Me - MOVED OUTSIDE OVERFLOW HIDDEN */}
                                         {activeEmotes.filter(e => e.senderId === myPlayerId).map(e => (
-                                            <div key={e.id} className="absolute -top-12 left-1/2 -translate-x-1/2 text-6xl animate-float-up z-50 pointer-events-none drop-shadow-lg">
+                                            <div key={e.id} className="absolute -top-12 left-1/2 -translate-x-1/2 text-6xl animate-float-down z-50 pointer-events-none drop-shadow-lg">
                                                 {e.emoji}
                                             </div>
                                         ))}
 
                                         <div className="flex items-center gap-3">
-                                            <div className={`w-12 h-12 rounded-full border-2 ${activeTurn ? 'border-yellow-400 animate-pulse' : 'border-white/20'} overflow-hidden shadow-xl relative ${voiceEnabled ? 'voice-pulse' : ''}`}>
+                                            <div className={`w-12 h-12 rounded-full border-2 ${activeTurn ? 'border-yellow-400 animate-pulse' : 'border-white/20'} overflow-hidden shadow-xl relative ${localMicEnabled ? 'voice-pulse' : ''}`}>
                                                 <img src={me.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" />
 
-                                                {voiceEnabled && (
+                                                {localMicEnabled && (
                                                     <div className="absolute top-0 right-0 p-1 z-20">
                                                         <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-lg border border-white/20"></div>
                                                     </div>
@@ -2645,24 +2712,38 @@
                             })()}
                         </div>
 
-                        {/* Voice Button - GAME - TEK BUTON ÜSTTE */}
-                        <div className="absolute -top-20 left-4 flex flex-col items-start gap-2 z-50">
+                        {/* Voice Buttons - HAND ÜSTÜNDE SOLDA */}
+                        <div className="absolute -top-24 left-4 flex flex-col items-start gap-2 z-50">
                             <button
-                                onClick={toggleVoice}
-                                className={`w-16 h-16 rounded-full flex flex-col items-center justify-center border-4 transition-all shadow-2xl ${voiceEnabled ? 'bg-green-500 border-green-400 text-white shadow-[0_0_20px_rgba(34,197,94,0.6)]' : 'bg-gray-900/90 border-gray-600 text-gray-400'}`}
+                                onClick={sendVoiceRequest}
+                                className="h-8 px-3 bg-purple-600/80 hover:bg-purple-500 border border-purple-400/50 rounded-xl text-white text-[10px] font-black uppercase tracking-wider shadow-lg active:scale-95 transition-all mb-1"
                             >
-                                <span className="text-2xl mb-0.5">{voiceEnabled ? '🎙️' : '🔇'}</span>
-                                <span className="text-[8px] font-bold uppercase">{voiceEnabled ? 'Açıq' : 'Bağlı'}</span>
+                                {t.voiceRequestBtn}
                             </button>
-
-                            {/* Emote Picker */}
-                            <div className="flex gap-1 mt-2 bg-black/40 p-1 rounded-full backdrop-blur-sm border border-white/5">
-                                {['😂', '😡', '👏','❤️','🖕🏼'].map(emoji => (
-                                    <button key={emoji} onClick={() => sendEmote(emoji)} className="text-lg hover:scale-125 transition-transform p-1">
-                                        {emoji}
-                                    </button>
-                                ))}
+                            <div className="flex flex-col items-center gap-2">
+                                <button
+                                    onClick={toggleMic}
+                                    className={`w-12 h-10 rounded-xl flex items-center justify-center border-2 transition-all shadow-xl ${localMicEnabled ? 'bg-green-500 border-green-400 text-white animate-glow-pulse' : 'bg-gray-900/80 border-white/10 text-gray-400'}`}
+                                >
+                                    <span className="text-xl">{localMicEnabled ? '🎙️' : '🔇'}</span>
+                                </button>
+                                <button
+                                    onClick={toggleSpeaker}
+                                    className={`w-12 h-10 rounded-xl flex items-center justify-center border-2 transition-all shadow-xl ${localSpeakerEnabled ? 'bg-blue-500 border-blue-400 text-white shadow-glow' : 'bg-gray-900/80 border-white/10 text-white/60'}`}
+                                >
+                                    <span className="text-xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
+                                </button>
                             </div>
+
+                        </div>
+
+                        {/* Emote Picker - Moved to Right Side to avoid overlap */}
+                        <div className="absolute -top-16 right-4 flex gap-1 bg-black/60 p-1.5 rounded-full backdrop-blur-md border border-white/10 z-50 shadow-xl">
+                            {['🧠', '😂', '😡', '👏', '💩', '❤️', '💋', '🖕🏼'].map(emoji => (
+                                <button key={emoji} onClick={() => sendEmote(emoji)} className="text-xl hover:scale-125 transition-transform p-1">
+                                    {emoji}
+                                </button>
+                            ))}
                         </div>
 
                         <div className="flex items-center justify-between mb-2">
@@ -2949,4 +3030,4 @@
 
 </body>
 
-</html> 
+</html>
