@@ -1475,7 +1475,7 @@
                 try {
                     // Önce URL'deki hash'e bak, eğer boşsa normal Telegram objesine bak
                     const initData = window.location.hash.split('tgWebAppData=')[1]?.split('&')[0]
-                        || window.Telegram.WebApp.initData;
+                        || window.Telegram?.WebApp?.initData;
                     // Artık 'initData' değişkenini kullanarak giriş yapabilirsin.
 
                     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
