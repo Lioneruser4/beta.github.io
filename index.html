@@ -600,7 +600,8 @@
 
             const handleClose = (e) => {
                 if (e) e.stopPropagation();
-                localStorage.setItem(messageKey, 'true'); // Mark as read only on close
+                // Already marked as read in message handler, but set again for safety
+                localStorage.setItem(messageKey, 'true');
                 setIsVisible(false);
                 onClose();
             };
@@ -1190,6 +1191,75 @@
                 sendMessage({ type: 'updateAudioStatus', audioType: 'speaker', enabled: newState });
             };
 
+            // Single button function for both mic and speaker
+            const toggleVoice = async () => {
+                const newState = !localMicEnabled; // Use mic state as primary
+                
+                if (newState) {
+                    // Enable both mic and speaker
+                    await toggleMicFunction(true);
+                    toggleSpeakerFunction(true);
+                    showNotification('Səs açıldı (Mikrofon + Hoparlör)', 'success');
+                    sendMessage({ type: 'updateAudioStatus', audioType: 'both', enabled: true });
+                } else {
+                    // Disable both mic and speaker
+                    toggleMicFunction(false);
+                    toggleSpeakerFunction(false);
+                    showNotification('Səs bağlandı', 'info');
+                    sendMessage({ type: 'updateAudioStatus', audioType: 'both', enabled: false });
+                }
+            };
+
+            // Helper functions for toggleVoice
+            const toggleMicFunction = async (enabled) => {
+                if (enabled) {
+                    try {
+                        localStream.current = await navigator.mediaDevices.getUserMedia({
+                            audio: {
+                                echoCancellation: true,
+                                noiseSuppression: true,
+                                autoGainControl: true,
+                                sampleRate: 44100
+                            }
+                        });
+
+                        Object.keys(peerConnections.current).forEach(pid => {
+                            const pc = peerConnections.current[pid];
+                            if (pc && localStream.current) {
+                                localStream.current.getTracks().forEach(track => {
+                                    pc.addTrack(track, localStream.current);
+                                });
+                            }
+                        });
+
+                        for (const pid of Object.keys(peerConnections.current)) {
+                            await createAndSendOffer(pid);
+                        }
+
+                        setLocalMicEnabled(true);
+                    } catch (err) {
+                        console.error('Mic Error:', err);
+                        setLocalMicEnabled(false);
+                        showNotification('Mikrofon hatası: ' + err.message, 'error');
+                    }
+                } else {
+                    if (localStream.current) {
+                        localStream.current.getTracks().forEach(t => t.enabled = false);
+                    }
+                    setLocalMicEnabled(false);
+                }
+            };
+
+            const toggleSpeakerFunction = (enabled) => {
+                setLocalSpeakerEnabled(enabled);
+                document.querySelectorAll('audio').forEach(a => {
+                    a.muted = !enabled;
+                    if (!a.muted) {
+                        a.play().catch(e => console.log('Audio play error:', e));
+                    }
+                });
+            };
+
             const sendEmote = (emoji) => {
                 sendMessage({ type: 'emote', emoji });
                 // Kendi ekranımda hemen göster
@@ -1330,9 +1400,11 @@
             }, [calculationLobby, calculationTimer]);
 
             // Oyun state'ini temizlemek için merkezi bir fonksiyon
-            const resetGameClientState = () => {
+            const resetGameClientState = (keepRoom = false) => {
                 setGameState(null);
-                setRoomCode('');
+                if (!keepRoom) {
+                    setRoomCode('');
+                }
                 setSearching(false);
                 setSelectedTileIndex(null);
                 setValidMoves([]);
@@ -1593,7 +1665,11 @@
                     case 'roomJoined':
                         setRoomCode(data.roomCode);
                         setIsHost(false);
-                        const currentOpponents = data.players.filter(p => String(p.id) !== String(data.playerId || currentPid));
+                        // Fix duplicate player issue - ensure we don't include current player
+                        const currentPid = String(data.playerId || playerIdRef.current);
+                        const currentOpponents = (data.players || [])
+                            .filter(p => String(p.id || p.playerId) !== currentPid)
+                            .filter((p, index, arr) => arr.findIndex(op => String(op.id || op.playerId) === String(p.id || p.playerId)) === index); // Remove duplicates
                         setOpponents(currentOpponents);
                         setScreen('room_lobby');
 
@@ -1604,7 +1680,14 @@
                         break;
                     case 'playerJoinedRoom':
                         showNotification(`${data.player.username} odaya katıldı!`, 'info');
-                        setOpponents(prev => [...prev, data.player]);
+                        setOpponents(prev => {
+                            // Check if player already exists to prevent duplicates
+                            const playerExists = prev.some(p => String(p.id || p.playerId) === String(data.player.id || data.player.playerId));
+                            if (!playerExists) {
+                                return [...prev, data.player];
+                            }
+                            return prev;
+                        });
                         // WebRTC: Yeni gelen oyuncuyla bağlantı kur
                         createPeerConnection(String(data.player.id));
                         break;
@@ -1710,18 +1793,20 @@
                             const isPersistent = (gameState?.playerOrder?.length === 4) || (roomCode && roomCode !== '');
                             const isRanked = data.isRanked;
 
-                            resetGameClientState();
-                            if (playerData) initializeTelegramAuth();
-
                             if (isRanked || !isPersistent) {
+                                // For ranked games or non-persistent games, reset everything and go to lobby
+                                resetGameClientState(false);
+                                if (playerData) initializeTelegramAuth();
                                 sendMessage({ type: 'cancelSearch' });
                                 cleanupVoiceChat();
                                 setScreen('lobby');
                             } else {
-                                // Özel oda veya 4p maç ise oda lobisine dön
+                                // For persistent games (4p or private rooms), keep room and go to room lobby
+                                resetGameClientState(true);
+                                if (playerData) initializeTelegramAuth();
                                 setScreen('room_lobby');
                             }
-                        }, 6000);
+                        }, 5000);
                         break;
                     case 'playerDisconnected':
                         showNotification('Rakip bağlantısı koptu, bekleniyor...', 'warning');
@@ -1780,8 +1865,13 @@
                         break;
                     case 'broadcastMessage':
                         try {
-                            if (!localStorage.getItem(`announcement_read_${data.id}`)) {
+                            // Create consistent key for both message handler and popup
+                            const broadcastKey = data.id ? `announcement_read_${data.id}` : `announcement_read_${btoa(data.message.substring(0, 20))}`;
+                            
+                            if (!localStorage.getItem(broadcastKey)) {
                                 setAnnouncement({ message: data.message, id: data.id });
+                                // Mark as read immediately to prevent showing again
+                                localStorage.setItem(broadcastKey, 'true');
                             }
                         } catch (e) { // localStorage yoksa
                             setAnnouncement({ message: data.message, id: data.id });
@@ -2035,10 +2125,17 @@
                 // Telegram WebApp için özel çıkış mesajı
                 const message = 'Oyundan çıkmak istediğinize emin misiniz? Çıkarsanız maçı kaybedersiniz.';
                 if (window.confirm(message)) {
-                    sendMessage({ type: 'leaveGame' });
-                    localStorage.removeItem('domino_session');
+                    // Stop timer and clean up game state first
+                    cleanupVoiceChat();
                     resetGameClientState();
+                    setSearching(false);
+                    
+                    // Then send leave message to server
+                    sendMessage({ type: 'leaveGame' });
                     sendMessage({ type: 'cancelSearch' });
+                    localStorage.removeItem('domino_session');
+                    
+                    // Force screen change to lobby
                     setScreen('lobby');
                 }
             };
@@ -2378,22 +2475,15 @@
                     </div>
 
                     <div className="mt-12 flex flex-col gap-3 w-full max-w-xs relative z-10">
-                        {/* Voice Buttons for Lobby */}
-                        <div className="flex gap-4 justify-center mb-6">
+                        {/* Voice Button for Lobby - TEK BUTON */}
+                        <div className="flex justify-center mb-6">
                             <button
-                                onClick={toggleMic}
-                                className={`w-14 h-14 rounded-2xl flex items-center justify-center border-2 transition-all shadow-2xl ${localMicEnabled ? 'bg-green-500 border-green-400 text-white animate-glow-pulse' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
+                                onClick={toggleVoice}
+                                className={`w-20 h-20 rounded-full flex flex-col items-center justify-center border-4 transition-all shadow-2xl ${localMicEnabled ? 'bg-green-500 border-green-400 text-white shadow-[0_0_20px_rgba(34,197,94,0.6)]' : 'bg-gray-800 border-gray-600 text-gray-400'}`}
                             >
-                                <span className="text-3xl">{localMicEnabled ? '🎙️' : '🔇'}</span>
+                                <span className="text-3xl mb-1">{localMicEnabled ? '🎙️' : '🔇'}</span>
+                                <span className="text-[10px] font-bold uppercase">{localMicEnabled ? 'Səs Açıq' : 'Səs Bağlı'}</span>
                             </button>
-                            <div className="w-full px-4">
-                                <button
-                                    onClick={toggleSpeaker}
-                                    className={`w-full py-3 rounded-2xl flex items-center justify-center gap-2 border-2 transition-all shadow-2xl ${localSpeakerEnabled ? 'bg-blue-500 border-blue-400 text-white shadow-glow' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
-                                >
-                                    <span className="text-2xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
-                                    <span className="text-sm font-bold">{localSpeakerEnabled ? 'Səs Açıq' : 'Səs Bağlı'}</span>
-                                </button>
                             </div>
                         </div>
 
@@ -2500,7 +2590,7 @@
                     {/* Top Bar - ONLY Opponents */}
                     {/* RAKİP BARI KONUMU: Aşağıdaki 'top-[2cm]' değerini değiştirerek barı aşağı veya yukarı taşıyabilirsiniz. */}
                     <div className="fixed top-[2cm] left-0 w-full z-40 bg-black/90 backdrop-blur-md border-b border-white/10 shadow-2xl">
-                        <div className="flex w-full items-stretch">
+                        <div className={`flex w-full items-stretch ${isFourPlayer ? 'gap-0' : 'gap-1'}`}>
                             {(() => {
                                 const playersMap = gameState?.players || {};
                                 const playerIds = gameState?.playerOrder || [];
@@ -2514,35 +2604,35 @@
                                     const activeTurn = gameState?.currentPlayer === pid;
 
                                     return (
-                                        <div key={idx} className={`relative flex-1 flex flex-col items-center justify-center ${isSingleOpponent ? 'py-4' : 'py-2'} transition-all duration-300 
+                                        <div key={idx} className={`relative flex-1 flex flex-col items-center justify-center ${isSingleOpponent ? 'py-6' : (isFourPlayer ? 'py-3' : 'py-4')} transition-all duration-300 
                                             ${activeTurn ? 'bg-yellow-500/20 shadow-[inset_0_0_15px_rgba(234,179,8,0.3)]' : 'bg-transparent'} 
                                             ${idx !== opponents.length - 1 ? 'border-r border-white/10' : ''}
                                         `}>
                                             {/* Emote Display for Opponent - MOVED OUTSIDE OVERFLOW HIDDEN */}
                                             {activeEmotes.filter(e => e.senderId === pid).map(e => (
-                                                <div key={e.id} className="absolute top-10 left-1/2 -translate-x-1/2 text-5xl animate-float-down z-50 pointer-events-none drop-shadow-lg">
+                                                <div key={e.id} className="absolute top-14 left-1/2 -translate-x-1/2 text-6xl animate-float-up z-50 pointer-events-none drop-shadow-lg">
                                                     {e.emoji}
                                                 </div>
                                             ))}
 
                                             <div className="flex items-center gap-1.5 px-0.5 w-full justify-center">
-                                                <div className={`${isSingleOpponent ? 'w-12 h-12' : (isFourPlayer ? 'w-8 h-8' : 'w-10 h-10')} rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative flex-shrink-0 ${p.micEnabled ? 'voice-pulse' : ''}`}>
+                                                <div className={`${isSingleOpponent ? 'w-12 h-12' : (isFourPlayer ? 'w-7 h-7' : 'w-10 h-10')} rounded-full border-2 ${activeTurn ? 'border-yellow-400 shadow-glow' : 'border-white/20'} overflow-hidden bg-gray-900 relative flex-shrink-0 ${p.micEnabled ? 'voice-pulse' : ''}`}>
                                                     <img src={p.photoUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" alt={p.name} />
 
                                                     <div className="absolute top-0 right-0 p-0.5 z-20">
-                                                        {p.micEnabled ? <span className="block w-2 h-2 bg-green-500 rounded-full animate-pulse border border-black shadow-lg"></span> : <span className="block w-2 h-2 bg-red-500 rounded-full border border-black"></span>}
+                                                        {p.micEnabled ? <span className="block w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse border border-black shadow-lg"></span> : <span className="block w-2.5 h-2.5 bg-red-500 rounded-full border border-black"></span>}
                                                     </div>
                                                 </div>
-                                                <div className="flex flex-col min-w-0 max-w-[60px] sm:max-w-[100px]">
-                                                    <span className={`text-white font-black ${isSingleOpponent ? 'text-xs' : (isFourPlayer ? 'text-[9px]' : 'text-[10px]')} truncate ${activeTurn ? 'text-yellow-400' : ''}`}>{p.name || 'Oyuncu'}</span>
-                                                    <div className={`text-yellow-500/80 font-black ${isFourPlayer ? 'text-[8px]' : 'text-[9px]'} leading-tight`}>{p.score} / 101</div>
+                                                <div className="flex flex-col min-w-0 max-w-[50px] sm:max-w-[80px]">
+                                                    <span className={`text-white font-black ${isSingleOpponent ? 'text-xs' : (isFourPlayer ? 'text-[8px]' : 'text-[10px]')} truncate ${activeTurn ? 'text-yellow-400' : ''}`}>{p.name || 'Oyuncu'}</span>
+                                                    <div className={`text-yellow-500/80 font-black ${isFourPlayer ? 'text-[7px]' : 'text-[9px]'} leading-tight`}>{p.score} / 101</div>
                                                 </div>
                                             </div>
 
                                             {/* Küçük Rakip Taşları */}
                                             <div className={`flex justify-center gap-0.5 mt-0.5 flex-wrap w-full px-1`}>
                                                 {Array(p.hand?.length || 0).fill(0).map((_, i) => (
-                                                    <div key={i} className={`${isSingleOpponent ? 'w-2 h-3' : (isFourPlayer ? 'w-1.5 h-2' : 'w-1.5 h-2.5')} bg-gray-300/50 rounded-[1px]`}></div>
+                                                    <div key={i} className={`${isSingleOpponent ? 'w-2 h-3' : (isFourPlayer ? 'w-1 h-1.5' : 'w-1.5 h-2.5')} bg-gray-300/50 rounded-[1px]`}></div>
                                                 ))}
                                             </div>
                                         </div>
@@ -2713,22 +2803,17 @@
                             </button>
                             <div className="flex flex-col items-center gap-2">
                                 <button
-                                    onClick={toggleMic}
-                                    className={`w-12 h-10 rounded-xl flex items-center justify-center border-2 transition-all shadow-xl ${localMicEnabled ? 'bg-green-500 border-green-400 text-white animate-glow-pulse' : 'bg-gray-900/80 border-white/10 text-gray-400'}`}
+                                    onClick={toggleVoice}
+                                    className={`w-16 h-16 rounded-full flex flex-col items-center justify-center border-4 transition-all shadow-2xl ${localMicEnabled ? 'bg-green-500 border-green-400 text-white shadow-[0_0_20px_rgba(34,197,94,0.6)]' : 'bg-gray-900/90 border-gray-600 text-gray-400'}`}
                                 >
-                                    <span className="text-xl">{localMicEnabled ? '🎙️' : '🔇'}</span>
-                                </button>
-                                <button
-                                    onClick={toggleSpeaker}
-                                    className={`w-12 h-10 rounded-xl flex items-center justify-center border-2 transition-all shadow-xl ${localSpeakerEnabled ? 'bg-blue-500 border-blue-400 text-white shadow-glow' : 'bg-gray-900/80 border-white/10 text-white/60'}`}
-                                >
-                                    <span className="text-xl">{localSpeakerEnabled ? '🔊' : '🔈'}</span>
+                                    <span className="text-2xl mb-1">{localMicEnabled ? '🎙️' : '🔇'}</span>
+                                    <span className="text-[8px] font-bold uppercase">{localMicEnabled ? 'Açıq' : 'Bağlı'}</span>
                                 </button>
                             </div>
 
                             {/* Emote Picker */}
                             <div className="flex gap-1 mt-2 bg-black/40 p-1 rounded-full backdrop-blur-sm border border-white/5">
-                                {['🧠', '😂', '😡', '👏', '💩', '❤️', '💋', '🖕🏼'].map(emoji => (
+                                {['😂', '😡', '👏', '💋', '🖕🏼'].map(emoji => (
                                     <button key={emoji} onClick={() => sendEmote(emoji)} className="text-lg hover:scale-125 transition-transform p-1">
                                         {emoji}
                                     </button>
