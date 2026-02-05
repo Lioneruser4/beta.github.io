@@ -681,7 +681,7 @@ function shuffleArray(array) {
     return arr;
 }
 
-function initializeGame(roomCode, playerIds, options = {}) {
+function initializeGame(roomCode, ...playerIds) {
     const tiles = createDominoSet();
     const room = rooms.get(roomCode);
     const playersCount = playerIds.length;
@@ -706,26 +706,22 @@ function initializeGame(roomCode, playerIds, options = {}) {
 
     const market = tiles.slice(playersCount * 7);
 
-    const { startingPlayerId = null, enforceFirstDouble = true } = options;
-
     // En düşük çifti bul (1|1, 2|2, ..., 6|6)
-    let startingPlayer = startingPlayerId || playerIds[0];
+    let startingPlayer = playerIds[0];
     let foundStartTile = false;
     let firstMoveTile = null;
 
-    if (enforceFirstDouble) {
-        // Önce çiftleri kontrol et (1:1'den başlayarak)
-        for (let d = 1; d <= 6; d++) {
-            for (const pid of playerIds) {
-                if (players[pid].hand.some(t => t[0] === d && t[1] === d)) {
-                    startingPlayer = pid;
-                    foundStartTile = true;
-                    firstMoveTile = [d, d];
-                    break;
-                }
+    // Önce çiftleri kontrol et (1:1'den başlayarak)
+    for (let d = 1; d <= 6; d++) {
+        for (const pid of playerIds) {
+            if (players[pid].hand.some(t => t[0] === d && t[1] === d)) {
+                startingPlayer = pid;
+                foundStartTile = true;
+                firstMoveTile = [d, d];
+                break;
             }
-            if (foundStartTile) break;
         }
+        if (foundStartTile) break;
     }
 
     const initialBoard = [];
@@ -736,7 +732,7 @@ function initializeGame(roomCode, playerIds, options = {}) {
         playerOrder: playerIds,
         market: market,
         currentPlayer: startingPlayer,
-        firstMoveTile: firstMoveTile, // Store for restriction (ilk el)
+        firstMoveTile: firstMoveTile, // Store for restriction
         moves: 0,
         turn: 1,
         lastMove: null,
@@ -1101,7 +1097,7 @@ function handleFindMatch(ws, data) {
         const room = { code: roomCode, players, type: gameType, startTime: Date.now(), capacity: targetSize };
         rooms.set(roomCode, room);
 
-        const gameState = initializeGame(roomCode, playerIds);
+        const gameState = initializeGame(roomCode, ...playerIds);
         gameState.turnDuration = 30000;
 
         participants.forEach(p => {
@@ -1304,7 +1300,7 @@ function startPrivateGame(roomCode) {
     if (!room) return;
 
     const playerIds = Object.keys(room.players);
-    const gameState = initializeGame(roomCode, playerIds);
+    const gameState = initializeGame(roomCode, ...playerIds);
 
     // Önce matchFound gönder
     playerIds.forEach(pid => {
@@ -1567,13 +1563,9 @@ async function handleGameEnd(roomCode, winnerResult, gameState, isForfeit = fals
             }
         });
 
-        const roundWinnerId = winnerId && winnerId !== 'DRAW' ? winnerId : null;
         setTimeout(() => {
             if (!rooms.has(roomCode)) return;
-            const newGS = initializeGame(roomCode, playerIds, {
-                startingPlayerId: roundWinnerId,
-                enforceFirstDouble: false
-            });
+            const newGS = initializeGame(roomCode, ...playerIds);
             playerIds.forEach(pid => sendGameState(roomCode, pid));
         }, 7000); // 7 Saniye Bekleme
 
@@ -1937,7 +1929,7 @@ function handlePlayAgain(ws) {
         });
 
         const playerIds = Object.keys(room.players);
-        const gameState = initializeGame(ws.roomCode, playerIds);
+        const gameState = initializeGame(ws.roomCode, ...playerIds);
 
         playerIds.forEach(pid => {
             const socket = playerConnections.get(pid);
@@ -1956,8 +1948,8 @@ function handleLeaveGame(ws) {
 
     const gs = room.gameState;
     const playerIds = Object.keys(gs.players);
-    if (playerIds.length > 2) {
-        endMultiplayerGameOnLeave(room, ws.playerId, ws.playerName, 'leave');
+    if (playerIds.length !== 2) {
+        rooms.delete(ws.roomCode);
         ws.roomCode = null;
         return;
     }
@@ -1973,54 +1965,6 @@ function handleLeaveGame(ws) {
 }
 
 const disconnectGraceTimers = new Map();
-
-function endMultiplayerGameOnLeave(room, leaverId, leaverName, reason) {
-    if (!room || !room.gameState) return;
-
-    const roomCode = room.code;
-    const remainingIds = Object.keys(room.players).filter(pid => String(pid) !== String(leaverId));
-
-    delete room.players[leaverId];
-    if (room.host === leaverId) {
-        room.host = remainingIds[0] || null;
-    }
-
-    room.gameState = null;
-    room.lastActivity = Date.now();
-
-    remainingIds.forEach(pid => {
-        const pWs = playerConnections.get(pid);
-        if (pWs && pWs.readyState === WebSocket.OPEN) {
-            pWs.send(JSON.stringify({
-                type: 'gameEnd',
-                winner: remainingIds[0] || null,
-                winnerName: remainingIds[0] ? room.players[remainingIds[0]]?.name : null,
-                isRanked: false,
-                reason: reason
-            }));
-            const lang = pWs.language || 'az';
-            pWs.send(JSON.stringify({
-                type: 'gameMessage',
-                message: `${leaverName || 'Oyuncu'} oyundan ayrıldı.`,
-                duration: 4000
-            }));
-        }
-    });
-
-    const playerList = Object.keys(room.players).map(id => ({ ...room.players[id], id }));
-    Object.keys(room.players).forEach(pid => {
-        const socket = playerConnections.get(pid);
-        if (socket) {
-            sendMessage(socket, {
-                type: 'roomUpdated',
-                players: playerList,
-                host: room.host,
-                capacity: room.capacity,
-                roomCode: roomCode
-            });
-        }
-    });
-}
 
 function handleDisconnect(ws) {
     if (!ws.playerId) return;
@@ -2047,11 +1991,6 @@ function handleDisconnect(ws) {
     if (ws.roomCode) {
         const room = rooms.get(ws.roomCode);
         if (room && room.gameState && !room.gameState.winner) {
-            if ((room.capacity || 2) >= 3) {
-                endMultiplayerGameOnLeave(room, ws.playerId, ws.playerName, 'disconnect');
-                ws.roomCode = null;
-                return;
-            }
             room.gameState.paused = true; // Oyunu dondur
             console.log(`🕒 Oyuncu için 15 saniye bekleme başlatıldı: ${ws.playerName}`);
 
