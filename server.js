@@ -204,28 +204,7 @@ app.post('/api/auth/telegram', async (req, res) => {
         const { telegramId, username, firstName, lastName, photoUrl, isGuest = false } = req.body;
 
         if (isGuest || !telegramId || !username) {
-            // Geçici olarak guest modunu aktif et - bağlantı sorunu için
-            if (isGuest) {
-                const guestPlayer = {
-                    _id: 'guest_' + Date.now(),
-                    telegramId: null,
-                    username: username || 'Guest' + Math.floor(Math.random() * 9999),
-                    firstName: '',
-                    lastName: '',
-                    photoUrl: null,
-                    elo: 0,
-                    level: 0,
-                    wins: 0,
-                    losses: 0,
-                    draws: 0,
-                    totalGames: 0,
-                    winStreak: 0,
-                    bestWinStreak: 0,
-                    isGuest: true
-                };
-                return res.json({ success: true, player: guestPlayer });
-            }
-            return res.status(403).json({ success: false, message: 'Telegram bilgileri bulunamadı.' });
+            return res.status(403).json({ success: false, message: 'Misafir girişi artık desteklenmiyor. Lütfen Telegram ile giriş yapın.' });
         }
 
         // Ban Kontrolü
@@ -2006,18 +1985,6 @@ function endMultiplayerGameOnLeave(room, leaverId, leaverName, reason) {
         room.host = remainingIds[0] || null;
     }
 
-    // Oyunu bitir - winner ve reason ayarla
-    room.gameState.winner = remainingIds[0] || 'LEAVER';
-    room.gameState.reason = reason;
-    room.gameState.leaverId = leaverId;
-    room.gameState.leaverName = leaverName;
-    
-    // Tüm oyunculara gameState gönder (oyun bitti bilgisi ile)
-    Object.keys(room.players).forEach(pid => {
-        sendGameState(roomCode, pid);
-    });
-    
-    // Sonra gameState'i null yap
     room.gameState = null;
     room.lastActivity = Date.now();
 
@@ -2080,9 +2047,13 @@ function handleDisconnect(ws) {
     if (ws.roomCode) {
         const room = rooms.get(ws.roomCode);
         if (room && room.gameState && !room.gameState.winner) {
-            // Tüm oyunlar (2, 3, 4 kişilik) için 30 saniye bekleme süresi
+            if ((room.capacity || 2) >= 3) {
+                endMultiplayerGameOnLeave(room, ws.playerId, ws.playerName, 'disconnect');
+                ws.roomCode = null;
+                return;
+            }
             room.gameState.paused = true; // Oyunu dondur
-            console.log(`🕒 Oyuncu için 30 saniye bekleme başlatıldı: ${ws.playerName} (Oda: ${room.capacity || 2} kişilik)`);
+            console.log(`🕒 Oyuncu için 15 saniye bekleme başlatıldı: ${ws.playerName}`);
 
             // Diğer oyuncularlara dillerine göre bildir
             Object.keys(room.players).forEach(pid => {
@@ -2092,27 +2063,34 @@ function handleDisconnect(ws) {
                     pWs.send(JSON.stringify({
                         type: 'gameMessage',
                         message: getMsg(lang, 'opponentDisconnected').replace('{name}', ws.playerName),
-                        duration: 30000 // 30 saniye bildiriş
+                        duration: 20000 // 20 saniyə bildiriş
                     }));
                 }
             });
 
-            // 30 saniyelik zamanlayıcı kur (tüm oyunlar için)
+            // 15 saniyelik zamanlayıcı kur
             const timer = setTimeout(() => {
                 const refreshedRoom = rooms.get(ws.roomCode);
                 if (refreshedRoom && refreshedRoom.gameState && !refreshedRoom.gameState.winner) {
-                    // Oyuncu geri dönmediyse oyunu bitir
-                    if (refreshedRoom.capacity >= 3) {
-                        // 3-4 kişilik oyun
-                        endMultiplayerGameOnLeave(refreshedRoom, ws.playerId, ws.playerName, 'disconnect');
+                    // 4 Kişilik Oyun Özel ELO Mantığı
+                    if (refreshedRoom.capacity === 4) {
+                        console.log(`🏆 4p maçta oyuncu düştü. Kalanlara puan dağıtılıyor.`);
+                        const totalTiles = refreshedRoom.gameState.board?.length || 0;
+                        const isLateGame = totalTiles > 15;
+                        const pointsToGive = isLateGame ? 17 : 10;
+
+                        handleGameEnd(ws.roomCode, null, refreshedRoom.gameState, true, 'disconnect_4p', {
+                            points: pointsToGive,
+                            leaver: ws.playerId
+                        });
                     } else {
-                        // 2 kişilik oyun
+                        // 2 Kişilik
                         const otherPlayerId = Object.keys(refreshedRoom.players).find(id => id !== ws.playerId);
                         handleGameEnd(ws.roomCode, otherPlayerId, refreshedRoom.gameState, true, 'disconnect');
                     }
                 }
                 disconnectGraceTimers.delete(ws.playerId);
-            }, 30000); // 30 saniye timeout
+            }, 20000); // 20 saniyə timeout
 
             disconnectGraceTimers.set(ws.playerId, timer);
         } else if (room && !room.gameState) {
@@ -2355,8 +2333,6 @@ function handleTurnTimeout(roomCode) {
         }
         // Əgər bazar bitdi və hələ də daş yoxdursa, aşağıdakı Pas məntiqinə keçəcək
     }
-}
-
 // RENDER UYUMA KODU (Server.js içine bu kısmı ekle)
 function keepRenderAlive() {
     const YOUR_SITE = 'https://beta-github-io.onrender.com';
@@ -2372,6 +2348,15 @@ function keepRenderAlive() {
 
 // Server başlayınca çağır
 keepRenderAlive();
+    // 3. Pazar boşsa pas geç
+    const currentIdx = gs.playerOrder.indexOf(currentPlayerId);
+    const nextIdx = (currentIdx + 1) % gs.playerOrder.length;
+    gs.currentPlayer = gs.playerOrder[nextIdx];
+    gs.turn++;
+    gs.turnStartTime = Date.now();
+
+    Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+}
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
