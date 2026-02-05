@@ -580,7 +580,7 @@
         const AnnouncementPopup = ({ message, id, onClose }) => {
             if (!message) return null;
 
-            const messageKey = `announcement_read_${id || btoa(message.substring(0, 20))}`;
+            const messageKey = `announcement_read_${id || 'unknown'}`;
             const [isVisible, setIsVisible] = useState(false);
 
             useEffect(() => {
@@ -600,7 +600,6 @@
 
             const handleClose = (e) => {
                 if (e) e.stopPropagation();
-                localStorage.setItem(messageKey, 'true'); // Mark as read only on close
                 setIsVisible(false);
                 onClose();
             };
@@ -1309,19 +1308,21 @@
             }, [calculationLobby, calculationTimer]);
 
             // Oyun state'ini temizlemek için merkezi bir fonksiyon
-            const resetGameClientState = () => {
+            const resetGameClientState = (keepRoom = false) => {
                 setGameState(null);
-                setRoomCode('');
+                if (!keepRoom) {
+                    setRoomCode('');
+                    setOpponents([]);
+                    setIsHost(false);
+                    setJoinCode('');
+                }
                 setSearching(false);
                 setSelectedTileIndex(null);
                 setValidMoves([]);
                 setEndInfo(null);
                 setOpponent(null);
-                setOpponents([]);
-                setJoinCode('');
                 setCalculationLobby(null);
                 setCalculationTimer(7);
-                setIsHost(false); // Reset host status
                 prevBoardLength.current = 0;
                 isMyMove.current = false;
             };
@@ -1566,6 +1567,7 @@
                         setRoomCode(data.roomCode);
                         setPlayerId(data.playerId); // FIX: Dublikat və səs problemi üçün ID-ni yenilə
                         setIsHost(true); // Set host status
+                        setRoomCapacity(data.capacity || 2);
                         setScreen('room_lobby'); // Transition to room lobby
                         setOpponents([]); // Clear opponents for new room
                         break;
@@ -1686,19 +1688,18 @@
 
                         localStorage.removeItem('domino_session');
                         setTimeout(() => {
-                            resetGameClientState();
-                            if (playerData) initializeTelegramAuth();
-
                             // Redirection Logic
                             const isRanked = data.isRanked;
                             const isPersistent = (gameState?.playerOrder?.length === 4) || (roomCode && roomCode !== '');
 
                             if (isRanked || !isPersistent) {
+                                resetGameClientState();
+                                if (playerData) initializeTelegramAuth();
                                 sendMessage({ type: 'cancelSearch' });
                                 cleanupVoiceChat();
                                 setScreen('lobby');
                             } else {
-                                // Özel oda veya 4p maç ise oda lobisine dön
+                                resetGameClientState(true);
                                 setScreen('room_lobby');
                             }
                         }, 5000);
@@ -1745,7 +1746,9 @@
                         break;
                     case 'broadcastMessage':
                         try {
-                            if (!localStorage.getItem(`announcement_read_${data.id}`)) {
+                            const broadcastKey = `announcement_read_${data.id || 'unknown'}`;
+                            if (!localStorage.getItem(broadcastKey)) {
+                                localStorage.setItem(broadcastKey, 'true');
                                 setAnnouncement({ message: data.message, id: data.id });
                             }
                         } catch (e) { // localStorage yoksa
@@ -2175,7 +2178,7 @@
                                 onClick={reportBug}
                                 className="bg-red-500/20 hover:bg-red-500/40 text-red-400 px-4 py-2 rounded-full text-xs font-black transition-all border border-red-500/30 flex items-center gap-2"
                             >
-                                🐞 {language === 'az' ? 'HATA BİLDİR' : 'REPORT BUG'}
+                                🐞 {language === 'az' ? 'XETA BİLDİR' : 'REPORT BUG'}
                             </button>
                         </div>
 
@@ -2689,7 +2692,7 @@
 
                             {/* Emote Picker */}
                             <div className="flex gap-1 mt-2 bg-black/40 p-1 rounded-full backdrop-blur-sm border border-white/5">
-                                {['🧠', '😂', '😡', '👏', '💩', '❤️', '💋', '🖕🏼'].map(emoji => (
+                                {['😂', '😡', '👏','❤️','🖕🏼'].map(emoji => (
                                     <button key={emoji} onClick={() => sendEmote(emoji)} className="text-lg hover:scale-125 transition-transform p-1">
                                         {emoji}
                                     </button>
