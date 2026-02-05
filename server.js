@@ -2334,8 +2334,6 @@ function handleTurnTimeout(roomCode) {
         }
         // Əgər bazar bitdi və hələ də daş yoxdursa, aşağıdakı Pas məntiqinə keçəcək
     }
-}
-
 // RENDER UYUMA KODU (Server.js içine bu kısmı ekle)
 function keepRenderAlive() {
     const YOUR_SITE = 'https://beta-github-io.onrender.com';
@@ -2351,6 +2349,15 @@ function keepRenderAlive() {
 
 // Server başlayınca çağır
 keepRenderAlive();
+    // 3. Pazar boşsa pas geç
+    const currentIdx = gs.playerOrder.indexOf(currentPlayerId);
+    const nextIdx = (currentIdx + 1) % gs.playerOrder.length;
+    gs.currentPlayer = gs.playerOrder[nextIdx];
+    gs.turn++;
+    gs.turnStartTime = Date.now();
+
+    Object.keys(gs.players).forEach(pid => sendGameState(roomCode, pid));
+}
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
