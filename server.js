@@ -1985,18 +1985,6 @@ function endMultiplayerGameOnLeave(room, leaverId, leaverName, reason) {
         room.host = remainingIds[0] || null;
     }
 
-    // Oyunu bitir - winner ve reason ayarla
-    room.gameState.winner = remainingIds[0] || 'LEAVER';
-    room.gameState.reason = reason;
-    room.gameState.leaverId = leaverId;
-    room.gameState.leaverName = leaverName;
-    
-    // Tüm oyunculara gameState gönder (oyun bitti bilgisi ile)
-    Object.keys(room.players).forEach(pid => {
-        sendGameState(roomCode, pid);
-    });
-    
-    // Sonra gameState'i null yap
     room.gameState = null;
     room.lastActivity = Date.now();
 
@@ -2059,9 +2047,13 @@ function handleDisconnect(ws) {
     if (ws.roomCode) {
         const room = rooms.get(ws.roomCode);
         if (room && room.gameState && !room.gameState.winner) {
-            // Tüm oyunlar (2, 3, 4 kişilik) için 30 saniye bekleme süresi
+            if ((room.capacity || 2) >= 3) {
+                endMultiplayerGameOnLeave(room, ws.playerId, ws.playerName, 'disconnect');
+                ws.roomCode = null;
+                return;
+            }
             room.gameState.paused = true; // Oyunu dondur
-            console.log(`🕒 Oyuncu için 30 saniye bekleme başlatıldı: ${ws.playerName} (Oda: ${room.capacity || 2} kişilik)`);
+            console.log(`🕒 Oyuncu için 15 saniye bekleme başlatıldı: ${ws.playerName}`);
 
             // Diğer oyuncularlara dillerine göre bildir
             Object.keys(room.players).forEach(pid => {
@@ -2071,27 +2063,34 @@ function handleDisconnect(ws) {
                     pWs.send(JSON.stringify({
                         type: 'gameMessage',
                         message: getMsg(lang, 'opponentDisconnected').replace('{name}', ws.playerName),
-                        duration: 30000 // 30 saniye bildiriş
+                        duration: 20000 // 20 saniyə bildiriş
                     }));
                 }
             });
 
-            // 30 saniyelik zamanlayıcı kur (tüm oyunlar için)
+            // 15 saniyelik zamanlayıcı kur
             const timer = setTimeout(() => {
                 const refreshedRoom = rooms.get(ws.roomCode);
                 if (refreshedRoom && refreshedRoom.gameState && !refreshedRoom.gameState.winner) {
-                    // Oyuncu geri dönmediyse oyunu bitir
-                    if (refreshedRoom.capacity >= 3) {
-                        // 3-4 kişilik oyun
-                        endMultiplayerGameOnLeave(refreshedRoom, ws.playerId, ws.playerName, 'disconnect');
+                    // 4 Kişilik Oyun Özel ELO Mantığı
+                    if (refreshedRoom.capacity === 4) {
+                        console.log(`🏆 4p maçta oyuncu düştü. Kalanlara puan dağıtılıyor.`);
+                        const totalTiles = refreshedRoom.gameState.board?.length || 0;
+                        const isLateGame = totalTiles > 15;
+                        const pointsToGive = isLateGame ? 17 : 10;
+
+                        handleGameEnd(ws.roomCode, null, refreshedRoom.gameState, true, 'disconnect_4p', {
+                            points: pointsToGive,
+                            leaver: ws.playerId
+                        });
                     } else {
-                        // 2 kişilik oyun
+                        // 2 Kişilik
                         const otherPlayerId = Object.keys(refreshedRoom.players).find(id => id !== ws.playerId);
                         handleGameEnd(ws.roomCode, otherPlayerId, refreshedRoom.gameState, true, 'disconnect');
                     }
                 }
                 disconnectGraceTimers.delete(ws.playerId);
-            }, 30000); // 30 saniye timeout
+            }, 20000); // 20 saniyə timeout
 
             disconnectGraceTimers.set(ws.playerId, timer);
         } else if (room && !room.gameState) {
