@@ -1325,9 +1325,21 @@
             // Ses Efektleri (Opsiyonel - Tarayıcı izin verirse çalışır)
 
             useEffect(() => {
+                // Timeout ekle - 10 saniye içinde lobby'e geç
+                const timeout = setTimeout(() => {
+                    if (screen === 'loading') {
+                        console.log('⏰ Loading timeout - forcing lobby');
+                        setScreen('lobby');
+                    }
+                }, 10000);
+
                 initializeTelegramAuth();
                 connectToServer();
-                return () => { if (wsRef.current) wsRef.current.close(); };
+
+                return () => { 
+                    clearTimeout(timeout);
+                    if (wsRef.current) wsRef.current.close(); 
+                };
             }, []);
 
             // Confetti Effect
@@ -1466,7 +1478,10 @@
                     setPlayerData(guestData);
                     console.log('👥 Guest mode (error fallback):', guestData);
                 } finally {
-                    setScreen('lobby');
+                    // Her durumda lobby'e geç - loading'de kalma
+                    if (screen === 'loading') {
+                        setScreen('lobby');
+                    }
                 }
             };
 
@@ -1515,9 +1530,21 @@
                     wsUrl = `ws://${window.location.hostname}:10000`;
                 }
 
+                console.log('🔌 Connecting to:', wsUrl);
+
                 const ws = new WebSocket(`${wsUrl}?lang=${language}`);
 
+                // Connection timeout
+                const connectionTimeout = setTimeout(() => {
+                    if (ws.readyState !== WebSocket.OPEN) {
+                        console.log('⏰ Connection timeout - forcing lobby');
+                        ws.close();
+                        setScreen('lobby');
+                    }
+                }, 8000);
+
                 ws.onopen = () => {
+                    clearTimeout(connectionTimeout);
                     setConnected(true);
                     showNotification('Sunucuya Bağlandı', 'success');
 
@@ -1530,7 +1557,17 @@
                         }));
                     }
                 };
-                ws.onclose = () => { setConnected(false); setTimeout(connectToServer, 3000); };
+                ws.onclose = () => { 
+                    clearTimeout(connectionTimeout);
+                    setConnected(false); 
+                    setTimeout(connectToServer, 3000); 
+                };
+                ws.onerror = (error) => {
+                    clearTimeout(connectionTimeout);
+                    console.error('WebSocket error:', error);
+                    showNotification('Bağlantı hatası - Lobby yönlendiriliyorsunuz', 'error');
+                    setScreen('lobby');
+                };
                 ws.onmessage = (e) => {
                     try {
                         const data = JSON.parse(e.data);
