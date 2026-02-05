@@ -3024,14 +3024,20 @@
     </script>
 
     <script>
-        const tgApp = window.Telegram.WebApp;
-        tgApp.ready();
-        tgApp.expand();
-        if (tgApp.requestFullscreen) {
-            tgApp.requestFullscreen();
+        const tgApp = window.Telegram?.WebApp;
+        if (tgApp) {
+            tgApp.ready();
+            tgApp.expand();
+            if (tgApp.requestFullscreen) {
+                tgApp.requestFullscreen();
+            }
+            if (tgApp.disableVerticalSwipes) {
+                tgApp.disableVerticalSwipes();
+            }
+            if (tgApp.setHeaderColor) {
+                tgApp.setHeaderColor('#1b4d3e');
+            }
         }
-        tgApp.disableVerticalSwipes();
-        tgApp.setHeaderColor('#1b4d3e');
 
         // Telegram WebApp çıkış işlemi için özel düzenleme
         const originalConfirm = window.confirm;
