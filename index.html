@@ -1617,12 +1617,14 @@
                         setRoomCode(data.roomCode);
                         setPlayerId(data.playerId); // FIX: Dublikat və səs problemi üçün ID-ni yenilə
                         setIsHost(true); // Set host status
+                        setRoomCapacity(data.capacity || 2);
                         setScreen('room_lobby'); // Transition to room lobby
                         setOpponents([]); // Clear opponents for new room
                         break;
                     case 'roomJoined':
                         setRoomCode(data.roomCode);
                         setIsHost(false);
+                        setRoomCapacity(data.capacity || 2);
                         const currentOpponents = data.players.filter(p => String(p.id) !== String(data.playerId || currentPid));
                         setOpponents(currentOpponents);
                         setScreen('room_lobby');
@@ -1694,6 +1696,12 @@
 
                         // FIX: Oyun içi uyarılarda lobiye atma
                         if (data.code === 'HAS_PLAYABLE_TILE' || data.code === 'NO_MARKET_FIRST_ROUND') return;
+
+                        // FIX: Oyun bulunamadıysa hatalı session'ı temizle
+                        if (data.code === 'GAME_NOT_FOUND') {
+                            localStorage.removeItem('domino_session');
+                            window._lastSession = null;
+                        }
 
                         // FIX: Kesinlikle lobiye atma, sadece bildirim göster
                         // sendMessage({ type: 'cancelSearch' });
