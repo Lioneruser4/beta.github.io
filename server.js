@@ -1297,7 +1297,7 @@ function handleJoinRoom(ws, data) {
     });
 
     // Odaya yeni biri girdiğinde, giren kişiye kendi ID'sini de teyit et (Dublikat engelleme için kritik)
-    sendMessage(ws, { type: 'roomJoined', roomCode: code, players: playerList, playerId: pid });
+    sendMessage(ws, { type: 'roomJoined', roomCode: code, players: playerList, playerId: pid, capacity: capacity });
 
     // --- PRIVATE ODALARDA OTOMATİK BAŞLATMA KAPASİTEYE GÖRE ---
     if (Object.keys(room.players).length >= capacity) {
@@ -1908,7 +1908,7 @@ function handleRejoin(ws, data) {
 
     const room = rooms.get(roomCode);
     if (!room || !room.gameState) {
-        return sendMessage(ws, { type: 'error', message: getMsg(ws.language, 'gameNotFound') });
+        return sendMessage(ws, { type: 'error', code: 'GAME_NOT_FOUND', message: getMsg(ws.language, 'gameNotFound') });
     }
 
     // Kopma zamanlayıcısını temizle
