@@ -1158,11 +1158,11 @@
                         });
 
                         setLocalMicEnabled(true);
-                        showNotification('Mikrofon açıldı', 'success');
+                        showNotification(t.micOpened, 'success');
                     } catch (err) {
                         console.error('Mic Error:', err);
                         setLocalMicEnabled(false);
-                        showNotification('Mikrofon hatası: ' + err.message, 'error');
+                        showNotification(t.micError + err.message, 'error');
                         return;
                     }
                 } else {
@@ -1170,7 +1170,7 @@
                         localStream.current.getTracks().forEach(t => t.enabled = false);
                     }
                     setLocalMicEnabled(false);
-                    showNotification('Mikrofon qapadıldı', 'info');
+                    showNotification(t.micClosed, 'info');
                 }
                 sendMessage({ type: 'updateAudioStatus', audioType: 'mic', enabled: newState });
             };
@@ -1259,7 +1259,19 @@
                     voiceRequestBtn: "Səsli Söhbət edək",
                     voiceRequestMsg: "danışmaq istəyir, mikrofonu və hoparloru aç!",
                     voiceRequestSent: "İstək göndərildi",
-                    waitCooldown: "Biraz gözləyin..."
+                    waitCooldown: "Biraz gözləyin...",
+                    serverConnected: "Serverə Qoşuldu",
+                    micOpened: "Mikrofon açıldı",
+                    micClosed: "Mikrofon qapadıldı",
+                    micError: "Mikrofon xətası: ",
+                    playerJoined: "otağa qoşuldu!",
+                    playerLeft: "otaqdan çıxdı!",
+                    nowHost: "Artıq otaq sahibisiniz!",
+                    gameStarted: "Oyun Başladı!",
+                    opponentDisconnected: "Rəqib bağlantısı kəsildi, gözlənilir...",
+                    opponentReconnected: "geri döndü!",
+                    opponentPassed: "pas keçdi",
+                    drawTileBtn: "DAŞI ÇƏK"
                 },
                 en: {
                     ranked: "Ranked",
@@ -1308,7 +1320,19 @@
                     voiceRequestMsg: "wants to talk, open mic and speaker!",
                     voiceRequestSent: "Request sent",
                     waitCooldown: "Please wait...",
-                    draw: "Draw"
+                    draw: "Draw",
+                    serverConnected: "Connected to Server",
+                    micOpened: "Microphone opened",
+                    micClosed: "Microphone closed",
+                    micError: "Microphone error: ",
+                    playerJoined: "joined the room!",
+                    playerLeft: "left the room!",
+                    nowHost: "You are now the host!",
+                    gameStarted: "Game Started!",
+                    opponentDisconnected: "Opponent disconnected, waiting...",
+                    opponentReconnected: "reconnected!",
+                    opponentPassed: "passed their turn",
+                    drawTileBtn: "DRAW TILE"
                 }
             };
 
@@ -1547,7 +1571,7 @@
 
                 ws.onopen = () => {
                     setConnected(true);
-                    showNotification('Sunucuya Bağlandı', 'success');
+                    showNotification(translations[languageRef.current].serverConnected, 'success');
 
                     // Keep-Alive Ping
                     if (window.pingInterval) clearInterval(window.pingInterval);
@@ -1609,7 +1633,7 @@
                         });
                         break;
                     case 'playerJoinedRoom':
-                        showNotification(`${data.player.username} odaya katıldı!`, 'info');
+                        showNotification(`${data.player.username} ${currentT.playerJoined}`, 'info');
                         setOpponents(prev => {
                             if (prev.some(p => p.id === data.player.id)) return prev;
                             return [...prev, data.player];
@@ -1618,11 +1642,11 @@
                         createPeerConnection(String(data.player.id));
                         break;
                     case 'playerLeftRoom':
-                        showNotification(`${data.player.username} odadan ayrıldı!`, 'info');
+                        showNotification(`${data.player.username} ${currentT.playerLeft}`, 'info');
                         setOpponents(prev => prev.filter(p => p.id !== data.player.id));
                         if (data.newHostId === currentPid) {
                             setIsHost(true);
-                            showNotification('Artık odanın sahibisiniz!', 'info');
+                            showNotification(currentT.nowHost, 'info');
                         }
                         break;
                     case 'gameStart':
@@ -1638,7 +1662,7 @@
                             setSearching(false);
                             if (data.type === 'gameStart') {
                                 playSound('start');
-                                showNotification('Oyun Başladı!', 'success');
+                                showNotification(currentT.gameStarted, 'success');
 
                                 // WebRTC: Oda katılımında bağlantıları hazırla
                                 if (data.gameState.playerOrder) {
@@ -1697,7 +1721,7 @@
                         }
 
                         setEndInfo({
-                            title: 'OYUN BİTDİ',
+                            title: language === 'az' ? 'OYUN BAŞA ÇATDI' : 'GAME OVER',
                             isWinner: amIWinner,
                             isRanked: data.isRanked,
                             reason: endReason,
@@ -1733,14 +1757,14 @@
                         }, 6000);
                         break;
                     case 'playerDisconnected':
-                        showNotification('Rakip bağlantısı koptu, bekleniyor...', 'warning');
+                        showNotification(currentT.opponentDisconnected, 'warning');
                         break;
                     case 'playerReconnected':
-                        showNotification(`${data.playerName} geri döndü!`, 'success');
+                        showNotification(`${data.playerName} ${currentT.opponentReconnected}`, 'success');
                         setServerMessage(null); // FIX: Rəqib gələn kimi AFK bildirişini dərhal sil
                         break;
                     case 'turnPassed':
-                        showNotification(`${data.playerName} pas geçti`, 'info');
+                        showNotification(`${data.playerName} ${currentT.opponentPassed}`, 'info');
                         playSound('pass');
                         break;
                     case 'voiceRequest':
@@ -2490,7 +2514,25 @@
                     {/* Bağlantı Kopma Uyarısı */}
                     {!connected && (
                         <div className="fixed top-0 left-0 w-full bg-red-600 text-white text-center text-xs font-bold py-1 z-[9999] animate-pulse">
-                            BAĞLANTI KOPTU - YENİDEN BAĞLANILIYOR...
+                            {language === 'az' ? 'BAĞLANTI KƏSİLDİ - YENİDƏN BAĞLANILIR...' : 'CONNECTION LOST - RECONNECTING...'}
+                        </div>
+                    )}
+
+                    {/* Oyun Durduruldu (Bağlantı Kaybı) */}
+                    {gameState?.paused && (
+                        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/70 backdrop-blur-md p-8 text-center animate-fade-in">
+                            <div className="bg-[#1b4d3e] border-2 border-yellow-500 rounded-[2.5rem] p-10 shadow-2xl max-w-sm animate-scale-up">
+                                <div className="w-24 h-24 bg-yellow-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-yellow-500/30">
+                                    <span className="text-5xl animate-pulse">⏳</span>
+                                </div>
+                                <h2 className="text-2xl font-black text-white mb-2 italic">{language === 'az' ? 'OYUN DAYANDIRILDI' : 'GAME PAUSED'}</h2>
+                                <p className="text-white/70 text-sm leading-relaxed mb-6">Bir oyunçunun bağlantısı kəsildi. Geri qayıtması gözlənilir...</p>
+                                <div className="flex justify-center gap-2">
+                                    <div className="w-3 h-3 bg-yellow-500 rounded-full animate-bounce"></div>
+                                    <div className="w-3 h-3 bg-yellow-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                                    <div className="w-3 h-3 bg-yellow-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -2754,7 +2796,7 @@
                                         onClick={() => sendMessage({ type: 'drawFromMarket' })}
                                         className="bg-yellow-500 text-black px-6 py-2 rounded-full text-xs font-black shadow-glow flex items-center gap-2 hover:scale-105 active:scale-95 transition-all"
                                     >
-                                        <span className="text-lg font-bold">+</span> <span>KARTI ÇEK ({marketSize})</span>
+                                        <span className="text-lg font-bold">+</span> <span>{t.drawTileBtn} ({marketSize})</span>
                                     </button>
                                 )}
                                 <button onClick={leaveGameClient} className="w-10 h-10 bg-red-600/20 hover:bg-red-600 border border-red-500/50 rounded-xl flex items-center justify-center transition-all group">
