@@ -1,5 +1,5 @@
 // Socket.io baglantisi
-const socket = io('https://beta-github-io-ndis.onrender.com', {
+const socket = io('https://beta-github-io-1.onrender.com', {
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
