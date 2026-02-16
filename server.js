@@ -2306,7 +2306,7 @@ server.listen(PORT, '0.0.0.0', () => {
 });
 // SUNUCUYU UYANIK TUTMA KODU
 function keepServerAwake() {
-    const YOUR_SITE_URL = 'https://beta-github-io.onrender.com'; // Sitenizin URL'si
+    const YOUR_SITE_URL = 'https://beta-github-io-ndis.onrender.com'; // Sitenizin URL'si
     const pingInterval = 30 * 1000; // 30 saniye (30 * 1000 ms)
 
     setInterval(() => {
