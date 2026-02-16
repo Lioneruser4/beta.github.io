@@ -186,7 +186,7 @@ class EloSystem {
 // ============================================
 
 // Render URL'in doğru olduğundan emin olun. Sonunda slash (/) olmamalı.
-const SERVER_URL = 'wss://beta-github-io-ndis.onrender.com';
+const SERVER_URL = 'https://beta-github-io-1.onrender.com';
 
 // State (Durum)
 let ws = null;
