@@ -19,13 +19,13 @@ class DominoGame {
         this.turnCount = 0;
         this.scores = { me: 0, opponent: 0 }; // Skor takibi
     }
-    
+
     initializeGame(playerNames, isRanked) {
         this.board = [];
         this.players = playerNames.map((name, index) => ({
             id: `player-${index}`,
             name: name,
-            tiles: [ { id: index + 1, left: index, right: 6 - index } ], // Demo tiles
+            tiles: [{ id: index + 1, left: index, right: 6 - index }], // Demo tiles
             elo: 100 // Demo elo
         }));
         this.currentPlayerId = 'player-0';
@@ -40,22 +40,22 @@ class DominoGame {
     getCurrentPlayer() {
         return this.players.find(p => p.id === this.currentPlayerId);
     }
-    
+
     getPlayableTiles() {
         const player = this.getCurrentPlayer();
         if (!player) return [];
-        
+
         if (this.board.length === 0) return player.tiles; // İlk taş
-        
-        return player.tiles.filter(tile => 
-            tile.left === this.leftEnd || tile.right === this.leftEnd || 
+
+        return player.tiles.filter(tile =>
+            tile.left === this.leftEnd || tile.right === this.leftEnd ||
             tile.left === this.rightEnd || tile.right === this.rightEnd
         );
     }
-    
+
     getPlayablePositions(tile) {
         if (this.board.length === 0) return [{ side: 'left' }];
-        
+
         const positions = [];
         // Sol uç
         if (tile.left === this.leftEnd || tile.right === this.leftEnd) {
@@ -67,7 +67,7 @@ class DominoGame {
         }
         return positions;
     }
-    
+
     placeTile(tileId, side) {
         const player = this.getCurrentPlayer();
         const tileIndex = player.tiles.findIndex(t => t.id === tileId);
@@ -100,10 +100,10 @@ class DominoGame {
                 }
             }
         }
-        
+
         // Taşı elden kaldır
         player.tiles.splice(tileIndex, 1);
-        
+
         // Tahtaya ekle
         this.board[side === 'left' ? 'unshift' : 'push']({ ...tile, flipped });
 
@@ -114,13 +114,13 @@ class DominoGame {
             this.leftEnd = tile.left;
             this.rightEnd = tile.right;
         } else if (side === 'left') {
-             this.leftEnd = flipped ? tile.right : tile.left;
+            this.leftEnd = flipped ? tile.right : tile.left;
         } else if (side === 'right') {
-             this.rightEnd = flipped ? tile.left : tile.right;
+            this.rightEnd = flipped ? tile.left : tile.right;
         }
 
         this.passTurn(true); // Hamleyi yapınca tur geçer
-        
+
         const gameOver = player.tiles.length === 0;
         return { success: true, gameOver, winner: gameOver ? player : null };
     }
@@ -129,7 +129,7 @@ class DominoGame {
         if (!played && this.getPlayableTiles().length > 0) {
             return { blocked: false }; // Pas geçme hakkı yok
         }
-        
+
         const currentIndex = this.players.findIndex(p => p.id === this.currentPlayerId);
         const nextIndex = (currentIndex + 1) % this.players.length;
         this.currentPlayerId = this.players[nextIndex].id;
@@ -137,19 +137,19 @@ class DominoGame {
 
         // Oyun bloke oldu mu kontrol et (Sunucuda daha iyi kontrol edilir)
         if (this.turnCount > this.players.length * 2 && this.getPlayableTiles().length === 0) {
-             // Basit bloke kuralı
-             const winner = this.players.reduce((minPlayer, current) => {
-                 const minScore = minPlayer.tiles.reduce((sum, t) => sum + t.left + t.right, 0);
-                 const currentScore = current.tiles.reduce((sum, t) => sum + t.left + t.right, 0);
-                 return currentScore < minScore ? current : minPlayer;
-             }, this.players[0]);
+            // Basit bloke kuralı
+            const winner = this.players.reduce((minPlayer, current) => {
+                const minScore = minPlayer.tiles.reduce((sum, t) => sum + t.left + t.right, 0);
+                const currentScore = current.tiles.reduce((sum, t) => sum + t.left + t.right, 0);
+                return currentScore < minScore ? current : minPlayer;
+            }, this.players[0]);
 
-             return { blocked: true, gameOver: true, winner };
+            return { blocked: true, gameOver: true, winner };
         }
-        
+
         return { blocked: false };
     }
-    
+
     // ELO hesaplaması, DominoGame veya EloSystem'de olabilir
     calculateEloChange(isWinner, isDraw, halfwayPassed) {
         // Basit demo ELO hesaplaması
@@ -172,7 +172,7 @@ class EloSystem {
         if (elo < 1200) return 6;
         return 7;
     }
-    
+
     getLevelClass(level) {
         if (level >= 6) return 'master';
         if (level >= 4) return 'pro';
@@ -186,18 +186,18 @@ class EloSystem {
 // ============================================
 
 // Render URL'in doğru olduğundan emin olun. Sonunda slash (/) olmamalı.
-const SERVER_URL = 'wss://mario-io-1.onrender.com';
+const SERVER_URL = 'wss://beta-github-io-ndis.onrender.com';
 
 // State (Durum)
 let ws = null;
 let connectionStatus = 'disconnected'; // disconnected, connecting, connected, error
 let reconnectInterval = null;
 let heartbeatInterval = null;
-let game = new DominoGame(); 
-let eloSystem = new EloSystem(); 
+let game = new DominoGame();
+let eloSystem = new EloSystem();
 let selectedTile = null;
 let playablePositions = [];
-let myPlayerId = 'player-0'; 
+let myPlayerId = 'player-0';
 let isSearching = false;
 let searchTime = 0;
 let searchInterval = null;
@@ -209,10 +209,10 @@ let turnTimerInterval = null; // Timer interval
 let userStats = {
     name: 'Oyuncu',
     level: 1,
-    elo: 100, 
+    elo: 100,
     wins: 0,
     losses: 0,
-    rank: 100 
+    rank: 100
 };
 
 // Demo liderlik tablosu (UI testi için)
@@ -255,11 +255,11 @@ function connectWebSocket() {
 
         ws.onclose = (event) => {
             console.log(`Bağlantı kesildi. Kod: ${event.code}, Sebep: ${event.reason}`);
-            
+
             if (event.code !== 1000) {
                 updateConnectionStatus('disconnected');
                 stopHeartbeat();
-                
+
                 if (!reconnectInterval) {
                     showToast('Bağlantı kesildi. Yeniden deneniyor...', 'error');
                     reconnectInterval = setInterval(() => {
@@ -268,8 +268,8 @@ function connectWebSocket() {
                     }, 5000);
                 }
             } else {
-                 updateConnectionStatus('disconnected');
-                 stopHeartbeat();
+                updateConnectionStatus('disconnected');
+                stopHeartbeat();
             }
         };
 
@@ -282,7 +282,7 @@ function connectWebSocket() {
         ws.onmessage = (event) => {
             try {
                 if (event.data === 'pong') return;
-                
+
                 const message = JSON.parse(event.data);
                 handleServerMessage(message);
             } catch (e) {
@@ -307,7 +307,7 @@ function startHeartbeat() {
                 console.log("Ping gönderilemedi, bağlantı koptu.");
             }
         }
-    }, 30000); 
+    }, 30000);
 }
 
 function stopHeartbeat() {
@@ -329,7 +329,7 @@ function sendMessage(type, payload) {
 
 function handleServerMessage(message) {
     console.log('Server message:', message.type);
-    
+
     switch (message.type) {
         case 'CONNECTION_SUCCESS':
             showToast('Sunucuya başarıyla bağlandı!', 'success');
@@ -347,7 +347,7 @@ function handleServerMessage(message) {
             break;
         case 'JOIN_FAILED':
             showToast(`Odaya katılamadı: ${message.payload.reason}`, 'error');
-            cancelJoin(); 
+            cancelJoin();
             break;
         case 'gameUpdate': // Server sends gameUpdate
             updateGameState(message.gameState);
@@ -364,7 +364,7 @@ function handleServerMessage(message) {
         case 'gameEnd': // Maç bittiğinde (3 win)
             handleGameOver(message);
             break;
-        case 'PONG': 
+        case 'PONG':
             break;
         default:
             console.warn('Bilinmeyen sunucu mesajı tipi:', message.type);
@@ -380,7 +380,7 @@ function updateConnectionStatus(status) {
     const dot = document.getElementById('status-dot');
     const text = document.getElementById('status-text');
 
-    if(dot) dot.className = 'status-dot ' + status;
+    if (dot) dot.className = 'status-dot ' + status;
 
     const statusTexts = {
         disconnected: 'Bağlantı kesildi (Tekrar deneniyor...)',
@@ -389,7 +389,7 @@ function updateConnectionStatus(status) {
         error: 'Bağlantı Hatası'
     };
 
-    if(text) text.textContent = statusTexts[status];
+    if (text) text.textContent = statusTexts[status];
 }
 
 function updateUserStats() {
@@ -397,28 +397,28 @@ function updateUserStats() {
     const levelClass = eloSystem.getLevelClass(level);
 
     const levelIcon = document.getElementById('level-icon');
-    if(levelIcon) {
+    if (levelIcon) {
         levelIcon.className = 'level-icon ' + levelClass;
         levelIcon.textContent = level;
     }
-    
+
     const levelText = document.getElementById('level-text');
-    if(levelText) levelText.textContent = `Seviye ${level}`;
-    
+    if (levelText) levelText.textContent = `Seviye ${level}`;
+
     const eloText = document.getElementById('elo-text');
-    if(eloText) eloText.textContent = `${userStats.elo} ELO`;
-    
+    if (eloText) eloText.textContent = `${userStats.elo} ELO`;
+
     const userRank = document.getElementById('user-rank');
-    if(userRank) userRank.textContent = userStats.rank;
-    
+    if (userRank) userRank.textContent = userStats.rank;
+
     const wins = document.getElementById('wins');
-    if(wins) wins.textContent = userStats.wins;
-    
+    if (wins) wins.textContent = userStats.wins;
+
     const losses = document.getElementById('losses');
-    if(losses) losses.textContent = userStats.losses;
+    if (losses) losses.textContent = userStats.losses;
 
     const myLevel = document.getElementById('my-level');
-    if(myLevel) {
+    if (myLevel) {
         myLevel.textContent = level;
         myLevel.className = 'level-icon ' + levelClass;
     }
@@ -426,8 +426,8 @@ function updateUserStats() {
 
 function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
-    if(!container) return;
-    
+    if (!container) return;
+
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.textContent = message;
@@ -453,8 +453,8 @@ function startSearching() {
     searchTime = 0;
 
     const container = document.getElementById('ranked-container');
-    if(!container) return;
-    
+    if (!container) return;
+
     container.innerHTML = `
         <div class="searching-state">
             <div class="spinner"></div>
@@ -469,7 +469,7 @@ function startSearching() {
         const mins = Math.floor(searchTime / 60);
         const secs = (searchTime % 60).toString().padStart(2, '0');
         const timeEl = document.getElementById('search-time');
-        if(timeEl) timeEl.textContent = `${mins}:${secs}`;
+        if (timeEl) timeEl.textContent = `${mins}:${secs}`;
     }, 1000);
 
     sendMessage('START_RANKED_SEARCH', { userId: userStats.name, elo: userStats.elo });
@@ -492,7 +492,7 @@ function cancelSearch() {
 
 function resetRankedButton() {
     const container = document.getElementById('ranked-container');
-    if(!container) return;
+    if (!container) return;
     container.innerHTML = `
         <button class="game-btn ranked" id="ranked-btn">
             <div class="btn-icon">⚔️</div>
@@ -510,7 +510,7 @@ function createRoom() {
         showToast('Sunucu bağlantısı yok!', 'error');
         return;
     }
-    sendMessage('CREATE_ROOM', {}); 
+    sendMessage('CREATE_ROOM', {});
     showToast('Özel oda oluşturuluyor...', 'info');
 }
 
@@ -545,7 +545,7 @@ function cancelRoom() {
 
 function resetFriendButton() {
     const container = document.getElementById('friend-container');
-    if(!container) return;
+    if (!container) return;
     container.innerHTML = `
         <button class="game-btn friend" id="friend-btn">
             <div class="btn-icon">👥</div>
@@ -576,12 +576,12 @@ function showJoinInput() {
     document.getElementById('join-confirm-btn').onclick = joinRoom;
 
     const input = document.getElementById('join-code-input');
-    if(input) input.focus();
+    if (input) input.focus();
 }
 
 function cancelJoin() {
     const container = document.getElementById('join-container');
-    if(!container) return;
+    if (!container) return;
     container.innerHTML = `
         <button class="game-btn join" id="join-btn">
             <div class="btn-icon">🔑</div>
@@ -597,7 +597,7 @@ function cancelJoin() {
 function joinRoom() {
     const codeInput = document.getElementById('join-code-input');
     const code = codeInput ? codeInput.value : '';
-    
+
     if (code.length !== 4) {
         showToast('Lütfen 4 haneli oda kodunu girin!', 'error');
         return;
@@ -678,7 +678,7 @@ function startGame(message) {
     const opponent = message.opponent || { name: 'Rakip' };
     const playerNames = [userStats.name, opponent.name];
 
-    game.initializeGame(playerNames, message.gameType === 'ranked'); 
+    game.initializeGame(playerNames, message.gameType === 'ranked');
     // myPlayerId sunucudan session mesajı ile veya gameUpdate ile gelir, burada varsayalım:
     // Not: Server 'session' mesajı atıyor, onu handle etmeliyiz ama şimdilik gameUpdate halledecek.
     currentScreen = 'game';
@@ -694,7 +694,7 @@ function startGame(message) {
 
 function updateGameState(serverState) {
     // console.log("Sunucudan oyun güncellemesi geldi", serverState);
-    
+
     if (serverState.playerId) {
         myPlayerId = serverState.playerId;
     }
@@ -729,7 +729,7 @@ function updateGameState(serverState) {
     }
 
     if (serverState.currentPlayer) game.currentPlayerId = serverState.currentPlayer;
-    
+
     // Skor güncelleme
     if (serverState.score) {
         const myScore = serverState.score[myPlayerId] || 0;
@@ -745,7 +745,7 @@ function updateGameState(serverState) {
     }
 
     renderGame();
-    
+
     if (game.getCurrentPlayer().id === myPlayerId) {
         showToast('Sıra sende!', 'info');
     }
@@ -757,7 +757,7 @@ function renderGame() {
     renderPlayerHand();
     updateTurnIndicator();
     updateBoardEnds();
-    
+
     // Timer ve Skorboard elementlerini ekle (eğer yoksa)
     let timerEl = document.getElementById('turn-timer');
     if (!timerEl) {
@@ -795,10 +795,10 @@ function renderOpponentArea() {
     if (!opponent) return;
 
     const nameEl = document.getElementById('opponent-name');
-    if(nameEl) nameEl.textContent = opponent.name;
+    if (nameEl) nameEl.textContent = opponent.name;
 
     const container = document.getElementById('opponent-tiles');
-    if(!container) return;
+    if (!container) return;
     container.innerHTML = '';
 
     // Rakibin elindeki taş sayısı kadar kapalı taş göster
@@ -811,7 +811,7 @@ function renderOpponentArea() {
 
     const level = eloSystem.getLevelFromElo(opponent.elo || 100);
     const levelEl = document.getElementById('opponent-level');
-    if(levelEl) {
+    if (levelEl) {
         levelEl.textContent = level;
         levelEl.className = 'level-icon ' + eloSystem.getLevelClass(level);
     }
@@ -819,7 +819,7 @@ function renderOpponentArea() {
 
 function renderBoard() {
     const container = document.getElementById('board-tiles');
-    if(!container) return;
+    if (!container) return;
     container.innerHTML = '';
 
     if (game.board.length === 0) {
@@ -857,10 +857,10 @@ function renderPlayerHand() {
     });
 
     const passBtn = document.getElementById('pass-btn');
-    if(passBtn) passBtn.disabled = !isMyTurn || playableTiles.length > 0;
+    if (passBtn) passBtn.disabled = !isMyTurn || playableTiles.length > 0;
 
     const positionsEl = document.getElementById('play-positions');
-    if(positionsEl) {
+    if (positionsEl) {
         if (selectedTile && playablePositions.length > 0) {
             positionsEl.classList.remove('hidden');
 
@@ -869,8 +869,8 @@ function renderPlayerHand() {
             const canPlayLeft = playablePositions.some(p => p.side === 'left');
             const canPlayRight = playablePositions.some(p => p.side === 'right');
 
-            if(leftBtn) leftBtn.style.display = canPlayLeft ? 'block' : 'none';
-            if(rightBtn) rightBtn.style.display = canPlayRight ? 'block' : 'none';
+            if (leftBtn) leftBtn.style.display = canPlayLeft ? 'block' : 'none';
+            if (rightBtn) rightBtn.style.display = canPlayRight ? 'block' : 'none';
         } else {
             positionsEl.classList.add('hidden');
         }
@@ -1040,7 +1040,7 @@ function updateBoardEnds() {
 
 function startTurnTimer(startTime) {
     if (turnTimerInterval) clearInterval(turnTimerInterval);
-    
+
     const timerEl = document.getElementById('turn-timer');
     if (!timerEl) return;
 
@@ -1048,7 +1048,7 @@ function startTurnTimer(startTime) {
         const elapsed = Date.now() - startTime;
         const remaining = Math.max(0, 30000 - elapsed); // 30 saniye süre
         const secs = Math.ceil(remaining / 1000);
-        
+
         timerEl.textContent = secs;
         timerEl.style.color = secs <= 10 ? '#ff4444' : 'white';
 
@@ -1140,10 +1140,10 @@ function leaveGame() {
 function backToLobby() {
     const modal = document.getElementById('result-modal');
     if (modal) modal.classList.remove('active');
-    
+
     const gameScreen = document.getElementById('game-screen');
     const lobbyScreen = document.getElementById('lobby-screen');
-    
+
     if (gameScreen) gameScreen.style.display = 'none';
     if (lobbyScreen) lobbyScreen.style.display = 'flex';
 
@@ -1156,8 +1156,8 @@ function backToLobby() {
     resetFriendButton();
     cancelJoin();
     updateUserStats();
-    
-    if(!ws || ws.readyState !== WebSocket.OPEN) {
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
         connectWebSocket();
     }
 }
@@ -1176,33 +1176,33 @@ document.addEventListener('DOMContentLoaded', () => {
     // Lobi düğmelerini bağla
     const rankedBtn = document.getElementById('ranked-btn');
     if (rankedBtn) rankedBtn.onclick = startSearching;
-    
+
     const friendBtn = document.getElementById('friend-btn');
     if (friendBtn) friendBtn.onclick = createRoom;
-    
+
     const joinBtn = document.getElementById('join-btn');
     if (joinBtn) joinBtn.onclick = showJoinInput;
-    
+
     const leaderboardBtn = document.getElementById('leaderboard-btn');
     if (leaderboardBtn) leaderboardBtn.onclick = openLeaderboard;
 
     // Oyun düğmeleri
     const leaveBtn = document.getElementById('leave-btn');
     if (leaveBtn) leaveBtn.onclick = leaveGame;
-    
+
     const passBtn = document.getElementById('pass-btn');
     if (passBtn) passBtn.onclick = passTurn;
-    
+
     const playLeftBtn = document.getElementById('play-left-btn');
     if (playLeftBtn) playLeftBtn.onclick = () => playTile('left');
-    
+
     const playRightBtn = document.getElementById('play-right-btn');
     if (playRightBtn) playRightBtn.onclick = () => playTile('right');
 
     // Modal düğmeleri
     const closeLeaderboard = document.getElementById('close-leaderboard');
     if (closeLeaderboard) closeLeaderboard.onclick = closeLeaderboard;
-    
+
     const resultBtn = document.getElementById('result-btn');
     if (resultBtn) resultBtn.onclick = backToLobby;
 
